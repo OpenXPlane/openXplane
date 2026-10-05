@@ -237,6 +237,31 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         println!("  Not interpreted (row code x count): {}", others.join(" "));
         return Ok(true);
     }
+    if args.len() == 2 && args[0] == "datarefs" {
+        let aircraft = Aircraft::parse(&fs::read_to_string(&args[1])?)?;
+        let p = openxplane::aircraft::AircraftParameters::from_acf(&aircraft)?;
+        let mut registry = openxplane::dataref::Registry::new();
+        registry.register_aircraft(&p)?;
+        println!(
+            "Aircraft datarefs registered from the ACF (type/writability per reference build):"
+        );
+        for name in registry.names() {
+            let writable = if registry.is_writable(name)? {
+                "rw"
+            } else {
+                "ro"
+            };
+            let value = match registry.data_type(name)? {
+                openxplane::dataref::DataType::Int => registry.get_int(name)?.to_string(),
+                _ => format!("{:.6}", registry.get_float(name)?),
+            };
+            println!(
+                "  {name} {:?} {writable} = {value}",
+                registry.data_type(name)?
+            );
+        }
+        return Ok(true);
+    }
     if args.len() == 2 && args[0] == "aircraft-info" {
         let aircraft = Aircraft::parse(&fs::read_to_string(&args[1])?)?;
         let p = openxplane::aircraft::AircraftParameters::from_acf(&aircraft)?;

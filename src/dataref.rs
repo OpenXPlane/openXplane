@@ -2,6 +2,7 @@
 //! Access is strictly typed. Cross-type conversions of the original (e.g. reading a
 //! float dataref as int) have not been established, so a mismatch is an error.
 //! The one confirmed conversion is a float32-exposed dataref backed by a double.
+use crate::aircraft::AircraftParameters;
 use crate::runtime::{RUNNING_TIME_DATAREF, RunningTime};
 use std::collections::BTreeMap;
 
@@ -51,6 +52,16 @@ pub struct Registry {
     entries: BTreeMap<String, Entry>,
 }
 
+/// Datarefs backed by the ACF fields studied in research/ACF_LOADING.md. Type and writability come
+/// from the registration records of the reference build (research/DATAREFS.md); each dataref's
+/// accessor reads the same aircraft-object field that the ACF loader stores into.
+pub const ACF_MASS_EMPTY: &str = "sim/aircraft/weight/acf_m_empty";
+pub const ACF_MASS_MAX: &str = "sim/aircraft/weight/acf_m_max";
+pub const ACF_MASS_FUEL_TOTAL: &str = "sim/aircraft/weight/acf_m_fuel_tot";
+pub const ACF_CG_Y_ORIGINAL: &str = "sim/aircraft/weight/acf_cgY_original";
+pub const ACF_CG_Z_ORIGINAL: &str = "sim/aircraft/weight/acf_cgZ_original";
+pub const ACF_ENGINE_COUNT: &str = "sim/aircraft/engine/acf_num_engines";
+
 fn check_name(name: &str) -> Result<(), String> {
     if name.is_empty() || !name.contains('/') || name.chars().any(char::is_whitespace) {
         return Err(format!("invalid dataref name '{name}'"));
@@ -98,6 +109,36 @@ impl Registry {
             Value::FloatOverDouble(time.seconds()),
             writable,
         )
+    }
+
+    /// Registers the datarefs whose backing ACF fields are confirmed. All or nothing: a name
+    /// that already exists leaves the registry unchanged.
+    ///
+    /// The ACF loader stores `_num_engn` into the engine-count field only when a flag in its load
+    /// context is zero; that condition is not modelled, so the value is always stored here.
+    pub fn register_aircraft(&mut self, p: &AircraftParameters) -> Result<(), String> {
+        let entries = [
+            (ACF_MASS_EMPTY, Value::Float(p.empty_mass_kg), true),
+            (ACF_MASS_MAX, Value::Float(p.maximum_mass_kg), true),
+            (
+                ACF_MASS_FUEL_TOTAL,
+                Value::Float(p.maximum_fuel_mass_kg),
+                true,
+            ),
+            (ACF_CG_Y_ORIGINAL, Value::Float(p.cg_y_acf_m), false),
+            (ACF_CG_Z_ORIGINAL, Value::Float(p.cg_z_acf_m), false),
+            (ACF_ENGINE_COUNT, Value::Int(p.engine_count), true),
+        ];
+        if let Some((name, _, _)) = entries
+            .iter()
+            .find(|(n, _, _)| self.entries.contains_key(*n))
+        {
+            return Err(format!("duplicate dataref: {name}"));
+        }
+        for (name, value, writable) in entries {
+            self.register(name, value, writable)?;
+        }
+        Ok(())
     }
 
     pub fn len(&self) -> usize {
@@ -300,6 +341,50 @@ mod tests {
         r.register("sim/f", Value::Float(0.0), true).unwrap();
         assert!(r.set_float("sim/f", f32::INFINITY).is_err());
         assert_eq!(r.get_float("sim/f"), Ok(0.0));
+    }
+
+    fn params() -> AircraftParameters {
+        AircraftParameters {
+            empty_mass_kg: 780.5,
+            maximum_mass_kg: 1160.25,
+            maximum_fuel_mass_kg: 158.75,
+            cg_y_acf_m: 0.09144,
+            cg_z_acf_m: 0.88392,
+            engine_count: 1,
+        }
+    }
+
+    #[test]
+    fn aircraft_datarefs_match_confirmed_types_and_writability() {
+        let mut r = Registry::new();
+        r.register_aircraft(&params()).unwrap();
+        assert_eq!(r.get_float(ACF_MASS_EMPTY), Ok(780.5));
+        assert_eq!(r.get_float(ACF_MASS_MAX), Ok(1160.25));
+        assert_eq!(r.get_float(ACF_MASS_FUEL_TOTAL), Ok(158.75));
+        assert_eq!(r.get_int(ACF_ENGINE_COUNT), Ok(1));
+        assert_eq!(r.data_type(ACF_ENGINE_COUNT), Ok(DataType::Int));
+        // cgY/cgZ "original" are read-only in the reference registration table.
+        assert_eq!(r.is_writable(ACF_CG_Y_ORIGINAL), Ok(false));
+        assert!(
+            r.set_float(ACF_CG_Z_ORIGINAL, 1.0)
+                .unwrap_err()
+                .contains("read-only")
+        );
+        r.set_float(ACF_MASS_EMPTY, 800.0).unwrap();
+        assert_eq!(r.get_float(ACF_MASS_EMPTY), Ok(800.0));
+    }
+
+    #[test]
+    fn register_aircraft_is_all_or_nothing() {
+        let mut r = Registry::new();
+        r.register(ACF_MASS_MAX, Value::Float(1.0), true).unwrap();
+        assert!(
+            r.register_aircraft(&params())
+                .unwrap_err()
+                .contains("duplicate")
+        );
+        assert_eq!(r.len(), 1);
+        assert_eq!(r.get_float(ACF_MASS_MAX), Ok(1.0));
     }
 
     #[test]

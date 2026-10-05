@@ -38,8 +38,9 @@ the original content, not only unit tests.
 1. **Content without simulation** (mostly done): ACF, OBJ8, AFL, apt.dat, the Cessna viewer. Remaining:
    PANEL_3D, materials and normal/lit maps, `xp-check` over the whole directory, an apt.dat index, decoding the
    surface codes.
-2. **Datarefs and commands** (datarefs done): a registry, types (int/float/double/array/data), read/write,
-   initial aircraft values. Commands and wiring of aircraft values remain. Everything after depends on it.
+2. **Datarefs and commands** (mostly done): a typed registry, the full 5503-record catalog of the reference
+   build, and the six ACF-backed datarefs with confirmed types. Remaining: commands, backing values for the
+   other datarefs, propagating writes to the aircraft state. Everything after depends on it.
 3. **Flight model**: wing forces from AFL, propeller and engine, landing gear, mass and centre of gravity,
    atmosphere; a simulation step; comparing trajectories with the reference on fixed inputs.
 4. **World**: DSF, terrain, library objects, airport lighting, placing the aircraft on a runway of the test

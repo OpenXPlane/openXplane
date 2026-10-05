@@ -163,6 +163,18 @@ Xplane12/
 The content directory and local reports are excluded from Git. The engine must read user content separately from
 its own code. The research tools do not modify the original files.
 
+## Datarefs
+
+```sh
+cargo run --offline -- datarefs "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+python3 tools/extract_datarefs.py Xplane12/X-Plane.exe --prefix sim/aircraft/weight/
+```
+
+`datarefs` registers the datarefs whose backing ACF fields are confirmed in the original (empty, maximum and fuel
+mass, CG Y/Z, engine count) with the type and writability of the reference build. `extract_datarefs.py` lists all
+5503 registration records of the original's table. Layout, evidence and limits:
+[research/DATAREFS.md](research/DATAREFS.md).
+
 ## Airports (apt.dat)
 
 ```sh
