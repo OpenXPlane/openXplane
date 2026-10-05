@@ -71,14 +71,22 @@ def schema(path):
     d, secs = pe(path)
     rows = []
     for lo, hi in LOADERS:
-        xmm, key, dest, coeff = {}, None, None, None
+        xmm, key, dest, coeff, keyregs = {}, None, None, None, {}
         for va, op, args in disasm(path, lo, hi):
             tgt = re.search(r'#\s*(0x[0-9a-f]+)', args)
-            if op == 'leaq' and tgt and args.endswith('%rax') or op == 'leaq' and tgt and args.endswith('%rdx'):
+            args = args.split('#')[0].strip()
+            m = re.match(r'(0x[0-9a-f]+|-?\d+)?\(%rip\), (%\w+)$', args)
+            if op == 'leaq' and tgt and m:
                 k = key_at(d, secs, int(tgt.group(1), 16))
                 if k:
+                    keyregs[m.group(2)] = k
                     key, dest, coeff = k, None, None
                     continue
+            # a key kept in a register and stored to the string_view slot later
+            m = re.match(r'(%\w+), -0x30\(%rbp\)$', args)
+            if op == 'movq' and m and m.group(1) in keyregs:
+                key, dest, coeff = keyregs[m.group(1)], None, None
+                continue
             if key is None:
                 if op == 'movss' and tgt and re.search(r'%xmm\d+$', args):
                     f = off(secs, int(tgt.group(1), 16))
@@ -86,11 +94,14 @@ def schema(path):
                         xmm[args.split('%')[-1]] = struct.unpack_from('<f', d, f)[0]
                 continue
             m = re.match(r'(-?0x[0-9a-f]+|-?\d+)\((%\w+)\), %rdx$', args)
-            if op == 'leaq' and m and m.group(2) != '%rbp' and m.group(2) != '%rsp':
+            if op == 'leaq' and m and m.group(2) not in ('%rbp', '%rsp'):
                 dest = (m.group(2), int(m.group(1), 16))
             m = re.match(r'\$(0x[0-9a-f]+), %rdx$', args)
             if op == 'addq' and m:
                 dest = ('ctx', int(m.group(1), 16))
+            m = re.match(r'(%r(?:cx|di|si|[0-9]+)), %rdx$', args)
+            if op == 'movq' and m:
+                dest = (m.group(1), 0)
             if op == 'movss' and tgt and re.search(r'%xmm\d+$', args):
                 f = off(secs, int(tgt.group(1), 16))
                 if f is not None:

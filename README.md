@@ -181,6 +181,16 @@ mass, CG Y/Z, engine count) with the type and writability of the reference build
 5503 registration records of the original's table. Layout, evidence and limits:
 [research/DATAREFS.md](research/DATAREFS.md).
 
+## ACF loader schema
+
+```sh
+python3 tools/extract_acf_schema.py Xplane12/X-Plane.exe > research/local/acf-schema.tsv
+```
+
+Lists the 1117 ACF property reads the original's loader performs in a recognisable shape, with the field offset,
+reader type and unit coefficient (wing geometry, part positions, engine fields). Evidence and limits:
+[research/ACF_SCHEMA.md](research/ACF_SCHEMA.md).
+
 ## Commands
 
 ```sh

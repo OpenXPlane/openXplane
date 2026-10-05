@@ -16,6 +16,7 @@ const DOCS = [
   ["research/AFL_REGIMES", "AFL regimes"],
   ["research/PROFILE_PIPELINE", "Profile evaluator"],
   ["research/RUNTIME_TIME", "Runtime clock"],
+  ["research/ACF_SCHEMA", "ACF loader schema"],
   ["research/DATAREFS", "Datarefs"],
   ["research/COMMANDS", "Commands"],
   ["research/VIEWER", "Cessna viewer"],
