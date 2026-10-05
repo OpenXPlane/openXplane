@@ -8,6 +8,7 @@ const DOCS = [
   ["README", "Overview and commands"],
   ["ARCHITECTURE", "Architecture and roadmap"],
   ["research/BASELINE", "Reference build"],
+  ["research/VERIFICATION", "Verification against the original"],
   ["research/ACF_LOADING", "ACF loading"],
   ["research/AIRFOILS", "AFL airfoils"],
   ["research/AERO_LOOKUP", "Aerodynamic lookup"],

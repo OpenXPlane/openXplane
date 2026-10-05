@@ -40,6 +40,12 @@ See README.md for full CLI argument semantics.
 - `apt`: streaming apt.dat (format 1200) reader for one airport at a time (`airport-info`); derived from observing the data file, not from the EXE (see `research/APT_DAT.md`).
 - Rendering: `obj8` (OBJ8 geometry reader), `scene`, `gpu`, `viewer`, `shader.wgsl` (wgpu + winit).
 
+## Verifying against the original
+
+`tools/emulate_xp.py` (Unicorn) executes original functions on synthetic inputs; `tools/gen_profile_vectors.py`
+writes `tests/data/profile_stage.txt` and `tests/original_vectors.rs` requires bit-identical output from the
+port. Prefer extending this over hand-reading disassembly when porting a new function (`research/VERIFICATION.md`).
+
 ## Conventions specific to this repo
 
 - Behavior is only implemented where confirmed in the original EXE; each ported stage is documented in `research/*.md` with function addresses (e.g. `0x141a412c0..0x141a41a2a`) and evidence. Update the matching research doc when adding or changing confirmed behavior, and state clearly what is not yet established.

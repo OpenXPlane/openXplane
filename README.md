@@ -194,6 +194,13 @@ mass, CG Y/Z, engine count) with the type and writability of the reference build
 5503 registration records of the original's table. Layout, evidence and limits:
 [research/DATAREFS.md](research/DATAREFS.md).
 
+## Verification against the original machine code
+
+`tools/emulate_xp.py` runs isolated functions of `X-Plane.exe` in a CPU emulator on synthetic inputs, and
+`tests/original_vectors.rs` requires the Rust port to match their outputs bit for bit: 1200 cases of the profile
+stage (angle correction, lookup, stall, buffet noise) and the interpolation helper all agree. Method and limits:
+[research/VERIFICATION.md](research/VERIFICATION.md).
+
 ## ACF loader schema
 
 ```sh
