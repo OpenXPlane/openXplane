@@ -41,9 +41,17 @@ the induced-drag term). It returns a float in `XMM0`: the weighted normalised an
 3. **Position inputs.** The corner coordinates interpolated at the element centre and divided by the three
    aircraft reference values (`+0x64f4`, `+0x64f8`, `+0x64fc`) give normalised x, y and z of the element. They are
    passed on as the `x`, `y`, `phase` noise coordinates of the stall perturbation
-   ([BUFFET.md](BUFFET.md)): the earlier note that these were an angle multiplier and divisor was wrong.
-4. **Angle.** An element angle is wrapped into -180..180 degrees and a transition factor over 20..70 degrees is
-   applied; flap and slat settings (`+0x56c`, `+0x594`) scale two further inputs.
+   ([BUFFET.md](BUFFET.md)). Confirmed in `0x141a44350`: its second and third float arguments are forwarded as the
+   noise `x` and `y`, and the stack float as `phase`. The earlier note that those two arguments were an angle
+   multiplier and divisor was wrong; the multiplier and divisor come from step 4.
+4. **Angle and the angle correction factors.** An element angle is wrapped into -180..180 degrees (`xmm9`).
+   Two factors are faded towards 1 as the absolute angle grows from 20 to 70 degrees
+   (`x' = clamp(x + (1 - x) / 70 * (|angle| - 20))`, kept between `x` and 1): the flow factor `y` of step 2 and a
+   flap/slat factor built from the per-element flags `+0x56c`, `+0x594` and the fields `+0x1a0`, `+0x1a4`. The
+   faded values (`xmm14`, `xmm15`) are passed to the profile function together with the angle, so they are, as far
+   as the data flow shows, the angle multiplier and divisor that `0x141a412c0` takes
+   ([AERO_LOOKUP.md](AERO_LOOKUP.md)). This reading is from the register flow and is still to be confirmed in
+   the emulator.
 5. **Three airfoils.** The element's span position `t = (index + 0.5) / elements` gives weights by the four
    `_foil_rat_*` ratios: the root weight falls from 1 at `_foil_rat_rot` to 0 at `_foil_rat_mid_inner`, the tip
    weight rises from 0 at `_foil_rat_mid_outer` to 1 at `_foil_rat_tip`, the middle weight is the rest. A weight is
