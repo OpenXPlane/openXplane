@@ -16,6 +16,7 @@ const DOCS = [
   ["research/BUFFET", "Stall buffet"],
   ["research/AFL_REGIMES", "AFL regimes"],
   ["research/PROFILE_PIPELINE", "Profile evaluator"],
+  ["research/WING_ELEMENT", "Wing element (partial)"],
   ["research/RUNTIME_TIME", "Runtime clock"],
   ["research/ACF_SCHEMA", "ACF loader schema"],
   ["research/DATAREFS", "Datarefs"],
