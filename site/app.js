@@ -1,6 +1,8 @@
 // openXplane site: hash-routed single page, documents are Markdown files under docs/.
 // Set REPO to the repository URL (currently the organization page); the link is hidden while it is empty.
 const REPO = "https://github.com/OpenXPlane/openXplane";
+// Discord invite link (https://discord.gg/...). Empty hides every Discord link.
+const DISCORD = "";
 
 const DOCS = [
   ["README", "Overview and commands"],
@@ -17,6 +19,7 @@ const DOCS = [
   ["research/DATAREFS", "Datarefs"],
   ["research/COMMANDS", "Commands"],
   ["research/VIEWER", "Cessna viewer"],
+  ["DISCORD", "Discord"],
   ["research/APT_DAT", "apt.dat airports"],
   ["research/INSTALL_LAYOUT", "Installation layout"],
 ];
@@ -52,6 +55,7 @@ function clone(id) { return document.getElementById(id).content.cloneNode(true);
 function renderHome() {
   const frag = clone("home");
   if (REPO) { const h = frag.querySelector("#hero-repo"); h.href = REPO; h.hidden = false; }
+  if (DISCORD) { const h = frag.querySelector("#hero-discord"); h.href = DISCORD; h.hidden = false; }
   view.replaceChildren(frag);
 }
 
@@ -119,6 +123,16 @@ for (const [name, title] of DOCS) {
   const a = document.createElement("a");
   a.href = `#/doc/${name}`; a.dataset.route = `/doc/${name}`; a.textContent = title;
   links.append(a);
+}
+if (DISCORD) {
+  const dl = $("#discord-link"); dl.href = DISCORD; dl.hidden = false;
+  const pl = $("#project-links");
+  const a = document.createElement("a");
+  a.href = DISCORD; a.target = "_blank"; a.rel = "noopener";
+  a.innerHTML = '<span class="material-icons">forum</span>';
+  a.append("Discord");
+  pl.append(a);
+  const hd = $("#hero-discord"); if (hd) hd.href = DISCORD;
 }
 if (REPO) {
   const r = $("#repo-link"); r.href = REPO; r.hidden = false;

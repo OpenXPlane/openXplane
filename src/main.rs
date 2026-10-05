@@ -282,6 +282,33 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     if (args.len() == 2 || (args.len() == 3 && args[2] == "--smoke")) && args[0] == "view" {
         let scene = scene::load(Path::new(&args[1]))?;
+        // Rich Presence is optional: it needs OPENXPLANE_DISCORD_APP_ID and a running Discord.
+        let _presence = match openxplane::discord::Presence::connect_from_env() {
+            Ok(Some(mut presence)) => {
+                let name = Path::new(&args[1])
+                    .file_stem()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let started = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .ok();
+                let activity = openxplane::discord::Activity {
+                    details: "Viewing an aircraft".into(),
+                    state: name,
+                    start_timestamp: started,
+                };
+                if let Err(error) = presence.set_activity(&activity) {
+                    eprintln!("{error}");
+                }
+                Some(presence)
+            }
+            Ok(None) => None,
+            Err(error) => {
+                eprintln!("{error}");
+                None
+            }
+        };
         viewer::run(scene, args.len() == 3)?;
         return Ok(true);
     }

@@ -203,6 +203,12 @@ Reads one airport as a stream: the header, the metadata (1302) and the land runw
 counted. Exit code 2 if the ICAO code is not found. Limits and verification:
 [research/APT_DAT.md](research/APT_DAT.md).
 
+## Discord
+
+While the viewer is open, Discord Rich Presence can show what you are looking at. It is off until you set a
+Discord application id in `OPENXPLANE_DISCORD_APP_ID`; setup and limits: [docs/DISCORD.md](docs/DISCORD.md). The
+website gets a Discord button as soon as an invite link is set in `site/app.js`.
+
 ## Roadmap
 
 1. Continue analysing the original EXE's loaders and confirm the ACF/OBJ rules.
