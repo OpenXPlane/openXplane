@@ -148,7 +148,13 @@ poses are rejected. All attached OBJ files of the three provided Cessna variants
 not mean all their commands or the full display of the aircraft are supported.
 Protocol: [research/VIEWER.md](research/VIEWER.md).
 
-Temporary layout of the input files:
+Installation layout. A standard X-Plane folder (`Aircraft/`, `Airfoils/`, `Custom Data/`, `Custom Scenery/`,
+`Global Scenery/`, `Resources/`) is supported with its folder precedence: `Custom Data/` before
+`Resources/default data/`, scenery packs from `scenery_packs.ini` before Global Airports before the default
+`apt.dat`, an aircraft's own `airfoils/` before the shared `Airfoils/`. Evidence and which rules are only
+documentation-based: [research/INSTALL_LAYOUT.md](research/INSTALL_LAYOUT.md).
+
+The minimal layout used while only a few files were provided is still accepted:
 
 ```text
 Xplane12/
@@ -190,6 +196,7 @@ and runs begin/continue/end phases through handler chains. Layout, evidence and 
 
 ```sh
 cargo run --offline -- airport-info "Xplane12/Earth nav data/apt.dat" KSEA
+cargo run --offline -- airport-info Xplane12 KSEA   # whole installation, priority order
 ```
 
 Reads one airport as a stream: the header, the metadata (1302) and the land runways (100). The other rows are only

@@ -6,6 +6,7 @@ pub mod apt;
 pub mod buffet;
 pub mod commands;
 pub mod dataref;
+pub mod install;
 pub mod obj8;
 pub mod profile;
 pub mod regimes;

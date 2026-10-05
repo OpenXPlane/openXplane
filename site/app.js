@@ -18,6 +18,7 @@ const DOCS = [
   ["research/COMMANDS", "Commands"],
   ["research/VIEWER", "Cessna viewer"],
   ["research/APT_DAT", "apt.dat airports"],
+  ["research/INSTALL_LAYOUT", "Installation layout"],
 ];
 
 const STATUS = [

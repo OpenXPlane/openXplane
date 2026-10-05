@@ -2,30 +2,7 @@ use openxplane::{Aircraft, reference_candidates};
 mod gpu;
 mod scene;
 mod viewer;
-use std::{
-    collections::BTreeSet,
-    env, fs,
-    path::{Path, PathBuf},
-    process::ExitCode,
-};
-
-fn collect_acf(dir: &Path, result: &mut Vec<PathBuf>) -> std::io::Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let kind = entry.file_type()?;
-        if kind.is_dir() {
-            collect_acf(&entry.path(), result)?;
-        } else if kind.is_file()
-            && entry
-                .path()
-                .extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("acf"))
-        {
-            result.push(entry.path());
-        }
-    }
-    Ok(())
-}
+use std::{collections::BTreeSet, env, fs, path::Path, process::ExitCode};
 
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -208,12 +185,20 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         return Ok(true);
     }
     if args.len() == 3 && args[0] == "airport-info" {
-        let file = std::io::BufReader::new(fs::File::open(&args[1])?);
         let id = args[2].to_string_lossy();
-        let Some(a) = openxplane::apt::find_airport(file, &id)? else {
+        let path = Path::new(&args[1]);
+        // An installation directory searches the apt.dat sources in priority order; a file is read alone.
+        let found = if path.is_dir() {
+            openxplane::install::Install::open(path)?.find_airport(&id)?
+        } else {
+            let file = std::io::BufReader::new(fs::File::open(path)?);
+            openxplane::apt::find_airport(file, &id)?.map(|a| (a, path.to_path_buf()))
+        };
+        let Some((a, source)) = found else {
             eprintln!("airport {id} not found");
             return Ok(false);
         };
+        println!("Source: {}", source.display());
         println!(
             "{} {} (header row {}, line {})",
             a.id, a.name, a.kind, a.line
@@ -309,11 +294,39 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         return Err("Usage: openxplane airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png>".into());
     }
     let root = fs::canonicalize(&args[1])?;
-    let mut paths = Vec::new();
-    collect_acf(&root, &mut paths)?;
-    paths.sort();
+    let install = openxplane::install::Install::open(&root)?;
+    let paths = install.find_acf()?;
     if paths.is_empty() {
         return Err("No ACF aircraft found".into());
+    }
+    println!("Installation: {}", root.display());
+    for (label, dir) in [
+        ("Aircraft", install.aircraft_dir()),
+        ("Airfoils", install.airfoils_dir()),
+        ("Custom Data", install.custom_data_dir()),
+        ("Custom Scenery", install.custom_scenery_dir()),
+        ("Global Airports", install.global_airports_dir()),
+        ("Resources/default data", install.default_data_dir()),
+    ] {
+        println!(
+            "  {label}: {}",
+            if dir.is_dir() { "present" } else { "absent" }
+        );
+    }
+    for name in ["earth_nav.dat", "earth_fix.dat", "earth_awy.dat"] {
+        match install.nav_data_file(name) {
+            Some(p) => println!(
+                "  {name}: {}",
+                p.strip_prefix(&root).unwrap_or(&p).display()
+            ),
+            None => println!("  {name}: not found"),
+        }
+    }
+    for source in install.apt_dat_sources()? {
+        println!(
+            "  apt.dat source: {}",
+            source.strip_prefix(&root).unwrap_or(&source).display()
+        );
     }
     let mut complete = true;
     for path in paths {
