@@ -13,6 +13,7 @@ pub mod profile;
 pub mod regimes;
 pub mod runtime;
 pub mod stall;
+pub mod world;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]

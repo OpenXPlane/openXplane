@@ -21,7 +21,7 @@ module appears, not in advance.
 | `xp-airfoil` | AFL, lookup, stall, buffet, regimes | `airfoil`, `aero`, `stall`, `buffet`, `regimes`, `profile` |
 | `xp-obj` | OBJ8, animations, materials | `obj8.rs` |
 | `xp-texture` | DDS/PNG, mipmaps, normal/lit | `image` in `gpu.rs` |
-| `xp-scenery` | apt.dat, earth_nav.dat, DSF, libraries | `apt.rs` |
+| `xp-scenery` | apt.dat, earth_nav.dat, DSF, libraries | `apt.rs`, `world.rs`, `install.rs` |
 | `xp-dataref` | registry of datarefs and commands | `dataref.rs`, `commands.rs` |
 | `xp-sim` | flight model, engines, landing gear, weather | none |
 | `xp-script` | runtime for the stock Lua scripts | none |
@@ -44,8 +44,8 @@ the original content, not only unit tests.
    to the aircraft state, the built-in command handlers. Everything after depends on it.
 3. **Flight model**: wing forces from AFL, propeller and engine, landing gear, mass and centre of gravity,
    atmosphere; a simulation step; comparing trajectories with the reference on fixed inputs.
-4. **World**: DSF, terrain, library objects, airport lighting, placing the aircraft on a runway of the test
-   airport.
+4. **World** (started): the airport ground from apt.dat is drawn with the aircraft on a runway. Remaining: DSF,
+   terrain, library objects, airport lighting, spawn from start locations.
 5. **Cockpit and systems**: instruments, panels, the stock Cessna's Lua, controls, input.
 6. **Audio, weather, multiplayer, plugins.**
 7. **Platforms and distribution**: macOS/Windows/Linux builds, CI.

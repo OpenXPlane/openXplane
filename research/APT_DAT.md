@@ -13,6 +13,7 @@ is taken from observations of the file, so the rules below are observed, not con
   threshold, overrun, markings, approach lights, touchdown-zone lights, REIL). Short rows are an error with the
   line number.
 - Row 1302: key/value metadata pairs, order preserved.
+- Pavements: row `110` with the node rows `111`-`114` that follow it (loops closed by `113`/`114`, bezier control points on `112`/`114`); see [WORLD_GEOMETRY.md](WORLD_GEOMETRY.md).
 - Other codes (in KSEA: 14, 18-21, 110-116, 120, 130, 1000-1056, 1101, 1110, 1200-1206, 1300-1301, 1400-1401,
   1500) are not interpreted, only counted.
 
@@ -28,6 +29,6 @@ ICAO gives exit code 2.
 ## Not done
 
 The units and values of the surface, marking and lighting codes are not decoded; water runways (101), helipads
-(102), taxiways (110-116), parking (1300), frequencies (50-56 in the old format, 1050+ in the new one), DSF,
+(102), linear features (120), parking (1300), frequencies (50-56 in the old format, 1050+ in the new one), DSF,
 library objects and the link to terrain are not read. There is no index over the file: every query is a linear
 pass.

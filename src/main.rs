@@ -312,6 +312,24 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         viewer::run(scene, args.len() == 3)?;
         return Ok(true);
     }
+    if (args.len() == 4 || (args.len() == 5 && args[4] == "--smoke")) && args[0] == "airport-view" {
+        let scene = scene::airport(
+            Path::new(&args[1]),
+            &args[2].to_string_lossy(),
+            Path::new(&args[3]),
+        )?;
+        viewer::run(scene, args.len() == 5)?;
+        return Ok(true);
+    }
+    if args.len() == 5 && args[0] == "airport-render" {
+        let scene = scene::airport(
+            Path::new(&args[1]),
+            &args[2].to_string_lossy(),
+            Path::new(&args[3]),
+        )?;
+        pollster::block_on(gpu::render_png(&scene, Path::new(&args[4])))?;
+        return Ok(true);
+    }
     if args.len() == 3 && args[0] == "render" {
         let scene = scene::load(Path::new(&args[1]))?;
         pollster::block_on(gpu::render_png(&scene, Path::new(&args[2])))?;

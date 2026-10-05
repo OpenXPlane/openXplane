@@ -57,6 +57,7 @@ pub struct Renderer {
     transparent: wgpu::RenderPipeline,
     meshes: Vec<GpuMesh>,
     format: wgpu::TextureFormat,
+    clear: wgpu::Color,
 }
 
 pub struct Targets {
@@ -261,6 +262,12 @@ impl Renderer {
             transparent,
             meshes,
             format,
+            clear: wgpu::Color {
+                r: scene.background[0],
+                g: scene.background[1],
+                b: scene.background[2],
+                a: 1.0,
+            },
         })
     }
 
@@ -338,12 +345,7 @@ impl Renderer {
                 depth_slice: None,
                 resolve_target: Some(view),
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.028,
-                        g: 0.045,
-                        b: 0.07,
-                        a: 1.0,
-                    }),
+                    load: wgpu::LoadOp::Clear(self.clear),
                     store: wgpu::StoreOp::Store,
                 },
             })],

@@ -20,7 +20,12 @@ pub struct Scene {
     pub meshes: Vec<Mesh>,
     pub center: Vec3,
     pub radius: f32,
+    /// Clear colour (linear RGB).
+    pub background: [f64; 3],
 }
+
+/// Clear colour of the aircraft-only preview.
+pub const PREVIEW_BACKGROUND: [f64; 3] = [0.028, 0.045, 0.07];
 
 pub fn texture_path(object: &Path, name: &str) -> Option<PathBuf> {
     let path = object.parent()?.join(name.replace('\\', "/"));
@@ -186,5 +191,105 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
         meshes,
         center,
         radius,
+        background: PREVIEW_BACKGROUND,
+    })
+}
+
+fn solid_texture(color: [u8; 4]) -> image::RgbaImage {
+    image::RgbaImage::from_pixel(2, 2, image::Rgba(color))
+}
+
+/// The aircraft preview placed on the first runway of an airport found in an installation, with the
+/// airport's ground, pavements, runways and markings. The aircraft stands 150 m from the first
+/// runway end, nose along the runway, wheels on the runway surface. The camera starts about 70 m away.
+pub fn airport(
+    root: &Path,
+    icao: &str,
+    aircraft_path: &Path,
+) -> Result<Scene, Box<dyn std::error::Error>> {
+    let install = openxplane::install::Install::open(root)?;
+    let (airport, source) = install
+        .find_airport(icao)?
+        .ok_or_else(|| format!("airport {icao} not found"))?;
+    let (frame, layers) = openxplane::world::airport_layers(&airport, 8000.0)?;
+    let runway = airport
+        .runways
+        .first()
+        .ok_or("airport has no land runway")?;
+    let [a, b] = openxplane::world::runway_ends(runway, &frame);
+    let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
+    let len = (dx * dx + dz * dz).sqrt();
+    if len < 200.0 {
+        return Err("first runway is shorter than 200 m".into());
+    }
+    let (ux, uz) = (dx / len, dz / len);
+    println!(
+        "Airport {} {} from {}: runway {}/{}, {:.0} m, {} pavements",
+        airport.id,
+        airport.name,
+        source.display(),
+        runway.ends[0].name,
+        runway.ends[1].name,
+        len,
+        airport.pavements.len()
+    );
+
+    let mut aircraft = load(aircraft_path)?;
+    let low_y = aircraft
+        .meshes
+        .iter()
+        .flat_map(|m| m.vertices.iter().map(|v| v.position[1]))
+        .fold(f32::INFINITY, f32::min);
+    // The aircraft nose points along local -Z; turn it onto the runway direction (x east, z south).
+    let heading = (-ux).atan2(-uz);
+    let rotation = glam::Mat4::from_rotation_y(heading);
+    let position = Vec3::new(a[0] + ux * 150.0, 0.2 - low_y, a[1] + uz * 150.0);
+    let placement = glam::Mat4::from_translation(position) * rotation;
+    for mesh in &mut aircraft.meshes {
+        for v in &mut mesh.vertices {
+            v.position = placement
+                .transform_point3(Vec3::from_array(v.position))
+                .to_array();
+            v.normal = rotation
+                .transform_vector3(Vec3::from_array(v.normal))
+                .to_array();
+        }
+        mesh.center = placement.transform_point3(mesh.center);
+    }
+
+    let mut meshes = Vec::new();
+    for layer in layers {
+        let vertices = layer
+            .triangles
+            .iter()
+            .map(|p| Vertex {
+                position: *p,
+                normal: [0.0, 1.0, 0.0],
+                uv: [0.5, 0.5],
+            })
+            .collect::<Vec<_>>();
+        if vertices.is_empty() {
+            continue;
+        }
+        let mut low = Vec3::splat(f32::INFINITY);
+        let mut high = Vec3::splat(f32::NEG_INFINITY);
+        for v in &vertices {
+            low = low.min(Vec3::from_array(v.position));
+            high = high.max(Vec3::from_array(v.position));
+        }
+        meshes.push(Mesh {
+            vertices,
+            texture: solid_texture(layer.color),
+            glass: false,
+            center: (low + high) * 0.5,
+        });
+    }
+    // Ground layers first so the opaque aircraft draws over them regardless of mesh order.
+    meshes.extend(aircraft.meshes);
+    Ok(Scene {
+        meshes,
+        center: position + Vec3::new(0.0, 1.0, 0.0),
+        radius: 40.0,
+        background: [0.30, 0.52, 0.80],
     })
 }

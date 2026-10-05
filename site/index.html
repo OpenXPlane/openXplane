@@ -94,13 +94,18 @@
       <figcaption>The Cessna 172 SP from X-Plane 12 in the openXplane viewer: wgpu, Metal. Static pose, no simulation.</figcaption>
     </figure>
 
+    <figure class="shot elevation-2">
+      <img src="assets/ksea.png" alt="Cessna 172 SP on runway 16L at Seattle-Tacoma, drawn from apt.dat" loading="lazy">
+      <figcaption>Seattle-Tacoma (KSEA) built from the original <code>apt.dat</code>: runways, taxiways, aprons with holes, and the Cessna on 16L.</figcaption>
+    </figure>
+
     <div class="grid">
       <div class="card elevation-1"><span class="material-icons card-icon">verified</span><h3>1:1 with the original</h3><p>Every step is confirmed by analysing the reference build and comparing against it. Unknowns are not guessed.</p></div>
       <div class="card elevation-1"><span class="material-icons card-icon">lock_open</span><h3>No original code or assets</h3><p>Nothing from the original is copied. Formats are described in our own words in the <a href="#/doc/ARCHITECTURE">documentation</a>.</p></div>
       <div class="card elevation-1"><span class="material-icons card-icon">speed</span><h3>A modern engine</h3><p>Rust and wgpu: Metal, Vulkan, DirectX&nbsp;12. 64-bit, multithreaded content loading.</p></div>
       <div class="card elevation-1"><span class="material-icons card-icon">flight</span><h3>Airfoil aerodynamics</h3><p>34 AFL airfoils: table lookup, stall with hysteresis, buffet and regime blending. <a href="#/doc/research/PROFILE_PIPELINE">Details</a></p></div>
       <div class="card elevation-1"><span class="material-icons card-icon">view_in_ar</span><h3>Cessna 172 viewer</h3><p>OBJ8 with animations, lighting and glass on wgpu. Verified on Metal.</p></div>
-      <div class="card elevation-1"><span class="material-icons card-icon">flight_takeoff</span><h3>Airports</h3><p>Streaming parser for the 380&nbsp;MB <code>apt.dat</code>: runways, metadata, end coordinates.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">flight_takeoff</span><h3>Airports</h3><p>Streaming parser for the 380&nbsp;MB <code>apt.dat</code>, with runways and pavement outlines drawn as a ground scene.</p></div>
       <div class="card elevation-1"><span class="material-icons card-icon">data_object</span><h3>Datarefs</h3><p>A typed registry that preserves the original's float32 behaviour.</p></div>
       <div class="card elevation-1"><span class="material-icons card-icon">description</span><h3>Open research</h3><p>Every subsystem is written up in <code>research/</code> notes with addresses and the limits of what is known.</p></div>
     </div>

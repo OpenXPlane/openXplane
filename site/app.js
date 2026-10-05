@@ -23,6 +23,7 @@ const DOCS = [
   ["DISCORD", "Discord"],
   ["research/APT_DAT", "apt.dat airports"],
   ["research/INSTALL_LAYOUT", "Installation layout"],
+  ["research/WORLD_GEOMETRY", "Airport geometry"],
 ];
 
 const STATUS = [
@@ -33,7 +34,7 @@ const STATUS = [
   ["Datarefs and commands", "part", "Typed dataref registry (5503-record catalog), six ACF-backed datarefs, command registry (3012-command catalog); nothing drives aircraft state yet"],
   ["Viewer", "part", "wgpu, Metal; static, no simulation"],
   ["Flight model", "todo", "Wing forces, engine, landing gear"],
-  ["DSF and world", "todo", "Terrain, libraries, objects"],
+  ["World", "part", "Airport ground from apt.dat (runways, taxiways, aprons) with the aircraft on a runway; no terrain, DSF or objects"],
   ["Cockpit, Lua, audio, network", "todo", ""],
 ];
 const BADGE = { done: "done", part: "partial", todo: "planned" };

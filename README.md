@@ -169,6 +169,19 @@ Xplane12/
 The content directory and local reports are excluded from Git. The engine must read user content separately from
 its own code. The research tools do not modify the original files.
 
+## Airport scene
+
+```sh
+cargo run --offline -- airport-render Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf" ksea.png
+cargo run --offline -- airport-view Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+```
+
+Draws an airport from `apt.dat` (runways with markings, taxiway and apron pavements with holes) and puts the
+aircraft on the first runway. Static, no terrain or objects. Rules and limits:
+[research/WORLD_GEOMETRY.md](research/WORLD_GEOMETRY.md).
+
+![Cessna on runway 16L at KSEA](assets/screenshots/ksea-cessna.png)
+
 ## Datarefs
 
 ```sh
