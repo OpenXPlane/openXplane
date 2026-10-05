@@ -1,0 +1,6 @@
+/Xplane12/
+/target/
+/research/local/
+.DS_Store
+__pycache__/
+/site/docs/

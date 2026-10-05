@@ -1,0 +1,190 @@
+use glam::Vec3;
+use openxplane::{
+    Aircraft,
+    obj8::{Object, Vertex},
+};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
+pub struct Mesh {
+    pub vertices: Vec<Vertex>,
+    pub texture: image::RgbaImage,
+    pub glass: bool,
+    pub center: Vec3,
+}
+
+pub struct Scene {
+    pub meshes: Vec<Mesh>,
+    pub center: Vec3,
+    pub radius: f32,
+}
+
+pub fn texture_path(object: &Path, name: &str) -> Option<PathBuf> {
+    let path = object.parent()?.join(name.replace('\\', "/"));
+    // X-Plane assets commonly declare PNG while shipping a DDS with the same stem.
+    let dds = path.with_extension("dds");
+    if dds.is_file() {
+        Some(dds)
+    } else if path.is_file() {
+        Some(path)
+    } else {
+        None
+    }
+}
+
+pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
+    let acf = Aircraft::parse(&fs::read_to_string(aircraft_path)?)?;
+    let dir = aircraft_path.parent().ok_or("ACF needs parent directory")?;
+    let mut unsupported = BTreeMap::<String, usize>::new();
+    let mut objects = 0;
+    let mut triangles = 0;
+    let mut missing = Vec::new();
+    let mut errors = Vec::new();
+    for p in acf
+        .properties
+        .iter()
+        .filter(|p| p.key.ends_with("/_v10_att_file_stl") && !p.value.is_empty())
+    {
+        let path = dir.join("objects").join(p.value.replace('\\', "/"));
+        let object = match fs::read_to_string(&path) {
+            Ok(text) => match Object::parse(&text) {
+                Ok(object) => object,
+                Err(e) => {
+                    errors.push(format!("{}: {e}", path.display()));
+                    continue;
+                }
+            },
+            Err(e) => {
+                errors.push(format!("{}: {e}", path.display()));
+                continue;
+            }
+        };
+        objects += 1;
+        triangles += object
+            .draws
+            .iter()
+            .map(|d| d.indices.len() / 3)
+            .sum::<usize>();
+        if let Some(name) = &object.texture
+            && texture_path(&path, name).is_none()
+        {
+            missing.push(format!("{}: {name}", path.display()));
+        }
+        for (key, count) in object.unsupported {
+            *unsupported.entry(key).or_default() += count;
+        }
+        for note in object.compatibility_notes {
+            println!("  COMPAT {}: {note}", path.display());
+        }
+    }
+    println!("OBJ8 audit: {objects} objects, {triangles} declared triangles");
+    println!("Missing declared base textures: {}", missing.len());
+    let complete = missing.is_empty() && errors.is_empty();
+    for item in missing {
+        println!("  MISSING: {item}");
+    }
+    println!("Unimplemented commands (occurrences):");
+    for (key, count) in unsupported {
+        println!("  {key}: {count}");
+    }
+    println!("Objects with read/parse errors: {}", errors.len());
+    for error in errors {
+        println!("  ERROR: {error}");
+    }
+    Ok(complete)
+}
+
+pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
+    let acf = Aircraft::parse(&fs::read_to_string(aircraft_path)?)?;
+    let dir = aircraft_path.parent().ok_or("ACF needs parent directory")?;
+    // A deliberate exterior subset; broken variants and full cockpit devices need runtime state.
+    let names = [
+        "fuselage.obj",
+        "fuselage_gear.obj",
+        "fuselage_prop.obj",
+        "wings.obj",
+        "cockpit_seats_front.obj",
+        "cockpit_seats_rear.obj",
+        "glass_out.obj",
+    ];
+    let mut meshes = Vec::new();
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    for name in names {
+        let p = acf
+            .properties
+            .iter()
+            .find(|p| p.key.ends_with("/_v10_att_file_stl") && p.value == name)
+            .ok_or_else(|| format!("Preview subset requires ACF object: {name}"))?;
+        let prefix = p.key.trim_end_matches("_v10_att_file_stl");
+        for field in [
+            "_v10_att_x_acf_prt_ref",
+            "_v10_att_y_acf_prt_ref",
+            "_v10_att_z_acf_prt_ref",
+            "_v10_att_phi_ref",
+            "_v10_att_psi_ref",
+            "_v10_att_the_ref",
+        ] {
+            let key = format!("{prefix}{field}");
+            if let Some(p) = acf.properties.iter().find(|p| p.key == key)
+                && p.value.parse::<f32>()? != 0.0
+            {
+                return Err(
+                    format!("Non-zero attachment pose not yet supported: {}", p.key).into(),
+                );
+            }
+        }
+        let path = dir.join("objects").join(name);
+        let object = Object::parse(&fs::read_to_string(&path)?)?;
+        let texture_name = object
+            .texture
+            .as_ref()
+            .ok_or("Preview object has no base texture")?;
+        let texture_path = texture_path(&path, texture_name)
+            .ok_or_else(|| format!("Missing texture for {name}: {texture_name}"))?;
+        let texture = image::open(&texture_path)?.to_rgba8();
+        let texture = image::imageops::flip_vertical(&texture);
+        let vertices = object.baked_vertices();
+        if vertices.is_empty() {
+            return Err(format!("No visible preview geometry: {name}").into());
+        }
+        let mut mesh_low = Vec3::splat(f32::INFINITY);
+        let mut mesh_high = Vec3::splat(f32::NEG_INFINITY);
+        for vertex in &vertices {
+            let v = Vec3::from_array(vertex.position);
+            mesh_low = mesh_low.min(v);
+            mesh_high = mesh_high.max(v);
+            low = low.min(v);
+            high = high.max(v);
+        }
+        println!(
+            "Loaded {name}: {} triangles, {}x{} texture, {} unsupported command types",
+            vertices.len() / 3,
+            texture.width(),
+            texture.height(),
+            object.unsupported.len()
+        );
+        meshes.push(Mesh {
+            vertices,
+            texture,
+            glass: object.glass || name.starts_with("glass"),
+            center: (mesh_low + mesh_high) * 0.5,
+        });
+    }
+    let center = (low + high) * 0.5;
+    let radius = (high - low).length() * 0.5;
+    if !radius.is_finite() || radius <= 0.0 {
+        return Err("Invalid scene bounds".into());
+    }
+    println!(
+        "Static exterior preview: all animation datarefs = 0; no flight simulation. Bounds: {low:?} .. {high:?}"
+    );
+    Ok(Scene {
+        meshes,
+        center,
+        radius,
+    })
+}

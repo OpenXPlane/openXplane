@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b4a74"/><stop offset="1" stop-color="#04213a"/></linearGradient>
+<linearGradient id="x" gradientUnits="userSpaceOnUse" x1="14" y1="12" x2="50" y2="52"><stop offset="0" stop-color="#2fd2f5"/><stop offset="1" stop-color="#1c86d8"/></linearGradient>
+<clipPath id="xc"><path transform="translate(32 32) skewX(-12) translate(-32 -32)" d="M10 14 H25 L54 50 H39 Z M39 14 H54 L25 50 H10 Z"/></clipPath>
+</defs>
+<rect x="1.5" y="1.5" width="61" height="61" rx="15" fill="url(#bg)" stroke="#79e4ff" stroke-width="2.4"/>
+<path transform="translate(30 34) skewX(-12) translate(-32 -32)" d="M10 14 H25 L54 50 H39 Z M39 14 H54 L25 50 H10 Z" fill="#2a78bf" opacity=".85"/>
+<path transform="translate(32 32) skewX(-12) translate(-32 -32)" d="M10 14 H25 L54 50 H39 Z M39 14 H54 L25 50 H10 Z" fill="url(#x)"/>
+<g clip-path="url(#xc)">
+<g fill="none" stroke="#fff" stroke-linecap="round" opacity=".42" stroke-width="1.6">
+<path d="M2 24 C 16 22 22 12 40 12 C 52 12 60 18 66 24"/>
+<path d="M2 42 C 16 44 26 54 42 53 C 54 52 60 47 66 41"/>
+</g>
+<path d="M14.17 30.63 L14.20 30.36 L14.31 30.09 L14.49 29.83 L14.75 29.58 L15.08 29.34 L15.48 29.11 L15.95 28.90 L16.49 28.71 L17.10 28.54 L17.77 28.39 L18.51 28.26 L19.30 28.17 L20.14 28.10 L21.03 28.07 L21.97 28.07 L22.94 28.10 L23.95 28.16 L25.00 28.26 L26.06 28.40 L27.15 28.57 L28.25 28.77 L29.34 28.99 L30.44 29.24 L31.53 29.50 L32.63 29.79 L33.72 30.08 L34.79 30.39 L35.84 30.71 L36.88 31.04 L37.89 31.37 L38.86 31.71 L39.81 32.04 L40.71 32.37 L41.58 32.70 L42.39 33.02 L43.16 33.33 L43.88 33.62 L44.55 33.90 L45.16 34.16 L45.71 34.40 L46.20 34.62 L46.63 34.81 L47.00 34.98 L47.30 35.11 L47.53 35.22 L47.70 35.30 L47.80 35.35 L47.83 35.37 L47.83 35.37 L47.80 35.36 L47.69 35.36 L47.50 35.35 L47.24 35.34 L46.91 35.33 L46.51 35.31 L46.04 35.30 L45.51 35.27 L44.91 35.25 L44.25 35.22 L43.54 35.19 L42.76 35.15 L41.94 35.12 L41.08 35.08 L40.17 35.04 L39.22 34.99 L38.23 34.94 L37.22 34.89 L36.17 34.84 L35.11 34.79 L34.03 34.73 L32.94 34.67 L31.84 34.60 L30.74 34.53 L29.64 34.46 L28.55 34.38 L27.47 34.29 L26.42 34.20 L25.39 34.11 L24.39 34.01 L23.41 33.91 L22.47 33.80 L21.56 33.68 L20.68 33.56 L19.85 33.42 L19.07 33.28 L18.33 33.12 L17.64 32.95 L17.01 32.77 L16.43 32.57 L15.92 32.37 L15.47 32.15 L15.08 31.92 L14.75 31.69 L14.50 31.44 L14.32 31.18 L14.20 30.91 L14.17 30.63Z" fill="#fff" opacity=".5"/>
+</g></svg>
