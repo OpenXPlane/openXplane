@@ -15,6 +15,7 @@ const DOCS = [
   ["research/PROFILE_PIPELINE", "Profile evaluator"],
   ["research/RUNTIME_TIME", "Runtime clock"],
   ["research/DATAREFS", "Datarefs"],
+  ["research/COMMANDS", "Commands"],
   ["research/VIEWER", "Cessna viewer"],
   ["research/APT_DAT", "apt.dat airports"],
 ];
@@ -24,7 +25,7 @@ const STATUS = [
   ["OBJ8", "part", "Geometry, rotation and translation animations; no normal/lit maps or instruments"],
   ["AFL (airfoils)", "done", "34 airfoils, lookup, stall, buffet, regime blending"],
   ["apt.dat", "part", "Airports, runways, metadata; no taxiways or frequencies"],
-  ["Datarefs", "part", "Typed registry, 5503-record catalog from the reference build, six ACF-backed datarefs; commands and the rest not connected"],
+  ["Datarefs and commands", "part", "Typed dataref registry (5503-record catalog), six ACF-backed datarefs, command registry (3012-command catalog); nothing drives aircraft state yet"],
   ["Viewer", "part", "wgpu, Metal; static, no simulation"],
   ["Flight model", "todo", "Wing forces, engine, landing gear"],
   ["DSF and world", "todo", "Terrain, libraries, objects"],

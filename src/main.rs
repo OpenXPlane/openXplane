@@ -237,6 +237,21 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         println!("  Not interpreted (row code x count): {}", others.join(" "));
         return Ok(true);
     }
+    if (args.len() == 2 || args.len() == 3) && args[0] == "commands" {
+        let mut registry = openxplane::commands::CommandRegistry::new();
+        let count = registry.load_catalog(&fs::read_to_string(&args[1])?)?;
+        let prefix = args
+            .get(2)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let mut shown = 0usize;
+        for name in registry.names().filter(|n| n.starts_with(&prefix)) {
+            println!("{name}\t{}", registry.description(name)?);
+            shown += 1;
+        }
+        eprintln!("{shown} of {count} commands");
+        return Ok(true);
+    }
     if args.len() == 2 && args[0] == "datarefs" {
         let aircraft = Aircraft::parse(&fs::read_to_string(&args[1])?)?;
         let p = openxplane::aircraft::AircraftParameters::from_acf(&aircraft)?;

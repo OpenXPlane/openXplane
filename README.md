@@ -175,6 +175,17 @@ mass, CG Y/Z, engine count) with the type and writability of the reference build
 5503 registration records of the original's table. Layout, evidence and limits:
 [research/DATAREFS.md](research/DATAREFS.md).
 
+## Commands
+
+```sh
+python3 tools/extract_commands.py Xplane12/X-Plane.exe > research/local/commands.tsv
+cargo run --offline -- commands research/local/commands.tsv sim/flight_controls/flaps
+```
+
+The original's command table (3012 built-in commands) is enumerated by the tool, and `CommandRegistry` loads it
+and runs begin/continue/end phases through handler chains. Layout, evidence and limits:
+[research/COMMANDS.md](research/COMMANDS.md).
+
 ## Airports (apt.dat)
 
 ```sh

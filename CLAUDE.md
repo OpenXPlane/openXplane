@@ -33,6 +33,7 @@ See README.md for full CLI argument semantics.
 - `src/lib.rs` holds the ACF parser (`Aircraft`, `Property`) and declares modules; `src/main.rs` is the CLI dispatcher.
 - Pipeline modules (aerodynamics, ported from the original EXE): `airfoil` (AFL 1110 reader) → `aero` (angle correction + fixed-grid table lookup) → `stall` (normalized angle, hysteresis: on above 1, reset below 0.75) → `buffet` (noise perturbation of Cl/Cd in active stall) → `regimes` (table-pair selection and blending) → `profile` (unified evaluator tying these together, shared stall-flag state across the table pair). `runtime` models the double-stored / float32-dataref time source.
 - `dataref`: typed registry; `register_aircraft` registers the ACF-backed datarefs whose type/writability were confirmed from the EXE's registration table (`research/DATAREFS.md`, `tools/extract_datarefs.py`).
+- `commands`: command registry (phases, handler chains) loading a catalog produced by `tools/extract_commands.py` (`research/COMMANDS.md`); handler order and misuse rules are openXplane policy.
 - `apt`: streaming apt.dat (format 1200) reader for one airport at a time (`airport-info`); derived from observing the data file, not from the EXE (see `research/APT_DAT.md`).
 - Rendering: `obj8` (OBJ8 geometry reader), `scene`, `gpu`, `viewer`, `shader.wgsl` (wgpu + winit).
 

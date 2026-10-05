@@ -22,7 +22,7 @@ module appears, not in advance.
 | `xp-obj` | OBJ8, animations, materials | `obj8.rs` |
 | `xp-texture` | DDS/PNG, mipmaps, normal/lit | `image` in `gpu.rs` |
 | `xp-scenery` | apt.dat, earth_nav.dat, DSF, libraries | `apt.rs` |
-| `xp-dataref` | registry of datarefs and commands | `dataref.rs` (datarefs) |
+| `xp-dataref` | registry of datarefs and commands | `dataref.rs`, `commands.rs` |
 | `xp-sim` | flight model, engines, landing gear, weather | none |
 | `xp-script` | runtime for the stock Lua scripts | none |
 | `xp-render` | wgpu renderer | `gpu.rs`, `scene.rs`, `viewer.rs` |
@@ -38,9 +38,10 @@ the original content, not only unit tests.
 1. **Content without simulation** (mostly done): ACF, OBJ8, AFL, apt.dat, the Cessna viewer. Remaining:
    PANEL_3D, materials and normal/lit maps, `xp-check` over the whole directory, an apt.dat index, decoding the
    surface codes.
-2. **Datarefs and commands** (mostly done): a typed registry, the full 5503-record catalog of the reference
-   build, and the six ACF-backed datarefs with confirmed types. Remaining: commands, backing values for the
-   other datarefs, propagating writes to the aircraft state. Everything after depends on it.
+2. **Datarefs and commands** (registries done): a typed dataref registry, the 5503-record dataref catalog and the
+   3012-command catalog of the reference build, six ACF-backed datarefs with confirmed types, and a command
+   registry with phases and handler chains. Remaining: backing values for the other datarefs, propagating writes
+   to the aircraft state, the built-in command handlers. Everything after depends on it.
 3. **Flight model**: wing forces from AFL, propeller and engine, landing gear, mass and centre of gravity,
    atmosphere; a simulation step; comparing trajectories with the reference on fixed inputs.
 4. **World**: DSF, terrain, library objects, airport lighting, placing the aircraft on a runway of the test

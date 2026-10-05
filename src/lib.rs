@@ -4,6 +4,7 @@ pub mod aircraft;
 pub mod airfoil;
 pub mod apt;
 pub mod buffet;
+pub mod commands;
 pub mod dataref;
 pub mod obj8;
 pub mod profile;
