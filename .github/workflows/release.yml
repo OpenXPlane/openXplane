@@ -31,7 +31,7 @@ jobs:
           version="0.1.${{ github.run_number }}"
           dir="openXplane-$version-${{ matrix.name }}"
           mkdir "$dir"
-          cp "target/release/${{ matrix.exe }}" README.md LICENSE "$dir/"
+          cp "target/release/${{ matrix.exe }}" README.md LICENSE NOTICE "$dir/"
           cp -r examples "$dir/"
           if [ "${{ runner.os }}" = "Windows" ]; then
             7z a "$dir.zip" "$dir"

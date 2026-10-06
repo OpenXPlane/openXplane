@@ -15,7 +15,7 @@ synthetic inputs; the Rust port must return the same bits ([research/VERIFICATIO
 **Why Rust and wgpu?** Memory safety, one code base for Windows, macOS and Linux, and a modern graphics layer
 (Vulkan, Metal, DirectX 12).
 
-**What licence is it under?** MIT, see [LICENSE](../LICENSE). The documents under `research/` describe observed
+**What licence is it under?** GPL-3.0-or-later, see [LICENSE](../LICENSE) and [NOTICE](../NOTICE). The documents under `research/` describe observed
 behaviour in our own words; no original code or assets are in the repository.
 
 **Does it work with scenery or aircraft from the store?** Only what the readers support: ACF, OBJ8, AFL and

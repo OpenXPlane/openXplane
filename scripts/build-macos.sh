@@ -6,6 +6,6 @@ version="$(scripts/version.sh)"
 cargo build --locked --release
 out="dist/macos"
 rm -rf "$out" && mkdir -p "$out"
-cp target/release/openxplane README.md LICENSE "$out/"
+cp target/release/openxplane README.md LICENSE NOTICE "$out/"
 cp -r examples "$out/"
 echo "openXplane $version -> $out/"

@@ -6,7 +6,7 @@ default-members = ["crates/xp-app"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "GPL-3.0-or-later"
 repository = "https://github.com/OpenXPlane/openXplane"
 
 [workspace.dependencies]

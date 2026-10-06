@@ -7,5 +7,6 @@ mkdir dist\windows
 copy target\release\openxplane.exe dist\windows\ >nul
 copy README.md dist\windows\ >nul
 copy LICENSE dist\windows\ >nul
+copy NOTICE dist\windows\ >nul
 xcopy examples dist\windows\examples\ /E /I /Q >nul
 echo openXplane built into dist\windows\

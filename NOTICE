@@ -7,3 +7,7 @@ words, with addresses and constants as evidence.
 
 The Roboto Mono font in `crates/xp-app/assets/font` is under the SIL Open Font License (see the licence file
 next to it).
+
+openXplane is free software under the GNU General Public License, version 3 or (at your option) any later
+version (see LICENSE). Until the licence change of this repository it was published under the MIT licence;
+the earlier versions stay available under those terms.

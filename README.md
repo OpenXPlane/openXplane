@@ -394,5 +394,5 @@ Results of the first investigation: [research/BASELINE.md](research/BASELINE.md)
 
 ## License
 
-MIT, see [LICENSE](LICENSE). X-Plane is a trademark of its respective owner. openXplane is an independent
+GPL-3.0-or-later, see [LICENSE](LICENSE) and [NOTICE](NOTICE). X-Plane is a trademark of its respective owner. openXplane is an independent
 project and is not affiliated with it.
