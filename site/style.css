@@ -129,7 +129,7 @@ blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--prim
 .badge { display: inline-block; padding: 1px 10px; border-radius: 12px; font-size: .78rem; font-weight: 500;
   border: 1px solid currentColor; white-space: nowrap; }
 .badge.done { color: var(--ok); } .badge.part { color: var(--part); } .badge.todo { color: var(--secondary-text); }
-.status td:first-child { white-space: nowrap; font-weight: 500; }
+.status td:first-child { white-space: normal; min-width: 220px; max-width: 460px; font-weight: 500; }
 .milestones li { margin: .5em 0; }
 .footer { margin: 48px 32px 0; padding: 20px 0 32px; border-top: 1px solid var(--divider);
   color: var(--secondary-text); font-size: .85rem; }
@@ -152,3 +152,6 @@ blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--prim
 .note { color: var(--secondary-text); font-size: .85rem; font-weight: 400; margin-top: 2px; }
 .status small { color: var(--secondary-text); }
 .milestones li { margin: .8em 0; }
+
+/* the hidden attribute must win over display rules such as .icon-btn */
+[hidden] { display: none !important; }
