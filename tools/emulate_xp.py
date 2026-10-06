@@ -67,6 +67,7 @@ class Emulator:
         self.stubs = {}
         self.trace = []
         self.uc.hook_add(UC_HOOK_CODE, self._on_code)
+        self.uc.hook_add(UC_HOOK_CODE, lambda uc, address, size, user: uc.emu_stop(), begin=RET_ADDR, end=RET_ADDR)
         self.uc.hook_add(UC_HOOK_MEM_UNMAPPED, self._on_unmapped)
 
     def _map(self, addr, size):
@@ -127,7 +128,7 @@ class Emulator:
         self.uc.reg_write(XMM[index], struct.unpack('<I', struct.pack('<f', value))[0])
 
     # ---- calling --------------------------------------------------------------------------------
-    def call(self, addr, ints=(), floats=(), stack=(), max_instructions=2_000_000):
+    def call(self, addr, ints=(), floats=(), stack=(), max_instructions=2_000_000, until=None):
         """Calls a function. `ints` go to RCX, RDX, R8, R9; `floats` to XMM0-3 (as float32); `stack`
         holds the 5th and later arguments, each a float32 (float) or a 64-bit integer (int)."""
         uc = self.uc
@@ -148,7 +149,7 @@ class Emulator:
         uc.reg_write(UC_X86_REG_RSP, sp)
         uc.reg_write(UC_X86_REG_RIP, addr)
         try:
-            uc.emu_start(addr, RET_ADDR, count=max_instructions)
+            uc.emu_start(addr, RET_ADDR if until is None else until, count=max_instructions)
         except UcError as error:
             raise RuntimeError(f'emulation failed in {addr:#x} at {uc.reg_read(UC_X86_REG_RIP):#x}: {error}')
         return uc.reg_read(UC_X86_REG_RAX)

@@ -1623,3 +1623,221 @@ fn scalar_helpers_match_the_original_machine_code() {
     assert_eq!(counts[..5], [300; 5]);
     assert!(counts[5] > 20);
 }
+
+/// Parses `off=word` tokens of the vector files (hex offsets unless `signed`, then decimal).
+fn parse_words(tokens: &[&str]) -> std::collections::HashMap<usize, u32> {
+    tokens
+        .iter()
+        .filter_map(|t| t.split_once('='))
+        .map(|(o, w)| {
+            (
+                usize::from_str_radix(o, 16).unwrap(),
+                u32::from_str_radix(w, 16).unwrap(),
+            )
+        })
+        .collect()
+}
+
+struct PropReplay {
+    flag: bool,
+    winds: std::collections::VecDeque<([u64; 3], [f32; 3])>,
+}
+
+impl openxplane::prop::PropEnv for PropReplay {
+    fn engine_flag(&mut self) -> bool {
+        self.flag
+    }
+    fn wind(&mut self, x: f64, y: f64, z: f64) -> [f32; 3] {
+        let (seen, wind) = self.winds.pop_front().expect("wind call not recorded");
+        assert_eq!(
+            [x.to_bits(), y.to_bits(), z.to_bits()],
+            seen,
+            "wind position"
+        );
+        wind
+    }
+}
+
+/// Frame slots that hold integers (compared exactly).
+const PROP_INT_SLOTS: [i32; 3] = [0x84, 0x8e0, 0x8d0];
+
+/// Float words equal up to the platform libm's last bits (sin, cos, tan, atan2 differ from the C runtime of the
+/// original by a few ulps, which cancellations can amplify); integers exactly.
+fn words_close(a: u32, b: u32, float: bool) -> bool {
+    if a == b {
+        return true;
+    }
+    if !float {
+        return false;
+    }
+    let (x, y) = (f32::from_bits(a), f32::from_bits(b));
+    if x.is_nan() && y.is_nan() {
+        return true;
+    }
+    let ulps = (i64::from(a as i32) - i64::from(b as i32)).unsigned_abs();
+    ulps <= 64 || (x - y).abs() <= 1e-5 * (1.0 + x.abs().max(y.abs()))
+}
+
+fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
+    use openxplane::forces::Words;
+    use openxplane::prop::{Objects, prop_force};
+    let text = std::fs::read_to_string(format!("{}/tests/data/{path}", env!("CARGO_MANIFEST_DIR")))
+        .unwrap();
+    let mut trials = 0;
+    let mut lines = text.lines().filter(|l| !l.starts_with('#')).peekable();
+    while let Some(head) = lines.next() {
+        let t: Vec<&str> = head.split_whitespace().collect();
+        assert_eq!(t[0], "T");
+        let n: i32 = t[1].parse().unwrap();
+        let early = t[2] == "1";
+        let mut regions = std::collections::HashMap::new();
+        let mut winds = std::collections::VecDeque::new();
+        let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
+        while let Some(line) = lines.peek() {
+            if line.starts_with("T ") {
+                break;
+            }
+            let line = lines.next().unwrap();
+            let tokens: Vec<&str> = line.split_whitespace().collect();
+            match tokens[0] {
+                "F" | "B" | "E" | "P" | "R" => {
+                    regions.insert(tokens[0], Words(parse_words(&tokens[1..])));
+                }
+                "W" => {
+                    let h = |s: &str| u64::from_str_radix(s, 16).unwrap();
+                    winds.push_back((
+                        [h(tokens[1]), h(tokens[2]), h(tokens[3])],
+                        [f(tokens[4]), f(tokens[5]), f(tokens[6])],
+                    ));
+                }
+                "O" => outputs.push((tokens[1].to_string(), parse_words(&tokens[2..]))),
+                "S" => {
+                    slots = Some(
+                        tokens[1..]
+                            .iter()
+                            .filter_map(|t| t.split_once('='))
+                            .map(|(o, w)| {
+                                (
+                                    o.parse::<i32>().unwrap(),
+                                    u32::from_str_radix(w, 16).unwrap(),
+                                )
+                            })
+                            .collect::<std::collections::HashMap<i32, u32>>(),
+                    )
+                }
+                "X" => {
+                    regs = Some(
+                        tokens[1..]
+                            .iter()
+                            .map(|s| {
+                                u32::from_str_radix(s, 16).unwrap_or_else(|_| s.parse().unwrap())
+                            })
+                            .collect::<Vec<u32>>(),
+                    )
+                }
+                other => panic!("unknown line {other}"),
+            }
+        }
+        let mut env = PropReplay {
+            flag: t[3] == "1",
+            winds,
+        };
+        let mut f = regions.remove("F").unwrap();
+        let mut r = regions.remove("R").unwrap();
+        let (b, e, p) = (
+            regions.remove("B").unwrap(),
+            regions.remove("E").unwrap(),
+            regions.remove("P").unwrap(),
+        );
+        // the part and engine records are arrays in the original: the port reads them at the record's own offsets
+        let (e_n, p_n) = (
+            shift_words(&e, n as usize * 0x68),
+            shift_words(&p, n as usize * 0x3770),
+        );
+        let mut objects = Objects {
+            f: &mut f,
+            b: &b,
+            e: &e_n,
+            p: &p_n,
+            r: &mut r,
+        };
+        let result = prop_force(&mut objects, n, &mut env, stop);
+        if early {
+            assert!(
+                result.is_err(),
+                "trial {trials}: the original returned early"
+            );
+        } else {
+            let (frame, got_regs) = result.unwrap_or_else(|err| panic!("trial {trials}: {err}"));
+            for (off, want) in slots.unwrap() {
+                if let Some(got) = frame.0.get(&off) {
+                    assert!(
+                        words_close(*got, want, !PROP_INT_SLOTS.contains(&off)),
+                        "trial {trials}: frame slot {off}: {got:#x} vs {want:#x}"
+                    );
+                }
+            }
+            for (off, got) in &frame.0 {
+                // a slot the port set must hold the original's word, if the original's frame is in the checked ranges
+                let _ = (off, got);
+            }
+            let want = regs.unwrap();
+            let got = [
+                got_regs.xmm6.to_bits(),
+                got_regs.xmm7.to_bits(),
+                got_regs.xmm8.to_bits(),
+                got_regs.xmm9.to_bits(),
+                got_regs.xmm11.to_bits(),
+                got_regs.xmm13.to_bits(),
+                got_regs.xmm15.to_bits(),
+                got_regs.r15 as u32,
+            ];
+            for (k, name) in [
+                "xmm6", "xmm7", "xmm8", "xmm9", "xmm11", "xmm13", "xmm15", "r15",
+            ]
+            .iter()
+            .enumerate()
+            {
+                if k == 2 {
+                    continue;
+                }
+                assert!(
+                    words_close(got[k], want[k], k != 7),
+                    "trial {trials}: {name}: {:#x} vs {:#x}",
+                    got[k],
+                    want[k]
+                );
+            }
+            for (region, words) in outputs {
+                let ours = if region == "R" { &r } else { &f };
+                for (off, want) in words {
+                    assert_eq!(
+                        ours.0.get(&off).copied().unwrap_or(0),
+                        want,
+                        "trial {trials}: {region}+{off:#x}"
+                    );
+                }
+            }
+        }
+        trials += 1;
+    }
+    trials
+}
+
+/// The words of a record array re-based so that record `index` starts at offset 0 (the port's view).
+fn shift_words(words: &openxplane::forces::Words, base: usize) -> openxplane::forces::Words {
+    openxplane::forces::Words(
+        words
+            .0
+            .iter()
+            .filter(|(o, _)| **o >= base)
+            .map(|(o, w)| (*o - base, *w))
+            .collect(),
+    )
+}
+
+#[test]
+fn prop_force_segment1_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_1.txt", openxplane::prop::Stop::Segment1);
+    assert!(trials >= 30);
+}

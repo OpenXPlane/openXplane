@@ -60,3 +60,18 @@ Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc
   not a wing function as first assumed: it indexes the engine record `B[0x5ff8] + i*0x68` and the part record
   `B[0x6010] + i*0x3770` with the same index, flies the airflow at the part's point `+0x790/+0x794/+0x798`, and
   loops over blade stations (`boundary_at(r12+0x88, ...)`) with `get_el_force`. Not ported yet.
+
+## The propeller force function `0x1411bd470` (in progress)
+
+Ported in segments to `crates/xp-airfoil/src/prop.rs`; each segment is checked at a frame checkpoint against the
+original running on lazily random-filled objects (`tools/xp_fuzz.py`: the first read of a word fills it with a
+random value of the kind the instruction implies, so the initial state is exactly the words that were read;
+`tools/gen_prop_vectors.py` records them with the stubbed callees' answers). Float words are compared up to a few
+ulps of libm.
+
+- Segment 1 (entry to `0x1411bda66`, 120 trials, 65 reaching the checkpoint): the speed factor from the two
+  ramps on `F+0x170` (`B+0x2140/0x2144/0xa78`), the early return below 0.01, the airflow at the part's point
+  `P+0x790..0x798`, its rotation by `P+0x79c..0x7a4`, the three speed terms (`hypot2`, `hypot3`, `atan2`), the
+  `F+0x1cc/0x1d0/0x120` terms, and the lever block of part kinds 3 and 7 (`R+0x30..0x3c`). The debug dump
+  guarded by `F+0xbcc8` is not ported.
+- `rdi` in the original is `P+0x88`, so the `+0x708/+0x710/+0x718` reads of that block are `P+0x790/0x798/0x7a0`.

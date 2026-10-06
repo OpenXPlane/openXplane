@@ -12,6 +12,7 @@ pub mod engine;
 pub mod forces;
 pub mod fuel;
 pub mod profile;
+pub mod prop;
 pub mod regimes;
 pub mod runtime;
 pub mod scalar;

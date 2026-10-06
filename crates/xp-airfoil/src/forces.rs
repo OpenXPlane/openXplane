@@ -18,6 +18,20 @@ impl Words {
     pub fn set_f32(&mut self, offset: usize, value: f32) {
         self.0.insert(offset, value.to_bits());
     }
+    pub fn set_i32(&mut self, offset: usize, value: i32) {
+        self.0.insert(offset, value as u32);
+    }
+    /// A double at `offset` (two consecutive words, low word first).
+    pub fn f64(&self, offset: usize) -> f64 {
+        let low = u64::from(self.0.get(&offset).copied().unwrap_or(0));
+        let high = u64::from(self.0.get(&(offset + 4)).copied().unwrap_or(0));
+        f64::from_bits(high << 32 | low)
+    }
+    pub fn set_f64(&mut self, offset: usize, value: f64) {
+        let bits = value.to_bits();
+        self.0.insert(offset, bits as u32);
+        self.0.insert(offset + 4, (bits >> 32) as u32);
+    }
     fn copy(&mut self, from: usize, to: usize) {
         let value = self.0.get(&from).copied().unwrap_or(0);
         self.0.insert(to, value);
@@ -92,4 +106,13 @@ pub fn force_totals(f: &mut Words) {
     f.set_f32(0x30c, roll);
     f.set_f32(0x324, pitch);
     f.set_f32(0x33c, yaw);
+}
+
+impl crate::element_force::Mem for Words {
+    fn f32(&self, offset: usize) -> f32 {
+        Words::f32(self, offset)
+    }
+    fn i32(&self, offset: usize) -> i32 {
+        Words::i32(self, offset)
+    }
 }
