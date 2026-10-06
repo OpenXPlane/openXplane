@@ -531,7 +531,7 @@ pub fn engine_update(
     }
     if live {
         let one = rec.i32(0x70) as f32;
-        second = one * second;
+        second *= one;
         rec.set_f32(0xcc, second);
         rec.set_f32(0xc4, one * rec.f32(0xc4));
     }
@@ -627,13 +627,7 @@ fn lag_filter(v: f32, f6c: f32, b950: f32, f400: f32, state: f32, half: f32, dt:
         };
         snapped.abs()
     };
-    let a = if 0.0 > dt {
-        0.0
-    } else if dt > 1.0 {
-        1.0
-    } else {
-        dt
-    };
+    let a = dt.clamp(0.0, 1.0);
     let rate = v / (reference * (sse_max(f6c, 0.001) * b950));
     (1.0 - a) * state + a * rate
 }
