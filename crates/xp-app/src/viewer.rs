@@ -140,8 +140,8 @@ struct Flight {
     free_camera: bool,
     view_offset: Vec3,
     message: Option<(String, Instant)>,
-    /// The data-output frame-rate line, off by default as in the reference build.
-    show_rate: bool,
+    /// The data-output lines to draw (`OPENXPLANE_DATA_OUTPUT`), none by default as in the reference build.
+    data_output: Vec<usize>,
     rate: Rate,
 }
 
@@ -389,7 +389,7 @@ impl ApplicationHandler for App {
                         .renderer
                         .update_meshes(flight.body.first_mesh, &self.scene);
                     state.window.set_title(&flight.title());
-                    if flight.show_rate {
+                    if !flight.data_output.is_empty() {
                         flight.rate.cpu_time =
                             Rate::blend(flight.rate.cpu_time, flight.last.elapsed().as_secs_f32());
                         let r = &flight.rate;
@@ -401,22 +401,27 @@ impl ApplicationHandler for App {
                             0.0
                         };
                         // no GPU timing is measured, so that cell has no value
-                        crate::dout::draw_line(
+                        let frame = [
+                            Some(active),
+                            Some(r.sim_rate),
+                            None,
+                            Some(r.frame_time),
+                            Some(r.cpu_time),
+                            None,
+                            Some(r.ratio),
+                            Some(r.ratio),
+                        ];
+                        let telemetry = flight.model.telemetry(&flight.controls);
+                        crate::dout::draw_lines(
                             &mut interface,
-                            16.0 * scale,
-                            16.0 * scale,
+                            &flight.data_output,
+                            &crate::dout::Sample {
+                                telemetry: &telemetry,
+                                controls: &flight.controls,
+                                state: &flight.model.state,
+                                frame: Some(frame),
+                            },
                             scale,
-                            crate::dout::FRAME_RATE_NO_VSYNC,
-                            &[
-                                Some(active),
-                                Some(r.sim_rate),
-                                None,
-                                Some(r.frame_time),
-                                Some(r.cpu_time),
-                                None,
-                                Some(r.ratio),
-                                Some(r.ratio),
-                            ],
                         );
                         state.renderer.set_hud(&interface.vertices);
                     }
@@ -564,7 +569,7 @@ pub fn run_flight(session: FlightSession, smoke: bool) -> Result<(), Box<dyn std
         free_camera: false,
         view_offset: Vec3::ZERO,
         message: None,
-        show_rate: std::env::var_os("OPENXPLANE_FRAME_RATE").is_some(),
+        data_output: crate::dout::selected_lines(),
         rate: Rate::default(),
     };
     run_app(scene, Some(flight), smoke)

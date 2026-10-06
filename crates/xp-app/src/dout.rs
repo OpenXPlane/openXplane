@@ -4,6 +4,7 @@
 //! What is taken from the reference build (`tools/extract_dout.py`, `assets/dout/lines.tsv`): the 173 line
 //! label strings. A label is 8 cells of 12 characters; `_` stands for a space; the first six characters of a
 //! cell are its upper label row and the last six its lower row; a cell whose label is `_____-_____` is empty.
+//! A `-` inside a label is drawn as a space (the photograph shows no dashes; this is an assumption).
 //! The frame-rate line has a second form without the `vblnk sync` cell, which the reference build uses when
 //! that value is not available.
 //!
@@ -12,6 +13,7 @@
 //! pitch, the teal text colour, and the value format (six characters, as many decimals as fit). Values are
 //! supplied by the caller; the font is this project's, not the reference build's bitmap font.
 use crate::hud::{Color, Hud};
+use openxplane::flight::{Controls, State, Telemetry};
 
 #[allow(dead_code)]
 const LINES: &str = include_str!("../assets/dout/lines.tsv");
@@ -93,6 +95,125 @@ pub fn draw_line(
     3.0 * row
 }
 
+/// The values the viewer can supply to a data-output line.
+pub struct Sample<'a> {
+    pub telemetry: &'a Telemetry,
+    pub controls: &'a Controls,
+    pub state: &'a State,
+    /// The measured frame timings (line 0), when the caller has them.
+    pub frame: Option<[Option<f32>; CELLS]>,
+}
+
+const KT_PER_MS: f32 = 1.943_844_5;
+const MPH_PER_MS: f32 = 2.236_936_3;
+
+/// Speed of sound in m/s of the standard atmosphere at the altitude in metres.
+fn speed_of_sound(altitude_m: f32) -> f32 {
+    let t = 288.15 - 0.0065 * altitude_m.min(11_000.0);
+    340.294 * (t / 288.15).sqrt()
+}
+
+/// The cell values of line `index` from the flight model, or `None` for a line this build cannot fill. The
+/// values come from the approximate flight model (research/FLIGHT_MODEL.md); cells without a source are
+/// empty.
+pub fn line_values(index: usize, s: &Sample) -> Option<[Option<f32>; CELLS]> {
+    let (t, c, st) = (s.telemetry, s.controls, s.state);
+    let tas = st.velocity.length();
+    let ground = (st.velocity.x * st.velocity.x + st.velocity.z * st.velocity.z).sqrt();
+    let heading = |x: f32, z: f32| (x.atan2(-z).to_degrees() + 360.0) % 360.0;
+    let mut v = [None; CELLS];
+    match index {
+        0 => return s.frame,
+        3 => {
+            v[0] = Some(t.airspeed_kt);
+            v[1] = Some(t.airspeed_kt);
+            v[2] = Some(tas * KT_PER_MS);
+            v[3] = Some(ground * KT_PER_MS);
+            v[5] = Some(t.airspeed_kt * MPH_PER_MS / KT_PER_MS);
+            v[6] = Some(tas * MPH_PER_MS);
+            v[7] = Some(ground * MPH_PER_MS);
+        }
+        4 => {
+            v[0] = Some(tas / speed_of_sound(t.altitude_ft * 0.3048));
+            v[2] = Some(t.vertical_speed_fpm);
+        }
+        8 => {
+            v[0] = Some(c.elevator);
+            v[1] = Some(c.aileron);
+            v[2] = Some(c.rudder);
+        }
+        13 => {
+            v[0] = Some(c.elevator_trim);
+            v[1] = Some(c.aileron_trim);
+            v[2] = Some(c.rudder_trim);
+            v[3] = Some(c.flaps);
+            v[4] = Some(c.flaps);
+        }
+        17 => {
+            v[0] = Some(t.pitch_deg);
+            v[1] = Some(t.roll_deg);
+            v[2] = Some(t.heading_deg);
+        }
+        18 => {
+            let body = st.orientation.inverse() * st.velocity;
+            v[0] = Some(t.alpha_deg);
+            v[1] = Some(body.x.atan2(-body.z).to_degrees());
+            v[2] = Some(heading(st.velocity.x, st.velocity.z));
+            v[3] = Some(st.velocity.y.atan2(ground).to_degrees());
+        }
+        20 => {
+            v[2] = Some(t.altitude_ft);
+            v[5] = Some(t.altitude_ft);
+        }
+        21 => {
+            v[0] = Some(st.position.x);
+            v[1] = Some(st.position.y);
+            v[2] = Some(st.position.z);
+            v[3] = Some(st.velocity.x);
+            v[4] = Some(st.velocity.y);
+            v[5] = Some(st.velocity.z);
+        }
+        25 => v[0] = Some(c.throttle),
+        _ => return None,
+    }
+    Some(v)
+}
+
+/// The lines selected by `OPENXPLANE_DATA_OUTPUT` (a comma-separated list of line indexes, like the Data
+/// Output checkboxes of the reference build); `OPENXPLANE_FRAME_RATE` adds line 0.
+pub fn selected_lines() -> Vec<usize> {
+    let mut lines: Vec<usize> = std::env::var("OPENXPLANE_DATA_OUTPUT")
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|t| t.trim().parse().ok())
+        .collect();
+    if std::env::var_os("OPENXPLANE_FRAME_RATE").is_some() {
+        lines.push(0);
+    }
+    lines.sort_unstable();
+    lines.dedup();
+    lines
+}
+
+/// Draws the selected lines one under the other in index order; lines without values are skipped. The
+/// frame-rate line uses its label without the vertical-blank cell.
+pub fn draw_lines(hud: &mut Hud, lines: &[usize], sample: &Sample, scale: f32) {
+    let (x, mut y) = (16.0 * scale, 16.0 * scale);
+    for &index in lines {
+        let Some(values) = line_values(index, sample) else {
+            continue;
+        };
+        let label = if index == 0 {
+            Some(FRAME_RATE_NO_VSYNC.to_string())
+        } else {
+            label(index)
+        };
+        if let Some(label) = label {
+            y += draw_line(hud, x, y, scale, &label, &values) + 6.0 * scale;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +241,48 @@ mod tests {
         assert_eq!(format_value(1.0), "1.0000");
         assert_eq!(format_value(123.456), "123.46");
         assert_eq!(format_value(-1.5), "-1.500");
+    }
+
+    #[test]
+    fn supported_lines_fill_cells_that_have_a_label() {
+        let telemetry = Telemetry {
+            airspeed_kt: 80.0,
+            altitude_ft: 1000.0,
+            vertical_speed_fpm: 500.0,
+            pitch_deg: 5.0,
+            roll_deg: -2.0,
+            heading_deg: 90.0,
+            alpha_deg: 4.0,
+            throttle: 1.0,
+            on_ground: false,
+            stalled_elements: 0,
+        };
+        let controls = Controls::default();
+        let state = State {
+            position: glam::Vec3::new(1.0, 2.0, 3.0),
+            velocity: glam::Vec3::new(40.0, 0.0, 0.0),
+            orientation: glam::Quat::IDENTITY,
+            omega: glam::Vec3::ZERO,
+            time: 0.0,
+        };
+        let sample = Sample {
+            telemetry: &telemetry,
+            controls: &controls,
+            state: &state,
+            frame: None,
+        };
+        for index in [3, 4, 8, 13, 17, 18, 20, 21, 25] {
+            let values = line_values(index, &sample).unwrap();
+            let cells = cell_labels(&label(index).unwrap());
+            for (value, cell) in values.iter().zip(&cells) {
+                assert!(value.is_none() || cell.is_some(), "line {index}");
+            }
+            assert!(values.iter().any(Option::is_some));
+        }
+        let speeds = line_values(3, &sample).unwrap();
+        assert!((speeds[3].unwrap() - 40.0 * KT_PER_MS).abs() < 1e-3);
+        assert!(line_values(100, &sample).is_none());
+        assert!(line_values(0, &sample).is_none());
     }
 
     #[test]

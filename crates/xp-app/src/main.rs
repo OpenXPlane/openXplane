@@ -384,27 +384,32 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
             camera.pitch = 0.18;
             camera.distance = 24.0;
-            if std::env::var_os("OPENXPLANE_FRAME_RATE").is_some() {
-                // the sample values of the reference photograph, to compare the layout
+            let lines = dout::selected_lines();
+            if !lines.is_empty() {
+                // line 0 shows the sample values of the reference photograph, to compare the layout
                 let (fw, fh) = offscreen.size();
                 let mut hud = hud::Hud::new(fw, fh);
                 let scale = (fh as f32 / 800.0).clamp(0.7, 1.6);
-                dout::draw_line(
+                let telemetry = session.model.telemetry(&c);
+                dout::draw_lines(
                     &mut hud,
-                    16.0 * scale,
-                    16.0 * scale,
+                    &lines,
+                    &dout::Sample {
+                        telemetry: &telemetry,
+                        controls: &c,
+                        state: &session.model.state,
+                        frame: Some([
+                            Some(10.462),
+                            Some(19.9),
+                            None,
+                            Some(0.0956),
+                            Some(0.0698),
+                            Some(0.0956),
+                            Some(1.0),
+                            Some(1.0),
+                        ]),
+                    },
                     scale,
-                    dout::FRAME_RATE_NO_VSYNC,
-                    &[
-                        Some(10.462),
-                        Some(19.9),
-                        None,
-                        Some(0.0956),
-                        Some(0.0698),
-                        Some(0.0956),
-                        Some(1.0),
-                        Some(1.0),
-                    ],
                 );
                 offscreen.set_hud(&hud.vertices);
             }

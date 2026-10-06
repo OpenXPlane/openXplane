@@ -71,7 +71,7 @@ const GALLERY = {
     ["assets/gallery/exterior-seaplane.jpg", "Cessna 172 SP seaplane", "The floats variant loads and flies in the model as well."],
   ],
   flight: [
-    ["assets/gallery/ui-frame-rate.jpg", "Frame-rate line", "The reference build's data-output frame-rate line (labels from its code; layout, colour and the sample values are from a photograph of it)."],
+    ["assets/gallery/ui-frame-rate.jpg", "Data-output lines", "Lines 0, 3, 4, 17, 18 and 21 of the reference build's data-output table: labels from its code, layout, colour and the frame-rate sample values from a photograph, the rest from the approximate flight model."],
     ["assets/gallery/flight-000.00s.jpg", "On the runway", "Standing on the gear at the start of runway 16L."],
     ["assets/gallery/flight-017.00s.jpg", "Takeoff roll", "About 17 seconds in, the nose rotating."],
     ["assets/gallery/flight-024.00s.jpg", "Liftoff", "The wheels leave the runway."],
