@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 LOG_CALLS = ('0x1405e18d0', '0x1422c675c', '0x1422c6748', '0x1408943e0', '0x140a31900', '0x1405dcad0')
 CHECK_CALLS = ('0x1411764a0', '0x1408e25a0', '0x141a67610')
 FPCLASSIFY = '0x14230c290'
+# the argument setup of a debug-check call: name and line constants, the object, the value address
+SETUP = re.compile(r'^(leaq .*\(%rip\), %r\w+|movq %r\w+, 0x(20|28)\(%rsp\)|movl \$0x[0-9a-f]+, %r(9|8)d( #.*)?|movq %r\w+, %r(cx|dx)|leaq 0x[0-9a-f]+\(%r\w+\), %r(dx|8|9))')
 
 
 def main():
@@ -47,7 +49,7 @@ def main():
                     break
         if t.startswith('callq') and t.endswith(CHECK_CALLS):
             k = i
-            while k > 0 and k > i - 14 and not ins[k - 1][1].startswith('callq'):
+            while k > 0 and k > i - 14 and SETUP.match(ins[k - 1][1]):
                 k -= 1
             skip.update(range(k, i + 1))
     logs = [i for i, (a, t) in enumerate(ins) if t.startswith('callq') and (t.endswith(LOG_CALLS) or re.search(r'callq \*', t))]
