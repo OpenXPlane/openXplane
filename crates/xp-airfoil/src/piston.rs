@@ -288,22 +288,14 @@ fn piston_levers(
         }
     }
     vm.set_i32(m + 0x210, 0);
-    let call_void = |vm: &mut Vm, env: &mut dyn Callees, address: u64, value: f32| {
-        let mut a = CallArgs::ints(&[m, b, f, u64::from(n as u32)]);
-        a.stack[0] = Some(u64::from(value.to_bits()));
-        env.call(vm, address, a);
-    };
     if vm.i32(engine(vm)) == 0 {
         let slot = i64::from(vm.i32(b + 0xd38 + 4 * n as i64 as u64));
         let input = vm.f32((inputs as i64 + slot * 4) as u64);
         update_engine_kind0(vm, env, m, b, f, n, x6 * input);
     }
     let scaled = x6 * x11;
-    if vm.i32(engine(vm)) == 1 {
-        call_void(vm, env, 0x14119d380, scaled);
-    }
-    if vm.i32(engine(vm)) == 2 {
-        call_void(vm, env, 0x14119d380, scaled);
+    if matches!(vm.i32(engine(vm)), 1 | 2) {
+        update_engine_kind12(vm, env, m, b, f, n, scaled);
     }
     if vm.i32(engine(vm)) == 4 {
         update_engine_kind4(vm, env, m, b, f, n, x6);
@@ -828,4 +820,337 @@ pub fn update_engine_kind0(
     vm.set_f32(m + 0x90, v);
     let v = percent(vm);
     vm.set_f32(m + 0x98, v);
+}
+
+/// `0x1408be0f0(F)`: a float of the flight object (the altitude the temperature tables are indexed by); replayed.
+fn flight_altitude(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> f32 {
+    reply_f32(env.call(vm, 0x1408be0f0, CallArgs::ints(&[f])))
+}
+
+/// A `0..10` limit (`minss` against 10 after the lower bound test).
+fn limit_0_10(v: f32) -> f32 {
+    if 0.0 > v { 0.0 } else { sse_min(10.0, v) }
+}
+
+/// The `[lo, hi]`-limited line `(v1 - v0) * t + v0` between two values (the original's inlined form of
+/// [`interpolate_clamped`] where the parameter `t` is already computed).
+fn line_between(v0: f32, v1: f32, t_line: f32) -> f32 {
+    let lo = sse_min(v0, v1);
+    if lo > t_line {
+        lo
+    } else {
+        sse_min(sse_max(v0, v1), t_line)
+    }
+}
+
+/// `0x14119d380(M, B, F, n, level)`: the handler of engine kinds 1 and 2 (the carburetted and injected piston
+/// engines): the mixture/altitude lookups (`B+0xb00..0xb18` against the runtime atmosphere table), the manifold
+/// pressure and its response, the magneto switches, the fuel flow, the thrust term, the power `M+0xb8`, the speeds
+/// `M+0x90/0x98`, the oil/cylinder terms `M+0x210/0x214` and the lagged fuel-air state `M+0xa0`.
+pub fn update_engine_kind12(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    m: u64,
+    b: u64,
+    f: u64,
+    n: i32,
+    level: f32,
+) {
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let x0 = vm.f32(b + 0x93c) * vm.f32(m + 0x258);
+    let a10 = if 0.0 > x0 { 0.0 } else { sse_min(1.0, x0) };
+    let altitude = flight_altitude(vm, env, f) - 0.0;
+    let e14 = vm.f32(engine(vm) + 0x14);
+    let e18 = vm.f32(engine(vm) + 0x18);
+    let w1 = sse_max(
+        line_between(e14, e18, (e18 - e14) / 10000.0 * altitude + e14),
+        1.0,
+    );
+    let m78 = vm.f32(m + 0x78);
+    let d15 = m78 / w1;
+    if vm.i32(m + 0x6c) != 0 {
+        let clamp_ratio = |q: f32| {
+            if 0.001 > q { 0.001 } else { sse_min(1000.0, q) }
+        };
+        let ca = clamp_ratio(m78 / sse_max(vm.f32(b + 0x9f4), 1.0));
+        let cb = clamp_ratio(m78 / sse_max(e18, 1.0));
+        let s11 = (2.0 / f64::from(ca)) as f32;
+        let two = (cb - 0.0) + (cb - 0.0);
+        let v = 1.0 - two;
+        let c3 = if 0.0 > v { 0.0 } else { sse_min(1.0, v) };
+        let m210 = (f64::from(vm.f32(m + 0x20c))
+            * 0.3
+            * f64::from(vm.f32(m + 0x40))
+            * (f64::from(vm.f32(m + 4)) * 0.8 + 0.2)
+            * f64::from(c3)) as f32;
+        vm.set_f32(m + 0x210, m210);
+        let dt = frame_time(env);
+        let v = (f64::from(vm.f32(m + 0x214)) + dt * f64::from(m210)) as f32;
+        let held = limit_0_10(v);
+        vm.set_f32(m + 0x214, held);
+        let dt = frame_time(env);
+        let v = (f64::from(held) - dt / f64::from(s11)) as f32;
+        vm.set_f32(m + 0x214, limit_0_10(v));
+    }
+    if vm.i32(engine(vm)) == 1 {
+        let (m64, m68) = (vm.f32(m + 0x64), vm.f32(m + 0x68));
+        if m68 > m64 {
+            let t = (m68 - m64) * 0.3 + vm.f32(m + 0x214);
+            vm.set_f32(m + 0x214, limit_0_10(t));
+        }
+    }
+    let running = vm.i32(m + 0x74);
+    vm.set_i32(m + 0x68, vm.i32(m + 0x64));
+    let mut x13 = 0.0f32;
+    if running != 0 {
+        x13 = kind12_running(vm, env, m, b, f, n, level, a10, d15);
+    }
+    kind12_finish(vm, env, m, b, f, n, level, d15, x13, running);
+}
+
+/// The part of [`update_engine_kind12`] for a running engine (`0x14119d65a..0x14119de6d`): the temperature
+/// breakpoints `A1..A5`, the throttle `M+0x40` from the starter, the manifold terms `M+0x240/0x244/0x248`, the
+/// table lookups for the power `M+0xcc`. Returns the magneto fuel factor.
+#[allow(clippy::too_many_arguments)]
+fn kind12_running(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    m: u64,
+    b: u64,
+    f: u64,
+    n: i32,
+    level: f32,
+    a10: f32,
+    d15: f32,
+) -> f32 {
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let k = f64::from(vm.f32(b + 0xb6c)) * 125.0;
+    let a = f64::from(a10) * 0.8;
+    let bterm = f64::from(d15) * 0.2;
+    let breakpoint = |numerator: f64| (((numerator / k) + a) + bterm - 1.0) as f32;
+    let (a1, a2, a3, a4, a5) = (
+        breakpoint(125.0),
+        breakpoint(105.0),
+        breakpoint(110.0),
+        breakpoint(85.0),
+        breakpoint(95.0),
+    );
+    if vm.i32(b + 0xab0) != 0 {
+        let state = vm.u64(f + 0x68b0) + (i64::from(n) * 0x2cc) as u64;
+        if vm.i32(state + 0x1e4) != 0 && !bind(env, f, 0x2fb, 0) && !bind(env, f, 0x239, n) {
+            let l = level - 0.25;
+            let t = (a1 - a5) / f32::from_bits(0x3f266666) * l + a5;
+            let y = line_between(a5, a1, t);
+            let v = if 0.0 > y { 0.0 } else { sse_min(1.0, y) };
+            vm.set_f32(m + 0x40, v);
+        }
+    }
+    let s = vm.f32(m + 0x214) + vm.f32(m + 0x40);
+    let dd = f64::from(s - a5);
+    let u2 = if s > a5 {
+        ((dd * -0.9848) * dd - dd * 0.203) as f32
+    } else {
+        (dd * 3.2) as f32
+    };
+    let dd2 = f64::from(s - a2);
+    let u12 = if s > a2 {
+        (0.015 - dd2 * 0.243) as f32
+    } else {
+        (dd2 * 0.633 + 0.015) as f32
+    };
+    let x6 = (f64::from(u2) + 1.0) as f32;
+    let s1 = signed_pow(vm.f32(m), 0.5);
+    let d15d = f64::from(d15);
+    let inner = ((f64::from(s1) * 0.45 + 0.55) * f64::from(x6)) as f32;
+    let v6 = ((0.25 - d15d * 0.25) + f64::from(inner)) as f32;
+    let mut v6 = clamp(v6, 0.0, 2.0);
+    let e = s - a3;
+    let ed = f64::from(e);
+    let mut q4 = (ed * 0.1235 - (ed * 1.3826) * ed) as f32;
+    if e > 0.0 {
+        q4 = sse_max((ed * -0.14) as f32, q4);
+    }
+    let kind = vm.i32(engine(vm));
+    let threshold = match kind {
+        1 => (f64::from(a5) * 0.95) as f32,
+        2 => (f64::from(a4) * 0.95) as f32,
+        _ => 0.0,
+    };
+    let mut x13 = 0.0f32;
+    if s > threshold {
+        let v = (f64::from(q4) + 1.0) as f32;
+        if v >= 0.0 || v.is_nan() {
+            x13 = sse_min(2.0, v);
+        }
+        if bind(env, f, 0x181, n) {
+            let t = (vm.f64(0x142f01910) * 2.0) as f32;
+            let mut args = CallArgs::ints(&[0, u64::from(n as u32)]);
+            args.xmm[0] = Some(t.to_bits());
+            args.int[0] = None;
+            let noise = reply_f32(env.call(vm, 0x1408bd9d0, args));
+            x13 = ((f64::from(noise) * 0.05 + 0.95) * f64::from(x13)) as f32;
+        }
+        let m48 = vm.i32(m + 0x48);
+        let mut working = 0;
+        if (m48.wrapping_sub(2) as u32) <= 1 && !bind(env, f, 0x151, n) {
+            working = 1;
+        }
+        if (m48.wrapping_sub(1) & !2) == 0 && !bind(env, f, 0x159, n) {
+            working += 1;
+        }
+        if working == 0 {
+            x13 = (f64::from(x13) * 0.0) as f32;
+            v6 = (f64::from(v6) * 0.0) as f32;
+        } else if working == 1 {
+            x13 = (f64::from(x13) * 0.95) as f32;
+            v6 = (f64::from(v6) * 1.04) as f32;
+        }
+        vm.set_f32(m + 0x240, v6);
+        vm.set_f32(m + 0x244, v6);
+        vm.set_f32(m + 0x248, (f64::from(u12) + 1.0) as f32);
+    }
+    // the power from the altitude and temperature tables
+    let r1 = flight_altitude(vm, env, f);
+    let k208 = f32::from_bits(0x3e9c0ebf);
+    let la = table_lookup(vm, table_position(vm.f32(b + 0xb04)));
+    let lb = table_lookup(vm, table_position(vm.f32(b + 0xb00)));
+    let lc = table_lookup(vm, table_position(r1 * k208));
+    let h1 = interpolate_clamped(la, vm.f32(b + 0xb14), lb, vm.f32(b + 0xb10), lc);
+    let r2 = flight_altitude(vm, env, f);
+    let la = table_lookup(vm, table_position(vm.f32(b + 0xb04)));
+    let lb = table_lookup(vm, table_position(vm.f32(b + 0xb00)));
+    let lc = table_lookup(vm, table_position(r2 * k208));
+    let h2 = interpolate_clamped(la, vm.f32(b + 0xb0c), lb, vm.f32(b + 0xb08), lc);
+    let h = if a3 == a4 {
+        (h2 + h1) * 0.5
+    } else {
+        (h1 - h2) / (a4 - a3) * (s - a3) + h2
+    };
+    let v0 = vm.f32(engine(vm) + 4) * vm.f32(b + 0xb18) * vm.f32(m + 0x258);
+    if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
+        let a1b = (f64::from(v0) + f64::from(v0)) as f32;
+        let m25c = vm.f32(m + 0x25c);
+        let r = interpolate_clamped(0.0, v0, a1b, m25c, m25c);
+        vm.set_f32(m + 0xcc, r * sse_max(h, 0.0));
+    }
+    x13
+}
+
+/// The common end of [`update_engine_kind12`] (`0x14119de7f..0x14119e559`): the load terms of the cylinder
+/// temperature and the power, the thrust term, the fuel-air lag `M+0xa0`.
+#[allow(clippy::too_many_arguments)]
+fn kind12_finish(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    m: u64,
+    b: u64,
+    f: u64,
+    n: i32,
+    level: f32,
+    d15: f32,
+    x13: f32,
+    running: i32,
+) {
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
+        let v = running as f32 * vm.f32(m + 0x22c) * vm.f32(m + 0xcc);
+        vm.set_f32(m + 0xcc, v);
+        let t = reply_f32(env.call(vm, 0x1411b0a30, CallArgs::ints(&[b, u64::from(n as u32)])));
+        vm.set_f32(m + 0xcc, t * vm.f32(m + 0x210) + v);
+    }
+    let cl = if 0.0 > d15 { 0.0 } else { sse_min(1.0, d15) };
+    let b9f0 = f64::from(vm.f32(b + 0x9f0));
+    let x14 = (b9f0 * 0.61) as f32;
+    let x12 = (b9f0 * 0.075) as f32;
+    let t10 = ((f64::from(x12) + 1.0) + f64::from(x14)) as f32;
+    let v = (f64::from(cl) * 0.4 + 0.6) as f32;
+    let p = signed_pow(v, f32::from_bits(0x3ecccccd));
+    let m258 = vm.f32(m + 0x258);
+    let x6 = p * t10 * level * x13 * m258;
+    let pw = signed_pow(d15, 1.6);
+    let s100 = (f64::from(d15) * 100.0) as f32;
+    let q10 = if -1.0 > s100 {
+        -1.0
+    } else {
+        sse_min(1.0, s100)
+    };
+    let m214 = f64::from(vm.f32(m + 0x214));
+    let x3 = pw * x14 * m258 + q10 * x12 * m258;
+    let v9 = ((m214 + 1.0) * f64::from(x6)) as f32;
+    let a = ((1.0 - f64::from(vm.f32(m + 0x2bc))) * f64::from(q10) + f64::from(x3)) as f32;
+    let b9f4 = vm.f32(b + 0x9f4);
+    let mut extra = 0.0f32;
+    if b9f4 > 0.0 {
+        let n958 = vm.i32(b + 0x958) as f32;
+        let a1 = (f64::from(b9f4) * 0.5) as f32;
+        let v1 = (1.0 / f64::from(n958)) as f32;
+        extra = interpolate_clamped(b9f4, 0.0, a1, v1, vm.f32(m + 0x78).abs());
+        let angle = vm.f32(m + 0x84) * f32::from_bits(0x3c8efa36) * n958;
+        extra *= angle.sin();
+    }
+    let x14b = a + extra;
+    let e0c = vm.f32(engine(vm) + 0xc);
+    let thrust = thrust_term_of(vm, env, f, n);
+    let s_pos = sse_max(s100, 0.0);
+    let friction = vm.f32(m + 0x268) / sse_max(vm.f32(m + 0x78), 0.01);
+    let power = thrust * e0c + (v9 - x14b) * e0c - friction;
+    vm.set_f32(m + 0x90, s_pos);
+    vm.set_f32(m + 0x98, s_pos);
+    vm.set_f32(m + 0xb8, power);
+    let e64 = vm.f32(engine(vm) + 0x64);
+    let g = if 0.1 > e64 { 0.1 } else { sse_min(2.0, e64) };
+    let v9n = v9 / t10;
+    let m_cc = vm.f32(m + 0xcc);
+    let sg = g.sqrt() * power;
+    let q11 = v9n * d15;
+    vm.set_f32(m + 0xb8, sg);
+    let x10 = m_cc / (vm.f32(engine(vm) + 4) * vm.f32(b + 0xb08));
+    let p2 = signed_pow(v9n, 0.5);
+    let t = (q11 - x10) * (p2 - 0.0) + x10;
+    let y = line_between(x10, q11, t);
+    vm.set_f32(m + 0x248, y * vm.f32(m + 0x248));
+    let x9 = vm.f32(m + 0x254) * f32::from_bits(0x41ef5eb8);
+    let mut x6f = (friction + sg) / vm.f32(engine(vm) + 0xc) + extra;
+    if x13 > 0.0 {
+        x6f += x14b;
+        x6f /= x13;
+        x6f -= x14b;
+    }
+    if 0.0 > x6f {
+        x6f = (f64::from(x6f) * 0.6) as f32;
+    }
+    let pc = (f64::from(x6f) * 100.0) as f32;
+    let pw3 = signed_pow(pc, f32::from_bits(0x3f99999a));
+    let b1a64 = f64::from(vm.f32(b + 0x1a64));
+    let w = sse_max((f64::from(pw3) * 0.105 + 9.5) as f32, 0.0);
+    let mut x6g = (f64::from(w) * (b1a64 / 35.5)) as f32;
+    if x13 == 0.0 {
+        let l = level - f32::from_bits(0x3e19999a);
+        let t = (x9 - x6g) / f32::from_bits(0x3f59999a) * l + x6g;
+        x6g = line_between(x6g, x9, t);
+    }
+    let b9f4 = vm.f32(b + 0x9f4);
+    if b9f4 == 0.0 {
+        x6g = (x6g + x9) * 0.5;
+    } else {
+        let t = (x9 - x6g) / (0.0 - b9f4) * (vm.f32(m + 0x78) - b9f4) + x6g;
+        x6g = line_between(x6g, x9, t);
+    }
+    if 1.0 > vm.f32(b + 0x938) {
+        x6g *= signed_pow(vm.f32(m + 0x254), 0.25);
+        if 0.0 > x6g {
+            x6g = 0.0;
+        } else {
+            let lim =
+                (f64::from(x9 * vm.f32(b + 0x1a64)) / 29.92 * f64::from(vm.f32(b + 0x9e0))) as f32;
+            if x6g > lim {
+                x6g = lim;
+            }
+        }
+    }
+    let dt = frame_time(env);
+    let g = (dt * 4.0) as f32;
+    let g = clamp(g, 0.0, 1.0);
+    let lagged = (1.0 - g) * vm.f32(m + 0xa0) + g * x6g;
+    vm.set_f32(m + 0xa0, lagged);
 }

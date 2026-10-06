@@ -222,5 +222,17 @@ follows `heat_rate`, `M+0xb8` is the summed drive less the lubrication term `c58
 are the speed in percent. Note the first-argument objects: the cooling reference `B+0x1afc`, limit `B+0x1b18` and the
 size terms `B+0x7ac..0x7bc` are read from the aircraft object, not from the part.
 
-Not ported: the kind handler for kinds 1 and 2 (`0x14119d380`, 1000 instructions), and the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
+The kind 1 and 2 handler `update_engine_kind12` (`0x14119d380(M, B, F, n, level)`, 1004 instructions; the two
+piston types of the engine table, `RCP_CRB` and `RCP_INJ`: the Cessna 172 SP is kind 2) is ported too. The engine type
+strings at `0x1427bd2f8` are, in order, `ELE` (kind 0, the heat model above), `RCP_CRB` (1), `RCP_INJ` (2), `TRB_FRE`
+(3), `TRB_FIX` (4), then the jets. The handler: the lean/rich mixture response (`M+0x210/0x214`, a first-order
+system with rate `M+0x20c` and decay time `2/ca`), the five altitude/temperature breakpoints `A1..A5 = K/(125 B+0xb6c)
++ 0.8 a + 0.2 d - 1` for `K` = 125, 105, 110, 85, 95, the throttle `M+0x40` from the starter, the manifold terms
+`M+0x240/0x244/0x248` (each cut by the magneto switches: `M+0x48` selects which of the inputs `0x151`/`0x159` count),
+the mixture-density lookups in the atmosphere table at the two sets of `B+0xb00..0xb14`, the power `M+0xcc`, the
+manifold pressure terms (the 29.92 inHg of `0x14254d9c8`), the thrust term, `M+0xb8`, `M+0x90/0x98` and the lagged
+fuel-air state `M+0xa0` (factor 4 times the frame time). 200 emulator cases (about 60 of kinds 1 and 2, 40 of
+them running) are identical, NaN-free.
+
+Not ported: the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
 the global clock).
