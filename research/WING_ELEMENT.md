@@ -167,3 +167,11 @@ accumulated by `+=` at the end (`0x1412230dd`).
 Not established: the meaning of each aircraft field, the helpers `0x1406ea0b0` and `0x1411b1cf0`, and all
 constants. Porting it needs an emulator harness that fills the aircraft and wing objects with plausible random
 data and compares the four outputs bit for bit.
+
+## Control-surface helper `0x141221220`: ported
+
+Ported as `control_surface_terms` in `crates/xp-airfoil/src/wing_element.rs` with `angle_shape` (`0x1411b1cf0`) and
+`interpolate_clamped` (`0x1406ea0b0`). Verified against 2000 emulator cases (the input-binding query is replaced
+by a stub that answers from a bit mask): 1951 bit-identical, the rest within 16 ulp (the platform's `sin`, `cos`
+and `atan2` against the C runtime's). The diagnostic output is not ported. What the aircraft fields stand for
+(`+0x1d20..+0x1d28`, `+0x1f74`, `+0x1f78..+0x1fc4`) and the meaning of the binding ids are still not established.

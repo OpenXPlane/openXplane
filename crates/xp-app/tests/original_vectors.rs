@@ -280,6 +280,97 @@ fn small_wing_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn control_surface_terms_match_the_original_machine_code() {
+    use openxplane::wing_element::{ControlSurface, control_deflection, control_surface_terms};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/control_surface.txt"
+    ))
+    .unwrap();
+    let offsets = [
+        (0xb, [0x324, 0x328, 0x1dfc, 0x1e00]),
+        (0xc, [0x354, 0x358, 0x1e0c, 0x1e10]),
+        (0xd, [0x444, 0x448, 0x1e18, 0x1e1c]),
+        (0xe, [0x474, 0x478, 0x1e28, 0x1e2c]),
+        (0xf, [0x4a4, 0x4a8, 0x1e3c, 0x1e40]),
+        (0x10, [0x384, 0x388, 0x1e4c, 0x1e50]),
+        (0x11, [0x3b4, 0x3b8, 0x1e60, 0x1e64]),
+        (0x12, [0x3e4, 0x3e8, 0x1e74, 0x1e78]),
+        (0x13, [0x414, 0x418, 0x1e88, 0x1e8c]),
+        (0x14, [0x534, 0x538, 0x1e9c, 0x1ea0]),
+        (0x15, [0x564, 0x568, 0x1ec4, 0x1ec8]),
+        (0x16, [0x4d4, 0x4d8, 0x1ee0, 0x1ee4]),
+        (0x17, [0x504, 0x508, 0x1ef0, 0x1ef4]),
+    ];
+    let (mut cases, mut exact, mut worst, mut changed) = (0, 0, 0u32, 0);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let code: u32 = t[0].parse().unwrap();
+        let element: i32 = t[1].parse().unwrap();
+        let mask = u32::from_str_radix(t[2], 16).unwrap();
+        let v: Vec<f32> = t[3..7].iter().map(|h| f(h)).collect();
+        let (w0, w20, x2c, x1bc, angle) = (f(t[7]), f(t[8]), f(t[9]), f(t[10]), f(t[11]));
+        let modes: Vec<i32> = t[12..15].iter().map(|x| x.parse().unwrap()).collect();
+        let kind: i32 = t[15].parse().unwrap();
+        let index: usize = t[16].parse().unwrap();
+        let ratios: Vec<f32> = t[17..23].iter().map(|h| f(h)).collect();
+        let table_a: Vec<f32> = t[23..28].iter().map(|h| f(h)).collect();
+        let table_b: Vec<f32> = t[28..33].iter().map(|h| f(h)).collect();
+        let chords: Vec<f32> = t[33..53].iter().map(|h| f(h)).collect();
+        let old: Vec<f32> = t[53..57].iter().map(|h| f(h)).collect();
+        let want: Vec<f32> = t[57..61].iter().map(|h| f(h)).collect();
+        let at = offsets.iter().find(|o| o.0 == code).unwrap().1;
+        let wing = |o: usize| {
+            if o == at[0] {
+                v[0]
+            } else if o == at[1] {
+                v[1]
+            } else {
+                chords[(o - 0x70) / 4]
+            }
+        };
+        let control = |o: usize| if o == at[2] { v[2] } else { v[3] };
+        let deflection = control_deflection(code, &wing, &control, element).unwrap();
+        let input = ControlSurface {
+            code,
+            deflection,
+            chord: chords[element as usize],
+            wing_0: w0,
+            wing_20: w20,
+            x_2c: x2c,
+            x_1bc: x1bc,
+            angle_deg: angle,
+            modes: [modes[0], modes[1], modes[2]],
+            kind,
+            table_a: table_a[index],
+            table_b: table_b[index],
+            ratios: [
+                ratios[0], ratios[1], ratios[2], ratios[3], ratios[4], ratios[5],
+            ],
+        };
+        let driven = |id: u32| mask >> (id - 0x2d9) & 1 == 1;
+        let mut got = old.clone();
+        if let Some(terms) = control_surface_terms(&input, &driven) {
+            changed += 1;
+            for k in 0..4 {
+                got[k] = terms[k] + old[k];
+            }
+        }
+        cases += 1;
+        let off = (0..4).map(|k| ulps(got[k], want[k])).max().unwrap();
+        worst = worst.max(off);
+        exact += usize::from(off == 0);
+    }
+    println!("{cases} cases, {changed} change the outputs, exact {exact}, worst {worst} ulp");
+    assert!(cases >= 1500 && changed > 800);
+    // sin, cos and atan2 come from the platform's libm here and from the C runtime in the original
+    assert!(worst <= 64, "outputs differ by {worst} ulp");
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

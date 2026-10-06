@@ -132,6 +132,210 @@ pub fn angle_shape(x: f32) -> f32 {
     r * sign
 }
 
+/// Everything `0x141221220` reads, named by its offset in the original objects: `A` the aircraft/flight
+/// object, `W` the wing object and `X` the wing-element array object.
+#[derive(Clone, Copy, Debug)]
+pub struct ControlSurface {
+    /// Control surface code, `0xb..=0x17`.
+    pub code: u32,
+    /// The deflection from [`control_deflection`] and the chord at the element (`W+0x70+4i`).
+    pub deflection: f32,
+    pub chord: f32,
+    /// `W+0x0` and `W+0x20`.
+    pub wing_0: f32,
+    pub wing_20: f32,
+    /// `X+0x2c+4i` and `X+0x1bc+4i`.
+    pub x_2c: f32,
+    pub x_1bc: f32,
+    /// The angle argument in degrees.
+    pub angle_deg: f32,
+    /// `A+0x1d20`, `A+0x1d24`, `A+0x1d28` and `A+0x1f74`.
+    pub modes: [i32; 3],
+    pub kind: i32,
+    /// `A+0x1f84+4k` and `A+0x1fc4+4k` at the table index `A+0x1eb0`.
+    pub table_a: f32,
+    pub table_b: f32,
+    /// `A+0x1f78`, `+0x1f7c`, `+0x1f80`, `+0x1fb8`, `+0x1fbc`, `+0x1fc0`.
+    pub ratios: [f32; 6],
+}
+
+const DEGREES: f32 = 57.295_776;
+const DEAD_ZONE: f32 = 0.01;
+
+/// The magnitude floor the original applies to a divisor: values below -0.01 or above 0.01 stay,
+/// the rest become -0.01 (negative input) or 0.01.
+#[allow(clippy::manual_range_contains)]
+fn floor_magnitude(v: f32) -> f32 {
+    if -DEAD_ZONE > v || v > DEAD_ZONE {
+        v
+    } else if 0.0 > v {
+        -DEAD_ZONE
+    } else {
+        DEAD_ZONE
+    }
+}
+
+/// The original divides by the literal 0.7071, not by the square root of one half.
+#[allow(clippy::approx_constant)]
+fn sine_ratio(degrees: f32) -> f32 {
+    ((degrees * RADIANS_PER_DEGREE).sin() as f64 / 0.7071) as f32
+}
+
+/// `0x141221220`: the four terms the control surface of `code` adds to the element's force and moment
+/// accumulators (the original does `out += term` on four float32 outputs), or `None` when it adds
+/// nothing. `driven(id)` answers the original's input-binding queries (`0x1407ace10`, ids
+/// `0x2d9..=0x2f0`). The diagnostic output of the original is not ported. Trigonometric functions come
+/// from the platform's libm, so the last bits can differ.
+pub fn control_surface_terms(i: &ControlSurface, driven: &dyn Fn(u32) -> bool) -> Option<[f32; 4]> {
+    let c = i.deflection / i.chord;
+    let w0 = i.wing_0;
+    // which of the two driven paths applies, or neither
+    #[derive(PartialEq)]
+    enum Path {
+        None,
+        A,
+        B,
+    }
+    let flagged = |first: u32, second: u32, path: Path| -> Path {
+        let flag = 0.0 > w0 && driven(first);
+        let direct = w0 > 0.0 && driven(second);
+        if flag || direct { path } else { Path::None }
+    };
+    let path = match i.code {
+        0xb => flagged(0x2d9, 0x2da, Path::B),
+        0xc => flagged(0x2db, 0x2dc, Path::B),
+        0x10 => flagged(0x2dd, 0x2de, Path::B),
+        0x11 => flagged(0x2df, 0x2e0, Path::B),
+        0xf => flagged(0x2e7, 0x2e8, Path::B),
+        0xd => flagged(0x2e3, 0x2e4, Path::A),
+        0xe => flagged(0x2e5, 0x2e6, Path::A),
+        0x16 => flagged(0x2e9, 0x2ea, Path::A),
+        0x17 => flagged(0x2eb, 0x2ec, Path::A),
+        0x12 if driven(0x2e1) => Path::B,
+        0x13 if driven(0x2e2) => Path::B,
+        0x14 => {
+            let (mut flag, mut direct) = (false, false);
+            if 0.0 > w0 {
+                flag = driven(0x2ed);
+                direct = driven(0x2ef);
+            }
+            if flag || direct { Path::B } else { Path::None }
+        }
+        0x15 => {
+            let (mut flag, mut direct) = (false, false);
+            if w0 > 0.0 {
+                flag = driven(0x2ee);
+                direct = driven(0x2f0);
+            }
+            if flag || direct { Path::B } else { Path::None }
+        }
+        _ => Path::None,
+    };
+    match path {
+        Path::A => {
+            let t = (-i.x_2c * c) as f64 * 0.1;
+            return Some([t as f32, 0.0, 0.05, 0.0]);
+        }
+        Path::B => {
+            let v = f64::from(-i.x_2c * c);
+            let last = ((0.75 - f64::from(c) * 0.5) * -0.0) as f32;
+            return Some([(v + v) as f32, 0.0, 0.1, last]);
+        }
+        Path::None => {}
+    }
+
+    let angle = i.angle_deg;
+    if angle.is_nan() || angle.abs() <= 0.0 {
+        return None;
+    }
+    let preamble = matches!(i.code, 0xb | 0xc | 0x10..=0x15);
+    let first = if preamble {
+        let r = angle * RADIANS_PER_DEGREE;
+        let d = ((r.cos() * c) as f64 + (1.0 - f64::from(c))) as f32;
+        let s = r.sin() * c;
+        let degrees = f64::from(s.atan2(d) * DEGREES);
+        let scale = match i.kind {
+            5 => 0.54,
+            1..=4 => 0.48,
+            _ => 0.6,
+        };
+        (degrees * scale) as f32
+    } else {
+        0.0
+    };
+    let radians = angle * RADIANS_PER_DEGREE;
+    let abs_radians = angle.abs() * RADIANS_PER_DEGREE;
+    let flap_like = |first: f32| {
+        let s = f64::from(radians.sin());
+        let t = s * (f64::from(c) * 1.23);
+        [first, 0.0, (t + t) as f32, 0.0]
+    };
+    let terms = match i.code {
+        0xf => flap_like(first),
+        0x16 | 0x17 if i.wing_20.abs() > 45.0 => flap_like(first),
+        0x16 | 0x17 | 0xd | 0xe => {
+            let r = (1.0 - f64::from((i.x_1bc * i.x_1bc).abs())) as f32;
+            let g = if 0.0 > r { 0.0 } else { sse_min(1.0, r) };
+            let s = abs_radians.sin() * c;
+            let second = (f64::from(-s * g) * 8.0) as f32;
+            let third = s * g;
+            [first, second, third, third]
+        }
+        0xb | 0xc | 0x10..=0x13 => {
+            let r1 = interpolate_clamped(0.0, 1.0, 15.0, 0.75, angle.abs());
+            let mut second = (f64::from(r1) * (f64::from(c * angle) * 0.1)) as f32;
+            let v = i.x_1bc;
+            let sign_a = if 0.0 > angle { -1.0f32 } else { 1.0 };
+            let sign_v = if 0.0 > v { -1.0f32 } else { 1.0 };
+            let limit = if sign_a == sign_v {
+                let f = (1.0 - f64::from(v.abs())) as f32;
+                if 0.0 > f { 0.0 } else { sse_min(1.0, f) }
+            } else {
+                1.0
+            };
+            second *= limit;
+            let mode = match i.code {
+                0xb | 0xc => i.modes[0],
+                0x10 | 0x11 => i.modes[1],
+                _ => i.modes[2],
+            };
+            let gain = match mode {
+                0 => 0.8,
+                1 => 0.9,
+                3 => 1.5,
+                _ => 1.0,
+            };
+            second *= gain;
+            let ratio = sine_ratio(angle.abs()) * interpolate_clamped(0.0, 0.0, 0.35, 1.0, c);
+            let third = (f64::from(ratio) * 0.14) as f32;
+            let fourth = ((0.75 - f64::from(c) * 0.5) * f64::from(-second)) as f32;
+            [first, second, third, fourth]
+        }
+        0x14 => {
+            let shape = angle_shape(i.table_a);
+            let floor = floor_magnitude(shape);
+            let applied = angle_shape(angle);
+            let second = applied * i.ratios[0] / floor;
+            let divisor = floor_magnitude(sine_ratio(i.table_a.abs()));
+            let third = sine_ratio(angle.abs()) * i.ratios[1] / divisor;
+            let fourth = applied * i.ratios[2] / floor_magnitude(shape);
+            [first, second, third, fourth]
+        }
+        0x15 => {
+            let shape = angle_shape(i.table_b);
+            let floor = floor_magnitude(shape);
+            let applied = angle_shape(angle);
+            let second = applied * i.ratios[3] / floor;
+            let divisor = floor_magnitude(sine_ratio(i.table_b.abs()));
+            let third = sine_ratio(angle.abs()) * i.ratios[4] / divisor;
+            let fourth = applied * i.ratios[5] / floor_magnitude(shape);
+            [first, second, third, fourth]
+        }
+        _ => [0.0; 4],
+    };
+    Some(terms)
+}
+
 fn clamp01_low_high(v: f32) -> f32 {
     // `if 0 > v { 0 } else { min(1, v) }` as comiss/minss
     if 0.0 > v { 0.0 } else { 1.0f32.min(v) }
