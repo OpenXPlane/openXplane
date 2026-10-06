@@ -933,6 +933,46 @@ fn atmosphere_accessors_match_the_original_machine_code() {
 }
 
 #[test]
+fn force_totals_match_the_original_machine_code() {
+    use openxplane::forces::{Words, force_totals};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/force_totals.txt"
+    ))
+    .unwrap();
+    let offsets: Vec<usize> = (0x2b0..0x340)
+        .step_by(4)
+        .chain((0x6750..0x67d0).step_by(4))
+        .collect();
+    let (mut cases, mut skipped) = (0, 0);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let (before, after) = line.split_once(" | ").unwrap();
+        let read = |part: &str| -> Vec<u32> {
+            part.split_whitespace()
+                .map(|h| u32::from_str_radix(h, 16).unwrap())
+                .collect()
+        };
+        let (before, after) = (read(before), read(after));
+        assert_eq!(before.len(), offsets.len());
+        let mut words = Words::default();
+        for (o, v) in offsets.iter().zip(&before) {
+            words.0.insert(*o, *v);
+        }
+        skipped += usize::from(words.i32(0x675c) != 0);
+        force_totals(&mut words);
+        for (o, v) in offsets.iter().zip(&after) {
+            assert_eq!(words.0[o], *v, "offset {o:#x} in {line}");
+        }
+        cases += 1;
+    }
+    println!("{cases} cases, {skipped} with the totals supplied from outside");
+    assert!(cases >= 300 && skipped > 20);
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

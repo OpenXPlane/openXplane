@@ -8,6 +8,7 @@ pub mod atmosphere;
 pub mod buffet;
 pub mod element_force;
 pub mod engine;
+pub mod forces;
 pub mod fuel;
 pub mod profile;
 pub mod regimes;

@@ -1,0 +1,16 @@
+# The flight model step (`0x1412656b0`)
+
+A 60 KB function that runs the aircraft's physics for one step. Parts of it are ported by running a block of it in
+the emulator on random data (the block must not call state-dependent functions; the debug range checks are
+replaced by a stub that returns).
+
+## Force and moment totals (block `0x14126f37f..0x14126f7f3`) - ported
+
+`forces::force_totals`. In aircraft axes the flight object keeps, for each of the three forces (axial, normal,
+side) and three moments (L, M, N), the contribution of the propeller, the aerodynamics, the landing gear, the
+aircraft mass (moments only) and a plug-in, plus the total: `+0x2bc..+0x2cc` axial, `+0x2d0..+0x2e0` normal,
+`+0x2e4..+0x2f4` side, `+0x2f8..+0x30c` L, `+0x310..+0x324` M, `+0x328..+0x33c` N (the names are the
+`sim/flightmodel/forces` datarefs). When the flag `+0x676c` (propeller), `+0x6768` (aerodynamics) or `+0x6770`
+(gear) is set, that group's six values are replaced from the override area `+0x6780..+0x67c0`; the totals are the
+aerodynamic term plus the propeller, gear, mass and plug-in terms in that order. When `+0x675c` is set the
+block does nothing (the totals come from outside). 300 emulator cases are identical.
