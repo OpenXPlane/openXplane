@@ -123,3 +123,57 @@ pub fn limit_b(vm: &Vm, obj: u64, n: i32, binding: &mut dyn FnMut(u32, i32) -> b
     }
     false
 }
+
+fn finite_or_zero(v: f32) -> f32 {
+    if v.is_finite() { v } else { 0.0 }
+}
+
+/// `0x1411767f0(F, f, a2, a3)`: an axial force `f` (a non-finite value counts as zero) at the point whose other
+/// two coordinates are `a2` and `a3`: `F+0x2bc += f`, `F+0x310 += f * a3`, `F+0x328 += f * a2`.
+pub fn add_axial_force(vm: &mut Vm, f_addr: u64, f: f32, a2: f32, a3: f32) {
+    let f = finite_or_zero(f);
+    vm.set_f32(f_addr + 0x2bc, f + vm.f32(f_addr + 0x2bc));
+    vm.set_f32(f_addr + 0x310, f * a3 + vm.f32(f_addr + 0x310));
+    vm.set_f32(f_addr + 0x328, f * a2 + vm.f32(f_addr + 0x328));
+}
+
+/// `0x141176be0(F, f, a2, a3)`: a normal force: `F+0x2d0 += f`, `F+0x2f8 -= f * a2`, `F+0x310 -= f * a3`.
+pub fn add_normal_force(vm: &mut Vm, f_addr: u64, f: f32, a2: f32, a3: f32) {
+    let f = finite_or_zero(f);
+    vm.set_f32(f_addr + 0x2d0, f + vm.f32(f_addr + 0x2d0));
+    vm.set_f32(f_addr + 0x2f8, vm.f32(f_addr + 0x2f8) - f * a2);
+    vm.set_f32(f_addr + 0x310, vm.f32(f_addr + 0x310) - f * a3);
+}
+
+/// `0x141176e30(F, f, a2, a3)`: a side force: `F+0x2e4 += f`, `F+0x2f8 += f * a2`, `F+0x328 -= f * a3`.
+pub fn add_side_force(vm: &mut Vm, f_addr: u64, f: f32, a2: f32, a3: f32) {
+    let f = finite_or_zero(f);
+    vm.set_f32(f_addr + 0x2e4, f + vm.f32(f_addr + 0x2e4));
+    vm.set_f32(f_addr + 0x2f8, f * a2 + vm.f32(f_addr + 0x2f8));
+    vm.set_f32(f_addr + 0x328, vm.f32(f_addr + 0x328) - f * a3);
+}
+
+/// `0x141176a30(F, a, b, c, g5, g6, g7)`: the force `(g5, g6, g7)` given in the world axes is rotated into the
+/// aircraft axes with the sine/cosine pairs of `F+0x430..0x454`, added at the point `(a, b, c)` as an axial, a
+/// side and a normal force, and its magnitude is stored at `F+0x294`.
+pub fn add_world_force(vm: &mut Vm, f_addr: u64, point: [f32; 3], force: [f32; 3]) {
+    let [a, b, c] = point;
+    let [g5, g6, g7] = force;
+    let (s1, c1) = (vm.f32(f_addr + 0x440), vm.f32(f_addr + 0x444));
+    let (s0, c0) = (vm.f32(f_addr + 0x430), vm.f32(f_addr + 0x434));
+    let (s2, c2) = (vm.f32(f_addr + 0x450), vm.f32(f_addr + 0x454));
+    let u = c1 * g7 - s1 * g5;
+    let v = c1 * g5 + s1 * g7;
+    let t = u * s0 + c0 * g6;
+    let w3 = u * c0 - s0 * g6;
+    let w1 = t * c2 + v * s2;
+    let w2 = v * c2 - t * s2;
+    add_axial_force(vm, f_addr, w3, a, b);
+    add_side_force(vm, f_addr, w2, b, c);
+    add_normal_force(vm, f_addr, w1, a, c);
+    let sum = w2 * w2 + w1 * w1 + w3 * w3;
+    vm.set_f32(
+        f_addr + 0x294,
+        if 0.0 > sum { f32::NAN } else { sum.sqrt() },
+    );
+}
