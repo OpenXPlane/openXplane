@@ -2908,3 +2908,19 @@ fn wash_jets_match_the_original_machine_code() {
 fn wash_parts_match_the_original_machine_code() {
     wash_stage("wash_2.txt", Some(openxplane::wash::Stop::Parts));
 }
+
+#[test]
+fn wing_chain_factor_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("chain.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (x, a, b) = (
+            hex(&case.header[1]),
+            hex(&case.header[2]),
+            hex(&case.header[3]),
+        );
+        openxplane::flight_step::wing_chain_factor(&mut case.vm, x, a, b);
+        words_match(&case, n);
+    }
+}

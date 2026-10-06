@@ -290,3 +290,15 @@ the runtime atmosphere table at the altitude, second floats of the entries), the
 (`0x141ba63a0` of the altitude `0x141ba6df0 * 0.3048 + h`), `F+0x70 = ratio / 1.225`, the pressure `F+0x68 = ratio *
 287.053 * T` (Kelvin), the speed of sound `F+0x74 = sqrt(401.874 T)` and the total temperature `F+0x64 = (1 + 0.2 M^2)
 T - 273.15` with the Mach number `F+0x420`. The three weather-object accessors are replayed. 150 cases identical.
+
+`wing_chain_factor` (`0x14121a9b0(W, X, &list_a, &list_b, log)`, called from the first loop of the step with the lists of
+chained wings, which it releases): see the function's doc comment; 120 cases identical (the vector release call
+`0x1422e7c2c` is stubbed). The wash `0x14117d970` is ported in two of its sections (`crates/xp-airfoil/src/wash.rs`:
+the jet exhaust of the engines of kinds 5 and 6, and the propeller slipstream of the parts, each compared from the
+function entry to a checkpoint, 80 cases): for an engine part the point is rotated into the propeller axes
+(`0x141296900`, whose six stack floats are `sin, cos` of the angles `+0x79c`, `+0x7a0`, `+0x7a4`), the normalized
+radius and axial position give the swirl and thrust velocity profiles, and the result is rotated back and added to the
+three outputs after finite-value guards. Not ported: the wake of the wings and bodies and the last stage
+(`0x141186930`, 526 instructions) of the wash, the radiator/gear loop of the step (it uses the terrain probe and
+standard containers) and the gear contact function `0x1411c8690` (2300 instructions, terrain-driven; no DSF scenery
+is available to verify it).

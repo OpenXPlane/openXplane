@@ -567,3 +567,59 @@ pub fn atmosphere_step(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     let total = (f64::from(mach * mach) * 0.2 + 1.0) * tk - f64::from_bits(0x4071126660000000);
     vm.set_f32(f + 0x64, total as f32);
 }
+
+/// `0x14121a9b0(W, X, &list_a, &list_b, log)`: the wing-chain factor of the wing state `X`: over the wings of the
+/// list `a` (records `W_k`) and the matching state lists `b`, every element contributes the weight
+/// `s^2 |f|` (its relative speed `X_k+0x54+4e` squared and the factor at `+0xf4+4e`) and the ratio of its distance
+/// from the wing's reference point `(W_k+0x36b0, +0x36b4)` to the distance from `(+0x36bc, +0x36c0)`; the clamped
+/// mean ratio `r` gives `X+0 = 2 (1 - r)` held to 0.5..2. The aerodynamic state fields `X+0x25c..0x294` are cleared
+/// and `X+0x288/0x28c/0x290` set to 1; the two lists are released (their begin, end and capacity words zeroed).
+pub fn wing_chain_factor(vm: &mut Vm, x: u64, list_a: u64, list_b: u64) {
+    for off in (0x25c..0x294).step_by(4) {
+        vm.set_u32(x + off, 0);
+    }
+    for off in [0x288, 0x28c, 0x290] {
+        vm.set_f32(x + off, 1.0);
+    }
+    let (mut sum_dist, mut sum_weight) = (0.005f32, 0.01f32);
+    let begin = vm.u64(list_a);
+    let count = (vm.u64(list_a + 8).wrapping_sub(begin) as i64) >> 3;
+    let b_begin = vm.u64(list_b);
+    for k in 0..count {
+        let wk = vm.u64(begin + 8 * k as u64);
+        let xk = vm.u64(b_begin + 8 * k as u64);
+        let elements = vm.i32(wk + 4);
+        let [ax, ay, _, _] = boundary_arrays(vm, wk, elements);
+        for e in 0..elements.max(0) {
+            let cell = xk + 0x54 + 4 * e as u64;
+            let weight = vm.f32(cell) * vm.f32(cell) * vm.f32(cell + 0xa0).abs();
+            let u = (f64::from(e as f32) + 0.5) as f32;
+            let dy = crate::wing_element::boundary_at(&ay, elements, u) - vm.f32(wk + 0x36b4);
+            let dx = crate::wing_element::boundary_at(&ax, elements, u) - vm.f32(wk + 0x36b0);
+            let near = {
+                let sum = dy * dy + dx * dx;
+                if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+            };
+            let far = {
+                let ey = vm.f32(wk + 0x36c0) - vm.f32(wk + 0x36b4);
+                let ex = vm.f32(wk + 0x36bc) - vm.f32(wk + 0x36b0);
+                let sum = ex * ex + ey * ey;
+                if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+            };
+            sum_weight += weight;
+            sum_dist += near * weight / far;
+        }
+    }
+    let ratio = sum_dist / sum_weight;
+    let ratio = crate::scalar::clamp(ratio, 0.0, 1.0);
+    let twice = (f64::from((1.0 - f64::from(ratio)) as f32) * 2.0) as f32;
+    let value = crate::scalar::clamp(twice, 0.5, 2.0);
+    vm.set_f32(x, value);
+    for list in [list_a, list_b] {
+        if vm.u64(list) != 0 {
+            for off in [0, 8, 0x10] {
+                vm.set_u64(list + off, 0);
+            }
+        }
+    }
+}
