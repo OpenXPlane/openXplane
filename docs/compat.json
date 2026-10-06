@@ -1,0 +1,49 @@
+{
+  "updated": "2026-10-06",
+  "method": "A self-assessed rubric, not a measurement. Each subsystem has a weight (weights sum to 100). 'implemented' is the share of that subsystem's work that exists in any form, including approximations. 'verified' is the share whose behaviour has been confirmed identical to the original (bit for bit against its machine code, or exact by the loader/table layout in its code). The overall numbers are the weighted sums. The weights and shares are judgement calls and will change as work and understanding grow.",
+  "subsystems": [
+    {"name": "Aircraft files (ACF)", "weight": 8, "implemented": 0.30, "verified": 0.10,
+     "note": "All properties are preserved; typed: mass, CG, wings, gear, engine and controls subset. Loader schema of 1117 properties extracted; six values confirmed in code."},
+    {"name": "3D models (OBJ8)", "weight": 7, "implemented": 0.35, "verified": 0.05,
+     "note": "Geometry, nested transforms, rotation/translation animation, textures. No normal/lit maps, instruments, panels or most dynamic animation."},
+    {"name": "Airfoil evaluation (AFL)", "weight": 6, "implemented": 0.90, "verified": 0.60,
+     "note": "All 34 airfoils; angle correction, lookup, stall, buffet and blending. The profile stage matches the original bit for bit on 1200 vectors."},
+    {"name": "Flight model", "weight": 28, "implemented": 0.25, "verified": 0.02,
+     "note": "An approximate rigid-body model that takes off and flies. The original's wing element function is mapped but not ported."},
+    {"name": "Datarefs and commands", "weight": 8, "implemented": 0.25, "verified": 0.15,
+     "note": "Registries and catalogs of 5503 datarefs and 3012 commands from the original; values exist for 6 datarefs; no command handlers."},
+    {"name": "Scenery and world", "weight": 14, "implemented": 0.10, "verified": 0.0,
+     "note": "Airport ground from apt.dat (runways, taxiways, aprons). No DSF, terrain, objects, lights or weather."},
+    {"name": "Cockpit, instruments, Lua systems", "weight": 10, "implemented": 0.0, "verified": 0.0,
+     "note": "Not started."},
+    {"name": "Rendering", "weight": 6, "implemented": 0.20, "verified": 0.0,
+     "note": "wgpu viewer with lighting and glass. No PBR, shadows, sky, clouds or instrument screens."},
+    {"name": "Audio, weather, multiplayer, plugins", "weight": 7, "implemented": 0.0, "verified": 0.0,
+     "note": "Not started."},
+    {"name": "Platforms and distribution", "weight": 6, "implemented": 0.50, "verified": 0.0,
+     "note": "CI on Linux, macOS and Windows, nightly builds, standard folder layout. No launcher or settings UI."}
+  ],
+  "roadmap": [
+    {"title": "Content without simulation", "state": "mostly done",
+     "detail": "ACF, OBJ8, AFL, apt.dat and the viewer work. Left: PANEL_3D, normal/lit maps, instruments, an apt.dat index."},
+    {"title": "Datarefs and commands", "state": "in progress",
+     "detail": "Registries and original catalogs exist. Left: values for the other 5497 datarefs, command handlers, wiring to the aircraft state."},
+    {"title": "Flight model", "state": "in progress",
+     "detail": "Approximate model flies. Next: port the original wing element function piece by piece, verified in the emulator, then the force loop, engine and gear."},
+    {"title": "World", "state": "started",
+     "detail": "Airport ground from apt.dat. Left: DSF terrain, library objects, lights, start locations, weather."},
+    {"title": "Cockpit and systems", "state": "planned",
+     "detail": "Instruments, panels, the stock Cessna's Lua scripts and controls."},
+    {"title": "Audio, multiplayer, plugins", "state": "planned",
+     "detail": "Sound, networking and the plugin interface."},
+    {"title": "Platforms and distribution", "state": "started",
+     "detail": "CI and nightly builds exist. Left: a launcher, settings, tagged releases."}
+  ],
+  "next": [
+    "Port the wing element aerodynamics function (0x1411b6630) in verified pieces",
+    "Fill datarefs from the aircraft state and drive them from the flight model",
+    "Read DSF scenery tiles for terrain under the airport",
+    "Recover the engine and propeller model",
+    "Instruments and the stock Cessna's Lua scripts"
+  ]
+}

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openXplane</title>
+<meta name="description" content="openXplane: an open Rust engine compatible with X-Plane 12 content. Requires an original copy of X-Plane.">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="apple-touch-icon" href="assets/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono&family=Material+Icons&display=swap" rel="stylesheet">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1f2227" media="(prefers-color-scheme: dark)">
+<script>
+  // theme chosen with the app bar button; nothing stored = follow the system
+  try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="appbar elevation-4">
+  <button class="icon-btn" id="menu-btn" aria-label="Menu"><span class="material-icons">menu</span></button>
+  <a href="#/" class="brand">
+    <img class="logo-on-dark" src="assets/logos/wordmark-light.svg" alt="openXplane">
+    <img class="logo-on-light" src="assets/logos/wordmark-dark.svg" alt="openXplane">
+  </a>
+  <span class="spacer"></span>
+  <button class="icon-btn" id="theme-btn" type="button" aria-label="Theme" title="Theme"><span class="material-icons">brightness_auto</span></button>
+  <a class="icon-btn" id="discord-link" href="#" aria-label="Discord" title="Discord" hidden>
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M20.32 4.37A19.8 19.8 0 0 0 15.39 2.8a13.8 13.8 0 0 0-.63 1.3 18.4 18.4 0 0 0-5.52 0 13.2 13.2 0 0 0-.64-1.3 19.7 19.7 0 0 0-4.93 1.53C.53 9.05-.32 13.58.1 18.06a19.9 19.9 0 0 0 6.04 3.05 14.7 14.7 0 0 0 1.29-2.1 12.9 12.9 0 0 1-2.04-.97l.5-.39a14.2 14.2 0 0 0 12.22 0l.5.39c-.65.39-1.33.71-2.04.98.37.74.8 1.44 1.29 2.1a19.8 19.8 0 0 0 6.04-3.06c.5-5.18-.84-9.67-3.58-13.69zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42s.95-2.42 2.16-2.42 2.18 1.09 2.16 2.42c0 1.33-.95 2.42-2.16 2.42zm7.97 0c-1.18 0-2.16-1.09-2.16-2.42s.95-2.42 2.16-2.42 2.18 1.09 2.16 2.42c0 1.33-.94 2.42-2.16 2.42z"/></svg>
+  </a>
+  <a class="icon-btn" id="repo-link" href="#" aria-label="GitHub" title="GitHub" hidden>
+    <svg viewBox="0 0 16 16" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+  </a>
+</header>
+
+<nav class="drawer" id="drawer">
+  <div class="drawer-section">
+    <a href="#/" data-route="/"><span class="material-icons">home</span>Overview</a>
+    <a href="#/download" data-route="/download"><span class="material-icons">download</span>Install</a>
+    <a href="#/status" data-route="/status"><span class="material-icons">fact_check</span>Status</a>
+  </div>
+  <div class="drawer-subheader">Documentation</div>
+  <div class="drawer-section" id="doc-links"></div>
+  <div class="drawer-subheader">Project</div>
+  <div class="drawer-section" id="project-links"></div>
+</nav>
+<div class="scrim" id="scrim"></div>
+
+<main id="main">
+  <div id="view"></div>
+  <footer class="footer">
+    openXplane is an independent project, not affiliated with Laminar Research.
+    An original copy of X-Plane&nbsp;12 is required. · <a id="license-link" href="#">MIT License</a>
+  </footer>
+</main>
+
+<template id="home">
+  <section class="hero">
+    <img class="hero-logo logo-on-dark" src="assets/logos/wordmark-light.svg" alt="openXplane">
+    <img class="hero-logo logo-on-light" src="assets/logos/wordmark-dark.svg" alt="openXplane">
+    <p class="hero-text">X-Plane&nbsp;12, recreated from scratch in Rust, compatible with the original aircraft, models and airports.</p>
+    <div class="hero-actions">
+      <a class="btn btn-contained" href="#/download"><span class="material-icons">download</span>Install</a>
+      <a class="btn btn-outlined" href="#/doc/ARCHITECTURE"><span class="material-icons">menu_book</span>Documentation</a>
+      <a class="btn btn-outlined" id="hero-repo" href="#" hidden><span class="material-icons">code</span>Source code</a>
+      <a class="btn btn-outlined" id="hero-discord" href="#" hidden><span class="material-icons">forum</span>Discord</a>
+    </div>
+    <div class="chip chip-warn"><span class="material-icons">construction</span><span>Early stage: no flight yet</span></div>
+    <a class="chip" id="compat-chip" href="#/status" hidden><span class="material-icons">percent</span><span>…</span></a>
+    <div class="chip"><span class="material-icons">sell</span><span>0.1.0</span></div>
+    <div class="chip"><span class="material-icons">memory</span><span>Rust · wgpu</span></div>
+  </section>
+
+  <div class="content">
+    <div class="card card-warning elevation-2">
+      <span class="material-icons card-icon">warning</span>
+      <div>
+        <h3>You need the original X-Plane&nbsp;12</h3>
+        <p>openXplane contains <b>no game content</b>. It reads the aircraft, models, airfoils and
+        airports of an installed copy of X-Plane&nbsp;12 and never modifies its files.</p>
+      </div>
+    </div>
+
+    <h2 class="section-title">What is openXplane?</h2>
+    <p class="lead">openXplane is a project to recreate the flight simulator <b>X-Plane&nbsp;12</b> from the ground up in
+    <b>Rust</b>. Content formats - ACF aircraft, OBJ8 models, AFL airfoils, apt.dat airports - are read the same way as
+    in the original, and behaviour is confirmed by analysing the reference build and comparing against it. Underneath
+    is a new engine: 64-bit, a modern renderer, none of the limits of a 32-bit process.</p>
+
+    <figure class="shot elevation-2">
+      <img src="assets/cessna.png" alt="Cessna 172 SP in the openXplane viewer (wgpu, Metal)" loading="lazy">
+      <figcaption>The Cessna 172 SP from X-Plane 12 in the openXplane viewer: wgpu, Metal. Static pose, no simulation.</figcaption>
+    </figure>
+
+    <figure class="shot elevation-2">
+      <img src="assets/ksea.png" alt="Cessna 172 SP on runway 16L at Seattle-Tacoma, drawn from apt.dat" loading="lazy">
+      <figcaption>Seattle-Tacoma (KSEA) built from the original <code>apt.dat</code>: runways, taxiways, aprons with holes, and the Cessna on 16L.</figcaption>
+    </figure>
+
+    <figure class="shot elevation-2">
+      <img src="assets/flight.png" alt="The Cessna 172 climbing out of Seattle-Tacoma with the approximate flight model" loading="lazy">
+      <figcaption>Flying the Cessna out of KSEA with the approximate flight model: wing elements use the airfoil code verified against the original. Not the original's flight model.</figcaption>
+    </figure>
+
+    <div class="grid">
+      <div class="card elevation-1"><span class="material-icons card-icon">verified</span><h3>1:1 with the original</h3><p>Every step is confirmed by analysing the reference build and comparing against it. Unknowns are not guessed.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">lock_open</span><h3>No original code or assets</h3><p>Nothing from the original is copied. Formats are described in our own words in the <a href="#/doc/ARCHITECTURE">documentation</a>.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">speed</span><h3>A modern engine</h3><p>Rust and wgpu: Metal, Vulkan, DirectX&nbsp;12. 64-bit, multithreaded content loading.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">flight</span><h3>Airfoil aerodynamics</h3><p>34 AFL airfoils: table lookup, stall with hysteresis, buffet and regime blending. <a href="#/doc/research/PROFILE_PIPELINE">Details</a></p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">view_in_ar</span><h3>Fly the Cessna</h3><p>Take off from the airport scene with an approximate flight model (not the original's) and fly it with the keyboard.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">flight_takeoff</span><h3>Airports</h3><p>Streaming parser for the 380&nbsp;MB <code>apt.dat</code>, with runways and pavement outlines drawn as a ground scene.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">data_object</span><h3>Datarefs</h3><p>A typed registry that preserves the original's float32 behaviour.</p></div>
+      <div class="card elevation-1"><span class="material-icons card-icon">description</span><h3>Open research</h3><p>Every subsystem is written up in <code>research/</code> notes with addresses and the limits of what is known.</p></div>
+    </div>
+  </div>
+</template>
+
+<template id="download">
+  <div class="content">
+    <h1>Install</h1>
+    <div class="card card-warning elevation-2">
+      <span class="material-icons card-icon">construction</span>
+      <div><h3>No prebuilt releases yet</h3>
+      <p>The engine is built from source. Automatic builds for macOS, Windows and Linux are planned.</p></div>
+    </div>
+    <h2>Requirements</h2>
+    <ul>
+      <li>The latest <a href="https://rustup.rs">Rust stable</a>.</li>
+      <li>An original X-Plane&nbsp;12 installation (with <code>X-Plane.exe</code>, <code>Cessna 172 SP</code>,
+        <code>Airfoils</code>, <code>Earth nav data</code>). Place or link it as
+        <code>Xplane12/</code> next to the project; it is kept out of Git.</li>
+    </ul>
+    <h2>Build and run</h2>
+    <pre><code>cargo test --offline
+cargo run --offline -- inspect Xplane12
+cargo run --offline -- view "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+cargo run --offline -- airport-info "Xplane12/Earth nav data/apt.dat" KSEA</code></pre>
+    <p>The other commands are in the <a href="#/doc/README">README</a>.</p>
+  </div>
+</template>
+
+<template id="status">
+  <div class="content">
+    <h1>Status</h1>
+    <p id="status-summary">Loading…</p>
+    <table class="status">
+      <thead><tr><th>Subsystem</th><th>Weight</th><th>Implemented</th><th>Verified identical</th></tr></thead>
+      <tbody id="status-rows"></tbody>
+    </table>
+    <p class="note" id="status-method"></p>
+    <h2>Roadmap</h2>
+    <ol class="milestones" id="milestones"></ol>
+    <h2>Next up</h2>
+    <ul id="next-list"></ul>
+    <p>More in the <a href="#/doc/ARCHITECTURE">architecture and roadmap</a> and the
+      <a href="#/doc/COMPATIBILITY">compatibility estimate</a>.</p>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
