@@ -2175,3 +2175,85 @@ fn prop_force_segment3_matches_the_original_machine_code() {
     let trials = prop_segment("prop_3.txt", openxplane::prop::Stop::Segment3);
     assert!(trials >= 20);
 }
+
+#[test]
+fn pointer_following_callees_match_the_original_machine_code() {
+    use openxplane::callees::{blend, engine_ratio, limit_a, limit_b};
+    use openxplane::vm::Vm;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/callees.txt"
+    ))
+    .unwrap();
+    let mut lines = text.lines().filter(|l| !l.starts_with('#')).peekable();
+    let mut counts = std::collections::HashMap::new();
+    while let Some(head) = lines.next() {
+        let t: Vec<&str> = head.split_whitespace().filter(|x| *x != "|").collect();
+        assert_eq!(t[0], "R", "{head}");
+        let mut vm = Vm::default();
+        let mut bindings = std::collections::VecDeque::new();
+        while let Some(l) = lines.peek() {
+            if l.starts_with("R ") {
+                break;
+            }
+            let l = lines.next().unwrap();
+            let tokens: Vec<&str> = l.split_whitespace().collect();
+            match tokens[0] {
+                "W" => {
+                    for tok in &tokens[1..] {
+                        let (a, w) = tok.split_once('=').unwrap();
+                        vm.set_u32(
+                            u64::from_str_radix(a, 16).unwrap(),
+                            u32::from_str_radix(w, 16).unwrap(),
+                        );
+                    }
+                }
+                "K" => bindings.push_back((
+                    tokens[1].parse::<u32>().unwrap(),
+                    tokens[2].parse::<i32>().unwrap(),
+                    tokens[3] == "1",
+                )),
+                other => panic!("unknown line {other}"),
+            }
+        }
+        let address = u64::from_str_radix(t[2], 16).unwrap();
+        let arg: i32 = t[3].parse().unwrap();
+        let mut binding = |id: u32, index: i32| {
+            let (i, x, a) = bindings.pop_front().expect("binding not recorded");
+            assert_eq!((id, index), (i, x), "{head}");
+            a
+        };
+        match t[1] {
+            "E" => {
+                let got = engine_ratio(&vm, address, arg);
+                let want = f(t[5]);
+                assert!(
+                    got.to_bits() == want.to_bits() || (got.is_nan() && want.is_nan()),
+                    "{head}"
+                );
+            }
+            "B" => {
+                let got = blend(&vm, address, arg);
+                let want = f(t[5]);
+                assert!(
+                    got.to_bits() == want.to_bits() || (got.is_nan() && want.is_nan()),
+                    "{head}"
+                );
+            }
+            "A" => assert_eq!(
+                limit_a(&vm, address, arg, &mut binding),
+                t[5] == "1",
+                "{head}"
+            ),
+            "P" => assert_eq!(
+                limit_b(&vm, address, arg, &mut binding),
+                t[5] == "1",
+                "{head}"
+            ),
+            other => panic!("unknown kind {other}"),
+        }
+        assert!(bindings.is_empty(), "unused binding answers: {head}");
+        *counts.entry(t[1].to_string()).or_insert(0) += 1;
+    }
+    assert!(counts.values().all(|c| *c >= 100));
+}
