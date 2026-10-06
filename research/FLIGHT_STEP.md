@@ -91,3 +91,17 @@ ulps of libm.
   `get_el_force` and at the force accumulation), each replacing a non-finite value by zero.
 - The second airflow call of the loop passes 1 as its last argument, which selects the call of `0x14117d970`
   (18 KB, not ported yet).
+- Segments 4-8 (the rest of the station loop and the loop control; every segment is checked at its first-pass
+  checkpoint, segment 8 after the whole loop with 2-4 elements x 4 azimuths): the second airflow call with the wash
+  adjustment `0x14117d970` (not ported, replayed), the rotation of the wind into the part frame, the blade-station
+  angle bookkeeping (`X+0x194/0x54/0x2c`, wrapped to -180..180), the call of `get_el_force` (replayed through
+  `PropEnv::element_force`, which is verified separately as `element_force`), the force terms of the pass with their
+  finite checks, three `rotate_pairs` into the aircraft frame and the accumulation into the propeller force
+  totals `F+0x2e4`, `F+0x2d0`, `F+0x2bc`, the pass record (frame words `0x1b0..0x200`) appended by `0x141219d90`
+  when `F+0x28` equals the global at `0x142f2e3dc`, the moment sums (frame slots `0xcc`, `0xd0`, `0xdc`, `0xd4`,
+  `0xd8`, `0x70`, `0x110`, `0xc8`, `0xe0`; `0x1408fd570` is the angle interpolation, ported as
+  `scalar::angle_lerp`), the ground-strike event (`0x1407cdce0`, replayed) and the air-flow lag step
+  (`engine::lag_filter` on `R+0x284+4*(inner+4k)`).
+- Loop structure of the original: an outer loop over the `P+0x8c` span elements `k` (frame slot `0x8d8`) and an inner
+  loop of 4 azimuth positions (`inner * pi/2`, frame slots `8` and `0x30`).
+- Not ported yet: the code after the loop (`0x1411c22c9..0x1411c3531`) and the wash function `0x14117d970`.

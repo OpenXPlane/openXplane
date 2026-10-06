@@ -1663,7 +1663,9 @@ struct PropReplay {
     winds: std::collections::VecDeque<([u64; 3], [f32; 3])>,
     times: std::collections::VecDeque<f64>,
     phases: std::collections::VecDeque<f64>,
-    probes: std::collections::VecDeque<([u32; 6], f32)>,
+    probes: std::collections::VecDeque<([u32; 6], (f32, i32))>,
+    gate: f64,
+    strikes: std::collections::VecDeque<(i32, i32)>,
     washes: std::collections::VecDeque<([u32; 6], [f32; 3])>,
     elements: std::collections::VecDeque<([u32; 6], openxplane::prop::ElementResult)>,
     recording: i32,
@@ -1751,7 +1753,14 @@ impl openxplane::prop::PropEnv for PropReplay {
         assert_eq!(got, seen, "element call arguments");
         result
     }
-    fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> f32 {
+    fn strike_gate(&mut self) -> f64 {
+        self.gate
+    }
+    fn strike(&mut self, id: i32, arg: i32) {
+        let want = self.strikes.pop_front().expect("strike not recorded");
+        assert_eq!((id, arg), want, "strike event");
+    }
+    fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> (f32, i32) {
         let (seen, out) = self.probes.pop_front().expect("terrain call not recorded");
         let got = [a[0], a[1], a[2], b[0], b[1], b[2]].map(f32::to_bits);
         assert_eq!(got, seen, "terrain probe points");
@@ -1802,6 +1811,8 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut probes = std::collections::VecDeque::new();
         let mut washes = std::collections::VecDeque::new();
         let mut elements = std::collections::VecDeque::new();
+        let mut gate = 0.0f64;
+        let mut strikes = std::collections::VecDeque::new();
         let mut recording = 0i32;
         let mut records = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
@@ -1812,7 +1823,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             let line = lines.next().unwrap();
             let tokens: Vec<&str> = line.split_whitespace().collect();
             match tokens[0] {
-                "F" | "B" | "E" | "P" | "R" | "X0" | "X1" | "X2" | "X3" => {
+                "F" | "B" | "E" | "P" | "R" | "X0" | "X1" | "X2" | "X3" | "N" => {
                     regions.insert(tokens[0], Words(parse_words(&tokens[1..])));
                 }
                 "W" => {
@@ -1823,6 +1834,8 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                     ));
                 }
                 "Z" => recording = tokens[1].parse().unwrap(),
+                "J" => gate = f64::from_bits(u64::from_str_radix(tokens[1], 16).unwrap()),
+                "K" => strikes.push_back((tokens[1].parse().unwrap(), tokens[2].parse().unwrap())),
                 "Q" => {
                     let mut words = [0u32; 20];
                     for (i, w) in words.iter_mut().enumerate() {
@@ -1877,7 +1890,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                             h(tokens[5]),
                             h(tokens[6]),
                         ],
-                        f(tokens[7]),
+                        (f(tokens[7]), tokens[8].parse().unwrap()),
                     ));
                 }
                 "D" => times.push_back(f64::from_bits(u64::from_str_radix(tokens[1], 16).unwrap())),
@@ -1917,6 +1930,8 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             probes,
             washes,
             elements,
+            gate,
+            strikes,
             recording,
             records,
             table: prop_noise_table(),
@@ -1939,6 +1954,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                 shift_words(&x, n as usize * 0x2d8)
             })
             .collect();
+        let mut y = shift_words(&regions.remove("N").unwrap(), n as usize * 0x388);
         let mut objects = Objects {
             f: &mut f,
             b: &b,
@@ -1946,6 +1962,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             p: &p_n,
             r: &mut r,
             x: &mut xs,
+            y: &mut y,
         };
         let result = prop_force(&mut objects, n, &mut env, stop);
         if early {
@@ -1972,6 +1989,13 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                 "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14",
                 "xmm15",
             ]) {
+                if std::env::var("PROP_DEBUG").is_ok() {
+                    eprintln!(
+                        "trial {trials} xmm{k}: {:?} vs {:#x}",
+                        got_regs.xmm[k].map(f32::to_bits),
+                        want[k - 6]
+                    );
+                }
                 if let Some(v) = got_regs.xmm[k] {
                     assert!(
                         words_close(v.to_bits(), want[k - 6], true),
@@ -1986,6 +2010,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                 let (ours, base) = match region.as_str() {
                     "R" => (&r, 0),
                     "F" => (&f, 0),
+                    "N" => (&y, n as usize * 0x388),
                     other => (
                         &xs[other[1..].parse::<usize>().unwrap()],
                         n as usize * 0x2d8,
@@ -2027,6 +2052,12 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment8_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_8.txt", openxplane::prop::Stop::Segment8);
     assert!(trials >= 30);
 }
 

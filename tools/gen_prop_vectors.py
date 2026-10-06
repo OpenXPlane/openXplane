@@ -17,10 +17,12 @@ Lines:
   Y xmm6 .. xmm15 (low words) r15
   X0..X3 off=word               initial words of the element records F[0x68e0 + b*0x18] (3 records of 0x2d8)
   L e retain ice x1 x2 x3 | out1 out2 out3 x4[4] x1bc stall   the get_el_force call (stubbed)
+  J gate (double hex)           the double at 0x142f01920
+  K id arg                      the ground-strike event call (stubbed 0x1407cdce0)
   Z id                          the global 0x142f2e3dc (the recorded id)
   Q w0 .. w19                   the pass record pushed by 0x141219d90 (stubbed)
   V x z y in1 in2 in3 out1 out2 out3   the wash adjustment of the second airflow call (0x14117d970)
-  H phase (double hex) / G a b h  time-phase and terrain-probe answers
+  H phase (double hex) / G a b h flag  time-phase and terrain-probe answers (height, int)
 """
 import math
 import struct
@@ -39,7 +41,7 @@ XMM = {6: UC_X86_REG_XMM6, 7: UC_X86_REG_XMM7, 8: UC_X86_REG_XMM8, 9: UC_X86_REG
        11: UC_X86_REG_XMM11, 12: UC_X86_REG_XMM12, 13: UC_X86_REG_XMM13, 14: UC_X86_REG_XMM14, 15: UC_X86_REG_XMM15}
 
 ENTRY = 0x1411bd470
-CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82, 6: 0x1411c1935, 7: 0x1411c2145}
+CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82, 6: 0x1411c1935, 7: 0x1411c2145, 8: 0x1411c22ba}
 NOISE_TABLE = 0x14578f1f0
 EXE = sys.argv[1]
 SEGMENT, TRIALS, SEED = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
@@ -103,11 +105,15 @@ def main():
         a = [e.read_f32(rdx + 4 * i) for i in range(3)]
         b = [e.read_f32(r8 + 4 * i) for i in range(3)]
         h = e.read_f32(r9)
+        rsp = e.uc.reg_read(UC_X86_REG_RSP)
+        flag_ptr = e.read_u64(rsp + 0x38)
+        flag = fz.rng.randrange(4)
+        e.write_u32(flag_ptr, flag)
         if fz.rng.random() < 0.6:
             h = fz.rng.uniform(-30, 30)
             e.write_f32(r9, h)
         hx = lambda v: f'{struct.unpack("<I", struct.pack("<f", v))[0]:08x}'
-        log.append('G ' + ' '.join(hx(v) for v in a + b) + ' ' + hx(h))
+        log.append('G ' + ' '.join(hx(v) for v in a + b) + ' ' + hx(h) + f' {flag}')
 
     def stub_wash(e):
         rsp = e.uc.reg_read(UC_X86_REG_RSP)
@@ -154,6 +160,10 @@ def main():
         words = [e.read_u32(e.uc.reg_read(UC_X86_REG_RDX) + 4 * i) for i in range(20)]
         log.append('Q ' + ' '.join(f'{w:08x}' for w in words))
 
+    def stub_strike(e):
+        log.append(f'K {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {e.uc.reg_read(UC_X86_REG_R8) & 0xffffffff}')
+
+    emu.stubs[0x1407cdce0] = stub_strike
     emu.stubs[0x141219d90] = stub_record
     emu.stubs[0x1411b9840] = stub_element
     emu.stubs[0x14117d970] = stub_wash
@@ -174,10 +184,11 @@ def main():
         B = emu.alloc(0x7000)
         E = emu.alloc(0x68 * 3)
         X = [emu.alloc(0x2d8 * 3) for _ in range(4)]
+        Yr = emu.alloc(0x388 * 3)
         P = emu.alloc(0x3770 * 3)
         R = emu.alloc(0x2000)
         for name, addr, size in [('F', F, 0x44000), ('B', B, 0x7000), ('E', E, 0x68 * 3), ('P', P, 0x3770 * 3),
-                                 ('R', R, 0x2000)] + [(f'X{i}', X[i], 0x2d8 * 3) for i in range(4)]:
+                                 ('R', R, 0x2000)] + [(f'X{i}', X[i], 0x2d8 * 3) for i in range(4)] + [('N', Yr, 0x388 * 3)]:
             fz.region(name, addr, size)
             emu.write(addr, bytes(size))
         n = fz.rng.randrange(3)
@@ -187,6 +198,10 @@ def main():
         fz.preset('B', 0x5ffc, E >> 32, record=False)
         fz.preset('B', 0x6010, P & 0xffffffff, record=False)
         fz.preset('B', 0x6014, P >> 32, record=False)
+        fz.preset('F', 0x68c8, Yr & 0xffffffff, record=False)
+        fz.preset('F', 0x68cc, Yr >> 32, record=False)
+        gate = fz.rng.choice([0.5, 1.5, 3.0])
+        emu.write(0x142f01920, struct.pack('<d', gate))
         for i in range(4):
             fz.preset('F', 0x68e0 + 0x18 * i, X[i] & 0xffffffff, record=False)
             fz.preset('F', 0x68e4 + 0x18 * i, X[i] >> 32, record=False)
@@ -219,8 +234,8 @@ def main():
         entry_rsp = ((STACK_TOP - 0x1000 - 0x20) & ~0xf) - 8
         rbp = entry_rsp - 0x8c8
         init = fz.initial()
-        out = [f'T {n} {early} {flag["v"]}', f'Z {recording}']
-        for name in ('F', 'B', 'E', 'P', 'R', 'X0', 'X1', 'X2', 'X3'):
+        out = [f'T {n} {early} {flag["v"]}', f'Z {recording}', f'J {struct.unpack("<Q", struct.pack("<d", gate))[0]:016x}']
+        for name in ('F', 'B', 'E', 'P', 'R', 'X0', 'X1', 'X2', 'X3', 'N'):
             out.append(f'{name} {words(init[name])}')
         out.extend(log)
         wr = fz.written()
@@ -228,6 +243,7 @@ def main():
         out.append('O F ' + words(wr['F']))
         for i in range(4):
             out.append(f'O X{i} ' + words(wr[f'X{i}']))
+        out.append('O N ' + words(wr['N']))
         if not early:
             slots = {}
             for off in list(range(-0x100, 0x260, 4)) + list(range(0x8d0, 0x8f8, 4)):

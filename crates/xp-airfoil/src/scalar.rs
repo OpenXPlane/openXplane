@@ -52,14 +52,7 @@ pub fn angle_lerp(a0: f32, v0: f32, a1: f32, v1: f32, x: f32) -> f32 {
     let t = if a0 == a1 {
         0.5
     } else {
-        let t = (1.0 / (a1 - a0)) * (x - a0) + 0.0;
-        if 0.0 > t {
-            0.0
-        } else if 1.0 < t {
-            1.0
-        } else {
-            t
-        }
+        clamp((1.0 / (a1 - a0)) * (x - a0) + 0.0, 0.0, 1.0)
     };
     let mut d = v1 - v0;
     if -180.0 > d {
