@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Disassembles one function of the reference build, with or without exception-table information.
 
-The end is the table's end when the function has an entry; otherwise it is the first `ret` that no earlier
-jump in the function skips past.
+The end is the first `ret` that no earlier jump in the function skips past (the exception table also lists
+split-off parts of a function, so it is not used).
 
     python3 tools/dump_func.py Xplane12/X-Plane.exe 0x1411a2bf0
 """
@@ -20,10 +20,8 @@ def main():
     exe, start = sys.argv[1], int(sys.argv[2], 16)
     table = load(exe)
     i = bisect.bisect_right([b for b, e in table], start - 0x140000000) - 1
-    end = None
-    if i >= 0 and table[i][0] == start - 0x140000000:
-        end = 0x140000000 + table[i][1]
-    stop = end or start + 0x600
+    end = None  # the table also holds split-off parts of a function, so the end is found from the jumps
+    stop = start + 0x6000
     asm = subprocess.run(['llvm-objdump', '-d', '--no-show-raw-insn', f'--start-address={start:#x}',
                           f'--stop-address={stop:#x}', exe], capture_output=True, text=True).stdout
     farthest = start

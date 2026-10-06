@@ -70,3 +70,23 @@ after cleaning with `tools/clean_asm.py` and calls about 25 helpers, among them 
 `0x1407ace10` (ids `0x1d1`, `0x2fb`, `0x239`...), the interpolation `0x1406ea0b0`, a signed power
 `0x1408625a0`, and several small engine helpers (`0x1411a2bf0`, `0x1411a2d90`, `0x1411e39a0`, `0x1411dd610`,
 `0x141170810`). Nothing is ported yet.
+
+## Ported engine functions
+
+`crates/xp-airfoil/src/engine.rs`, verified by `tools/gen_engine_vectors.py` (1300 emulator cases in
+`crates/xp-app/tests/data/engine.txt`):
+
+- `signed_pow` (`0x1408625a0`): `x^p` keeping the sign of `x`, 0 for zero. 300 cases identical.
+- `curve` (`0x14082b800` and `0x1411a2bf0`, two copies of one function): `v0 + (v1 - v0) * t^p` for `t` the
+  position of `x` between `a0` and `a1` limited to 0..1. 389 of 400 identical, the rest within 35 ulp
+  (cancellation after a libm `pow` differing in the last bit).
+- `ram_power_factor` (`0x1411e39a0`): gas dynamics of the intake. The ram rise `(1 + 0.2 M^2)^3.5` scaled by
+  the efficiency `B+0x980`, with the normal shock total pressure recovery
+  `(2.4 r^2 / (0.4 r^2 + 2))^3.5 * (2.4 / (2.8 r^2 - 0.4))^2.5` blended in above the critical Mach number
+  `B+0x984`; the slipstream speed by a five step square root iteration (`g = (g + 2 D / (rho g)) / 2` from
+  170.145, with `D` from the engine descriptor, `rho = 1.225 B+0x950`); the result times the density ratio.
+  598 of 600 identical, the rest within 2 ulp.
+
+The small engine helpers `0x1411dd610` (throttle gain between `B+0x9d8` and `B+0x9dc`), `0x1411a2d90` (engine
+starter conditions from two input-binding queries) and `0x141170810` (a response curve with the exponent
+`B+0x9ac`) are read but not yet ported.

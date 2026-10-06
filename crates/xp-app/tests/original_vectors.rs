@@ -628,6 +628,71 @@ fn aircraft_frame_transform_matches_the_original_machine_code() {
     assert_eq!(exact, cases);
 }
 
+struct Fields(std::collections::HashMap<usize, f32>);
+
+impl openxplane::element_force::Mem for Fields {
+    fn f32(&self, offset: usize) -> f32 {
+        self.0.get(&offset).copied().unwrap_or(0.0)
+    }
+    fn i32(&self, offset: usize) -> i32 {
+        self.0.get(&offset).copied().unwrap_or(0.0).to_bits() as i32
+    }
+}
+
+#[test]
+fn engine_functions_match_the_original_machine_code() {
+    use openxplane::engine::{curve, ram_power_factor, signed_pow};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/engine.txt"
+    ))
+    .unwrap();
+    let (mut counts, mut exact, mut worst) = ([0usize; 3], [0usize; 3], [0u32; 3]);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let (kind, got, want) = match t[0] {
+            "P" => (0, signed_pow(f(t[1]), f(t[2])), f(t[3])),
+            "C" => (
+                1,
+                curve(f(t[1]), f(t[2]), f(t[3]), f(t[4]), f(t[5]), f(t[6])),
+                f(t[7]),
+            ),
+            "R" => {
+                let b = Fields(
+                    [
+                        (0x984, f(t[1])),
+                        (0x980, f(t[2])),
+                        (0x950, f(t[3])),
+                        (0x940, f(t[4])),
+                        (0x988, f(t[5])),
+                        (0x98c, f(t[6])),
+                    ]
+                    .into_iter()
+                    .collect(),
+                );
+                (
+                    2,
+                    ram_power_factor(&b, f(t[7]), f(t[8]), f(t[9]), f(t[10]), f(t[11]), f(t[12])),
+                    f(t[13]),
+                )
+            }
+            other => panic!("unknown record {other}"),
+        };
+        counts[kind] += 1;
+        let off = ulps(got, want);
+        exact[kind] += usize::from(off == 0);
+        worst[kind] = worst[kind].max(off);
+    }
+    println!("cases {counts:?}, exact {exact:?}, worst ulp {worst:?}");
+    assert!(counts.iter().all(|c| *c >= 300));
+    // powf and cos come from the platform's libm here and from the C runtime in the original
+    assert!(worst[0] <= 4 && worst[1] <= 64, "{worst:?}");
+    assert!(worst[2] <= 512, "{worst:?}");
+}
+
 #[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
