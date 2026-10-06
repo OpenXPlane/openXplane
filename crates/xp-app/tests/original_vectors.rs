@@ -2773,3 +2773,76 @@ fn element_pass_matches_the_original_machine_code() {
         words_match(&case, n);
     }
 }
+
+#[test]
+fn body_aero_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("body_141a51600.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u32::from_str_radix(s, 16).unwrap();
+    let bits = |s: &str| f32::from_bits(hex(s));
+    for (n, case) in cases.into_iter().enumerate() {
+        let r = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let out = u64::from_str_radix(&case.header[6], 16).unwrap();
+        let want_return = bits(&case.header[9]);
+        let got = openxplane::body::body_aero(
+            &case.vm,
+            r,
+            bits(&case.header[1]),
+            bits(&case.header[2]),
+            bits(&case.header[3]),
+            bits(&case.header[4]),
+            bits(&case.header[5]),
+        );
+        let close = |a: f32, b: f32| {
+            a.to_bits() == b.to_bits()
+                || (a.is_nan() && b.is_nan())
+                || (a - b).abs() <= 1e-5 * (1.0 + b.abs())
+        };
+        match got {
+            None => assert_eq!(want_return, 0.0, "case {n}"),
+            Some(f) => {
+                assert!(
+                    close(f.magnitude, want_return),
+                    "case {n}: {} vs {want_return}",
+                    f.magnitude
+                );
+                for (offset, value) in [(0u64, f.axial), (4, f.side), (8, f.normal)] {
+                    let want = case
+                        .expected
+                        .iter()
+                        .find(|(a, _)| *a == out + offset)
+                        .map(|(_, w)| f32::from_bits(*w))
+                        .expect("an output word");
+                    assert!(
+                        close(value, want),
+                        "case {n}: output {offset}: {value} vs {want}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn body_wave_drag_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("body_141a522d0.txt");
+    assert!(cases.len() >= 60);
+    let bits = |s: &str| f32::from_bits(u32::from_str_radix(s, 16).unwrap());
+    for (n, case) in cases.into_iter().enumerate() {
+        let r = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let want = bits(&case.header[4]);
+        let got = openxplane::body::body_wave_drag(
+            &case.vm,
+            r,
+            bits(&case.header[1]),
+            bits(&case.header[2]),
+            bits(&case.header[3]),
+        );
+        assert!(
+            got.to_bits() == want.to_bits()
+                || (got.is_nan() && want.is_nan())
+                || (got - want).abs() <= 1e-5 * (1.0 + want.abs()),
+            "case {n}: {got} vs {want}"
+        );
+    }
+}

@@ -249,3 +249,26 @@ regenerated so that the real engine code runs in the emulator under the orchestr
 replayed: the input bindings, the frame time, the atmosphere queries, the noise, the random generator, the fuel
 draw, and the unported callees (`0x141197b00` the kinds 5 and 6 update, `0x1411bd470` the propeller force on the
 `Objects` layout, `0x141190ed0` the init).
+
+### Blocks of `update_flight` and the body functions
+
+Blocks are verified by running them from their start address to their end address in the emulator on random
+objects (`tools/gen_flight_block_vectors.py`; the registers a block reads at its start are set by the case, and the
+leaf callees are replayed): `flight_step::wing_aspect_pass` (`0x141265f7d..0x14126644a`: for each of the 48 wings
+that is enabled and has `|W+0xf4| < 45`, the blending factors `X+0x288/0x28c/0x290` from the aspect ratio
+`boundary_ratio` over the area factor), `thrust_effects_pass` (`..0x141266b52`: the engine controls call, the six
+rocket forces `F+0x6518` 0x264..0x269, the pitch-tilt thrust `F+0x6514`, the moments `F+0x57c`, the blown-flap
+factors `F+0x64bc/0x64c0`) and `element_pass` (`..0x141267978`: for each element of each enabled wing the air
+velocity at the element (`0x14121b580`, replayed), resolved with the dihedral cosine and sine into the
+cross-flow terms; the relative speed `X+0x50` (blended by `W+0x54`), the angle `X+0x28` wrapped to -180..180, the
+sweep-corrected factor `X+0`, the counters `F+0x544..0x558` of elements with control surfaces and their mean
+speed in knots (1.9438), the element force `0x1411b9840` (replayed) added to `X+0x294/0x298` and the moments
+`F+0x314/0x32c`, and the aerodynamic force `0x140f26ef0` at the element point). The locals of the original's frame
+are read and written at `rbp + offset`, as the environment calls fill them.
+
+The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
+cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
+and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded
+surface, area-weighted mean normals of the triangle pairs of the grid cells with the Ackeret factor
+`2/sqrt(M^2-1)`; 70 cases). A negative argument of the original's square root goes through a domain handler the
+emulator cannot run, so the vectors keep those arguments non-negative.

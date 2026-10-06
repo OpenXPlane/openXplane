@@ -2,7 +2,7 @@
 //! tests use.
 pub use xp_acf::{Aircraft, Property, aircraft, reference_candidates, wing};
 pub use xp_airfoil::{
-    aero, airflow, airfoil, atmosphere, buffet, callees, controls, element_force, engine,
+    aero, airflow, airfoil, atmosphere, body, buffet, callees, controls, element_force, engine,
     engine_env, flight_step, forces, fuel, piston, profile, prop, regimes, runtime, scalar, stall,
     transform, vm, wing_element,
 };
