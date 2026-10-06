@@ -1440,3 +1440,34 @@ fn boundary_ratio_matches_the_original_machine_code() {
     }
     assert_eq!(cases, 300);
 }
+
+#[test]
+fn engine_held_back_matches_the_original_machine_code() {
+    use openxplane::engine::{HoldInputs, engine_held_back};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/engine_held.txt"
+    ))
+    .unwrap();
+    let ids = [0x179u32, 0x1f9, 0x2f6, 0x2f7, 0x2f8, 0x2f9];
+    let mut cases = 0;
+    for line in text.lines().filter(|l| l.starts_with("H ")) {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let answers: Vec<bool> = t[7..13].iter().map(|a| *a == "1").collect();
+        let got = engine_held_back(
+            HoldInputs {
+                kind: t[1].parse().unwrap(),
+                lever: f(t[2]),
+                limit_low: f(t[3]),
+                limit_high: f(t[4]),
+                index: t[5].parse().unwrap(),
+                mode: t[6].parse().unwrap(),
+            },
+            |id, _| answers[ids.iter().position(|i| *i == id).unwrap()],
+            |_, _| t[13].parse().unwrap(),
+        );
+        assert_eq!(got, t[14].parse::<i32>().unwrap(), "{line}");
+        cases += 1;
+    }
+    assert_eq!(cases, 600);
+}

@@ -817,3 +817,49 @@ fn thrust_term(
     rec.set_f32(0x21c, smoothed);
     level
 }
+
+/// Inputs of [`engine_held_back`] read from the objects: `kind` is the engine record's word at `+0`, `lever` is
+/// `F+0x64b4`, `limit_low`/`limit_high` the record's floats at `+0x790`/`+0x798`.
+#[derive(Clone, Copy)]
+pub struct HoldInputs {
+    pub kind: i32,
+    pub lever: f32,
+    pub limit_low: f32,
+    pub limit_high: f32,
+    pub index: i32,
+    pub mode: i32,
+}
+
+/// `0x1411d9f60`: whether engine `index` is held back for input mode `mode` (1 or 2 select the two directions
+/// of the `0x179`/`0x1f9` binding pair). `binding(id, index)` is the input query `0x1407ace10` (its other
+/// arguments are the fixed 1 and the float `0x1425036a4`), `fallback(index, mode)` the function `0x140822620`
+/// that decides when no rule applies.
+pub fn engine_held_back(
+    h: HoldInputs,
+    mut binding: impl FnMut(u32, i32) -> bool,
+    fallback: impl FnOnce(i32, i32) -> i32,
+) -> i32 {
+    if h.kind == 6 && h.lever == 0.0 {
+        return 0;
+    }
+    let (low, high) = (h.limit_low, h.limit_high);
+    if binding(0x179, h.index) && h.mode == 2 {
+        return 0;
+    }
+    if binding(0x1f9, h.index) && h.mode == 1 {
+        return 0;
+    }
+    if binding(0x2f6, 0) && low < 0.0 && high < 0.0 {
+        return 0;
+    }
+    if binding(0x2f7, 0) && low > 0.0 && high < 0.0 {
+        return 0;
+    }
+    if binding(0x2f8, 0) && low < 0.0 && high > 0.0 {
+        return 0;
+    }
+    if binding(0x2f9, 0) && low > 0.0 && high > 0.0 {
+        return 0;
+    }
+    fallback(h.index, h.mode)
+}
