@@ -2,7 +2,7 @@
 """Vectors for the scalar helpers of xp-airfoil::scalar from the originals 0x14081dfa0 (clamp), 0x140910be0
 (sign), 0x1411b4a20 (max3), 0x1411b03f0 (snap), 0x140819240 (lerp) and 0x1411e26e0 (kind_is_3_or_7).
 
-Lines: C x lo hi | r      S x | r      M a b c | r      N x lo hi | r      L a b t | r      K kind | r
+Lines: A a0 v0 a1 v1 x | r (0x1408fd570, angle_lerp)      C x lo hi | r      S x | r      M a b c | r      N x lo hi | r      L a b t | r      K kind | r
 
     python3 tools/gen_scalar_vectors.py Xplane12/X-Plane.exe > crates/xp-app/tests/data/scalar.txt
 """
@@ -40,6 +40,12 @@ def main():
         print('M', *map(hx, (x, lo, hi)), '|', hx(emu.call_float(0x1411b4a20, floats=[x, lo, hi])))
         print('N', *map(hx, (x, lo, hi)), '|', hx(emu.call_float(0x1411b03f0, floats=[x, lo, hi])))
         print('L', *map(hx, (x, lo, hi)), '|', hx(emu.call_float(0x140819240, floats=[x, lo, hi])))
+    for _ in range(300):
+        a0, a1 = rng.uniform(0, 3), rng.choice([rng.uniform(0, 3), None])
+        a1 = a0 if a1 is None else a1
+        v0, v1 = rng.uniform(-400, 400), rng.uniform(-400, 400)
+        x = rng.uniform(-1, 4)
+        print('A', *map(hx, (a0, v0, a1, v1, x)), '|', hx(emu.call_float(0x1408fd570, floats=[a0, v0, a1, v1], stack=[x])))
     for kind in list(range(-3, 20)) + [0x7fffffff, -0x80000000]:
         emu.write_u32(F, kind & 0xffffffff)
         print('K', kind, '|', emu.call(0x1411e26e0, ints=[F]) & 0xff)

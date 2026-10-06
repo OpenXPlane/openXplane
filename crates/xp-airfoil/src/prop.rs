@@ -11,7 +11,7 @@
 use crate::airflow::{AirflowEnv, airflow};
 use crate::engine::signed_pow;
 use crate::forces::Words;
-use crate::scalar::{clamp, kind_is_3_or_7, lerp, max3, sign, snap};
+use crate::scalar::{angle_lerp, clamp, kind_is_3_or_7, lerp, max3, sign, snap};
 use crate::transform::{rotate_euler_offset, rotate_pairs};
 use crate::wing_element::{
     Boundary, boundary_at, element_dihedral, hypot2, hypot3, interpolate_clamped, rotate_euler,
@@ -29,6 +29,17 @@ pub struct Frame(pub BTreeMap<i32, u32>);
 impl Frame {
     pub fn set(&mut self, offset: i32, value: f32) {
         self.0.insert(offset, value.to_bits());
+    }
+    /// A double stored over two slots (low word first).
+    pub fn set_d(&mut self, offset: i32, value: f64) {
+        let bits = value.to_bits();
+        self.0.insert(offset, bits as u32);
+        self.0.insert(offset + 4, (bits >> 32) as u32);
+    }
+    pub fn d(&self, offset: i32) -> f64 {
+        let low = u64::from(self.0.get(&offset).copied().unwrap_or(0));
+        let high = u64::from(self.0.get(&(offset + 4)).copied().unwrap_or(0));
+        f64::from_bits(high << 32 | low)
     }
     pub fn set_i(&mut self, offset: i32, value: i32) {
         self.0.insert(offset, value as u32);
@@ -113,6 +124,8 @@ pub enum Stop {
     Segment5,
     /// First pass, after the force accumulation and the record, at `0x1411c1935`.
     Segment6,
+    /// First pass, after the moment sums, at `0x1411c2145`.
+    Segment7,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original, low 32 bits), for checkpoints. Only
@@ -974,6 +987,85 @@ pub fn prop_force(
         r15,
     );
     if stop == Stop::Segment6 {
+        return Ok((fr, regs));
+    }
+
+    // ---- segment 7: the moment sums of the pass ----
+    let (d4, d1, d2) = (f64::from(x6), f64::from(x7), f64::from(x8));
+    fr.set_d(0x88, d4);
+    let c2 = f64::from(f.f32(0x454));
+    let s2 = f64::from(f.f32(0x450));
+    let c0d = f64::from(f.f32(0x434));
+    fr.set_d(0x90, c0d);
+    let s0d = f64::from(f.f32(0x430));
+    let c1d = f64::from(f.f32(0x444));
+    fr.set_d(0x40, c1d);
+    let s1d = f64::from(f.f32(0x440));
+    fr.set_d(-8, s1d);
+    let mut m11 = c2 * d2 + s2 * d1;
+    let m10 = c2 * d1 - s2 * d2;
+    let m12 = m10 * s0d + c0d * d4;
+    let f368 = f.f32(0x368);
+    let f36c = f.f32(0x36c);
+    let f370 = f.f32(0x370);
+    x8 = (f36c * f36c + f368 * f368 + f370 * f370).sqrt();
+    x6 = angle_lerp(one, f.f32(0x358), 2.0, f.f32(0x410), x8) * RAD;
+    x7 = interpolate_clamped(one, f.f32(0x350), 2.0, f.f32(0x414), x8) * RAD;
+    let mut m9 = f64::from(fr.f(0xe0));
+    let t2 = m12 * fr.d(0x40) + m11 * fr.d(-8);
+    let mut m8 = f64::from(x6.cos()) * t2;
+    m11 = m11 * fr.d(0x40) - m12 * fr.d(-8);
+    m8 -= f64::from(x6.sin()) * m11;
+    m8 *= f64::from(x7.cos());
+    let t10 = m10 * fr.d(0x90) - s0d * fr.d(0x88);
+    m8 -= f64::from(x7.sin()) * t10;
+    m9 -= m8;
+    fr.set(0xe0, m9 as f32);
+    let t7 = p.f32(0x7a4) * RAD;
+    let t6 = p.f32(0x7a0) * RAD;
+    let (ca, sa) = (t6.cos(), t6.sin());
+    let t9 = p.f32(0x79c) * RAD;
+    let (c9, s9) = (t9.cos(), t9.sin());
+    let mut y11 = t7.cos() * zero0;
+    let z0 = t7.sin() * zero0;
+    let y1 = z0 + y11;
+    y11 -= z0;
+    let y7 = y11 * sa + ca * x15;
+    let y12 = y1 * c9 - y7 * s9;
+    fr.set(0x148, y12);
+    let y11b = y11 * ca - sa * x15;
+    fr.set(0x88, y11b);
+    let y7b = y7 * c9 + y1 * s9;
+    fr.set(0x90, y7b);
+    let g1 = fr.f(0x138);
+    fr.set(0xcc, fr.f(0xcc) - g1 * fr.f(0x98) + fr.f(0x6c) * x15);
+    fr.set(0xd0, fr.f(0xd0) - g1 * fr.f(0x18) + fr.f(0x100) * x15);
+    let (q2, q3) = (p.f32(0x794), p.f32(0x790));
+    fr.set(0xdc, q2 * y12 + fr.f(0xdc) - q3 * y11b);
+    let q1 = p.f32(0x798);
+    fr.set(0xd4, fr.f(0xd4) - q1 * y11b + q2 * y7b);
+    fr.set(0xd8, fr.f(0xd8) - q1 * y12 + q3 * y7b);
+    let w6 = fr.f(0x190);
+    fr.set(0x70, w6 * y12 + fr.f(0x70) - fr.f(0x108) * y11b);
+    let w9 = fr.f(0x108);
+    let w8 = fr.f(0x80);
+    fr.set(0x110, fr.f(0x110) - w8 * y11b + w6 * y7b);
+    fr.set(0xc8, fr.f(0xc8) - w8 * y12 + w9 * y7b);
+    let regs = Regs::with(
+        &[
+            (6, w6),
+            (7, y7b),
+            (8, w8),
+            (9, w9),
+            (10, fr.f(0x110)),
+            (11, y11b),
+            (12, y12),
+            (13, fr.f(0xc8)),
+            (15, x15),
+        ],
+        r15,
+    );
+    if stop == Stop::Segment7 {
         return Ok((fr, regs));
     }
     Err("rest of the loop not ported".into())

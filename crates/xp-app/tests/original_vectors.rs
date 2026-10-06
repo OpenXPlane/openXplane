@@ -1608,13 +1608,13 @@ fn airflow_matches_the_original_machine_code() {
 
 #[test]
 fn scalar_helpers_match_the_original_machine_code() {
-    use openxplane::scalar::{clamp, kind_is_3_or_7, lerp, max3, sign, snap};
+    use openxplane::scalar::{angle_lerp, clamp, kind_is_3_or_7, lerp, max3, sign, snap};
     let text = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/data/scalar.txt"
     ))
     .unwrap();
-    let mut counts = [0usize; 6];
+    let mut counts = [0usize; 7];
     let same = |a: f32, b: f32| a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan());
     for line in text
         .lines()
@@ -1627,12 +1627,20 @@ fn scalar_helpers_match_the_original_machine_code() {
             "M" => (2, same(max3(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
             "N" => (3, same(snap(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
             "L" => (4, same(lerp(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
+            "A" => (
+                6,
+                same(
+                    angle_lerp(f(t[1]), f(t[2]), f(t[3]), f(t[4]), f(t[5])),
+                    f(t[6]),
+                ),
+            ),
             _ => (5, kind_is_3_or_7(t[1].parse().unwrap()) == (t[2] == "1")),
         };
         assert!(ok, "{line}");
         counts[k] += 1;
     }
     assert_eq!(counts[..5], [300; 5]);
+    assert_eq!(counts[6], 300);
     assert!(counts[5] > 20);
 }
 
@@ -2019,6 +2027,12 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment7_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_7.txt", openxplane::prop::Stop::Segment7);
     assert!(trials >= 30);
 }
 

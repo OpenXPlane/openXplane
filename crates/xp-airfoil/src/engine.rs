@@ -627,7 +627,7 @@ fn engine_curve(b: &dyn Mem, x: f32) -> f32 {
 
 /// `0x1410c98f0`: one step of the air flow lag: the new value of the state is a blend of the old one and
 /// `v` over the reference speed, weighted by the frame time limited to 0..1.
-fn lag_filter(v: f32, f6c: f32, b950: f32, f400: f32, state: f32, half: f32, dt: f32) -> f32 {
+pub fn lag_filter(v: f32, f6c: f32, b950: f32, f400: f32, state: f32, half: f32, dt: f32) -> f32 {
     let reference = {
         let magnitude = sse_max(f400.abs(), ((f64::from(state) * 0.5) as f32).abs());
         let m = sse_max(1.0, magnitude);

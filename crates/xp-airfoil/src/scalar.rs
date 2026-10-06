@@ -44,3 +44,44 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 pub fn kind_is_3_or_7(kind: i32) -> bool {
     (kind.wrapping_sub(3) as u32) & 0xffff_fffb == 0
 }
+
+/// `0x1408fd570`: the angle (degrees, wrapped to `0..=360`) between `v0` and `v1` at the fraction of `x` between
+/// `a0` and `a1` (0.5 when they are equal, otherwise `(x - a0) / (a1 - a0)` held to 0..1), taking the shorter way
+/// round (the difference is first wrapped to `-180..=180`).
+pub fn angle_lerp(a0: f32, v0: f32, a1: f32, v1: f32, x: f32) -> f32 {
+    let t = if a0 == a1 {
+        0.5
+    } else {
+        let t = (1.0 / (a1 - a0)) * (x - a0) + 0.0;
+        if 0.0 > t {
+            0.0
+        } else if 1.0 < t {
+            1.0
+        } else {
+            t
+        }
+    };
+    let mut d = v1 - v0;
+    if -180.0 > d {
+        while -180.0 > d {
+            d += 360.0;
+        }
+    }
+    if d > 180.0 {
+        while d > 180.0 {
+            d += -360.0;
+        }
+    }
+    let mut r = d * t + v0;
+    if 0.0 > r {
+        while 0.0 > r {
+            r += 360.0;
+        }
+    }
+    if r > 360.0 {
+        while r > 360.0 {
+            r += -360.0;
+        }
+    }
+    r
+}
