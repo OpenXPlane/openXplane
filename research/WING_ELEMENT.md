@@ -117,3 +117,20 @@ Port from the bottom up and verify each helper against the original in the emula
 interpolation helper is already done; next the two geometry helpers, the shaping function and the noise terms,
 then this function with synthetic objects whose fields are filled at exactly the offsets read (found by tracing
 memory reads in the emulator), so the verification does not depend on knowing every field's meaning.
+
+## Control-surface helper `0x141221220` (first reading, not ported)
+
+Called about 13 times at the start of `get_el_force` (`0x1411b9840`) with a control-surface code in the last
+stack argument. Seen so far:
+
+- It first calls `0x141192870` (a control deflection getter, element index and code as arguments) and divides
+  the result by the element field at `+0x70 + 4 i`.
+- It then switches on the code (`0xb`..`0x17`: `0xb, 0xc, 0xf, 0x10, 0x11, 0x14` set one flag; `0xd, 0xe, 0x16,
+  0x17` set another; `0x12`, `0x13`, `0x15` test directly). For each it queries the aircraft object at `+0x61f8`
+  through `0x1407ace10` with ids `0x2d9`..`0x2f0` and a float `0x1425036a4`. The ids appear to name per-surface
+  control inputs, so the helper depends on aircraft-wide state that the emulator does not yet model.
+- When the flags are set it scales a value from the wing object (`+0x2c + 4 i`) by the deflection ratio and a
+  double constant at `0x14250e310`.
+
+Not established: what ids `0x2d9`..`0x2f0` stand for, and the final output values. Porting needs a model of the
+`0x1407ace10` state first, so this is the next reverse-engineering step.
