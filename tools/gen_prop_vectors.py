@@ -11,6 +11,7 @@ Lines:
   T n early flag      (flag: the engine flag 0x1417f12c0, constant for the trial)
   F|B|E|P|R off=word ...        initial words (hex)
   W x y z (double hex) w1 w2 w3 wind sampler: position it was asked for and the three floats it stored
+  D dt (double hex)             the time step answers, in call order
   O R|F off=word ...            final words of the written offsets of R / F
   S off=word ...               frame words (signed rbp offsets, decimal) in the checked ranges
   X xmm6 xmm7 xmm8 xmm9 xmm11 xmm13 xmm15 r15
@@ -24,12 +25,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 from emulate_xp import Emulator, STACK_TOP  # noqa: E402
 from xp_fuzz import Fuzz  # noqa: E402
 from unicorn.x86_const import (  # noqa: E402
-    UC_X86_REG_RAX, UC_X86_REG_RBP, UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_XMM1, UC_X86_REG_XMM2,
+    UC_X86_REG_RAX, UC_X86_REG_RBP, UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_XMM0, UC_X86_REG_XMM1, UC_X86_REG_XMM2,
     UC_X86_REG_XMM3, UC_X86_REG_RDX, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9,
     UC_X86_REG_XMM11, UC_X86_REG_XMM13, UC_X86_REG_XMM15, UC_X86_REG_R15)
 
 ENTRY = 0x1411bd470
-CHECKPOINTS = {1: 0x1411bda66}
+CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a}
 EXE = sys.argv[1]
 SEGMENT, TRIALS, SEED = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
 
@@ -63,6 +64,12 @@ def main():
         log.append('W ' + ' '.join(f'{s:016x}' for s in seen) + ' ' + ' '.join(
             f'{struct.unpack("<I", struct.pack("<f", v))[0]:08x}' for v in wind))
 
+    def stub_time(e):
+        dt = fz.rng.uniform(0.004, 0.06)
+        e.uc.reg_write(UC_X86_REG_XMM0, struct.unpack('<Q', struct.pack('<d', dt))[0])
+        log.append(f'D {struct.unpack("<Q", struct.pack("<d", dt))[0]:016x}')
+
+    emu.stubs[0x140c448c0] = stub_time
     emu.stubs[0x1417f12c0] = stub_flag
     emu.stubs[0x141176330] = stub_sanitize
     emu.stubs[0x141ba80a0] = stub_wind
@@ -95,6 +102,7 @@ def main():
         fz.preset('P', base_p + 0x8c, fz.rng.randrange(2, 5))
         fz.preset('P', base_p + 0, fz.rng.choice([0, 1, 3, 6, 7, 2]))
         fz.preset_f32('R', 0x1c, fz.rng.uniform(0, 1))
+        fz.preset_f32('P', base_p + 0x10, fz.rng.choice([2.0, 2.0, 1.0, fz.rng.uniform(0, 3)]))
         # fractions near the thresholds of the first block
         log.clear()
         flag['v'] = fz.rng.randrange(2)

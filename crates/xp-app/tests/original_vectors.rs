@@ -1641,6 +1641,7 @@ fn parse_words(tokens: &[&str]) -> std::collections::HashMap<usize, u32> {
 struct PropReplay {
     flag: bool,
     winds: std::collections::VecDeque<([u64; 3], [f32; 3])>,
+    times: std::collections::VecDeque<f64>,
 }
 
 impl openxplane::prop::PropEnv for PropReplay {
@@ -1655,6 +1656,9 @@ impl openxplane::prop::PropEnv for PropReplay {
             "wind position"
         );
         wind
+    }
+    fn frame_time(&mut self) -> f64 {
+        self.times.pop_front().expect("time call not recorded")
     }
 }
 
@@ -1692,6 +1696,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let early = t[2] == "1";
         let mut regions = std::collections::HashMap::new();
         let mut winds = std::collections::VecDeque::new();
+        let mut times = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
         while let Some(line) = lines.peek() {
             if line.starts_with("T ") {
@@ -1710,6 +1715,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                         [f(tokens[4]), f(tokens[5]), f(tokens[6])],
                     ));
                 }
+                "D" => times.push_back(f64::from_bits(u64::from_str_radix(tokens[1], 16).unwrap())),
                 "O" => outputs.push((tokens[1].to_string(), parse_words(&tokens[2..]))),
                 "S" => {
                     slots = Some(
@@ -1741,6 +1747,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut env = PropReplay {
             flag: t[3] == "1",
             winds,
+            times,
         };
         let mut f = regions.remove("F").unwrap();
         let mut r = regions.remove("R").unwrap();
@@ -1798,9 +1805,6 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             .iter()
             .enumerate()
             {
-                if k == 2 {
-                    continue;
-                }
                 assert!(
                     words_close(got[k], want[k], k != 7),
                     "trial {trials}: {name}: {:#x} vs {:#x}",
@@ -1839,5 +1843,11 @@ fn shift_words(words: &openxplane::forces::Words, base: usize) -> openxplane::fo
 #[test]
 fn prop_force_segment1_matches_the_original_machine_code() {
     let trials = prop_segment("prop_1.txt", openxplane::prop::Stop::Segment1);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment2_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
     assert!(trials >= 30);
 }

@@ -10,7 +10,8 @@
 //! is not ported.
 use crate::airflow::airflow;
 use crate::forces::Words;
-use crate::scalar::{clamp, kind_is_3_or_7, sign};
+use crate::scalar::{clamp, kind_is_3_or_7, lerp, max3, sign, snap};
+use crate::transform::rotate_euler_offset;
 use crate::wing_element::{boundary_at, hypot2, hypot3, interpolate_clamped, rotate_euler};
 use std::collections::BTreeMap;
 
@@ -43,6 +44,8 @@ pub trait PropEnv {
     fn engine_flag(&mut self) -> bool;
     /// `0x141ba80a0`: the wind at a world position.
     fn wind(&mut self, x: f64, y: f64, z: f64) -> [f32; 3];
+    /// `0x140c448c0`: the time step in seconds (a per-thread constant divided by a per-thread integer).
+    fn frame_time(&mut self) -> f64;
 }
 
 pub struct Objects<'a> {
@@ -58,6 +61,8 @@ pub struct Objects<'a> {
 pub enum Stop {
     /// Before the call at `0x1411bda66`.
     Segment1,
+    /// Before the element-count test at `0x1411be62a` (the loop over elements).
+    Segment2,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original), for checkpoints.
@@ -77,7 +82,7 @@ pub fn prop_force(
     o: &mut Objects,
     n: i32,
     env: &mut dyn PropEnv,
-    _stop: Stop,
+    stop: Stop,
 ) -> Result<(Frame, Regs), String> {
     let (f, b, e, p, r) = (&mut *o.f, o.b, o.e, o.p, &mut *o.r);
     let mut fr = Frame::default();
@@ -229,14 +234,118 @@ pub fn prop_force(
         }
     }
     let _ = x8;
-    let regs = Regs {
+    let mut x7 = fr.f(0x8d8);
+    let mut x11 = fr.f(-0x14);
+    let mut x8 = f32::from_bits(ABS);
+    let regs1 = Regs {
         xmm6: x6,
-        xmm7: fr.f(0x8d8),
-        xmm8: 0.0,
+        xmm7: x7,
+        xmm8: x8,
         xmm9: x9,
         xmm11: x11,
         xmm13: x13,
         xmm15: x15,
+        r15,
+    };
+    if stop == Stop::Segment1 {
+        return Ok((fr, regs1));
+    }
+
+    // ---- segment 2: 0x1411bda66 .. 0x1411be62a ----
+    if f.i32(0xbcc8) != 0 || f.i32(0xbcd0) != 0 {
+        return Err("debug dump not ported".into());
+    }
+    x6 = fr.f(-0x18);
+    let abs = |v: f32| f32::from_bits(v.to_bits() & ABS);
+    let a6 = abs(x6);
+    x7 = r.f32(0x84);
+    x8 = abs(x7);
+    let m = max3(x8, a6, one);
+    x13 = interpolate_clamped(0.0, 0.0, m, one, fr.f(0x8e8));
+    x6 = f32::from_bits(x6.to_bits() ^ 0x8000_0000);
+    let d = snap(x7, f32::from_bits(0xbc23d70a), f32::from_bits(0x3c23d70a));
+    x6 /= d;
+    x6 = clamp(x6, -2.0, 2.0);
+    r.set_f32(0x50, x6);
+    let half = 0.5f32;
+    x7 = -0.5;
+    x9 = interpolate_clamped(-0.75, half, x7, half, x6);
+    if x6 >= x7 {
+        x9 = interpolate_clamped(x7, half, half, half, x6);
+    }
+    x7 = 4.0;
+    if x6 >= half {
+        x9 = interpolate_clamped(half, half, one, x7, x6);
+    }
+    if x6 >= one {
+        x9 = interpolate_clamped(one, x7, 1.25, one, x6);
+    }
+    x8 = (f64::from(x8) * 10.0).sqrt() as f32;
+    let d7 = f64::from(x8);
+    let x2 = (f64::from(x11) + f64::from(x11)) as f32;
+    x6 = interpolate_clamped(x11, 0.0, x2, one, fr.f(0x8e8));
+    x11 = interpolate_clamped((d7 * 0.5) as f32, 0.0, x8, one, fr.f(0x8e8));
+    x11 *= x6;
+    x7 = interpolate_clamped(x8, 0.0, (d7 * 5.0) as f32, one, fr.f(0x8e8));
+    x7 *= x6;
+    if x11 > 0.0 {
+        x9 = interpolate_clamped(0.0, x9, one, half, x11);
+    }
+    if x7 > 0.0 {
+        x9 = interpolate_clamped(0.0, x9, one, 0.25, x7);
+    }
+    let dt = env.frame_time();
+    let t2 = (dt + dt) as f32;
+    r.set_f32(0xa0, lerp(r.f32(0xa0), x9, t2));
+    x8 = interpolate_clamped(0.0, fr.f(-0x18), one, fr.f(-0xa0), x11);
+    fr.set(-0x14, x8);
+    let p10 = p.f32(0x10);
+    let quarter = (f64::from(p10) * 0.25) as f32;
+    x11 = quarter;
+    let x0;
+    if p10 == 2.0 && (b.i32(0x214c) != 0 || b.i32(0x2150) != 0) {
+        let inv = (1.0 / env.frame_time()) as f32;
+        x9 = (f64::from(inv) * f64::from_bits(0x3fc6_5718_7000_0000)) as f32;
+        let x8l = r.f32(0x1c);
+        x7 = quarter;
+        x6 = r.f32(0x24) * RAD;
+        x11 = interpolate_clamped(0.0, abs(x6.sin()), x9, x7, x8l);
+        x0 = interpolate_clamped(0.0, abs(x6.cos()), x9, x7, x8l);
+        x8 = fr.f(-0x14);
+    } else {
+        x0 = quarter;
+    }
+    fr.set(0x48, x0);
+    fr.set(0x4c, x11);
+    fr.set(0x50, x0);
+    fr.set(0x54, x11);
+    // 0x1411be54c: the rotation of the point (0, 0, -1) by the part's angles, with its offsets
+    let angles = [p.f32(0x79c), p.f32(0x7a0), p.f32(0x7a4)];
+    let offsets = [p.f32(0x790), p.f32(0x794), p.f32(0x798)];
+    let rot = rotate_euler_offset(angles, offsets, false, 0.0, 0.0, -1.0);
+    fr.set(-0xc, rot[0]);
+    fr.set(-0xa0, rot[1]);
+    fr.set(0x8d8, rot[2]);
+    for off in [
+        0xcc, 0xd0, 0xdc, 0xd4, 0xd8, 0x70, 0x110, 0xc8, 0xe4, 0xe8, 0xec,
+    ] {
+        fr.set(off, 0.0);
+    }
+    fr.set(0x114, f32::from_bits(0x3c23d70a));
+    fr.set(0x10, f32::from_bits(0x3c23d70a));
+    fr.set_i(0x8d8, 0);
+    x6 = 0.0;
+    x7 = 0.0;
+    x9 = 0.0;
+    x11 = 0.0;
+    let regs = Regs {
+        xmm6: x6,
+        xmm7: x7,
+        xmm8: x8,
+        xmm9: x9,
+        xmm11: x11,
+        xmm13: x13,
+        xmm15: f32::from_bits(ABS),
         r15,
     };
     Ok((fr, regs))
