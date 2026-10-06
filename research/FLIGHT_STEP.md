@@ -75,3 +75,19 @@ ulps of libm.
   `F+0x1cc/0x1d0/0x120` terms, and the lever block of part kinds 3 and 7 (`R+0x30..0x3c`). The debug dump
   guarded by `F+0xbcc8` is not ported.
 - `rdi` in the original is `P+0x88`, so the `+0x708/+0x710/+0x718` reads of that block are `P+0x790/0x798/0x7a0`.
+- Segment 2 (`0x1411bda66` .. `0x1411be62a`, 150 trials): the lever response curve on `R+0x84` / `F+0x8e8` (a stack of
+  `interpolate_clamped` segments around the speed ratio), the smoothing of `R+0xa0` toward it with `2 * dt`, the
+  `P+0x10 == 2` branch, the rotation of the point (0, 0, -1) by the part's angles, and the zeroing of the
+  per-pass accumulators (frame slots `0xcc..0xec`, `0x114`, `0x10`).
+- Segment 3 (first pass of the station loop up to the second airflow call at `0x1411bf1c8`, 100 trials): the
+  per-pass constants, the station position on the blade (`boundary_at` x/y/z, dihedral, azimuth angle `inner *
+  pi/2`), its rotation by the part angles and into the world frame, the terrain probe `0x14195f4b0`
+  (replayed), the ground-effect ratio, the clamped `R+0xa4` and `R+0x144` factors and the six-octave
+  turbulence (`NoiseTable::basis2` = `0x140984e50`, a 2-D lookup in the same 0x40000-float runtime table as the
+  3-D noise; the vectors fill the table with a fixed pseudo-random sequence because the real contents are
+  generated at run time and not recovered).
+- `tools/clean_asm.py` now also prints the repairs of the inline finite checks of the form `movaps %xmm14, %xmmN`,
+  `movss %xmm14, off(%rbp)` and `movl %esi/%edi, off(%r14)`; the function has twelve of them (after
+  `get_el_force` and at the force accumulation), each replacing a non-finite value by zero.
+- The second airflow call of the loop passes 1 as its last argument, which selects the call of `0x14117d970`
+  (18 KB, not ported yet).

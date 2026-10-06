@@ -1642,6 +1642,23 @@ struct PropReplay {
     flag: bool,
     winds: std::collections::VecDeque<([u64; 3], [f32; 3])>,
     times: std::collections::VecDeque<f64>,
+    phases: std::collections::VecDeque<f64>,
+    probes: std::collections::VecDeque<([u32; 6], f32)>,
+    table: openxplane::buffet::NoiseTable,
+}
+
+/// The deterministic noise table the vector generator writes into the emulated process.
+fn prop_noise_table() -> openxplane::buffet::NoiseTable {
+    let values = (0..262_144u32)
+        .map(|i| {
+            let mut h = i.wrapping_mul(2_654_435_761).wrapping_add(12345);
+            h ^= h >> 15;
+            h = h.wrapping_mul(2_246_822_519);
+            h ^= h >> 13;
+            (h & 0xff_ffff) as f32 / 16_777_216.0
+        })
+        .collect();
+    openxplane::buffet::NoiseTable::new(values).unwrap()
 }
 
 impl openxplane::prop::PropEnv for PropReplay {
@@ -1660,10 +1677,28 @@ impl openxplane::prop::PropEnv for PropReplay {
     fn frame_time(&mut self) -> f64 {
         self.times.pop_front().expect("time call not recorded")
     }
+    fn time_phase(&mut self) -> f64 {
+        self.phases
+            .pop_front()
+            .expect("time-phase call not recorded")
+    }
+    fn noise2(&mut self, x: f32, y: f32, seed: i32) -> f32 {
+        self.table.basis2(x, y, seed)
+    }
+    fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> f32 {
+        let (seen, out) = self.probes.pop_front().expect("terrain call not recorded");
+        let got = [a[0], a[1], a[2], b[0], b[1], b[2]].map(f32::to_bits);
+        assert_eq!(got, seen, "terrain probe points");
+        let _ = height;
+        out
+    }
 }
 
 /// Frame slots that hold integers (compared exactly).
-const PROP_INT_SLOTS: [i32; 3] = [0x84, 0x8e0, 0x8d0];
+const PROP_INT_SLOTS: [i32; 16] = [
+    0x84, 0x8e0, 0x8d0, 8, 0x30, 0x34, 0x28, 0x2c, 0x208, 0x20c, 0x240, 0x244, 0x200, 0x204, 0x248,
+    0x24c,
+];
 
 /// Float words equal up to the platform libm's last bits (sin, cos, tan, atan2 differ from the C runtime of the
 /// original by a few ulps, which cancellations can amplify); integers exactly.
@@ -1697,6 +1732,8 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut regions = std::collections::HashMap::new();
         let mut winds = std::collections::VecDeque::new();
         let mut times = std::collections::VecDeque::new();
+        let mut phases = std::collections::VecDeque::new();
+        let mut probes = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
         while let Some(line) = lines.peek() {
             if line.starts_with("T ") {
@@ -1705,7 +1742,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             let line = lines.next().unwrap();
             let tokens: Vec<&str> = line.split_whitespace().collect();
             match tokens[0] {
-                "F" | "B" | "E" | "P" | "R" => {
+                "F" | "B" | "E" | "P" | "R" | "X0" | "X1" | "X2" | "X3" => {
                     regions.insert(tokens[0], Words(parse_words(&tokens[1..])));
                 }
                 "W" => {
@@ -1713,6 +1750,23 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                     winds.push_back((
                         [h(tokens[1]), h(tokens[2]), h(tokens[3])],
                         [f(tokens[4]), f(tokens[5]), f(tokens[6])],
+                    ));
+                }
+                "H" => {
+                    phases.push_back(f64::from_bits(u64::from_str_radix(tokens[1], 16).unwrap()))
+                }
+                "G" => {
+                    let h = |s: &str| u32::from_str_radix(s, 16).unwrap();
+                    probes.push_back((
+                        [
+                            h(tokens[1]),
+                            h(tokens[2]),
+                            h(tokens[3]),
+                            h(tokens[4]),
+                            h(tokens[5]),
+                            h(tokens[6]),
+                        ],
+                        f(tokens[7]),
                     ));
                 }
                 "D" => times.push_back(f64::from_bits(u64::from_str_radix(tokens[1], 16).unwrap())),
@@ -1731,7 +1785,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                             .collect::<std::collections::HashMap<i32, u32>>(),
                     )
                 }
-                "X" => {
+                "Y" => {
                     regs = Some(
                         tokens[1..]
                             .iter()
@@ -1748,6 +1802,9 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             flag: t[3] == "1",
             winds,
             times,
+            phases,
+            probes,
+            table: prop_noise_table(),
         };
         let mut f = regions.remove("F").unwrap();
         let mut r = regions.remove("R").unwrap();
@@ -1761,12 +1818,19 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             shift_words(&e, n as usize * 0x68),
             shift_words(&p, n as usize * 0x3770),
         );
+        let mut xs: Vec<openxplane::forces::Words> = (0..4)
+            .map(|i| {
+                let x = regions.remove(format!("X{i}").as_str()).unwrap();
+                shift_words(&x, n as usize * 0x2d8)
+            })
+            .collect();
         let mut objects = Objects {
             f: &mut f,
             b: &b,
             e: &e_n,
             p: &p_n,
             r: &mut r,
+            x: &mut xs,
         };
         let result = prop_force(&mut objects, n, &mut env, stop);
         if early {
@@ -1789,29 +1853,20 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                 let _ = (off, got);
             }
             let want = regs.unwrap();
-            let got = [
-                got_regs.xmm6.to_bits(),
-                got_regs.xmm7.to_bits(),
-                got_regs.xmm8.to_bits(),
-                got_regs.xmm9.to_bits(),
-                got_regs.xmm11.to_bits(),
-                got_regs.xmm13.to_bits(),
-                got_regs.xmm15.to_bits(),
-                got_regs.r15 as u32,
-            ];
-            for (k, name) in [
-                "xmm6", "xmm7", "xmm8", "xmm9", "xmm11", "xmm13", "xmm15", "r15",
-            ]
-            .iter()
-            .enumerate()
-            {
-                assert!(
-                    words_close(got[k], want[k], k != 7),
-                    "trial {trials}: {name}: {:#x} vs {:#x}",
-                    got[k],
-                    want[k]
-                );
+            for (k, name) in (6..16).zip([
+                "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14",
+                "xmm15",
+            ]) {
+                if let Some(v) = got_regs.xmm[k] {
+                    assert!(
+                        words_close(v.to_bits(), want[k - 6], true),
+                        "trial {trials}: {name}: {:#x} vs {:#x}",
+                        v.to_bits(),
+                        want[k - 6]
+                    );
+                }
             }
+            assert_eq!(got_regs.r15 as u32, want[10], "trial {trials}: r15");
             for (region, words) in outputs {
                 let ours = if region == "R" { &r } else { &f };
                 for (off, want) in words {
@@ -1849,5 +1904,11 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment3_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_3.txt", openxplane::prop::Stop::Segment3);
     assert!(trials >= 30);
 }

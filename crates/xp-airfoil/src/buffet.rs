@@ -51,6 +51,25 @@ impl NoiseTable {
         Ok((f64::from(combined) * 2.0 - 1.0) as f32)
     }
 
+    /// `0x140984e50`: the two-dimensional lookup the propeller turbulence uses: the cell is `(|y| << 9) + |x| +
+    /// 100 * seed` (32-bit), the four table entries at `+0`, `+1`, `+0x200`, `+0x201` (indices wrap at 0x40000)
+    /// are blended bilinearly and mapped from `0..1` to `-1..1` in double precision.
+    pub fn basis2(&self, x: f32, y: f32, seed: i32) -> f32 {
+        let (ax, ay) = (x.abs(), y.abs());
+        let (ix, iy) = (ax as i64 as u32, ay as i64 as u32);
+        let base = (iy << 9)
+            .wrapping_add(ix)
+            .wrapping_add((seed as u32).wrapping_mul(100));
+        let v = |offset: u32| self.values[(base.wrapping_add(offset) & 0x3ffff) as usize];
+        let fx = ax - ix as f32;
+        let fy = ay - iy as f32;
+        let inv_x = 1.0 - fx;
+        let inv_y = 1.0 - fy;
+        let low = (fx * v(1) + inv_x * v(0)) * inv_y;
+        let high = (inv_x * v(0x200) + fx * v(0x201)) * fy;
+        (f64::from(low + high) * 2.0 - 1.0) as f32
+    }
+
     /// 0x141a42a10..0x141a42c0e: six calls, double accumulation, final float32.
     pub fn fractal(&self, xyz: [f32; 3], seed: u32) -> Result<f32, String> {
         let sample = |scale: f64| self.basis(xyz.map(|v| (f64::from(v) * scale) as f32), seed);

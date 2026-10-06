@@ -55,7 +55,9 @@ def main():
                         nxt = ins[k + 1][1] if k + 1 < len(ins) else ''
                         m2 = re.match(r'xorps (%xmm\d+), (%xmm\d+)$', u)
                         if (m2 and m2.group(1) == m2.group(2) and not nxt.startswith('movup')) or re.match(
-                            r'movl (\$0x0|%r\d+d), 0x[0-9a-f]+\(%r(si|di|bx|14|15|13)\)', u
+                            r'movaps %xmm14, %xmm\d+$', u
+                        ) or re.match(r'movss %xmm14, 0x[0-9a-f]+\(%r(bp|14|13)\)$', u) or re.match(
+                            r'movl (\$0x0|%r\d+d|%e(si|di|bx)), 0x[0-9a-f]+\(%r(si|di|bx|14|15|13|bp)\)', u
                         ):
                             repairs.append(u)
                     if repairs:

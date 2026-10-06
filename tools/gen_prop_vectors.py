@@ -14,7 +14,9 @@ Lines:
   D dt (double hex)             the time step answers, in call order
   O R|F off=word ...            final words of the written offsets of R / F
   S off=word ...               frame words (signed rbp offsets, decimal) in the checked ranges
-  X xmm6 xmm7 xmm8 xmm9 xmm11 xmm13 xmm15 r15
+  Y xmm6 .. xmm15 (low words) r15
+  X0..X3 off=word               initial words of the element records F[0x68e0 + b*0x18] (3 records of 0x2d8)
+  H phase (double hex) / G a b h  time-phase and terrain-probe answers
 """
 import math
 import struct
@@ -25,14 +27,31 @@ sys.path.insert(0, str(Path(__file__).parent))
 from emulate_xp import Emulator, STACK_TOP  # noqa: E402
 from xp_fuzz import Fuzz  # noqa: E402
 from unicorn.x86_const import (  # noqa: E402
-    UC_X86_REG_RAX, UC_X86_REG_RBP, UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_XMM0, UC_X86_REG_XMM1, UC_X86_REG_XMM2,
-    UC_X86_REG_XMM3, UC_X86_REG_RDX, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9,
-    UC_X86_REG_XMM11, UC_X86_REG_XMM13, UC_X86_REG_XMM15, UC_X86_REG_R15)
+    UC_X86_REG_RAX, UC_X86_REG_RBP, UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_XMM0, UC_X86_REG_XMM1, UC_X86_REG_XMM2,
+    UC_X86_REG_XMM3, UC_X86_REG_RDX, UC_X86_REG_R15)
+from unicorn.x86_const import (UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM10,  # noqa: E402
+                               UC_X86_REG_XMM11, UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
+XMM = {6: UC_X86_REG_XMM6, 7: UC_X86_REG_XMM7, 8: UC_X86_REG_XMM8, 9: UC_X86_REG_XMM9, 10: UC_X86_REG_XMM10,
+       11: UC_X86_REG_XMM11, 12: UC_X86_REG_XMM12, 13: UC_X86_REG_XMM13, 14: UC_X86_REG_XMM14, 15: UC_X86_REG_XMM15}
 
 ENTRY = 0x1411bd470
-CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a}
+CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8}
+NOISE_TABLE = 0x14578f1f0
 EXE = sys.argv[1]
 SEGMENT, TRIALS, SEED = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+
+
+def noise_value(i):
+    # a deterministic table: the original's runtime table is not recovered, so any fixed values do
+    h = (i * 2654435761 + 12345) & 0xffffffff
+    h ^= h >> 15
+    h = (h * 2246822519) & 0xffffffff
+    h ^= h >> 13
+    return (h & 0xffffff) / 16777216.0
+
+
+def noise_table():
+    return struct.pack('<262144f', *[noise_value(i) for i in range(262144)])
 
 
 def words(d):
@@ -43,6 +62,7 @@ def main():
     emu = Emulator(EXE)
     fz = Fuzz(emu, EXE, [(0x141170000, 0x1412a0000), (0x140800000, 0x140a00000), (0x1406e0000, 0x140700000)], SEED)
     heap_mark = emu.heap_top
+    emu.write(NOISE_TABLE, noise_table())
     log = []
     flag = {'v': 0}
 
@@ -69,6 +89,24 @@ def main():
         e.uc.reg_write(UC_X86_REG_XMM0, struct.unpack('<Q', struct.pack('<d', dt))[0])
         log.append(f'D {struct.unpack("<Q", struct.pack("<d", dt))[0]:016x}')
 
+    def stub_phase(e):
+        v = fz.rng.uniform(0, 1000)
+        e.uc.reg_write(UC_X86_REG_XMM0, struct.unpack('<Q', struct.pack('<d', v))[0])
+        log.append(f'H {struct.unpack("<Q", struct.pack("<d", v))[0]:016x}')
+
+    def stub_terrain(e):
+        rdx, r8, r9 = (e.uc.reg_read(r) for r in (UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9))
+        a = [e.read_f32(rdx + 4 * i) for i in range(3)]
+        b = [e.read_f32(r8 + 4 * i) for i in range(3)]
+        h = e.read_f32(r9)
+        if fz.rng.random() < 0.6:
+            h = fz.rng.uniform(-30, 30)
+            e.write_f32(r9, h)
+        hx = lambda v: f'{struct.unpack("<I", struct.pack("<f", v))[0]:08x}'
+        log.append('G ' + ' '.join(hx(v) for v in a + b) + ' ' + hx(h))
+
+    emu.stubs[0x140c81ea0] = stub_phase
+    emu.stubs[0x14195f4b0] = stub_terrain
     emu.stubs[0x140c448c0] = stub_time
     emu.stubs[0x1417f12c0] = stub_flag
     emu.stubs[0x141176330] = stub_sanitize
@@ -83,10 +121,11 @@ def main():
         F = emu.alloc(0x44000)
         B = emu.alloc(0x7000)
         E = emu.alloc(0x68 * 3)
+        X = [emu.alloc(0x2d8 * 3) for _ in range(4)]
         P = emu.alloc(0x3770 * 3)
         R = emu.alloc(0x2000)
-        for name, addr, size in (('F', F, 0x44000), ('B', B, 0x7000), ('E', E, 0x68 * 3), ('P', P, 0x3770 * 3),
-                                 ('R', R, 0x2000)):
+        for name, addr, size in [('F', F, 0x44000), ('B', B, 0x7000), ('E', E, 0x68 * 3), ('P', P, 0x3770 * 3),
+                                 ('R', R, 0x2000)] + [(f'X{i}', X[i], 0x2d8 * 3) for i in range(4)]:
             fz.region(name, addr, size)
             emu.write(addr, bytes(size))
         n = fz.rng.randrange(3)
@@ -96,6 +135,10 @@ def main():
         fz.preset('B', 0x5ffc, E >> 32, record=False)
         fz.preset('B', 0x6010, P & 0xffffffff, record=False)
         fz.preset('B', 0x6014, P >> 32, record=False)
+        for i in range(4):
+            fz.preset('F', 0x68e0 + 0x18 * i, X[i] & 0xffffffff, record=False)
+            fz.preset('F', 0x68e4 + 0x18 * i, X[i] >> 32, record=False)
+        fz.preset_f32('P', n * 0x3770 + 0x3730, fz.rng.uniform(0.3, 3.0))
         for off in (0xbcc8, 0xbcd0):
             fz.preset('F', off, 0, record=False)
         base_p = n * 0x3770
@@ -121,7 +164,7 @@ def main():
         rbp = entry_rsp - 0x8c8
         init = fz.initial()
         out = [f'T {n} {early} {flag["v"]}']
-        for name in ('F', 'B', 'E', 'P', 'R'):
+        for name in ('F', 'B', 'E', 'P', 'R', 'X0', 'X1', 'X2', 'X3'):
             out.append(f'{name} {words(init[name])}')
         out.extend(log)
         wr = fz.written()
@@ -134,9 +177,8 @@ def main():
                 if w:
                     slots[off] = w
             out.append('S ' + ' '.join(f'{o}={w:08x}' for o, w in sorted(slots.items())))
-            regs = [UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,
-                    UC_X86_REG_XMM13, UC_X86_REG_XMM15]
-            out.append('X ' + ' '.join(f'{emu.uc.reg_read(r) & 0xffffffff:08x}' for r in regs) + ' '
+            regs = [UC_X86_REG_XMM0 + i for i in range(6, 16)] if False else [XMM[i] for i in range(6, 16)]
+            out.append('Y ' + ' '.join(f'{emu.uc.reg_read(r) & 0xffffffff:08x}' for r in regs) + ' '
                        + f'{emu.uc.reg_read(UC_X86_REG_R15) & 0xffffffff}')
         print('\n'.join(out))
         done += 1
