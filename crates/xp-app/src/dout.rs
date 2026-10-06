@@ -45,7 +45,7 @@ pub fn line_count() -> usize {
 pub fn cell_labels(label: &str) -> [Option<(String, String)>; CELLS] {
     let chars: Vec<char> = label
         .chars()
-        .map(|c| if c == '_' { ' ' } else { c })
+        .map(|c| if matches!(c, '_' | '-') { ' ' } else { c })
         .collect();
     let raw: Vec<char> = label.chars().collect();
     std::array::from_fn(|i| {
