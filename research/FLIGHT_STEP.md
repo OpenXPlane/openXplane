@@ -52,3 +52,11 @@ Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc
   **Correction**: the eighth argument of the frame transform is *not* the caller's `r12` (as first assumed): the
   function's inline finite check executes `xorl %r12d, %r12d` at `0x14121b735` on every path, so the argument is 0
   and the origin is never subtracted from the wind.
+- `scalar` (`crates/xp-airfoil/src/scalar.rs`): `clamp` (`0x14081dfa0`), `sign` (`0x140910be0`), `max3`
+  (`0x1411b4a20`), `snap` (`0x1411b03f0`: a value inside the bounds goes to the nearer one), `lerp`
+  (`0x140819240`, `t` held to 0..1) and `kind_is_3_or_7` (`0x1411e26e0`). 1500 vectors including NaN and ties
+  (`tools/gen_scalar_vectors.py`).
+- Reading of `0x1411bd470` (24 KB, called once per engine index): it is the **per-engine propeller force** function,
+  not a wing function as first assumed: it indexes the engine record `B[0x5ff8] + i*0x68` and the part record
+  `B[0x6010] + i*0x3770` with the same index, flies the airflow at the part's point `+0x790/+0x794/+0x798`, and
+  loops over blade stations (`boundary_at(r12+0x88, ...)`) with `get_el_force`. Not ported yet.

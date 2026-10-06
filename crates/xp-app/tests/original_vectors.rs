@@ -1593,3 +1593,33 @@ fn airflow_matches_the_original_machine_code() {
     }
     assert_eq!(cases, 500);
 }
+
+#[test]
+fn scalar_helpers_match_the_original_machine_code() {
+    use openxplane::scalar::{clamp, kind_is_3_or_7, lerp, max3, sign, snap};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/scalar.txt"
+    ))
+    .unwrap();
+    let mut counts = [0usize; 6];
+    let same = |a: f32, b: f32| a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan());
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let (k, ok) = match t[0] {
+            "C" => (0, same(clamp(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
+            "S" => (1, same(sign(f(t[1])), f(t[2]))),
+            "M" => (2, same(max3(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
+            "N" => (3, same(snap(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
+            "L" => (4, same(lerp(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
+            _ => (5, kind_is_3_or_7(t[1].parse().unwrap()) == (t[2] == "1")),
+        };
+        assert!(ok, "{line}");
+        counts[k] += 1;
+    }
+    assert_eq!(counts[..5], [300; 5]);
+    assert!(counts[5] > 20);
+}

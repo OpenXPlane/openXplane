@@ -14,6 +14,7 @@ pub mod fuel;
 pub mod profile;
 pub mod regimes;
 pub mod runtime;
+pub mod scalar;
 pub mod stall;
 pub mod transform;
 pub mod wing_element;
