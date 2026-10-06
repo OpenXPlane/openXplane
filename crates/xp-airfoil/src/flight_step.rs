@@ -87,3 +87,89 @@ pub fn wing_aspect_pass(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<()
     }
     Ok(())
 }
+
+const RAD: f32 = f32::from_bits(0x3c8efa36);
+
+fn neg(v: f32) -> f32 {
+    f32::from_bits(v.to_bits() ^ 0x8000_0000)
+}
+
+/// `0x14126644a..0x141266b52`: the engine controls (`0x141260090`, called through the environment), the thrust
+/// of the manoeuvring rockets, the pitch-tilt thrust, the blown-flap factors:
+///
+/// * while the rocket timer `F+0x6538` is ahead of the simulation time, the code `F+0x6518` selects one of the six
+///   rocket forces (`0x264..0x269`: +/- normal `B+0x20d8`, +/- side `B+0x20d4`, +/- axial `B+0x20dc`) added at the
+///   origin;
+/// * while `F+0x6514` is set, the thrust `B+0x2920` at the angle `B+0x291c` is added as an axial and a normal
+///   force (at the lever arms `B+0x2914`/`B+0x2918`) and the timer `F+0x6534` runs down;
+/// * with `F+0x57c` set, the moments `B+0x20c8..0x20d0` are added scaled by `F+0x11c/0x118/0x120`;
+/// * the blown-flap factor `F+0x64bc` from the flap setting `F+0x184` and, when `B+0x21e8` is positive, the mean of
+///   the squared jet speeds (`F+0x64c0`).
+pub fn thrust_effects_pass(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<(), String> {
+    use crate::callees::{add_axial_force, add_normal_force, add_side_force};
+    env.call(vm, 0x141260090, CallArgs::ints(&[f]));
+    if debug_dump_active(vm, f) {
+        return Err("debug dump not ported".into());
+    }
+    let b = vm.u64(f + 0x20);
+    if f64::from(vm.f32(f + 0x6538)) > vm.f64(crate::callees::SIM_TIME) {
+        let code = vm.i32(f + 0x6518);
+        match code {
+            0x264 => add_normal_force(vm, f, vm.f32(b + 0x20d8), 0.0, 0.0),
+            0x265 => add_normal_force(vm, f, neg(vm.f32(b + 0x20d8)), 0.0, 0.0),
+            0x266 => add_side_force(vm, f, neg(vm.f32(b + 0x20d4)), 0.0, 0.0),
+            0x267 => add_side_force(vm, f, vm.f32(b + 0x20d4), 0.0, 0.0),
+            0x268 => add_axial_force(vm, f, neg(vm.f32(b + 0x20dc)), 0.0, 0.0),
+            0x269 => add_axial_force(vm, f, vm.f32(b + 0x20dc), 0.0, 0.0),
+            _ => {}
+        }
+    }
+    if vm.i32(f + 0x6514) != 0 {
+        let angle = vm.f32(b + 0x291c) * RAD;
+        let force = angle.cos() * neg(vm.f32(b + 0x2920));
+        add_axial_force(vm, f, force, 0.0, vm.f32(b + 0x2914));
+        let force = angle.sin() * vm.f32(b + 0x2920);
+        add_normal_force(vm, f, force, 0.0, vm.f32(b + 0x2918));
+        let dt = f64::from_bits(
+            env.call(vm, 0x140c448c0, CallArgs::ints(&[0x1_42f0_18b8]))
+                .xmm0,
+        );
+        let remaining = (f64::from(vm.f32(f + 0x6534)) - dt) as f32;
+        vm.set_f32(f + 0x6534, remaining);
+        if 0.0 > remaining {
+            vm.set_i32(f + 0x6514, 0);
+        }
+    }
+    if vm.i32(f + 0x57c) != 0 {
+        let (x0, x1, x2) = (vm.f32(b + 0x20c8), vm.f32(b + 0x20cc), vm.f32(b + 0x20d0));
+        if x0 > 0.0 || x1 > 0.0 || x2 > 0.0 {
+            vm.set_f32(f + 0x2f8, x0 * vm.f32(f + 0x11c) + vm.f32(f + 0x2f8));
+            vm.set_f32(f + 0x310, x1 * vm.f32(f + 0x118) + vm.f32(f + 0x310));
+            vm.set_f32(f + 0x328, x2 * vm.f32(f + 0x120) + vm.f32(f + 0x328));
+        }
+    }
+    let blown = interpolate_clamped(vm.f32(b + 0x21e4), 0.0, 1.0, 1.0, vm.f32(f + 0x184));
+    vm.set_f32(f + 0x64bc, blown);
+    vm.set_i32(f + 0x64c0, 0);
+    let engines = vm.i32(b + 0x91c);
+    if engines > 0 && vm.f32(b + 0x21e8) > 0.0 && blown > 0.0 {
+        let (mut sum, mut count) = (0.0f32, 0.0f32);
+        for e in 0..engines {
+            if bind(env, f, 0x179, e) {
+                continue;
+            }
+            let engine = vm.u64(b + 0x5ff8) + (i64::from(e) * 0x68) as u64;
+            let jet = (vm.i32(engine).wrapping_sub(5) as u32) <= 1;
+            let state = vm.u64(f + 0x68b0) + (i64::from(e) * 0x2cc) as u64;
+            if jet && vm.i32(state + 0x298) != 3 {
+                let n1 = (f64::from(vm.f32(state + 0x90)) * 0.01) as f32;
+                sum += n1 * n1;
+                count = (f64::from(count) + 1.0) as f32;
+            }
+        }
+        if sum > 0.0 && count > 0.0 {
+            vm.set_f32(f + 0x64c0, sum / count * blown * vm.f32(b + 0x21e8));
+        }
+    }
+    Ok(())
+}
