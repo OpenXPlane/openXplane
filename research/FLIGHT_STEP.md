@@ -203,8 +203,16 @@ through the feedback blend on `B+0x9d0`, the 2/7 power and the 3.5 power of the 
 `F+0x400` term, the lubrication `M+0x2bc` blend and the bindings `0x1d1`, `0x181` (noise), `0x171` (cut) and `0x1b1`
 (the starter delay)); the thrust term of the fuel supply, the friction (`M+0x268` over the 4.5 power of the speed)
 and the frame time integrate the speed `M+0x90` (200 per second per unit of power over `B+0xa20`), `M+0x98` is the
-speed ratio in percent, and `M+0xb8` is the power from the propeller curve `0x141a6a650` (replayed).
+speed ratio in percent, and `M+0xb8` is the power from the propeller curve `0x141a6a650`.
 
-Not ported: the kind handlers for kind 0 (`0x14119bc00`) and kinds 1 and 2 (`0x14119d380`, 1000 instructions), the
-propeller curve `0x141a6a650`, and the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
+`propeller_curve` (`0x141a6a650(B, a, r, d)`, 311 instructions): the propeller power coefficient for the speed `a`
+(percent), the speed ratio `r` and the density factor `d`. `B+0x990 == 0`: the 3rd and 1.4th powers of `a/100`
+blended between 25 and 50 percent (a clamped line), the 4th power times 1.202 and the square of `r` times -0.2 (each
+scaled by the blend and `d`), less 0.002 of `r` in percent, plus the difference of the squares of `a/100` and `r`
+over `(1 + 0.05 a) (1 + 5 r)`. `B+0x990 == 1`: the density ratio from the two runtime values at `0x14612c1c8` and
+`0x14612c1d0` (clamped line between 135 and 136 at 135.344, over 1.225), the exponents `B+0x998..0x9a4` extrapolated
+along the line to `d`, and the power laws of `a` and `r` over `0.95 sqrt|r| + 0.05`. Any other value gives 0.
+
+Not ported: the kind handlers for kind 0 (`0x14119bc00`) and kinds 1 and 2 (`0x14119d380`, 1000 instructions), and
+the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
 the global clock).

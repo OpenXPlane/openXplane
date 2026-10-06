@@ -17,6 +17,7 @@ EXE, TRIALS, SEED = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 FUNC = 0x14119ac90
 SEED_GLOBAL = 0x142f01918
 CLOCK_GLOBAL = 0x142f01910
+REFERENCE = 0x14612c1c8
 
 
 def bool_stub(call, rng):
@@ -28,14 +29,13 @@ def void_stub(call, rng):
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x141190000, 0x1411a3000), (0x140800000, 0x140900000), (0x1406e0000, 0x1406f0000), (0x140820000, 0x140830000), (0x141230000, 0x141240000), (0x140c40000, 0x140c50000)])
+    case = VmCase(EXE, SEED, [(0x141190000, 0x1411a3000), (0x140800000, 0x140900000), (0x1406e0000, 0x1406f0000), (0x140820000, 0x140830000), (0x141230000, 0x141240000), (0x141a60000, 0x141a70000), (0x140c40000, 0x140c50000)])
     for addr in (0x1407ace10, 0x1417f12c0):
         case.stub(addr, bool_stub)
     case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0.005, 0.06)))
     case.stub(0x141ba6750, lambda call, rng: call.ret_f32(rng.uniform(-40.0, 45.0)))
     case.stub(0x141ba64e0, lambda call, rng: call.ret_f32(rng.uniform(0.3, 1.4)))
     case.stub(0x1411dd610, lambda call, rng: call.ret_f32(rng.uniform(0.0, 1.0)))
-    case.stub(0x141a6a650, lambda call, rng: call.ret_f32(rng.uniform(0.1, 1.5)))
     case.stub(0x1410c9c60, lambda call, rng: call.ret_int(0x6f0000100000))
     case.stub(0x14067b2f0, lambda call, rng: call.ret_f32(rng.uniform(0.0, 1.0)))
     case.stub(0x1408bd9d0, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
@@ -73,6 +73,7 @@ def main():
             fz.preset('B', 0xd38 + 4 * e, rng.randrange(0, 8))
         for j in range(4):
             fz.preset('B', 0xbbc + 4 * j, rng.randrange(0, 3))
+        fz.preset('B', 0x990, rng.choice([0, 0, 1, 1, 2]))
         fz.preset('B', 0xa9c, rng.choice([0, 2, 3, 3, 2]))
         fz.preset('B', 0xc24, rng.choice([0, 1]))
         fz.preset('M', 0x298, rng.choice([0, 1, 2, 3]))
@@ -85,6 +86,9 @@ def main():
         clock = struct.unpack('<Q', struct.pack('<d', rng.uniform(0.0, 1000.0)))[0]
         case.emu.write_u32(CLOCK_GLOBAL, clock & 0xffffffff)
         case.emu.write_u32(CLOCK_GLOBAL + 4, clock >> 32)
+        reference = [struct.unpack('<I', struct.pack('<f', rng.uniform(100.0, 300.0)))[0] for _ in range(2)]
+        for i, w in enumerate(reference):
+            case.emu.write_u32(REFERENCE + 8 * i, w)
         for i in range(0x803 * 2):
             case.emu.write_u32(0x14612bd90 + 4 * i, struct.unpack('<I', struct.pack('<f', 0.3 + ((i * 37) % 101) / 100.0))[0])
         try:
@@ -92,7 +96,7 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        print(case.dump(f'{M + 0x2cc * n:x} {F:x} {n} {I:x}', extra_words={SEED_GLOBAL: seed & 0xffffffff, SEED_GLOBAL + 4: seed >> 32, CLOCK_GLOBAL: clock & 0xffffffff, CLOCK_GLOBAL + 4: clock >> 32}))
+        print(case.dump(f'{M + 0x2cc * n:x} {F:x} {n} {I:x}', extra_words={SEED_GLOBAL: seed & 0xffffffff, SEED_GLOBAL + 4: seed >> 32, REFERENCE: reference[0], REFERENCE + 8: reference[1], CLOCK_GLOBAL: clock & 0xffffffff, CLOCK_GLOBAL + 4: clock >> 32}))
         done += 1
 
 

@@ -604,13 +604,68 @@ pub fn update_engine_kind3(
     let v = if -1.5 > m98 { -1.5 } else { sse_min(1.5, m98) };
     let e64 = vm.f32(engine(vm) + 0x64);
     let g2 = if 0.1 > e64 { 0.1 } else { sse_min(2.0, e64) };
-    let mut args = CallArgs::ints(&[b]);
-    args.xmm[1] = Some(speed_new.to_bits());
-    args.xmm[2] = Some(ratio.to_bits());
-    args.xmm[3] = Some(vm.f32(m + 0x258).to_bits());
-    let efficiency = reply_f32(env.call(vm, 0x141a6a650, args));
+    let efficiency = propeller_curve(vm, b, speed_new, ratio, vm.f32(m + 0x258));
     let d7 = f64::from(efficiency) - f64::from(v) * 0.01 * (1.0 - f64::from(r13));
     vm.set_f32(m + 0x98, m98);
     let e10 = f64::from(vm.f32(engine(vm) + 0x10));
     vm.set_f32(m + 0xb8, (f64::from(g2.sqrt()) * (e10 * d7)) as f32);
+}
+
+/// The runtime values the propeller curve of `B+0x990 == 1` interpolates between (two floats at `0x14612c1c8`
+/// and `0x14612c1d0`; zero in the reference build until the weather system fills them).
+pub const PROPELLER_REFERENCE: u64 = 0x1_4612_c1c8;
+
+/// `0x141a6a650(B, a, r, d)`: the propeller power coefficient from the speed `a` (percent), the speed ratio `r`
+/// and the density factor `d`, by the model selected with `B+0x990` (0: the power laws of the speed, 1: the
+/// density-scaled model with the exponents `B+0x998..0x9a4`, anything else 0).
+pub fn propeller_curve(vm: &Vm, b: u64, a: f32, r: f32, d: f32) -> f32 {
+    match vm.i32(b + 0x990) {
+        0 => {
+            let h = (f64::from(a) * 0.01) as f32;
+            let p3 = signed_pow(h, 3.0);
+            let p14 = signed_pow(h, f32::from_bits(0x3fb33333));
+            let cc = interpolate_clamped(25.0, p3, 50.0, p14, a);
+            let s1 = (f64::from(cc) * f64::from_bits(0x3ff33b645a1cac08)) as f32;
+            let s2 = (f64::from(cc) * -0.2) as f32;
+            let p4 = signed_pow(h, 4.0);
+            let r2 = signed_pow(r, 2.0);
+            let rr = (f64::from(r) * 100.0) as f32;
+            let q = if -1.0 > rr { -1.0 } else { sse_min(1.0, rr) };
+            let e1 = r2 * s2 * d + p4 * s1 * d - q * f32::from_bits(0x3b03126f);
+            let h2 = signed_pow(h, 2.0);
+            let r2b = signed_pow(r, 2.0);
+            let diff = f64::from(h2 - r2b);
+            let t = (diff / (f64::from(a) * 5.0 * 0.01 + 1.0)) as f32;
+            let t = (f64::from(t) / (f64::from(r) * 5.0 + 1.0)) as f32;
+            sse_max(0.0, t) * d + e1
+        }
+        1 => {
+            let rho = interpolate_clamped(
+                135.0,
+                vm.f32(PROPELLER_REFERENCE),
+                136.0,
+                vm.f32(PROPELLER_REFERENCE + 8),
+                f32::from_bits(0x43075811),
+            ) / 1.225;
+            let line = |v0: f32, v1: f32| {
+                if rho == 1.0 {
+                    (v0 + v1) * 0.5
+                } else {
+                    (v1 - v0) / (1.0 - rho) * (d - rho) + v0
+                }
+            };
+            let k1 = line(vm.f32(b + 0x998), vm.f32(b + 0x99c));
+            let k2 = line(vm.f32(b + 0x9a0), vm.f32(b + 0x9a4));
+            let ah = (f64::from(a) * 0.01) as f32;
+            let pa = signed_pow(ah, k1);
+            let k994 = vm.f32(b + 0x994);
+            let t12 = ((f64::from(k994) + 1.0) * f64::from(d) * f64::from(pa)) as f32;
+            let pr = signed_pow(r, k2);
+            let abs_r = r.abs();
+            let v = neg(d) * k994 * pr + t12;
+            let root = f64::from(abs_r.sqrt());
+            (f64::from(v) / (root * 0.95 + 0.05)) as f32
+        }
+        _ => 0.0,
+    }
 }
