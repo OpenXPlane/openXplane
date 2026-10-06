@@ -46,6 +46,9 @@ def main():
         v0, v1 = rng.uniform(-400, 400), rng.uniform(-400, 400)
         x = rng.uniform(-1, 4)
         print('A', *map(hx, (a0, v0, a1, v1, x)), '|', hx(emu.call_float(0x1408fd570, floats=[a0, v0, a1, v1], stack=[x])))
+    for _ in range(300):
+        v, lo, hi = value(), value(), value()
+        print('W', *map(hx, (v, lo, hi)), '|', emu.call(0x140983ae0, floats=[v, lo, hi]) & 0xff)
     for kind in list(range(-3, 20)) + [0x7fffffff, -0x80000000]:
         emu.write_u32(F, kind & 0xffffffff)
         print('K', kind, '|', emu.call(0x1411e26e0, ints=[F]) & 0xff)

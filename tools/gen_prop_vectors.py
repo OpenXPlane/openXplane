@@ -18,6 +18,7 @@ Lines:
   X0..X3 off=word               initial words of the element records F[0x68e0 + b*0x18] (3 records of 0x2d8)
   L e retain ice x1 x2 x3 | out1 out2 out3 x4[4] x1bc stall   the get_el_force call (stubbed)
   J gate (double hex)           the double at 0x142f01920
+  U n ratio                     the 0x1408154c0 answer (engine ratio, stubbed)
   K id arg                      the ground-strike event call (stubbed 0x1407cdce0)
   Z id                          the global 0x142f2e3dc (the recorded id)
   Q w0 .. w19                   the pass record pushed by 0x141219d90 (stubbed)
@@ -41,7 +42,7 @@ XMM = {6: UC_X86_REG_XMM6, 7: UC_X86_REG_XMM7, 8: UC_X86_REG_XMM8, 9: UC_X86_REG
        11: UC_X86_REG_XMM11, 12: UC_X86_REG_XMM12, 13: UC_X86_REG_XMM13, 14: UC_X86_REG_XMM14, 15: UC_X86_REG_XMM15}
 
 ENTRY = 0x1411bd470
-CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82, 6: 0x1411c1935, 7: 0x1411c2145, 8: 0x1411c22ba}
+CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82, 6: 0x1411c1935, 7: 0x1411c2145, 8: 0x1411c22ba, 9: 0x1411c2d35}
 NOISE_TABLE = 0x14578f1f0
 EXE = sys.argv[1]
 SEGMENT, TRIALS, SEED = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
@@ -163,6 +164,12 @@ def main():
     def stub_strike(e):
         log.append(f'K {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {e.uc.reg_read(UC_X86_REG_R8) & 0xffffffff}')
 
+    def stub_ratio(e):
+        v = fz.rng.uniform(0, 2)
+        e.uc.reg_write(UC_X86_REG_XMM0, struct.unpack('<I', struct.pack('<f', v))[0])
+        log.append(f'U {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {struct.unpack("<I", struct.pack("<f", v))[0]:08x}')
+
+    emu.stubs[0x1408154c0] = stub_ratio
     emu.stubs[0x1407cdce0] = stub_strike
     emu.stubs[0x141219d90] = stub_record
     emu.stubs[0x1411b9840] = stub_element

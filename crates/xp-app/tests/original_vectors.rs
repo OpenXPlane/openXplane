@@ -1608,13 +1608,13 @@ fn airflow_matches_the_original_machine_code() {
 
 #[test]
 fn scalar_helpers_match_the_original_machine_code() {
-    use openxplane::scalar::{angle_lerp, clamp, kind_is_3_or_7, lerp, max3, sign, snap};
+    use openxplane::scalar::{angle_lerp, clamp, kind_is_3_or_7, lerp, max3, sign, snap, within};
     let text = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/data/scalar.txt"
     ))
     .unwrap();
-    let mut counts = [0usize; 7];
+    let mut counts = [0usize; 8];
     let same = |a: f32, b: f32| a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan());
     for line in text
         .lines()
@@ -1627,6 +1627,10 @@ fn scalar_helpers_match_the_original_machine_code() {
             "M" => (2, same(max3(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
             "N" => (3, same(snap(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
             "L" => (4, same(lerp(f(t[1]), f(t[2]), f(t[3])), f(t[4]))),
+            "W" => (
+                7,
+                usize::from(within(f(t[1]), f(t[2]), f(t[3]))) == t[4].parse::<usize>().unwrap(),
+            ),
             "A" => (
                 6,
                 same(
@@ -1641,6 +1645,7 @@ fn scalar_helpers_match_the_original_machine_code() {
     }
     assert_eq!(counts[..5], [300; 5]);
     assert_eq!(counts[6], 300);
+    assert_eq!(counts[7], 300);
     assert!(counts[5] > 20);
 }
 
@@ -1666,6 +1671,7 @@ struct PropReplay {
     probes: std::collections::VecDeque<([u32; 6], (f32, i32))>,
     gate: f64,
     strikes: std::collections::VecDeque<(i32, i32)>,
+    ratios: std::collections::VecDeque<(i32, f32)>,
     washes: std::collections::VecDeque<([u32; 6], [f32; 3])>,
     elements: std::collections::VecDeque<([u32; 6], openxplane::prop::ElementResult)>,
     recording: i32,
@@ -1756,7 +1762,12 @@ impl openxplane::prop::PropEnv for PropReplay {
     fn strike_gate(&mut self) -> f64 {
         self.gate
     }
-    fn strike(&mut self, id: i32, arg: i32) {
+    fn engine_ratio(&mut self, n: i32) -> f32 {
+        let (seen, v) = self.ratios.pop_front().expect("ratio not recorded");
+        assert_eq!(seen, n);
+        v
+    }
+    fn event(&mut self, id: i32, arg: i32) {
         let want = self.strikes.pop_front().expect("strike not recorded");
         assert_eq!((id, arg), want, "strike event");
     }
@@ -1813,6 +1824,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut elements = std::collections::VecDeque::new();
         let mut gate = 0.0f64;
         let mut strikes = std::collections::VecDeque::new();
+        let mut ratios = std::collections::VecDeque::new();
         let mut recording = 0i32;
         let mut records = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
@@ -1835,6 +1847,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                 }
                 "Z" => recording = tokens[1].parse().unwrap(),
                 "J" => gate = f64::from_bits(u64::from_str_radix(tokens[1], 16).unwrap()),
+                "U" => ratios.push_back((tokens[1].parse().unwrap(), f(tokens[2]))),
                 "K" => strikes.push_back((tokens[1].parse().unwrap(), tokens[2].parse().unwrap())),
                 "Q" => {
                     let mut words = [0u32; 20];
@@ -1932,6 +1945,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             elements,
             gate,
             strikes,
+            ratios,
             recording,
             records,
             table: prop_noise_table(),
@@ -2005,7 +2019,9 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                     );
                 }
             }
-            assert_eq!(got_regs.r15 as u32, want[10], "trial {trials}: r15");
+            if let Some(r15) = got_regs.r15 {
+                assert_eq!(r15 as u32, want[10], "trial {trials}: r15");
+            }
             for (region, words) in outputs {
                 let (ours, base) = match region.as_str() {
                     "R" => (&r, 0),
@@ -2052,6 +2068,12 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment9_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_9.txt", openxplane::prop::Stop::Segment9);
     assert!(trials >= 30);
 }
 

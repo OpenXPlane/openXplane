@@ -78,3 +78,10 @@ pub fn angle_lerp(a0: f32, v0: f32, a1: f32, v1: f32, x: f32) -> f32 {
     }
     r
 }
+
+/// `0x140983ae0`: whether `v` lies within `lo..=hi`; a NaN passes (the comparisons take the "not outside" branch).
+pub fn within(v: f32, lo: f32, hi: f32) -> bool {
+    let below = lo > v;
+    let above = v > hi;
+    !below && !above
+}

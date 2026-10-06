@@ -11,7 +11,7 @@
 use crate::airflow::{AirflowEnv, airflow};
 use crate::engine::{lag_filter, signed_pow};
 use crate::forces::Words;
-use crate::scalar::{angle_lerp, clamp, kind_is_3_or_7, lerp, max3, sign, snap};
+use crate::scalar::{angle_lerp, clamp, kind_is_3_or_7, lerp, max3, sign, snap, within};
 use crate::transform::{rotate_euler_offset, rotate_pairs};
 use crate::wing_element::{
     Boundary, boundary_at, element_dihedral, hypot2, hypot3, interpolate_clamped, rotate_euler,
@@ -21,6 +21,10 @@ use std::collections::BTreeMap;
 const RAD: f32 = f32::from_bits(0x3c8efa36);
 const DEG: f32 = f32::from_bits(0x42652ee0);
 const ABS: u32 = 0x7fff_ffff;
+
+fn neg(v: f32) -> f32 {
+    f32::from_bits(v.to_bits() ^ 0x8000_0000)
+}
 
 /// Frame slots by `rbp` offset, as raw words.
 #[derive(Clone, Debug, Default)]
@@ -67,8 +71,11 @@ pub trait PropEnv: AirflowEnv {
     fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> (f32, i32);
     /// The double at `0x142f01920` that gates the ground-strike event.
     fn strike_gate(&mut self) -> f64;
-    /// `0x1407cdce0(F, id, arg)`: the ground-strike event (`id` 0xd8 with 0 for part kind 5, else 0x209 with `n`).
-    fn strike(&mut self, id: i32, arg: i32);
+    /// `0x1407cdce0(F, id, arg)`: an event (`id` 0xd8 with 0 for part kind 5, else 0x209 with `n`; 0x1f9 and
+    /// 0x209 with a station index from the limit code).
+    fn event(&mut self, id: i32, arg: i32);
+    /// `0x1408154c0(B, n)`: the ratio of engine record `n` (clamped) to the part record (not ported).
+    fn engine_ratio(&mut self, n: i32) -> f32;
     /// The global at `0x142f2e3dc`: the identifier that `F+0x28` is compared with to decide whether the pass
     /// is recorded.
     fn recording_id(&mut self) -> i32;
@@ -132,8 +139,10 @@ pub enum Stop {
     Segment6,
     /// First pass, after the moment sums, at `0x1411c2145`.
     Segment7,
-    /// After the whole loop, at `0x1411c228f`.
+    /// After the whole loop, at `0x1411c22ba`.
     Segment8,
+    /// After the limit code of the post-loop section, at the join `0x1411c2d35`.
+    Segment9,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original, low 32 bits), for checkpoints. Only
@@ -141,14 +150,14 @@ pub enum Stop {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Regs {
     pub xmm: [Option<f32>; 16],
-    pub r15: i32,
+    pub r15: Option<i32>,
 }
 
 impl Regs {
     fn with(values: &[(usize, f32)], r15: i32) -> Self {
         let mut regs = Regs {
             xmm: [None; 16],
-            r15,
+            r15: Some(r15),
         };
         for (i, v) in values {
             regs.xmm[*i] = Some(*v);
@@ -157,6 +166,9 @@ impl Regs {
     }
 }
 
+/// The `xmm` registers of the original are mirrored by locals; some assignments keep a register's value
+/// across a block boundary so that the checkpoints can compare it, hence the allowed dead stores.
+#[allow(unused_assignments)]
 pub fn prop_force(
     o: &mut Objects,
     n: i32,
@@ -446,9 +458,6 @@ pub fn prop_force(
 
     // ---- segment 3: the loop over `k` (0x1411be62a ..), first pass up to 0x1411bf1c8 ----
     let count = p.i32(0x8c);
-    if count <= 0 {
-        return Err("loop skipped: post-loop code not ported".into());
-    }
     let one = 1.0f32;
     let half = 0.5f32;
     let zero = 0.0f32;
@@ -853,7 +862,6 @@ pub fn prop_force(
             x6 = xs[inner as usize].f32(0x194 + kk) * RAD;
             x7 = x6.sin();
             x6 = x6.cos();
-            let neg = |v: f32| f32::from_bits(v.to_bits() ^ 0x8000_0000);
             let p0c = p.f32(0xc);
             fr.set(0xf0, neg(x8) * x7 * fr.f(4) * p0c);
             fr.set(0x5c, x8 * x7 * x11 * p0c);
@@ -1092,7 +1100,7 @@ pub fn prop_force(
                 y.set_i32(0x18, 0);
                 y.set_i32(0x1c, 0);
                 let (id, arg) = if p.i32(0) == 5 { (0xd8, 0) } else { (0x209, n) };
-                env.strike(id, arg);
+                env.event(id, arg);
             }
             let dt = env.frame_time();
             let slot = inner as usize + 4 * k as usize;
@@ -1140,6 +1148,169 @@ pub fn prop_force(
         r15,
     );
     if stop == Stop::Segment8 {
+        return Ok((fr, regs));
+    }
+    // ---- segment 9: the post-loop section up to the join at 0x1411c2d35 ----
+    x13 = f32::from_bits(0x8000_0000);
+    let dt = env.frame_time();
+    let half84 = (f64::from(r.f32(0x84)) * 0.5) as f32;
+    let new84 = lag_filter(
+        r.f32(0x60),
+        f.f32(0x6c),
+        p.f32(0x4c),
+        x8,
+        r.f32(0x84),
+        half84,
+        dt as f32,
+    );
+    r.set_f32(0x84, new84);
+    let angles = [p.f32(0x79c), p.f32(0x7a0), p.f32(0x7a4)];
+    let offsets = [p.f32(0x790), p.f32(0x794), p.f32(0x798)];
+    let rot = rotate_euler_offset(angles, offsets, false, 0.0, 0.0, x10);
+    fr.set(0x8d8, rot[0]);
+    fr.set(-0x14, rot[1]);
+    fr.set(-0xa0, rot[2]);
+    // the moment contributions are added to F+0x2f8 / 0x310 / 0x328 (propeller moments)
+    if r15 != 0 {
+        let mut x8a = fr.f(-0x10) * p.f32(0x14);
+        let scale = f64::from(x8a) * 0.05;
+        x15 = DEG;
+        let t0 = r.f32(0x48) * x15 + r.f32(0x40);
+        x11 = (f64::from(x6) - f64::from(t0) * scale) as f32;
+        let t1 = r.f32(0x4c) * x15 + r.f32(0x44);
+        x13 = (f64::from(x7) - f64::from(t1) * scale) as f32;
+        let p18 = p.f32(0x18);
+        x7 = x13 / p18;
+        x8a = x11 / p18;
+        let reverse = fr.i(0x84) != 0;
+        let sgn1 = if reverse { -1.0f64 } else { 1.0 };
+        let sgn2 = if reverse { 1.0f64 } else { -1.0 };
+        let denom = f64::from(
+            (if abs(r.f32(0x1c)) > x10 {
+                abs(r.f32(0x1c))
+            } else {
+                x10
+            }) * p18,
+        );
+        x9 = (f64::from(x13) * sgn1 / denom) as f32;
+        x6 = (f64::from(x11) * sgn2 / denom) as f32;
+        let dt1 = env.frame_time();
+        r.set_f32(0x48, (f64::from(r.f32(0x48)) + dt1 * f64::from(x7)) as f32);
+        let dt2 = env.frame_time();
+        let r4c = (f64::from(r.f32(0x4c)) + dt2 * f64::from(x8a)) as f32;
+        r.set_f32(0x4c, r4c);
+        if x7 > 0.0 && r.f32(0x48) > x9 {
+            r.set_f32(0x48, x9);
+        }
+        if 0.0 > x7 && x9 > r.f32(0x48) {
+            r.set_f32(0x48, x9);
+        }
+        let mut x0 = r4c;
+        if x8a > 0.0 && r4c > x6 {
+            r.set_f32(0x4c, x6);
+            x0 = x6;
+        }
+        if 0.0 > x8a && x6 > x0 {
+            r.set_f32(0x4c, x6);
+        }
+        let v7 = fr.f(-0xa0);
+        let v6 = fr.f(-0x14);
+        let w8 = hypot2(v6, v7) * f.f32(0x3d0);
+        let v6b = fr.f(0x8d8);
+        let mut w9 = hypot2(v6b, v6) * f.f32(0x3cc);
+        w9 += hypot2(v6b, v7) * f.f32(0x3d4);
+        let dtc = env.frame_time();
+        let t1 = (r.f32(0x48) - w8) * x15;
+        r.set_f32(0x40, (f64::from(r.f32(0x40)) + dtc * f64::from(t1)) as f32);
+        let dtd = env.frame_time();
+        let t2 = (r.f32(0x4c) - w9) * x15;
+        r.set_f32(0x44, (f64::from(r.f32(0x44)) + dtd * f64::from(t2)) as f32);
+        x6 = v6b;
+        x7 = v7;
+        x8 = w8;
+        x9 = w9;
+        f.set_f32(0x310, fr.f(0xd4) + f.f32(0x310));
+        f.set_f32(0x328, fr.f(0xd8) + f.f32(0x328));
+        f.set_f32(0x2f8, fr.f(0xdc) + f.f32(0x2f8));
+        let (mut lim1, mut lim2) = (b.f32(0x2094), b.f32(0x2098));
+        if lim1 > 0.0 && lim2 > 0.0 {
+            lim1 *= fr.f(0xc);
+            lim2 *= fr.f(0xc);
+            let r40 = r.f32(0x40);
+            let keep1 = (r40 > lim1 && x11 > 0.0) || (neg(lim1) > r40 && 0.0 > x11);
+            x15 = r40;
+            if !keep1 {
+                x11 = 0.0;
+            }
+            let r44 = r.f32(0x44);
+            let keep2 = (r44 > lim2 && x13 > 0.0) || (neg(lim2) > r44 && 0.0 > x13);
+            if !keep2 {
+                x13 = 0.0;
+            }
+            x9 = r44;
+            if b.i32(0x296c) == 0 {
+                let rate = f64::from(abs(r.f32(0x1c)));
+                let ratio = f64::from(env.engine_ratio(n)) * 0.0771;
+                if rate > ratio {
+                    let outside1 = !within(x15, neg(b.f32(0x2094)), b.f32(0x2094));
+                    if outside1 || !within(x9, neg(b.f32(0x2098)), b.f32(0x2098)) {
+                        env.event(0x1f9, n);
+                        for station in 0..b.i32(0x91c) {
+                            if b.i32(0xb7c + 4 * station as usize) == b.i32(0xbbc + 4 * n as usize)
+                            {
+                                env.event(0x209, station);
+                            }
+                        }
+                    }
+                }
+            }
+            r.set_f32(0x40, clamp(r.f32(0x40), neg(lim1), lim1));
+            r.set_f32(0x44, clamp(r.f32(0x44), neg(lim2), lim2));
+            let rot = rotate_euler_offset(angles, offsets, false, x11, x13, zero0);
+            fr.set(-0xc, rot[0]);
+            fr.set(0x20, rot[1]);
+            fr.set(0x8d8, rot[2]);
+            f.set_f32(0x2f8, fr.f(0x8d8) + f.f32(0x2f8));
+            f.set_f32(0x310, fr.f(-0xc) + f.f32(0x310));
+            f.set_f32(0x328, fr.f(0x20) + f.f32(0x328));
+        }
+        let r1c = r.f32(0x1c);
+        x11 = fr.f(-0x10);
+        let q = f64::from(r1c * r1c * x11) * 0.7071 * f64::from(p.f32(0x14));
+        let q7 = f64::from(q as f32) * 0.7071;
+        let b2134 = f64::from(b.f32(0x2134));
+        let rr = RAD;
+        let s44 = (r.f32(0x44) * rr).sin();
+        x8 = (f64::from(s44) * q7 * b2134) as f32;
+        let s40 = (r.f32(0x40) * rr).sin();
+        let a1 = (f64::from(s40) * q7 * b2134) as f32;
+        let rot = rotate_euler_offset(angles, offsets, false, a1, x8, zero0);
+        fr.set(-0xc, rot[0]);
+        fr.set(0x20, rot[1]);
+        fr.set(0x8d8, rot[2]);
+        f.set_f32(0x2f8, fr.f(0x8d8) + f.f32(0x2f8));
+        f.set_f32(0x310, fr.f(-0xc) + f.f32(0x310));
+        f.set_f32(0x328, fr.f(0x20) + f.f32(0x328));
+    } else {
+        let x1 = p.f32(0x18);
+        let x0 = r.f32(0x1c);
+        let x2 = p.f32(0xc);
+        let v7 = fr.f(0x8d8) * x1 * x0 * x2;
+        let v6 = fr.f(-0x14) * x1 * x0 * x2;
+        let v4 = fr.f(-0xa0) * x1 * x0 * x2;
+        let (c3d4, c3d0, c3cc) = (f.f32(0x3d4), f.f32(0x3d0), f.f32(0x3cc));
+        x8 = neg(v7) * c3d4 - v6 * c3d0;
+        x6 = v6 * c3cc - v4 * c3d4;
+        x7 = v7 * c3cc + v4 * c3d0;
+        x12 = fr.f(0x70);
+        f.set_f32(0x2f8, (x12 + x8) + f.f32(0x2f8));
+        f.set_f32(0x310, (x9 + x6) + f.f32(0x310));
+        f.set_f32(0x328, (x11 + x7) + f.f32(0x328));
+        x11 = fr.f(-0x10);
+    }
+    let mut regs = Regs::with(&[(13, x13)], r15);
+    regs.r15 = None;
+    if stop == Stop::Segment9 {
         return Ok((fr, regs));
     }
     Err("post-loop code not ported".into())
