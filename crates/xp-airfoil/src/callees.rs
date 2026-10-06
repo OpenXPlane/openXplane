@@ -343,3 +343,17 @@ pub fn lever_curve(vm: &Vm, obj: u64, x: f32) -> f32 {
         sse_min(sse_max(lo, hi), target)
     }
 }
+
+/// `0x141183bf0(a, b, c, ...)`: direction angles and the norm of the vector `(a, b, c)` (the four optional outputs):
+/// `atan2(b, c)`, `atan2(a, sqrt(c*c + b*b))`, `atan2(sqrt(a*a + b*b), c)` and `sqrt((a*a + b*b) + c*c)`; angles
+/// are in radians (the C runtime's `atan2f`, here the platform's).
+pub fn direction_angles(a: f32, b: f32, c: f32) -> [f32; 4] {
+    let sqrt = |x: f32| if 0.0 > x { f32::NAN } else { x.sqrt() };
+    let (bb, cc, aa) = (b * b, c * c, a * a);
+    [
+        b.atan2(c),
+        a.atan2(sqrt(cc + bb)),
+        sqrt(aa + bb).atan2(c),
+        sqrt(aa + bb + cc),
+    ]
+}

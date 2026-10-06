@@ -2305,6 +2305,13 @@ fn pointer_following_callees_match_the_original_machine_code() {
                     assert!(got == *want, "{head}: {addr:#x}: {got:#x} vs {want:#x}");
                 }
             }
+            "D" => {
+                let got = openxplane::callees::direction_angles(f(t[5]), f(t[6]), f(t[7]));
+                for k in 0..4 {
+                    let want = f(t[8 + k]);
+                    assert!((got[k] - want).abs() <= 1e-6 * (1.0 + want.abs()), "{head}");
+                }
+            }
             "T" | "U" | "C" => {
                 let got = match t[1] {
                     "T" => wing_area_factor(&vm, address),

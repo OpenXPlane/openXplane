@@ -45,7 +45,7 @@ def main():
 
     emu.stubs[0x1407ace10] = stub_binding
     print('# callee vectors (tools/gen_callee_vectors.py)')
-    for kind in 'EBAPXYZVGTUC':
+    for kind in 'EBAPXYZVGTUCD':
         for trial in range(150 if kind in 'EBAP' else 50):
             emu.heap_top = mark
             fz.policy = {}
@@ -97,6 +97,12 @@ def main():
                 emu.call(0x141218060, ints=[O, abs(n)])
                 result = str(emu.reg(UC_X86_REG_RAX) & 0xff)
                 head = f'R P {O:x} {abs(n)} 0'
+            elif kind == 'D':
+                a, b, c = (fz.rng.uniform(-5, 5) for _ in range(3))
+                outs = [emu.alloc(16) for _ in range(4)]
+                emu.call(0x141183bf0, ints=[0, 0, 0, outs[0]], floats=[a, b, c], stack=[outs[1], outs[2], outs[3]])
+                result = ' '.join(hx(emu.read_f32(o)) for o in outs)
+                head = f'R D {O:x} 0 0 {hx(a)} {hx(b)} {hx(c)}'
             elif kind in 'TUC':
                 if kind == 'T':
                     emu.call(0x141294180, ints=[O])
