@@ -195,6 +195,60 @@ fn wing_element_area_matches_the_original_machine_code() {
 }
 
 #[test]
+fn control_deflection_matches_the_original_machine_code() {
+    use openxplane::wing_element::control_deflection;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/control_deflection.txt"
+    ))
+    .unwrap();
+    let offsets = [
+        (0xb, [0x324, 0x328, 0x1dfc, 0x1e00]),
+        (0xc, [0x354, 0x358, 0x1e0c, 0x1e10]),
+        (0xd, [0x444, 0x448, 0x1e18, 0x1e1c]),
+        (0xe, [0x474, 0x478, 0x1e28, 0x1e2c]),
+        (0xf, [0x4a4, 0x4a8, 0x1e3c, 0x1e40]),
+        (0x10, [0x384, 0x388, 0x1e4c, 0x1e50]),
+        (0x11, [0x3b4, 0x3b8, 0x1e60, 0x1e64]),
+        (0x12, [0x3e4, 0x3e8, 0x1e74, 0x1e78]),
+        (0x13, [0x414, 0x418, 0x1e88, 0x1e8c]),
+        (0x14, [0x534, 0x538, 0x1e9c, 0x1ea0]),
+        (0x15, [0x564, 0x568, 0x1ec4, 0x1ec8]),
+        (0x16, [0x4d4, 0x4d8, 0x1ee0, 0x1ee4]),
+        (0x17, [0x504, 0x508, 0x1ef0, 0x1ef4]),
+    ];
+    let (mut cases, mut exact) = (0, 0);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().collect();
+        let code: u32 = t[0].parse().unwrap();
+        let index: i32 = t[1].parse().unwrap();
+        let at = offsets.iter().find(|o| o.0 == code).unwrap().1;
+        let (first, last, a, b) = (f(t[2]), f(t[3]), f(t[4]), f(t[5]));
+        let chords: Vec<f32> = t[6..26].iter().map(|h| f(h)).collect();
+        let wing = |o: usize| {
+            if o == at[0] {
+                first
+            } else if o == at[1] {
+                last
+            } else {
+                chords[(o - 0x70) / 4]
+            }
+        };
+        let control = |o: usize| if o == at[2] { a } else { b };
+        let got = control_deflection(code, &wing, &control, index).unwrap();
+        cases += 1;
+        exact += usize::from(got.to_bits() == f(t[27]).to_bits());
+    }
+    println!("{cases} cases, exact {exact}");
+    assert!(cases >= 600);
+    assert_eq!(exact, cases);
+    assert!(control_deflection(0x18, &|_| 0.0, &|_| 0.0, 0).is_none());
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

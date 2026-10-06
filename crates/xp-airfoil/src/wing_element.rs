@@ -44,6 +44,50 @@ pub fn element_area(sweep_field: f32, span: f32, chord: &[f32], i: usize, elemen
     (cosine * mean / f64::from(elements as f32)) as f32
 }
 
+/// Control surface codes of `0x141192870` with the byte offsets it reads: the wing object fields that
+/// hold the first and last element of the surface (float32 holding whole numbers), and the control
+/// object fields that hold the deflection values at the two ends.
+const CONTROL_SURFACES: [(u32, usize, usize, usize, usize); 13] = [
+    (0xb, 0x324, 0x328, 0x1dfc, 0x1e00),
+    (0xc, 0x354, 0x358, 0x1e0c, 0x1e10),
+    (0xd, 0x444, 0x448, 0x1e18, 0x1e1c),
+    (0xe, 0x474, 0x478, 0x1e28, 0x1e2c),
+    (0xf, 0x4a4, 0x4a8, 0x1e3c, 0x1e40),
+    (0x10, 0x384, 0x388, 0x1e4c, 0x1e50),
+    (0x11, 0x3b4, 0x3b8, 0x1e60, 0x1e64),
+    (0x12, 0x3e4, 0x3e8, 0x1e74, 0x1e78),
+    (0x13, 0x414, 0x418, 0x1e88, 0x1e8c),
+    (0x14, 0x534, 0x538, 0x1e9c, 0x1ea0),
+    (0x15, 0x564, 0x568, 0x1ec4, 0x1ec8),
+    (0x16, 0x4d4, 0x4d8, 0x1ee0, 0x1ee4),
+    (0x17, 0x504, 0x508, 0x1ef0, 0x1ef4),
+];
+
+/// `0x141192870`: the deflection (times chord) of control surface `code` at span element `index`.
+/// The surface covers elements `first..=last`; its end values are multiplied by the chords at those
+/// elements (`+0x70`) and interpolated linearly over the element index (the plain mean when the
+/// surface is one element). `wing` and `control` read float32 fields by byte offset. `None` for a
+/// code outside `0xb..=0x17`.
+pub fn control_deflection(
+    code: u32,
+    wing: &dyn Fn(usize) -> f32,
+    control: &dyn Fn(usize) -> f32,
+    index: i32,
+) -> Option<f32> {
+    let &(_, first_at, last_at, a_at, b_at) = CONTROL_SURFACES.iter().find(|c| c.0 == code)?;
+    let first = wing(first_at) as i32;
+    let last = wing(last_at) as i32;
+    let chord = |i: i32| wing(0x70 + 4 * i as usize);
+    let end = control(b_at) * chord(last);
+    let start = control(a_at) * chord(first);
+    let (first_f, last_f) = (first as f32, last as f32);
+    Some(if first_f == last_f {
+        (end + start) * 0.5
+    } else {
+        (end - start) / (last_f - first_f) * (index as f32 - first_f) + start
+    })
+}
+
 fn clamp01_low_high(v: f32) -> f32 {
     // `if 0 > v { 0 } else { min(1, v) }` as comiss/minss
     if 0.0 > v { 0.0 } else { 1.0f32.min(v) }

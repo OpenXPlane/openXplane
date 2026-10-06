@@ -132,5 +132,12 @@ stack argument. Seen so far:
 - When the flags are set it scales a value from the wing object (`+0x2c + 4 i`) by the deflection ratio and a
   double constant at `0x14250e310`.
 
+Update: the deflection getter `0x141192870` is pure and ported as `control_deflection` (650 emulator cases, all
+bit-identical). For codes `0xb..=0x17` it reads the first and last element of the surface from the wing object
+(float32 whole numbers), multiplies the surface's two end deflections (control object, `+0x1dfc`..`+0x1ef4`) by
+the chords at those elements, and interpolates linearly over the element index (the mean for a one-element
+surface). The code to offset table is in `crates/xp-airfoil/src/wing_element.rs`. `0x1407ace10` turned out to
+be an input/binding state lookup (tables at `+0x55f0`, `+0xdc0`, command ids `0x43..0x130`), not physics.
+
 Not established: what ids `0x2d9`..`0x2f0` stand for, and the final output values. Porting needs a model of the
 `0x1407ace10` state first, so this is the next reverse-engineering step.
