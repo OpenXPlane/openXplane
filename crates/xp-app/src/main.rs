@@ -1,7 +1,6 @@
 use openxplane::{Aircraft, reference_candidates};
 mod gpu;
 mod hud;
-mod menu;
 mod scene;
 mod viewer;
 use std::{collections::BTreeSet, env, fs, path::Path, process::ExitCode};
@@ -384,8 +383,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
             camera.pitch = 0.18;
             camera.distance = 24.0;
-            let menu_title = std::env::var("OPENXPLANE_MENU").ok();
-            if std::env::var_os("OPENXPLANE_HUD").is_some() || menu_title.is_some() {
+            if std::env::var_os("OPENXPLANE_HUD").is_some() {
                 let tel = session.model.telemetry(&c);
                 let (fw, fh) = offscreen.size();
                 let mut hud = hud::Hud::new(fw, fh);
@@ -399,15 +397,6 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                         note: None,
                     },
                 );
-                if let Some(title) = &menu_title {
-                    // a screenshot of an open menu with its second item highlighted
-                    let open = menu::MENUS
-                        .iter()
-                        .position(|(name, _)| name == title)
-                        .ok_or("unknown OPENXPLANE_MENU title")?;
-                    let menu = menu::Menu::opened(open);
-                    menu.draw(&mut hud, Some((open, 1)));
-                }
                 offscreen.set_hud(&hud.vertices);
             }
             let out = format!("{prefix}-{t:06.2}s.png");

@@ -4,8 +4,6 @@ All notable changes. The newest is first. Versions are `MAJOR.MINOR.COMMITS` (se
 
 ## 0.1
 
-- A menu bar in the flight window in the layout of X-Plane's, with drop-downs and key shortcuts.
-- Ports with emulator vectors: the element planform area and the control surface deflection getter.
 - Workspace of crates by subsystem (`xp-acf`, `xp-airfoil`, `xp-obj`, `xp-scenery`, `xp-dataref`, `xp-sim`,
   `xp-discord`, `xp-app`), with scripts, CI and nightly builds.
 - Readers for ACF, OBJ8, AFL and apt.dat; the standard X-Plane folder layout and its precedence.

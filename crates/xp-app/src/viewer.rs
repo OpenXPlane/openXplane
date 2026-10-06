@@ -320,39 +320,9 @@ struct App {
     state: Option<State>,
     dragging: bool,
     cursor: Option<(f64, f64)>,
-    menu: crate::menu::Menu,
     error: Option<String>,
     smoke: bool,
     frames: u32,
-}
-
-fn apply_view(action: ViewAction, flight: &mut Flight, camera: &mut Camera) {
-    match action {
-        ViewAction::Default => {
-            flight.camera_yaw = 0.0;
-            flight.free_camera = false;
-            flight.view_offset = Vec3::ZERO;
-            camera.pitch = 0.3;
-            camera.distance = camera.radius * 1.8;
-        }
-        ViewAction::ToggleFree => flight.free_camera = !flight.free_camera,
-        ViewAction::Shift(dx, dy) => {
-            let right = Vec3::new(-camera.yaw.cos(), 0.0, -camera.yaw.sin());
-            flight.view_offset += right * dx + Vec3::Y * dy;
-        }
-        ViewAction::Rotate { yaw, pitch } => {
-            if flight.free_camera {
-                camera.yaw += yaw;
-            } else {
-                flight.camera_yaw += yaw;
-            }
-            camera.pitch = (camera.pitch + pitch).clamp(-1.4, 1.4);
-        }
-        ViewAction::Zoom(z) => {
-            camera.distance = (camera.distance * (z * 0.05_f32).exp())
-                .clamp(camera.radius * 0.3, camera.radius * 15.0);
-        }
-    }
 }
 
 impl ApplicationHandler for App {
@@ -409,7 +379,6 @@ impl ApplicationHandler for App {
                             note,
                         },
                     );
-                    self.menu.draw(&mut interface, None);
                     state.renderer.set_hud(&interface.vertices);
                 }
                 match state.draw() {
@@ -442,47 +411,12 @@ impl ApplicationHandler for App {
                 state: button_state,
                 button: MouseButton::Left,
                 ..
-            } => {
-                let pressed = button_state == ElementState::Pressed;
-                if pressed && let Some((x, y)) = self.cursor {
-                    let height = state.config.height as f32;
-                    match self.menu.click(x as f32, y as f32, height) {
-                        crate::menu::Click::Outside => {}
-                        crate::menu::Click::Consumed => {
-                            state.window.request_redraw();
-                            return;
-                        }
-                        crate::menu::Click::Run("Quit") => {
-                            event_loop.exit();
-                            return;
-                        }
-                        crate::menu::Click::Run(key) => {
-                            if let Some(flight) = &mut self.flight
-                                && let Some(action) = flight.handle_key(key, Phase::Begin)
-                            {
-                                apply_view(action, flight, &mut state.camera);
-                            }
-                            return;
-                        }
-                    }
-                }
-                self.dragging = pressed;
-            }
+            } => self.dragging = button_state == ElementState::Pressed,
             WindowEvent::Focused(false) | WindowEvent::CursorLeft { .. } => {
                 self.dragging = false;
                 self.cursor = None;
-                self.menu.pointer_left();
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let height = state.config.height as f32;
-                self.menu
-                    .pointer_moved(position.x as f32, position.y as f32, height);
-                if self
-                    .menu
-                    .covers(position.x as f32, position.y as f32, height)
-                {
-                    self.dragging = false;
-                }
                 if let Some((x, y)) = self.cursor
                     && self.dragging
                 {
@@ -514,9 +448,6 @@ impl ApplicationHandler for App {
                     (true, true) => Phase::Continue,
                 };
                 if pressed && matches!(event.logical_key, Key::Named(NamedKey::Escape)) {
-                    if self.menu.open.take().is_some() {
-                        return;
-                    }
                     event_loop.exit();
                     return;
                 }
@@ -524,7 +455,34 @@ impl ApplicationHandler for App {
                 match (&mut self.flight, name) {
                     (Some(flight), Some(name)) => {
                         if let Some(action) = flight.handle_key(&name, phase) {
-                            apply_view(action, flight, &mut state.camera);
+                            let camera = &mut state.camera;
+                            match action {
+                                ViewAction::Default => {
+                                    flight.camera_yaw = 0.0;
+                                    flight.free_camera = false;
+                                    flight.view_offset = Vec3::ZERO;
+                                    camera.pitch = 0.3;
+                                    camera.distance = camera.radius * 1.8;
+                                }
+                                ViewAction::ToggleFree => flight.free_camera = !flight.free_camera,
+                                ViewAction::Shift(dx, dy) => {
+                                    let right =
+                                        Vec3::new(-camera.yaw.cos(), 0.0, -camera.yaw.sin());
+                                    flight.view_offset += right * dx + Vec3::Y * dy;
+                                }
+                                ViewAction::Rotate { yaw, pitch } => {
+                                    if flight.free_camera {
+                                        camera.yaw += yaw;
+                                    } else {
+                                        flight.camera_yaw += yaw;
+                                    }
+                                    camera.pitch = (camera.pitch + pitch).clamp(-1.4, 1.4);
+                                }
+                                ViewAction::Zoom(z) => {
+                                    camera.distance = (camera.distance * (z * 0.05_f32).exp())
+                                        .clamp(camera.radius * 0.3, camera.radius * 15.0);
+                                }
+                            }
                         }
                     }
                     (None, Some(name)) if pressed && name == "R" => {
@@ -583,7 +541,6 @@ fn run_app(
         state: None,
         dragging: false,
         cursor: None,
-        menu: crate::menu::Menu::default(),
         error: None,
         smoke,
         frames: 0,
