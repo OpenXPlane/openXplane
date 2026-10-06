@@ -249,6 +249,37 @@ fn control_deflection_matches_the_original_machine_code() {
 }
 
 #[test]
+fn small_wing_helpers_match_the_original_machine_code() {
+    use openxplane::wing_element::{angle_shape, interpolate_clamped};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/wing_helpers.txt"
+    ))
+    .unwrap();
+    let (mut shape, mut interp) = (0, 0);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().collect();
+        match t[0] {
+            "S" => {
+                assert_eq!(angle_shape(f(t[1])).to_bits(), f(t[3]).to_bits(), "{line}");
+                shape += 1;
+            }
+            "I" => {
+                let got = interpolate_clamped(f(t[1]), f(t[2]), f(t[3]), f(t[4]), f(t[5]));
+                assert_eq!(got.to_bits(), f(t[7]).to_bits(), "{line}");
+                interp += 1;
+            }
+            other => panic!("unknown record {other}"),
+        }
+    }
+    println!("{shape} angle_shape and {interp} interpolate_clamped cases, all exact");
+    assert!(shape >= 400 && interp >= 400);
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

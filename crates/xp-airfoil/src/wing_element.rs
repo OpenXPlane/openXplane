@@ -88,6 +88,50 @@ pub fn control_deflection(
     })
 }
 
+/// `minss`: the first operand when it is smaller, otherwise the second (also for NaN).
+fn sse_min(a: f32, b: f32) -> f32 {
+    if a < b { a } else { b }
+}
+
+/// `maxss`: the first operand when it is larger, otherwise the second.
+fn sse_max(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
+/// `0x1406ea0b0`: the value at `x` on the line through `(a0, v0)` and `(a1, v1)`, limited to the range of
+/// the two values; the mean of the values when `a0 == a1`.
+pub fn interpolate_clamped(a0: f32, v0: f32, a1: f32, v1: f32, x: f32) -> f32 {
+    if a0 == a1 {
+        return (v0 + v1) * 0.5;
+    }
+    let t = (v1 - v0) / (a1 - a0) * (x - a0) + v0;
+    let low = sse_min(v0, v1);
+    if low > t {
+        low
+    } else {
+        sse_min(sse_max(v0, v1), t)
+    }
+}
+
+/// `0x1411b1cf0`: a signed ramp of an angle in degrees, 0 to 0.9 over the first 20 degrees of magnitude
+/// (slope 0.045), 0.9 to 1.0 up to 45 degrees (slope 0.004), then growing slowly to at most 1.2
+/// (slope 0.004444), with the sign of the angle. The aircraft argument is not used.
+pub fn angle_shape(x: f32) -> f32 {
+    let sign = if 0.0 > x { -1.0f32 } else { 1.0 };
+    let a = x.abs();
+    let r = if 20.0 > a {
+        let t = a * f32::from_bits(0x3d38_51eb) + 0.0;
+        if 0.0 > t { 0.0 } else { sse_min(0.9, t) }
+    } else if 45.0 > a {
+        let t = (a - 20.0) * f32::from_bits(0x3b83_1271) + 0.9;
+        if 0.9 > t { 0.9 } else { sse_min(1.0, t) }
+    } else {
+        let t = (a - 45.0) * f32::from_bits(0x3b91_a2b6) + 1.0;
+        if 1.0 > t { 1.0 } else { sse_min(1.2, t) }
+    };
+    r * sign
+}
+
 fn clamp01_low_high(v: f32) -> f32 {
     // `if 0 > v { 0 } else { min(1, v) }` as comiss/minss
     if 0.0 > v { 0.0 } else { 1.0f32.min(v) }
