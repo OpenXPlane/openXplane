@@ -207,3 +207,19 @@ loops over the elements calling `get_el_force`, and sums forces and moments. Sma
 ported and verified (`hypot2` `0x1408be280`, `hypot3` `0x14090e310`, `rotate_euler` `0x141291580`, a rotation of
 three values by the angles at `+0x9c`, `+0xa0`, `+0xa4` of an object). Larger callees still to read:
 `0x14121b580` (2.5 KB), `0x14090e310`-based speed terms, and the many calls to `0x1406ea0b0`.
+
+### Callees of the wing force function read so far
+
+- `0x141296750` (ported as `transform::to_aircraft_frame`, 500 cases identical): subtracts the world origin
+  offsets (doubles at `F+0x378/0x380/0x388`, skipped when the engine flag tested by `0x1417f12c0` is set or the
+  eighth argument is not 1), then rotates by three sine/cosine pairs at `F+0x430..0x454`.
+- `0x14121b580` (2.5 KB): the airflow velocity at a point of the aircraft. It rotates the point with the same
+  matrices in double precision, adds the origin, asks the wind sampler `0x141ba80a0` (object `F+0xc200`) for the
+  wind there, subtracts the reference point `F+0x368..0x370`, converts with `to_aircraft_frame`, adds the rotation
+  term from the angular rates at `F+0x3cc/0x3d0/0x3d4`, and finally calls `0x14117d970` (18 KB, not read).
+- `0x141ba80a0` (2.7 KB): the wind sampler. With the disturbance disabled (`+0x2c` zero, or a global time check
+  failing) it copies the base wind from `+0x14/+0x18/+0x1c`; otherwise it computes a localized disturbance
+  (a vortex-like field around `+0x30..+0x5c` with radius `+0x60`) using `0x141244c10` and a table noise.
+- Small leaf helpers seen: `max`, `max3`, `clamp` and lerp utilities (`0x14081dfa0`, `0x1411b4a20`,
+  `0x1411b03f0`, `0x140819240`), a 2-D table noise (`0x140984e50`, table of 0x40000 floats), element array
+  accessors (`0x1411b4730`, `0x1408154c0`, `0x141170d20`).
