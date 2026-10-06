@@ -105,16 +105,31 @@ pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
 pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
     let acf = Aircraft::parse(&fs::read_to_string(aircraft_path)?)?;
     let dir = aircraft_path.parent().ok_or("ACF needs parent directory")?;
-    // A deliberate exterior subset; broken variants and full cockpit devices need runtime state.
-    let names = [
-        "fuselage.obj",
-        "fuselage_gear.obj",
-        "fuselage_prop.obj",
-        "wings.obj",
-        "cockpit_seats_front.obj",
-        "cockpit_seats_rear.obj",
-        "glass_out.obj",
+    // A deliberate exterior subset; broken variants and full cockpit devices need runtime state. The
+    // landing gear object has an alternative in the seaplane variant (floats).
+    let wanted: [&[&str]; 7] = [
+        &["fuselage.obj"],
+        &["fuselage_gear.obj", "fuselage_floats.obj"],
+        &["fuselage_prop.obj"],
+        &["wings.obj"],
+        &["cockpit_seats_front.obj"],
+        &["cockpit_seats_rear.obj"],
+        &["glass_out.obj"],
     ];
+    let mut names = Vec::new();
+    for alternatives in wanted {
+        let found = alternatives.iter().find(|n| {
+            acf.properties
+                .iter()
+                .any(|p| p.key.ends_with("/_v10_att_file_stl") && p.value == **n)
+        });
+        names.push(*found.ok_or_else(|| {
+            format!(
+                "Preview subset requires one of the ACF objects: {}",
+                alternatives.join(", ")
+            )
+        })?);
+    }
     let mut meshes = Vec::new();
     let mut low = Vec3::splat(f32::INFINITY);
     let mut high = Vec3::splat(f32::NEG_INFINITY);

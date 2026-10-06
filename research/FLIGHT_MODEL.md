@@ -49,6 +49,9 @@ Mass 951 kg (empty plus 80 kg fuel and 90 kg payload). Checked by `tests/flight_
 - Control signs: stick back pitches up, stick right rolls right, right pedal yaws right.
 - Held full back at idle power it stalls the whole wing and oscillates through repeated stall and recovery.
 
+The G1000 and seaplane variants load and fly as well (the seaplane's floats are treated as wheeled gear and its
+preview uses `fuselage_floats.obj`); only the standard variant is covered by the tests.
+
 ```sh
 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 60
 FLY_DEBUG=1 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 40
