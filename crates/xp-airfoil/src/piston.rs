@@ -296,7 +296,7 @@ fn piston_levers(
     if vm.i32(engine(vm)) == 0 {
         let slot = i64::from(vm.i32(b + 0xd38 + 4 * n as i64 as u64));
         let input = vm.f32((inputs as i64 + slot * 4) as u64);
-        call_void(vm, env, 0x14119bc00, x6 * input);
+        update_engine_kind0(vm, env, m, b, f, n, x6 * input);
     }
     let scaled = x6 * x11;
     if vm.i32(engine(vm)) == 1 {
@@ -668,4 +668,164 @@ pub fn propeller_curve(vm: &Vm, b: u64, a: f32, r: f32, d: f32) -> f32 {
         }
         _ => 0.0,
     }
+}
+
+/// `0x14119f090(a, ratio, load, ambient, ...)`: the heat rate of the engine's cooling model, shared by the kind 0
+/// handler (the same formulas, per bank, are inlined there): `a`/`ratio` the accumulated drive and speed ratio,
+/// `load` the part's load fraction, `ambient` the outside temperature `F+0x64`, `state` the engine temperature
+/// `M+0x1a4`, `reference` `B+0x1afc`, `average` the mean of the two bank temperatures, `limit` `B+0x1b18`, `scale`
+/// and `gain` two constants chosen by the part's temperature.
+#[allow(clippy::too_many_arguments)]
+fn heat_rate(
+    a: f32,
+    ratio: f32,
+    load: f32,
+    ambient: f32,
+    state: f32,
+    reference: f32,
+    average: f32,
+    limit: f32,
+    scale: f32,
+    gain: f32,
+) -> f32 {
+    let drive = signed_pow(a * ratio, f32::from_bits(0x3fa66666));
+    let line = |lo_bound: f32, hi_bound: f32| {
+        let lo = sse_min(lo_bound, hi_bound);
+        let t = (hi_bound - lo_bound) * f32::from_bits(0x3e99999a) + lo_bound;
+        if lo > t {
+            lo
+        } else {
+            sse_min(sse_max(lo_bound, hi_bound), t)
+        }
+    };
+    let temperature = state - line(ambient, average);
+    let cooling = reference - line(15.0, limit);
+    let root = signed_pow(ratio, 1.25);
+    let load_term = (f64::from(load) * 0.15) as f32;
+    let spread = (load_term * load_term + root * root).sqrt();
+    let rate = signed_pow(temperature / cooling, f32::from_bits(0x3f933333));
+    let heat = (f64::from(spread) * 0.9 * f64::from(rate) + 0.1) as f32;
+    let net = drive * scale - heat;
+    (f64::from(net) * 1.9 * f64::from(gain)) as f32
+}
+
+/// `0x14119bc00(M, B, F, n, level)`: the kind 0 handler: two banks (magnetos `0x141`, `0x149`, cut by `0x171`)
+/// heated by the drive, their temperatures `M+0x1ac/0x1b0` integrated by the frame time, and the engine temperature
+/// `M+0x1a4` through [`heat_rate`]; the power `M+0xb8` and the speeds `M+0x90/0x98`.
+pub fn update_engine_kind0(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    m: u64,
+    b: u64,
+    f: u64,
+    n: i32,
+    level: f32,
+) {
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let part = vm.u64(b + 0x6010) + (i64::from(n) * 0x3770) as u64;
+    vm.set_f32(m + 0x22c, 1.0);
+    let cold = f32::from_bits(0x42340000) > vm.f32(part + 0x7a0);
+    let (c168, c160, c50, ratio_exponent) = if cold {
+        (1.0f32, 1.0f32, 1.0f32, 1.0f32)
+    } else {
+        (
+            f32::from_bits(0x409ccccd),
+            f32::from_bits(0x3fcccccd),
+            0.7f64 as f32,
+            f32::from_bits(0x3fb33333),
+        )
+    };
+    let m78 = vm.f32(m + 0x78);
+    let ratio = m78 / vm.f32(engine(vm) + 0x18);
+    let mx = sse_max(
+        (f64::from(vm.f32(b + 0x7ac)) * 1.5) as f32,
+        (f64::from(vm.f32(b + 0x7b0)) * 1.3) as f32,
+    );
+    let size = sse_max(
+        sse_max(vm.f32(b + 0x7bc), mx),
+        sse_max(vm.f32(b + 0x7b4), 1.0),
+    );
+    let c54 = vm.f32(f + 0x41c) / size;
+    let sign = if 0.0 <= m78 || m78.is_nan() {
+        1.0f64
+    } else {
+        -1.0
+    };
+    let c60 = f64::from((f64::from(vm.f32(b + 0x9f0)) * 0.001) as f32) + 1.0;
+    let c58 = ((c60 - f64::from(vm.f32(m + 0x2bc))) * 1.01 * f64::from(sign as f32)) as f32;
+    let e18 = vm.f32(engine(vm) + 0x18);
+    let c150 = e18.abs() / sse_max(e18, m78);
+    let c158 = {
+        let t = (f64::from(c54) * 0.15) as f32;
+        t * t
+    };
+    let c68 = f64::from(ratio_exponent);
+    let mut accumulated = 0.0f32;
+    for j in 0..2u64 {
+        let mut drive = 0.0f32;
+        if !bind(env, f, 0x171, n) {
+            let skipped = match j {
+                0 => bind(env, f, 0x141, n),
+                _ => bind(env, f, 0x149, n),
+            };
+            if !skipped {
+                let lv = f64::from(level);
+                if 0.01 > lv && f64::from(vm.f32(b + 0xa3c)) > 0.01 {
+                    let m78 = vm.f32(m + 0x78);
+                    let held = if -1.0 > m78 {
+                        neg(-1.0)
+                    } else {
+                        neg(sse_min(1.0, m78))
+                    };
+                    drive = held * vm.f32(b + 0xa40);
+                } else {
+                    drive = (lv * c60 * f64::from(c150)) as f32;
+                    if vm.i32(m + 0x298) == 3 {
+                        drive = (-f64::from(drive)) as f32;
+                    }
+                }
+            }
+        }
+        let bank = m + 0x1ac + 4 * j;
+        let w = signed_pow(drive * ratio, 2.0);
+        let t7 = (vm.f32(bank) - vm.f32(f + 0x64)) / (vm.f32(b + 0x1b18) - 15.0);
+        let pk = signed_pow(ratio, 1.25);
+        let spread = (pk * pk + c158).sqrt();
+        let rate = signed_pow(t7, f32::from_bits(0x40033333));
+        let dt = frame_time(env);
+        let heat = (f64::from(spread) * 0.9 * f64::from(rate) + 0.1) as f32;
+        let net = w * c168 - heat;
+        let step = f64::from((f64::from(net) * 1.25 * c68) as f32);
+        vm.set_f32(bank, (f64::from(vm.f32(bank)) + dt * step) as f32);
+        let e64 = vm.f32(engine(vm) + 0x64);
+        let g = if 0.1 > e64 { 0.1 } else { sse_min(2.0, e64) };
+        accumulated =
+            (f64::from(accumulated) + f64::from(g.sqrt()) * (f64::from(drive) * 0.5)) as f32;
+    }
+    let average = (f64::from(vm.f32(m + 0x1b0)) * 0.5 + f64::from(vm.f32(m + 0x1ac)) * 0.5) as f32;
+    let rate = heat_rate(
+        accumulated,
+        ratio,
+        c54,
+        vm.f32(f + 0x64),
+        vm.f32(m + 0x1a4),
+        vm.f32(b + 0x1afc),
+        average,
+        vm.f32(b + 0x1b18),
+        c160,
+        c50,
+    );
+    let dt = frame_time(env);
+    let state = f64::from(vm.f32(m + 0x1a4));
+    vm.set_f32(m + 0x1a4, (state + dt * f64::from(rate)) as f32);
+    let power = (accumulated - c58) * vm.f32(engine(vm) + 0x10);
+    vm.set_f32(m + 0xb8, power);
+    let percent = |vm: &Vm| {
+        let r = vm.f32(m + 0x78) / vm.f32(engine(vm) + 0x18);
+        (f64::from(r) * 100.0) as f32
+    };
+    let v = percent(vm);
+    vm.set_f32(m + 0x90, v);
+    let v = percent(vm);
+    vm.set_f32(m + 0x98, v);
 }

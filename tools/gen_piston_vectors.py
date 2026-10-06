@@ -40,7 +40,7 @@ def main():
     case.stub(0x14067b2f0, lambda call, rng: call.ret_f32(rng.uniform(0.0, 1.0)))
     case.stub(0x1408bd9d0, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
     case.stub(0x140984e50, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
-    for addr in (0x14119bc00, 0x14119d380, 0x14117c380):
+    for addr in (0x14119d380, 0x14117c380):
         case.stub(addr, void_stub)
     print('# piston engine vectors (tools/gen_piston_vectors.py)')
     done = attempts = 0

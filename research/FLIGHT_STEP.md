@@ -213,6 +213,14 @@ over `(1 + 0.05 a) (1 + 5 r)`. `B+0x990 == 1`: the density ratio from the two ru
 `0x14612c1d0` (clamped line between 135 and 136 at 135.344, over 1.225), the exponents `B+0x998..0x9a4` extrapolated
 along the line to `d`, and the power laws of `a` and `r` over `0.95 sqrt|r| + 0.05`. Any other value gives 0.
 
-Not ported: the kind handlers for kind 0 (`0x14119bc00`) and kinds 1 and 2 (`0x14119d380`, 1000 instructions), and
-the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
+The kind 0 handler `update_engine_kind0` (`0x14119bc00(M, B, F, n, level)`, 548 instructions) is ported with its heat
+rate `heat_rate` (`0x14119f090`): two banks (inputs `0x141` and `0x149`, both cut by `0x171`) get a drive from the
+lever (or, below 1 percent lever on a cold engine, the shutdown drive) and their temperatures `M+0x1ac/0x1b0` follow
+the net heat (the drive's square against a spread of `1.25` power of the speed ratio and the part's load fraction,
+scaled by the cooling term `(T - ambient)/(B+0x1b18 - 15)` to the power 2.05); the engine temperature `M+0x1a4`
+follows `heat_rate`, `M+0xb8` is the summed drive less the lubrication term `c58` times `E+0x10`, and `M+0x90/0x98`
+are the speed in percent. Note the first-argument objects: the cooling reference `B+0x1afc`, limit `B+0x1b18` and the
+size terms `B+0x7ac..0x7bc` are read from the aircraft object, not from the part.
+
+Not ported: the kind handler for kinds 1 and 2 (`0x14119d380`, 1000 instructions), and the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
 the global clock).
