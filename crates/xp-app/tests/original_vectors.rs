@@ -169,6 +169,32 @@ fn wing_element_geometry_matches_the_original_machine_code() {
 }
 
 #[test]
+fn wing_element_area_matches_the_original_machine_code() {
+    use openxplane::wing_element::element_area;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/wing_area.txt"
+    ))
+    .unwrap();
+    let (mut cases, mut worst) = (0, 0u32);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().collect();
+        let chord = [f(t[3]), f(t[4])];
+        let i = 0;
+        let got = element_area(f(t[0]), f(t[1]), &chord, i, t[2].parse().unwrap());
+        worst = worst.max(ulps(got, f(t[6])));
+        cases += 1;
+    }
+    println!("{cases} cases, worst {worst} ulp");
+    assert!(cases >= 300);
+    // cosf comes from the platform's libm here and from the C runtime in the original
+    assert!(worst <= 2, "area differs by {worst} ulp");
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

@@ -34,6 +34,16 @@ pub fn sweep_degrees(b: &Boundary, i: usize) -> f32 {
     (rise.atan2(f64::from(distance)) * DEGREES_PER_RADIAN) as f32
 }
 
+/// `0x1411a0080`: the planform area of span element `i` of a wing with `elements` elements, the
+/// cosine of the sweep field (`+0x30`, degrees) times the span (`+0x10`) times the mean of the
+/// element's two boundary chords (`+0x70`), divided by the element count (`+0x4`). The cosine comes
+/// from the platform's libm here, so the last bit can differ.
+pub fn element_area(sweep_field: f32, span: f32, chord: &[f32], i: usize, elements: i32) -> f32 {
+    let cosine = f64::from((sweep_field * RADIANS_PER_DEGREE).cos());
+    let mean = f64::from(chord[i] + chord[i + 1]) * 0.5 * f64::from(span);
+    (cosine * mean / f64::from(elements as f32)) as f32
+}
+
 fn clamp01_low_high(v: f32) -> f32 {
     // `if 0 > v { 0 } else { min(1, v) }` as comiss/minss
     if 0.0 > v { 0.0 } else { 1.0f32.min(v) }
