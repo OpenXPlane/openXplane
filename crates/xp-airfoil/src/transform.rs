@@ -65,7 +65,7 @@ pub fn rotate_euler_offset(
     let mut out = rotate_pairs(a, b, c, p);
     if add_offsets {
         for k in 0..3 {
-            out[k] = offsets[k] + out[k];
+            out[k] += offsets[k];
         }
     }
     out
