@@ -75,6 +75,7 @@ const GALLERY = {
     ["assets/gallery/flight-000.00s.jpg", "On the runway", "Standing on the gear at the start of runway 16L."],
     ["assets/gallery/flight-017.00s.jpg", "Takeoff roll", "About 17 seconds in, the nose rotating."],
     ["assets/gallery/flight-024.00s.jpg", "Liftoff", "The wheels leave the runway."],
+    ["assets/gallery/ui-menu.jpg", "Menu bar", "The menu bar along the top edge with a drop-down and key shortcuts, in the layout of X-Plane (titles as remembered, not copied)."],
     ["assets/gallery/flight-040.00s.jpg", "Climb-out", "Climbing over the airport at about 90 knots."],
   ],
 };
