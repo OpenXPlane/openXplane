@@ -2482,7 +2482,7 @@ impl openxplane::vm::Callees for VmReplay {
     }
 }
 
-fn controls_stage(path: &str, stop: openxplane::controls::Stop) {
+fn controls_stage(path: &str, stop: Option<openxplane::controls::Stop>) {
     let cases = parse_vm_cases(path);
     assert!(cases.len() >= 20);
     for (n, mut case) in cases.into_iter().enumerate() {
@@ -2491,8 +2491,7 @@ fn controls_stage(path: &str, stop: openxplane::controls::Stop) {
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
-        let result =
-            openxplane::controls::engine_controls(&mut case.vm, &mut env, f, entry, Some(stop));
+        let result = openxplane::controls::engine_controls(&mut case.vm, &mut env, f, entry, stop);
         result.unwrap_or_else(|e| panic!("case {n}: {e}"));
         assert!(
             env.calls.is_empty(),
@@ -2511,10 +2510,20 @@ fn controls_stage(path: &str, stop: openxplane::controls::Stop) {
 
 #[test]
 fn engine_controls_dispatch_matches_the_original_machine_code() {
-    controls_stage("controls_1.txt", openxplane::controls::Stop::Dispatch);
+    controls_stage("controls_1.txt", Some(openxplane::controls::Stop::Dispatch));
 }
 
 #[test]
 fn engine_controls_blend_matches_the_original_machine_code() {
-    controls_stage("controls_2.txt", openxplane::controls::Stop::Blend);
+    controls_stage("controls_2.txt", Some(openxplane::controls::Stop::Blend));
+}
+
+#[test]
+fn engine_controls_groups_match_the_original_machine_code() {
+    controls_stage("controls_3.txt", Some(openxplane::controls::Stop::Groups));
+}
+
+#[test]
+fn engine_controls_match_the_original_machine_code_to_the_end() {
+    controls_stage("controls_4.txt", None);
 }

@@ -47,79 +47,94 @@ pub fn blend(vm: &Vm, obj: u64, mask: i32) -> f32 {
     clamp((level - f32::from_bits(0x3dcccccd)) * 2.5 + 0.0, 0.0, 1.0)
 }
 
-/// `0x1411a0970(obj, i)` / `0x1411a0a10(obj, i)`: the positive and negative lever levels of engine `i`
-/// (`binding(0x201, i)` is the input query `0x1407ace10`).
-fn lever_levels_engine(
+/// `0x1411a0970(obj, i)`: the positive lever level of engine `i` (`binding(0x201, i)` is the input query `0x1407ace10`).
+pub fn engine_level_positive(
     vm: &Vm,
     obj: u64,
     i: i32,
     binding: &mut dyn FnMut(u32, i32) -> bool,
-) -> (f32, f32) {
+) -> f32 {
     let b = vm.u64(obj + 8);
     let record = vm.u64(b + 0x5ff8) + (i64::from(i) * 0x68) as u64;
     let state = vm.f32(obj + 0x18);
-    let held = binding(0x201, i);
-    let positive = if held {
+    if binding(0x201, i) {
         0.0
     } else if vm.i32(record + 0x2c) == 0 {
         1.0
     } else {
         state * state
-    };
-    let negative = if held || vm.i32(record + 0x28) != 0 {
+    }
+}
+
+/// `0x1411a0a10(obj, i)`: the negative lever level of engine `i`.
+pub fn engine_level_negative(
+    vm: &Vm,
+    obj: u64,
+    i: i32,
+    binding: &mut dyn FnMut(u32, i32) -> bool,
+) -> f32 {
+    let b = vm.u64(obj + 8);
+    let record = vm.u64(b + 0x5ff8) + (i64::from(i) * 0x68) as u64;
+    let state = vm.f32(obj + 0x18);
+    if binding(0x201, i) || vm.i32(record + 0x28) != 0 {
         0.0
     } else if vm.i32(record + 0x2c) == 0 {
         -1.0
     } else {
         -(state * state)
-    };
-    (positive, negative)
+    }
 }
 
 /// `0x1411a0900(obj, i)`: whether engine `i`'s lever is fully forward (above 0.99) and the negative level below -0.99.
 pub fn limit_a(vm: &Vm, obj: u64, i: i32, binding: &mut dyn FnMut(u32, i32) -> bool) -> bool {
-    let (positive, _) = lever_levels_engine(vm, obj, i, binding);
-    if f64::from(positive) > 0.99 {
-        let (_, negative) = lever_levels_engine(vm, obj, i, binding);
-        return -0.99 > f64::from(negative);
+    if f64::from(engine_level_positive(vm, obj, i, binding)) > 0.99 {
+        return -0.99 > f64::from(engine_level_negative(vm, obj, i, binding));
     }
     false
 }
 
-/// `0x1412180d0` / `0x141218180`: the same levels for part record `n` (part kind 5 asks `binding(0xd8, 0)` first).
-fn lever_levels_part(
+/// `0x1412180d0(obj, n)`: the positive lever level of part `n` (kind 5 asks `binding(0xd8, 0)` first).
+pub fn part_level_positive(
     vm: &Vm,
     obj: u64,
     n: i32,
     binding: &mut dyn FnMut(u32, i32) -> bool,
-) -> (f32, f32) {
+) -> f32 {
     let b = vm.u64(obj + 8);
     let part = vm.u64(b + 0x6010) + (i64::from(n) * 0x3770) as u64;
     let state = vm.f32(obj + 0x18);
-    let held = vm.i32(part) == 5 && binding(0xd8, 0);
-    let positive = if held {
+    if vm.i32(part) == 5 && binding(0xd8, 0) {
         0.0
     } else if vm.i32(part + 0x1c) == 0 {
         1.0
     } else {
         state * state
-    };
-    let negative = if held {
+    }
+}
+
+/// `0x141218180(obj, n)`: the negative lever level of part `n`.
+pub fn part_level_negative(
+    vm: &Vm,
+    obj: u64,
+    n: i32,
+    binding: &mut dyn FnMut(u32, i32) -> bool,
+) -> f32 {
+    let b = vm.u64(obj + 8);
+    let part = vm.u64(b + 0x6010) + (i64::from(n) * 0x3770) as u64;
+    let state = vm.f32(obj + 0x18);
+    if vm.i32(part) == 5 && binding(0xd8, 0) {
         0.0
     } else if vm.i32(part + 0x1c) == 0 {
         -1.0
     } else {
         -(state * state)
-    };
-    (positive, negative)
+    }
 }
 
 /// `0x141218060(obj, n)`: [`limit_a`] for part record `n`.
 pub fn limit_b(vm: &Vm, obj: u64, n: i32, binding: &mut dyn FnMut(u32, i32) -> bool) -> bool {
-    let (positive, _) = lever_levels_part(vm, obj, n, binding);
-    if f64::from(positive) > 0.99 {
-        let (_, negative) = lever_levels_part(vm, obj, n, binding);
-        return -0.99 > f64::from(negative);
+    if f64::from(part_level_positive(vm, obj, n, binding)) > 0.99 {
+        return -0.99 > f64::from(part_level_negative(vm, obj, n, binding));
     }
     false
 }
