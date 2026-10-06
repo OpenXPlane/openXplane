@@ -106,6 +106,73 @@ pub fn evaluate(
     })
 }
 
+/// Inputs of the profile function `0x141a44350`, which wraps `evaluate` with a compressibility
+/// correction. `mach` is the stack argument the wing element function passes at `+0x148`.
+#[derive(Clone, Copy, Debug)]
+pub struct OuterInputs {
+    pub alpha_deg: f32,
+    pub multiplier: f32,
+    pub divisor: f32,
+    pub regime: f32,
+    pub mach: f32,
+    pub time: RunningTime,
+    pub noise_coordinates: [f32; 3],
+    pub retain_stall: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OuterOutput {
+    pub cl: f32,
+    pub cd: f32,
+    pub cm: f32,
+    pub normalized_alpha: f32,
+    pub stalled: bool,
+    /// Returned in `XMM0`: the second header scalar minus a tenth of the absolute Cl.
+    pub ret: f32,
+}
+
+/// Prandtl-Glauert style factor `1 / sqrt(1 - m^2)` with `m` the Mach argument limited to 0..0.7.
+pub fn compressibility_factor(mach: f32) -> f32 {
+    let m = mach.clamp(0.0, 0.7);
+    let m2 = m * m;
+    (1.0f64 / (1.0f64 - f64::from(m2)).sqrt()) as f32
+}
+
+/// `0x141a44350`: the profile evaluation, then Cl and Cm multiplied by the compressibility factor.
+pub fn outer(
+    airfoil: &Airfoil,
+    input: OuterInputs,
+    previously_stalled: bool,
+    noise: Option<&NoiseTable>,
+) -> Result<OuterOutput, String> {
+    let e = evaluate(
+        airfoil,
+        Inputs {
+            alpha_deg: input.alpha_deg,
+            multiplier: input.multiplier,
+            divisor: input.divisor,
+            regime: input.regime,
+            time: input.time,
+            noise_coordinates: input.noise_coordinates,
+            retain_stall: input.retain_stall,
+        },
+        previously_stalled,
+        noise,
+    )?;
+    let factor = compressibility_factor(input.mach);
+    let cl = factor * e.coefficients.cl;
+    let cm = factor * e.coefficients.cm;
+    let ret = (f64::from(airfoil.header_scalars[1]) - f64::from(cl.abs()) * 0.1) as f32;
+    Ok(OuterOutput {
+        cl,
+        cd: e.coefficients.cd,
+        cm,
+        normalized_alpha: e.normalized_alpha,
+        stalled: e.stalled,
+        ret,
+    })
+}
+
 pub const REPLAY_HEADER: &str = "alpha,multiplier,divisor,regime,time,x,y,phase,retain";
 
 /// Strict numeric CSV: nine columns, no quoted fields; no implicit clock steps.

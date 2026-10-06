@@ -14,9 +14,13 @@ use crate::{
     airfoil::Airfoil,
     buffet::{NoiseTable, TABLE_LEN},
     install::Install,
-    profile::{self, Inputs},
+    profile::{self, OuterInputs},
     runtime::RunningTime,
     wing::{Element, Wing, aspect_ratios},
+    wing_element::{
+        self, Aircraft as ElementAircraft, ElementInputs, ElementState, Flow, FoilCall, FoilResult,
+        WingFields,
+    },
 };
 use glam::{Mat3, Quat, Vec3};
 use std::{collections::BTreeMap, path::Path};
@@ -25,8 +29,6 @@ const G: f32 = 9.80665;
 const LB_TO_N: f32 = 4.448_222;
 const HP_TO_W: f32 = 745.7;
 const SEA_LEVEL_DENSITY: f32 = 1.225;
-/// Lift slope per radian of a thin airfoil in the flow factor of the wing element function (0.1 per degree).
-const LIFT_SLOPE: f32 = 5.729_578;
 /// Published Cessna 172 inertias (kg m^2) at 1043 kg: about the lateral (pitch), longitudinal (roll)
 /// and vertical (yaw) axes. Scaled with mass.
 const INERTIA_REF: (f32, f32, f32, f32) = (1043.0, 1825.0, 1285.0, 2667.0);
@@ -77,16 +79,35 @@ pub struct Gear {
     pub on_ground: bool,
 }
 
+/// Boundary points and per-element flags of one wing in the layout the wing element function reads.
+struct WingGeom {
+    x: Vec<f32>,
+    y: Vec<f32>,
+    z: Vec<f32>,
+    chord: Vec<f32>,
+    flap_flags: Vec<i32>,
+    slat_flags: Vec<i32>,
+    names: [String; 3],
+    ratios: [f32; 4],
+    elements: i32,
+    ar: f32,
+    side: f32,
+    /// A swept wing whose sweep passes 40 degrees would select the unported delta-wing block.
+    swept: bool,
+}
+
 struct ElementData {
     element: Element,
-    foils: [Option<usize>; 3],
-    weights: [f32; 3],
-    ar: f32,
+    /// Index into `FlightModel::geoms`.
+    geom: usize,
+    foil_ids: [usize; 3],
+    /// `parameters[4]` of the middle airfoil's first table: the angle limit the flap factor scales.
+    g10: f32,
     /// aileron, elevator, rudder, flap: fraction of the element carrying the surface.
     controls: [f32; 4],
     control_chord: [f32; 4],
     side: f32,
-    stalled: [bool; 3],
+    stalled: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -124,6 +145,7 @@ pub struct FlightModel {
     pub elevation_m: f32,
     wings: Vec<Wing>,
     elements: Vec<ElementData>,
+    geoms: Vec<WingGeom>,
     airfoils: Vec<Airfoil>,
     noise: NoiseTable,
     max_power_w: f32,
@@ -172,36 +194,6 @@ fn synthetic_noise() -> NoiseTable {
     NoiseTable::new(values).expect("fixed length")
 }
 
-/// Span weights of the root, middle and tip airfoils of an element, as read from the wing element
-/// function: the root weight falls from 1 at `_foil_rat_rot` to 0 at `_foil_rat_mid_inner`, the tip
-/// weight rises from 0 at `_foil_rat_mid_outer` to 1 at `_foil_rat_tip`, the middle takes the rest;
-/// equal neighbouring airfoil names zero the outer weight; equal ratios give 0.5.
-pub fn foil_weights(t: f32, ratios: [f32; 4], names: [&str; 3]) -> [f32; 3] {
-    let ramp = |from: f32, to: f32| {
-        if from == to {
-            0.5
-        } else {
-            ((1.0 / (to - from)) * (t - from)).clamp(0.0, 1.0)
-        }
-    };
-    let mut root = ramp(ratios[1], ratios[0]);
-    let mut tip = ramp(ratios[2], ratios[3]);
-    if names[0] == names[1] {
-        root = 0.0;
-    }
-    if names[1] == names[2] {
-        tip = 0.0;
-    }
-    [root, 1.0 - root - tip, tip]
-}
-
-/// Fades a factor towards 1 as the absolute angle goes from 20 to 70 degrees (the caller of the
-/// profile function does this to the angle multiplier).
-pub fn fade_to_one(x: f32, alpha_deg: f32) -> f32 {
-    let t = ((alpha_deg.abs() - 20.0) / 50.0).clamp(0.0, 1.0);
-    x + (1.0 - x) * t
-}
-
 fn control_deflection(
     control: usize,
     side: f32,
@@ -239,9 +231,9 @@ impl FlightModel {
         }
         let ars = aspect_ratios(&wings);
 
-        let mut airfoils = Vec::new();
-        let mut index = BTreeMap::new();
-        let mut load_foil = |name: &str| -> Result<usize, String> {
+        let mut airfoils: Vec<Airfoil> = Vec::new();
+        let mut index: BTreeMap<String, usize> = BTreeMap::new();
+        let mut load_foil = |airfoils: &mut Vec<Airfoil>, name: &str| -> Result<usize, String> {
             if let Some(&i) = index.get(name) {
                 return Ok(i);
             }
@@ -285,6 +277,7 @@ impl FlightModel {
             .collect();
 
         let mut elements = Vec::new();
+        let mut geoms = Vec::new();
         for (w, ar) in wings.iter().zip(&ars) {
             let names = [
                 w.airfoils[0].as_str(),
@@ -292,31 +285,67 @@ impl FlightModel {
                 w.airfoils[2].as_str(),
             ];
             let foil_ids = [
-                load_foil(names[0])?,
-                load_foil(names[1])?,
-                load_foil(names[2])?,
+                load_foil(&mut airfoils, names[0])?,
+                load_foil(&mut airfoils, names[1])?,
+                load_foil(&mut airfoils, names[2])?,
             ];
+            // `parameters[4]` of the middle airfoil's first table (the original reads it at +0x10 of
+            // the first table of the middle airfoil)
+            let g10 = airfoils[foil_ids[1]]
+                .polars
+                .first()
+                .map_or(1.0, |p| p.parameters[4]);
+            // boundary points of the span elements; z carries a quarter chord so that z - chord/4 is the
+            // quarter-chord line the sweep is measured on
+            let n = w.elements;
+            let u = w.span_direction();
+            let (mut x, mut y, mut z, mut chord) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            for i in 0..=n {
+                let t = i as f32 / n as f32;
+                let c = w.root_chord + (w.tip_chord - w.root_chord) * t;
+                let p = w.root + u * (w.semilen * t);
+                x.push(p.x);
+                y.push(p.y);
+                z.push(p.z + 0.25 * c);
+                chord.push(c);
+            }
+            let mut flap_flags = vec![0i32; n + 1];
+            for (i, c) in w.controls.iter().enumerate() {
+                flap_flags[i] = i32::from(c[3] > 0.0);
+            }
+            geoms.push(WingGeom {
+                x,
+                y,
+                z,
+                chord,
+                flap_flags,
+                slat_flags: vec![0; n + 1],
+                names: [
+                    names[0].to_string(),
+                    names[1].to_string(),
+                    names[2].to_string(),
+                ],
+                ratios: w.foil_ratios,
+                elements: n as i32,
+                ar: (*ar).max(0.5),
+                side: w.side,
+                swept: w.sweep_deg.abs() > 35.0,
+            });
+            let geom = geoms.len() - 1;
             for e in w.elements() {
-                let weights = foil_weights(e.span_fraction, w.foil_ratios, names);
-                let mut foils = [None; 3];
-                for k in 0..3 {
-                    if weights[k] > 0.0 {
-                        foils[k] = Some(foil_ids[k]);
-                    }
-                }
-                let mut chord = [0.0; 4];
-                for (c, (r, t)) in chord.iter_mut().zip(crats) {
+                let mut ctrl_chord = [0.0; 4];
+                for (c, (r, t)) in ctrl_chord.iter_mut().zip(crats) {
                     *c = r + (t - r) * e.span_fraction;
                 }
                 elements.push(ElementData {
                     element: e,
-                    foils,
-                    weights,
-                    ar: (*ar).max(0.5),
+                    geom,
+                    foil_ids,
+                    g10,
                     controls: w.controls[e.index],
-                    control_chord: chord,
+                    control_chord: ctrl_chord,
                     side: w.side,
-                    stalled: [false; 3],
+                    stalled: false,
                 });
             }
         }
@@ -397,6 +426,7 @@ impl FlightModel {
             elevation_m: 0.0,
             wings,
             elements,
+            geoms,
             airfoils,
             noise: synthetic_noise(),
             max_power_w: power_hp * HP_TO_W,
@@ -459,7 +489,7 @@ impl FlightModel {
             self.state = *state;
             self.gears = gears.clone();
             for e in &mut self.elements {
-                e.stalled = [false; 3];
+                e.stalled = false;
             }
             self.downwash_cl = 0.0;
         }
@@ -494,7 +524,10 @@ impl FlightModel {
         let rot_t = rot.transpose();
         let v_body = rot_t * st.velocity;
         let height = self.elevation_m + st.position.y - self.rest_cg_height;
-        let (rho, mu) = isa(height);
+        let (rho, _) = isa(height);
+        let temperature_k = 288.15 - 0.0065 * height.clamp(-500.0, 11000.0);
+        let temperature_c = temperature_k - 273.15;
+        let sound_speed = 20.046_8 * temperature_k.sqrt();
         let mut force_b = Vec3::ZERO;
         let mut moment_b = Vec3::ZERO;
         let flap_deg = self.flap_degrees(c.flaps);
@@ -532,48 +565,94 @@ impl FlightModel {
                 0.0
             };
             let alpha_deg = wn.atan2(wt).to_degrees() + shift - downwash;
-            let re_meg = rho * vp * e.chord / mu / 1.0e6;
-            // finite-wing flow factor and compressibility-style factor of the wing element function
-            let y = 1.0 / (1.0 + LIFT_SLOPE / (std::f32::consts::PI * ed.ar));
-            let k = ((8.0 * y + 1.0).sqrt() + 1.0) * 0.25;
-            let multiplier = fade_to_one(y / k, alpha_deg);
-            let coords = [e.center.x / 10.0, e.center.y / 10.0, e.center.z / 10.0];
-            let (mut cl, mut cd, mut cm) = (0.0f32, 0.0f32, 0.0f32);
-            for slot in 0..3 {
-                let (Some(f), w) = (ed.foils[slot], ed.weights[slot]) else {
-                    continue;
-                };
-                if w <= 0.0 {
-                    continue;
-                }
-                let input = Inputs {
-                    alpha_deg,
-                    multiplier,
-                    divisor: 1.0,
-                    regime: re_meg,
-                    time,
-                    noise_coordinates: coords,
-                    retain_stall: true,
-                };
-                let Ok(ev) = profile::evaluate(
-                    &self.airfoils[f],
-                    input,
-                    ed.stalled[slot],
-                    Some(&self.noise),
-                ) else {
-                    continue;
-                };
-                ed.stalled[slot] = ev.stalled;
-                cl += w * ev.coefficients.cl;
-                cd += w * ev.coefficients.cd;
-                cm += w * ev.coefficients.cm;
-            }
-            cl *= k;
+            let geom = &self.geoms[ed.geom];
+            let mach = vp / sound_speed;
+            let inputs = ElementInputs {
+                index: e.index,
+                retain_request: true,
+                arg6: mach,
+                ice: 0.0,
+                alpha_in: alpha_deg,
+                extra: [0.0; 3],
+                flow: Flow {
+                    f5c: temperature_c,
+                    f6c: rho,
+                    f1a0: 0.0,
+                    f1a4: 0.0,
+                    f408: 0.0,
+                    flag_dac: false,
+                    diagnostics: false,
+                },
+                aircraft: ElementAircraft {
+                    f1f00: 0.0,
+                    f1f3c: 0.0,
+                    f64f4: 10.0,
+                    f64f8: 10.0,
+                    f64fc: 10.0,
+                },
+                g10: ed.g10,
+                wing: WingFields {
+                    is_right: geom.side,
+                    elements: geom.elements,
+                    f14: geom.ar,
+                    f18: 0.0,
+                    f1c: 0.0,
+                    ratios: geom.ratios,
+                    boundary: wing_element::Boundary {
+                        x: &geom.x,
+                        y: &geom.y,
+                        z: &geom.z,
+                        chord: &geom.chord,
+                    },
+                    flap_flags: &geom.flap_flags,
+                    slat_flags: &geom.slat_flags,
+                    names: [&geom.names[0], &geom.names[1], &geom.names[2]],
+                },
+                state: ElementState {
+                    v: 1.0,
+                    r11: 0.0,
+                    r21: vp,
+                    r163: 1.0,
+                    stall_flag: ed.stalled,
+                },
+                skip_delta_block: geom.swept,
+            };
+            let airfoils = &self.airfoils;
+            let noise = &self.noise;
+            let foil_ids = ed.foil_ids;
+            let Ok(out) = wing_element::evaluate(&inputs, |c: &FoilCall| {
+                let o = profile::outer(
+                    &airfoils[foil_ids[c.slot]],
+                    OuterInputs {
+                        alpha_deg: c.alpha,
+                        multiplier: c.multiplier,
+                        divisor: c.divisor,
+                        regime: c.re_meg,
+                        mach: c.arg6,
+                        time,
+                        noise_coordinates: [c.x_norm, c.y_norm, c.z_norm],
+                        retain_stall: c.retain,
+                    },
+                    c.stalled,
+                    Some(noise),
+                )?;
+                Ok(FoilResult {
+                    ret: o.ret,
+                    cl: o.cl,
+                    cd: o.cd,
+                    cm: o.cm,
+                    ratio: o.normalized_alpha,
+                    stalled: o.stalled,
+                })
+            }) else {
+                continue;
+            };
+            ed.stalled = out.stall_flag;
+            let (cl, mut cd, cm) = (out.cl, out.cd, out.cm);
             if !behind && e.normal.y.abs() > 0.7 && e.chord > 0.5 {
                 cl_weighted += cl * e.area;
                 area_sum += e.area;
             }
-            cd += cl * cl / (std::f32::consts::PI * ed.ar);
             if ed.controls[3] > 0.0 {
                 cd += 0.012 * (flap_deg / 10.0).powi(2) * ed.controls[3];
             }
@@ -699,11 +778,7 @@ impl FlightModel {
             alpha_deg: (-v_body.y).atan2(-v_body.z).to_degrees(),
             throttle: controls.throttle,
             on_ground: self.gears.iter().any(|g| g.on_ground),
-            stalled_elements: self
-                .elements
-                .iter()
-                .filter(|e| e.stalled.iter().any(|s| *s))
-                .count(),
+            stalled_elements: self.elements.iter().filter(|e| e.stalled).count(),
         }
     }
 }
@@ -743,33 +818,6 @@ mod tests {
         );
         let (rho5, _) = isa(5000.0);
         assert!((rho5 - 0.7364).abs() < 0.003, "{rho5}");
-    }
-
-    #[test]
-    fn foil_weights_follow_the_ratios_and_name_equality() {
-        let r = [0.1, 0.2, 0.8, 0.9];
-        assert_eq!(foil_weights(0.5, r, ["a", "a", "a"]), [0.0, 1.0, 0.0]);
-        assert_eq!(foil_weights(0.05, r, ["r", "m", "t"]), [1.0, 0.0, 0.0]);
-        let w = foil_weights(0.15, r, ["r", "m", "t"]);
-        assert!((w[0] - 0.5).abs() < 1e-6 && (w[1] - 0.5).abs() < 1e-6 && w[2] == 0.0);
-        assert_eq!(foil_weights(0.5, r, ["r", "m", "t"]), [0.0, 1.0, 0.0]);
-        let w = foil_weights(0.95, r, ["r", "m", "t"]);
-        assert_eq!(w, [0.0, 0.0, 1.0]);
-        // equal neighbours zero the outer weight even where the ramp is positive
-        assert_eq!(foil_weights(0.05, r, ["m", "m", "t"])[0], 0.0);
-        // equal ratios give the one half of the original's special case
-        assert_eq!(
-            foil_weights(0.5, [0.2, 0.2, 0.8, 0.9], ["r", "m", "t"])[0],
-            0.5
-        );
-    }
-
-    #[test]
-    fn angle_factors_fade_to_one_between_20_and_70_degrees() {
-        assert_eq!(fade_to_one(0.8, 10.0), 0.8);
-        assert_eq!(fade_to_one(0.8, -20.0), 0.8);
-        assert!((fade_to_one(0.8, 45.0) - 0.9).abs() < 1e-6);
-        assert_eq!(fade_to_one(0.8, -90.0), 1.0);
     }
 
     #[test]

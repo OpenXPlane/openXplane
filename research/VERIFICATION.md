@@ -35,6 +35,8 @@ cargo test --offline --test original_vectors
 | `0x141a412c0` | angle correction, fixed-grid lookup, normalised angle, stall flag, active-stall noise | 1200 | identical bits |
 | `0x1411a0230` | sweep angle of an element's quarter-chord line ([WING_ELEMENT.md](WING_ELEMENT.md)) | 1500 | identical bits (on macOS libm) |
 | `0x1411a00f0` | delta-wing weight of an element | 1500 (482 nonzero) | identical bits (on macOS libm) |
+| `0x141a44350` | the profile function: table-pair selection, two evaluations with shared stall flag, four blends, compressibility factor, return value | 600 (158 stalled, 446 with several tables) | identical bits |
+| `0x1411b6630` | the wing element function, straight-wing path (flow factor, Reynolds number, viscosity, positions, three airfoil weights, calls, accumulation, induced drag, ice), with the profile function replaced by a recording stub | 400 cases, 590 profile calls (root 132, middle 337, tip 121) | identical bits: every call's arguments and every output |
 
 For `0x141a412c0` the signature recovered from the disassembly is: `RCX` the table object (parameters at
 `+0x04..+0x10`, Cl at `+0x14`, Cd at `+0xb58`, Cm at `+0x169c`, 721 floats each), `XMM1..XMM3` the noise x, y and
@@ -54,6 +56,14 @@ The two element geometry functions use `atan2` and `tan`. The original calls its
 platform's libm. On the development machine (macOS) all 3000 results match exactly; on other platforms the last
 bit may differ, so `tests/original_vectors.rs` allows 4 ulps for the sweep and 64 ulps for the weight (which
 divides by a small difference) and prints the exact and worst counts.
+
+The wing element function is verified with the profile function **stubbed**: the stub records the arguments the
+original passes (all 13 values per call) and returns recorded random results, which the test replays into the
+port. That checks everything the element function itself computes and the exact arguments it hands to the profile
+function; the profile function itself is verified separately as a whole (`0x141a44350` above). The element cases
+stay on the straight-wing path (sweep below 38 degrees, delta-wing weight zero) and keep the original's diagnostic
+logging off. A mutation check confirmed the test's sensitivity: changing one constant by 4e-5 relative made 119 of
+the 400 cases differ.
 
 ## Limits
 

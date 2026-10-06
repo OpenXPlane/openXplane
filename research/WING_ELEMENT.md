@@ -2,8 +2,9 @@
 
 Date: 2026-10-06. The reference and SHA256 are in [BASELINE.md](BASELINE.md). Static analysis of the function at
 `0x1411b6630 .. 0x1411b8df7` (10183 bytes), the caller of the profile function
-[`0x141a44350`](AFL_REGIMES.md). It is **not ported yet**; this note records what is established so the port
-can be done in verified pieces with the emulator ([VERIFICATION.md](VERIFICATION.md)).
+[`0x141a44350`](AFL_REGIMES.md). It is **partly ported**: the straight-wing path is in `src/wing_element.rs` and verified bit for bit against the original
+([VERIFICATION.md](VERIFICATION.md)); the delta-wing block (step 9) is not ported. This note records what is
+established.
 
 About 1400 of its 2284 instructions are diagnostic logging (stream calls), guarded by two flags at
 `0xbcd0(%rdi)` and `0xbcc8(%rdi)`; the numeric code is about 900 instructions with 24 calls. The diagnostic
@@ -77,13 +78,38 @@ the induced-drag term). It returns a float in `XMM0`: the weighted normalised an
 10. **Ice.** When an ice factor in the stack arguments is positive, Cl and Cd are multiplied by two per-element
     factors saved at entry (`ice_cl_mult`, `ice_cd_mult`).
 
+## Ported and verified
+
+`wing_element::evaluate` covers steps 1 to 8 and 10 for the straight-wing path, with the profile function passed in
+as a closure (`profile::outer` is the verified port of `0x141a44350`). Details found while porting that go beyond
+the first reading above:
+
+- The profile function's four outputs are Cl, Cd, Cm and the normalised angle ("alpha ratio"); it returns the
+  airfoil's second header scalar minus a tenth of the absolute Cl, which the element function blends with the
+  weights into its own return value. The profile function multiplies Cl and Cm (not Cd) by `1/sqrt(1 - m^2)` with
+  `m` the Mach argument limited to 0..0.7.
+- The element function receives that Mach argument at `+0x148`, the ice factor at `+0x150` and the input angle at
+  `+0x158`; three more stack floats are added to the Cl, Cd and Cm accumulators; the last four stack arguments are
+  the output pointers (Cl, Cd, Cm and the induced-drag term).
+- The three airfoil objects hold their tables as a vector (`+0xd0` begin, `+0xd8` end, 0x2230 bytes each); the
+  `g10` value is `parameters[4]` of the first table of the middle airfoil. The second AFL header scalar is stored
+  at `+0x5c`.
+- The viscosity segments are linear through -50, 0 and +50 (degrees Celsius assumed) at 1.4638e-5, 1.7231e-5 and
+  1.9608e-5; `Re_meg = mac * (R8[21+e] * f6c) / (mu * 1e6)` with `mac = (2/3) c0 (r^2 + r + 1)/(r + 1)`, the mean
+  chord of the element, which fits density in `f6c` and the element speed in `R8[21+e]`.
+- Persistent per-element stall flags live in the float array at `R8[121 + e]` (`+0x1e4`), shared by the three
+  calls; the Cl accumulator is multiplied by `k` after the extra terms; the induced drag is
+  `Cl^2/(pi * f14 * v) * R8[163]`.
+
+The approximate flight model now calls this port (research/FLIGHT_MODEL.md).
+
 ## Not established
 
 The meaning of the objects' fields beyond what the diagnostics name; the sources of `R8`'s arrays (they come from
 the caller's per-element flow computation); the behaviour of helpers `0x14082b800`, `0x14121bfd0`, `0x1411e1940`,
 `0x1408bd9d0`, `0x1411a0230`, `0x1411a00f0` and of the C runtime functions `0x14230b380`, `0x14230be80`,
 `0x14230c1d0`; the exact formulas of steps 2, 4 and 9; and whether the temperature field is in degrees Celsius.
-Steps 1, 5, 6 and 7 are read in full; the rest is read at the level of the constants and data flow above.
+Steps 1 to 8 and 10 are ported and verified; step 9 (the delta-wing block, which runs only for sweeps above 40 degrees) is read at the level of the constants and data flow above.
 
 ## Plan
 

@@ -167,3 +167,322 @@ fn wing_element_geometry_matches_the_original_machine_code() {
     assert!(worst_sweep <= 4, "sweep differs by {worst_sweep} ulp");
     assert!(worst_weight <= 64, "weight differs by {worst_weight} ulp");
 }
+
+#[test]
+fn wing_element_straight_path_matches_the_original_machine_code() {
+    use openxplane::wing_element::{
+        Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,
+        evaluate,
+    };
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/wing_element.txt"
+    ))
+    .unwrap();
+    let (mut cases, mut calls_total, mut mismatches) = (0, 0, Vec::<String>::new());
+    let mut by_slot = [0usize; 3];
+    for (n, line) in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .enumerate()
+    {
+        let mut it = line.split_whitespace().filter(|t| *t != "|");
+        let mut next = || it.next().unwrap_or_else(|| panic!("line {n} too short"));
+        let int = |t: &str| t.parse::<i64>().unwrap();
+        let e = int(next()) as usize;
+        let els = int(next()) as i32;
+        let retain = int(next()) != 0;
+        let (arg6, ice, alpha_in) = (f(next()), f(next()), f(next()));
+        let extra = [f(next()), f(next()), f(next())];
+        let is_right = f(next());
+        let (f14, f18, f1c) = (f(next()), f(next()), f(next()));
+        let ratios = [f(next()), f(next()), f(next()), f(next())];
+        let (c0, c1, x0, x1, y0, y1, z0, z1) = (
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+        );
+        let (flap, slat) = (int(next()) as i32, int(next()) as i32);
+        let names: Vec<String> = (0..3).map(|_| format!("foil{}", int(next()))).collect();
+        let flow = Flow {
+            f5c: f(next()),
+            f6c: f(next()),
+            f1a0: f(next()),
+            f1a4: f(next()),
+            f408: f(next()),
+            flag_dac: int(next()) != 0,
+            diagnostics: int(next()) != 0 || int(next()) != 0,
+        };
+        let aircraft = Aircraft {
+            f1f00: f(next()),
+            f1f3c: f(next()),
+            f64f4: f(next()),
+            f64f8: f(next()),
+            f64fc: f(next()),
+        };
+        let g10 = f(next());
+        let state = ElementState {
+            v: f(next()),
+            r11: f(next()),
+            r21: f(next()),
+            r163: f(next()),
+            stall_flag: int(next()) != 0,
+        };
+        let ncalls = int(next()) as usize;
+        let mut recorded: Vec<(FoilCall, FoilResult)> = Vec::new();
+        for _ in 0..ncalls {
+            let call = FoilCall {
+                slot: int(next()) as usize,
+                x_norm: f(next()),
+                y_norm: f(next()),
+                z_norm: f(next()),
+                retain: int(next()) != 0,
+                diagnostics: int(next()) != 0,
+                re_meg: f(next()),
+                arg6: f(next()),
+                alpha: f(next()),
+                multiplier: f(next()),
+                divisor: f(next()),
+                flag_dac: int(next()) != 0,
+                stalled: int(next()) != 0,
+            };
+            let result = FoilResult {
+                ret: f(next()),
+                cl: f(next()),
+                cd: f(next()),
+                cm: f(next()),
+                ratio: f(next()),
+                stalled: int(next()) != 0,
+            };
+            recorded.push((call, result));
+        }
+        let want = [
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+            f(next()),
+        ];
+        let want_stall = int(next()) != 0;
+
+        // arrays indexed by element: only the entries the function reads are meaningful
+        let pad = |a: f32, b: f32| {
+            let mut v = vec![0.0f32; e + 2];
+            v[e] = a;
+            v[e + 1] = b;
+            v
+        };
+        let (cx, cy, cz, cc) = (pad(x0, x1), pad(y0, y1), pad(z0, z1), pad(c0, c1));
+        let mut flaps = vec![0i32; e + 1];
+        let mut slats = vec![0i32; e + 1];
+        flaps[e] = flap;
+        slats[e] = slat;
+        let inputs = ElementInputs {
+            index: e,
+            retain_request: retain,
+            arg6,
+            ice,
+            alpha_in,
+            extra,
+            flow,
+            aircraft,
+            g10,
+            wing: WingFields {
+                is_right,
+                elements: els,
+                f14,
+                f18,
+                f1c,
+                ratios,
+                boundary: Boundary {
+                    x: &cx,
+                    y: &cy,
+                    z: &cz,
+                    chord: &cc,
+                },
+                flap_flags: &flaps,
+                slat_flags: &slats,
+                names: [&names[0], &names[1], &names[2]],
+            },
+            state,
+            skip_delta_block: false,
+        };
+        let mut replay = recorded.iter();
+        let mut problems = Vec::new();
+        let got = evaluate(&inputs, |c: &FoilCall| {
+            let Some((want_call, result)) = replay.next() else {
+                problems.push(format!("extra call to slot {}", c.slot));
+                return Ok(FoilResult {
+                    ret: 0.0,
+                    cl: 0.0,
+                    cd: 0.0,
+                    cm: 0.0,
+                    ratio: 0.0,
+                    stalled: false,
+                });
+            };
+            let bits = |a: f32, b: f32| a.to_bits() == b.to_bits();
+            let same = c.slot == want_call.slot
+                && bits(c.x_norm, want_call.x_norm)
+                && bits(c.y_norm, want_call.y_norm)
+                && bits(c.z_norm, want_call.z_norm)
+                && c.retain == want_call.retain
+                && c.diagnostics == want_call.diagnostics
+                && bits(c.re_meg, want_call.re_meg)
+                && bits(c.arg6, want_call.arg6)
+                && bits(c.alpha, want_call.alpha)
+                && bits(c.multiplier, want_call.multiplier)
+                && bits(c.divisor, want_call.divisor)
+                && c.flag_dac == want_call.flag_dac
+                && c.stalled == want_call.stalled;
+            if !same {
+                problems.push(format!(
+                    "call differs:\n   port     {c:?}\n   original {want_call:?}"
+                ));
+            }
+            calls_total += 1;
+            by_slot[c.slot] += 1;
+            Ok(*result)
+        })
+        .unwrap();
+        if replay.next().is_some() {
+            problems.push("the port made fewer calls than the original".into());
+        }
+        let have = [got.ret, got.cl, got.cd, got.cm, got.ratio, got.induced_drag];
+        if have
+            .iter()
+            .zip(want)
+            .any(|(a, b)| a.to_bits() != b.to_bits())
+            || got.stall_flag != want_stall
+        {
+            problems.push(format!(
+                "outputs differ: port {have:?} stall {} original {want:?} stall {want_stall}",
+                got.stall_flag
+            ));
+        }
+        cases += 1;
+        if !problems.is_empty() {
+            mismatches.push(format!("case {n}: {}", problems.join("\n")));
+        }
+    }
+    println!(
+        "{cases} cases, {calls_total} profile calls (root {}, middle {}, tip {})",
+        by_slot[0], by_slot[1], by_slot[2]
+    );
+    assert!(
+        cases >= 400 && by_slot.iter().all(|c| *c > 20),
+        "vectors must exercise all three airfoils"
+    );
+    assert!(
+        mismatches.is_empty(),
+        "{} of {cases} cases differ from the original:\n{}",
+        mismatches.len(),
+        mismatches
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
+#[test]
+fn profile_function_with_compressibility_matches_the_original_machine_code() {
+    use openxplane::{
+        airfoil::Airfoil,
+        profile::{OuterInputs, outer},
+    };
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/profile_outer.txt"
+    ))
+    .unwrap();
+    let noise = noise();
+    let (mut cases, mut stalled, mut two_tables, mut mismatches) = (0, 0, 0, Vec::<String>::new());
+    for (n, line) in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .enumerate()
+    {
+        let mut it = line.split_whitespace().filter(|t| *t != "|");
+        let mut next = || it.next().unwrap();
+        let tables: usize = next().parse().unwrap();
+        let mut polars = Vec::new();
+        for _ in 0..tables {
+            let k: i64 = next().parse().unwrap();
+            let p = [f(next()), f(next()), f(next()), f(next()), f(next())];
+            polars.push(polar(k, p));
+        }
+        let scalar = f(next());
+        let airfoil = Airfoil {
+            version: 1110,
+            header_scalars: [0.0, scalar],
+            shape_points: [[0.0; 2]; 14],
+            polars,
+        };
+        let noise_coordinates = [f(next()), f(next()), f(next())];
+        let retain_stall = next().parse::<i32>().unwrap() != 0;
+        let regime = f(next());
+        let mach = f(next());
+        let alpha_deg = f(next());
+        let multiplier = f(next());
+        let divisor = f(next());
+        let _dac = next();
+        let time = f64::from_bits(u64::from_str_radix(next(), 16).unwrap());
+        let stall_in = next().parse::<i32>().unwrap() != 0;
+        let want = [f(next()), f(next()), f(next()), f(next()), f(next())];
+        let want_stall = next().parse::<i32>().unwrap() != 0;
+        let got = outer(
+            &airfoil,
+            OuterInputs {
+                alpha_deg,
+                multiplier,
+                divisor,
+                regime,
+                mach,
+                time: RunningTime::from_snapshot(time).unwrap(),
+                noise_coordinates,
+                retain_stall,
+            },
+            stall_in,
+            Some(&noise),
+        )
+        .unwrap();
+        let have = [got.cl, got.cd, got.cm, got.normalized_alpha, got.ret];
+        cases += 1;
+        stalled += usize::from(want_stall);
+        two_tables += usize::from(tables > 1);
+        if have
+            .iter()
+            .zip(want)
+            .any(|(a, b)| a.to_bits() != b.to_bits())
+            || got.stalled != want_stall
+        {
+            mismatches.push(format!(
+                "case {n}: port {:08x?} stall {} original {:08x?} stall {want_stall}",
+                have.map(f32::to_bits),
+                got.stalled,
+                want.map(f32::to_bits)
+            ));
+        }
+    }
+    println!("{cases} cases, {stalled} stalled, {two_tables} with several tables");
+    assert!(cases >= 600 && stalled > 100 && two_tables > 300);
+    assert!(
+        mismatches.is_empty(),
+        "{} of {cases} cases differ:\n{}",
+        mismatches.len(),
+        mismatches
+            .iter()
+            .take(4)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}

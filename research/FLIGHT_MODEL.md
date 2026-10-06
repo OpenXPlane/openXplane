@@ -12,7 +12,7 @@ X-Plane. The code is `src/wing.rs` and `src/flight.rs`.
 | ACF mass, CG, wing geometry, gear springs and dampers, engine power, control deflection limits and chord ratios, flap detents | ACF properties ([ACF_SCHEMA.md](ACF_SCHEMA.md); lengths with the build's float32 feet constant) |
 | Airfoil tables, finite-grid lookup, stall hysteresis, buffet perturbation, three-table blending | `profile::evaluate`, verified bit for bit against the original machine code ([VERIFICATION.md](VERIFICATION.md)) |
 | Span weights of the root, middle and tip airfoils of an element | the wing element function, read in full ([WING_ELEMENT.md](WING_ELEMENT.md) step 5) |
-| The flow factor `y = 1/(1 + 5.73/(pi AR))`, the factor `k = (sqrt(8y + 1) + 1)/4` that multiplies Cl, the multiplier `y/k` faded to 1 between 20 and 70 degrees, the induced drag `Cl^2/(pi AR)` | the same function, from the constants and data flow (steps 2, 4, 7, 8); `AR` is taken as the aspect ratio of the whole surface, which is how the function's inputs behave but was not confirmed |
+| The whole per-element coefficient computation: flow factor, compressibility factor, Reynolds number from viscosity, the three airfoil weights, the profile function with its Mach factor, accumulation, induced drag | `wing_element::evaluate` and `profile::outer`, both verified bit for bit against the original machine code ([VERIFICATION.md](VERIFICATION.md)); what the model feeds them (see below) is its own |
 
 ## What is openXplane's own simplification
 
@@ -22,6 +22,12 @@ X-Plane. The code is `src/wing.rs` and `src/flight.rs`.
   the span-direction vector.
 - Control surfaces shift the effective angle of attack by `0.65 * tau * delta` (thin-airfoil `tau`, an assumed
   effectiveness factor); flaps add `0.012 (delta/10)^2` to Cd on flapped elements.
+- Inputs fed to the element function: the temperature and density of the ISA atmosphere, the element's own speed
+  in the plane of the airfoil as the Reynolds-number speed, the Mach number from that speed, the local angle of
+  attack (with the control-surface shift and the tail downwash added), the aspect ratio of the whole surface as
+  the function's aspect-ratio field with a unit speed factor, no flap or slat factor, no ice, and a position
+  normalisation of 10 m. In the original these come from the flight loop, which is not recovered. A wing whose
+  design sweep exceeds 35 degrees runs the straight-wing path without the delta-wing block.
 - The tail sits in the wing's downwash estimated as `1.2 * 2 CL / (pi AR)` from the wing lift one step ago.
 - A fuselage pitching-moment slope of `+0.5` per radian (referenced to wing area and mean chord) and a parasite
   drag area of `0.30 m^2`; without them the lifting surfaces alone are about twice as stable in pitch as a real

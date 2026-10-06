@@ -20,15 +20,15 @@
       "name": "Airfoil evaluation (AFL)",
       "weight": 6,
       "implemented": 0.9,
-      "verified": 0.6,
-      "note": "All 34 airfoils; angle correction, lookup, stall, buffet and blending. The profile stage matches the original bit for bit on 1200 vectors."
+      "verified": 0.85,
+      "note": "All 34 airfoils; the whole profile function (selection, stall, buffet, blending, Mach factor) matches the original bit for bit on 1800 emulator cases."
     },
     {
       "name": "Flight model",
       "weight": 28,
-      "implemented": 0.25,
-      "verified": 0.03,
-      "note": "An approximate rigid-body model that takes off and flies. The original's wing element function is mapped; its element geometry and delta-wing weight are ported and verified, the rest is not."
+      "implemented": 0.3,
+      "verified": 0.1,
+      "note": "An approximate rigid-body model that takes off and flies. Its per-element coefficient computation is the original's straight-wing path (verified); the flight loop, engine, gear and controls are our own."
     },
     {
       "name": "Datarefs and commands",
