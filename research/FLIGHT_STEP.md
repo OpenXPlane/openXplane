@@ -149,3 +149,22 @@ loop over the 48 wings with downwash, swirl and radius ratios; it also calls `0x
 after removing diagnostics) assembles these: the wing and element loops, the body forces (`0x6040` table), landing
 gear, radiators, arresting cable, speed brakes, chute, water rudder, anchor and water pick-up, then the force
 totals already ported.
+
+### Engine control update and engine family (`crates/xp-airfoil/src/controls.rs`)
+
+`engine_controls` (`0x141260090`, 1836 instructions without diagnostics) is the per-frame engine orchestrator and is
+ported completely, checked at four checkpoints and to the end (`tools/gen_controls_vectors.py`; the replay of the
+recorded callees is generic: `tools/xp_vmcase.py`, `vm::Callees`). It: copies the override area to the propeller
+totals when `F+0x6760` is set; otherwise computes each throttle group's lever as the weighted mean of its engines'
+levers (`B+0xc90..`, with the `B+0xd88` curve), dispatches each engine to its kind's update (`0x14119ac90` kinds 0-4
+when `F+0x6764` is clear, `0x141197b00` the engine update for kinds 5 and 6, `0x14119a570` kind 7), calls the
+propeller force `0x1411bd470` for each part that is not held back, sets the lever of the propeller parts of kind 6
+from the jet engines (`F+0x64b4/0x64b8`), eases the engines' power (`M+0x25c`) toward the propeller's, and then runs
+the lever groups (`B+0xb78` groups: the lever position moves with the group's thrust, limited by `limit_a`/`limit_b`
+and the rate follower `0x1410c9620`), the rates of change `M+0x7c`, `N+0x18`, `N+0x10` and the moments of the
+propeller parts into `F+0x2f8/0x310/0x328`.
+
+Also ported: `apply_engine_thrust` (`0x1411975a0`) and `update_engine_kind7` (`0x14119a570`, which reads the runtime
+atmosphere table at `0x14612bd90`). The hold rule `engine_held_back` is used wherever the original inlines it (the
+inline copies call the bindings in the same order). Not ported: `0x14119ac90` (3.9 KB, engine kinds 0-4),
+`0x1411854a0` (a per-group query), `0x1411da6c0`, `0x1411c5a90` and the init `0x141190ed0` (replayed).
