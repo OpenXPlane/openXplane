@@ -166,5 +166,25 @@ propeller parts into `F+0x2f8/0x310/0x328`.
 
 Also ported: `apply_engine_thrust` (`0x1411975a0`) and `update_engine_kind7` (`0x14119a570`, which reads the runtime
 atmosphere table at `0x14612bd90`). The hold rule `engine_held_back` is used wherever the original inlines it (the
-inline copies call the bindings in the same order). Not ported: `0x14119ac90` (3.9 KB, engine kinds 0-4),
-`0x1411854a0` (a per-group query), `0x1411da6c0`, `0x1411c5a90` and the init `0x141190ed0` (replayed).
+inline copies call the bindings in the same order). Not ported: `0x1411854a0` (a per-group query), `0x1411da6c0`, `0x1411c5a90` and the init `0x141190ed0` (replayed).
+
+### Engine kinds 0-4 (`crates/xp-airfoil/src/piston.rs`)
+
+`update_engine_piston` (`0x14119ac90(M, F, n, inputs)`, 888 instructions without diagnostics) is ported completely
+and checked on 150 random objects (`tools/gen_piston_vectors.py`, `piston.txt`). Kind 0 only sets `M+0x24c/0x254/
+0x258` to 1. For the other kinds: `M+0x58/0x60` follow `M+0x54/0x5c` at 0.2 times the frame time; the held lever
+(`M+0x58` unless input `0xa8` is bound, against `M+0x60`) gives the power fraction `M+0x24c` (with the manifold ratio
+from `B+0x934 * F+0x424 / F+0x68`, the 15 % lever term, the kind 1 lean term from `M+0x50`/`M+0x2b4` and the
+squared half-power term), `M+0x254` (over 101325) and `M+0x258` (the density ratio over 1.225; both scaled by the
+noise `0x140984e50` when input `0x1a1` is bound). Then the throttle gain `0x1411dd610` is blended with the lever
+`M+4` (kinds 3/4: the larger; kind 4 with `B+0xa9c == 3` and `M+0x298 == 1` a second blend), scaled by `M+0x22c`
+(the ramp: kinds 3/4 and others move it by the frame time over `B+0xa18`; kinds 0-2 set it to 1), optionally replaced
+by an interpolation on `E+0x18` (`0x1411a2e40`), and limited for kind 3 (`B+0xa9c` 2) and kind 4 (3) by the extremes
+of the bound elements' values against the engine ratio (factors 1.05, 0.95, 1.06). The kind handlers
+(`0x14119bc00` kind 0 with the lever input, `0x14119d380` kinds 1 and 2, `0x14119c610` kind 4, `0x14119cb70` kind 3)
+are called with the resulting lever and are replayed, not ported. For kinds 3 and 4, when `F+0x28 != 0` or
+`F+0x6880 == 0`, the power `M+0xcc` is two curves (`0x14082b800`) of the engine speed `M+0x90`, from a bilinear
+lookup of the temperature and altitude in the runtime atmosphere table.
+
+Not ported: the four kind handlers, `0x1411a2e40`, and the callees already listed as environment (frame time, bindings,
+atmosphere queries, noise).

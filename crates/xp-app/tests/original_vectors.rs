@@ -2577,3 +2577,39 @@ fn engine_kind7_update_matches_the_original_machine_code() {
         }
     }
 }
+
+#[test]
+fn piston_engine_update_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("piston.txt");
+    assert!(cases.len() >= 50);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let state = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let f = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let e: i32 = case.header[2].parse().unwrap();
+        let inputs = u64::from_str_radix(&case.header[3], 16).unwrap();
+        for i in 0..0x803u64 * 2 {
+            let v = (0.3 + ((i * 37) % 101) as f64 / 100.0) as f32;
+            case.vm
+                .set_f32(openxplane::controls::ATMOSPHERE_TABLE + 4 * i, v);
+        }
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::piston::update_engine_piston(&mut case.vm, &mut env, state, f, e, inputs);
+        assert!(
+            env.calls.is_empty(),
+            "case {n}: {} recorded calls unused",
+            env.calls.len()
+        );
+        for (addr, want) in &case.expected {
+            let got = case.vm.u32(*addr);
+            let (g, w) = (f32::from_bits(got), f32::from_bits(*want));
+            assert!(
+                got == *want
+                    || (g.is_nan() && w.is_nan())
+                    || (g - w).abs() <= 1e-5 * (1.0 + w.abs()),
+                "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
+            );
+        }
+    }
+}
