@@ -1,7 +1,7 @@
 //! The engine helpers of [`crate::engine`] on the original's objects ([`Vm`]): the environment queries are the
 //! callees of the original (frame time, input bindings, atmosphere, random generator, fuel draw), replayed in the
 //! tests, and the engine record is a window of `0x2cc` bytes of memory.
-use crate::engine::{EngineEnv, Record, starter_timer, thrust_term};
+use crate::engine::{EngineEnv, Record, starter_ready, starter_timer, thrust_term};
 use crate::vm::{CallArgs, Callees, Vm};
 
 const FRAME_TIME_OWNER: u64 = 0x142f_018b8;
@@ -137,4 +137,16 @@ pub fn starter_delay(vm: &mut Vm, env: &mut dyn Callees, f: u64, state: u64, sta
     let effects = callees.effects;
     store_record(vm, state, &before, &record);
     apply_effects(vm, &effects);
+}
+
+/// `0x1411a2d90(F, n)`: whether engine `n` can be started; see [`starter_ready`].
+pub fn starter_ready_of(vm: &mut Vm, env: &mut dyn Callees, f: u64, n: i32) -> bool {
+    let b = vm.u64(f + 0x20);
+    let state = vm.u64(f + 0x68b0) + (i64::from(n) * 0x2cc) as u64;
+    let record = load_record(vm, state);
+    let mut callees = CalleeEnv::new(env, vm, f);
+    let ready = starter_ready(&(&*vm, b), &record, n, &mut callees);
+    let effects = callees.effects;
+    apply_effects(vm, &effects);
+    ready
 }

@@ -5,7 +5,7 @@
 use crate::callees::engine_ratio;
 use crate::controls::ATMOSPHERE_TABLE;
 use crate::engine::{curve, signed_pow};
-use crate::engine_env::{starter_delay, thrust_term_of};
+use crate::engine_env::{starter_delay, starter_ready_of, thrust_term_of};
 use crate::scalar::clamp;
 use crate::vm::{CallArgs, Callees, Vm};
 use crate::wing_element::interpolate_clamped;
@@ -309,7 +309,7 @@ fn piston_levers(
         update_engine_kind4(vm, env, m, b, f, n, x6);
     }
     if vm.i32(engine(vm)) == 3 {
-        call_void(vm, env, 0x14119cb70, x6);
+        update_engine_kind3(vm, env, m, b, f, n, x6);
     }
     if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
         let kind = vm.i32(engine(vm));
@@ -470,4 +470,147 @@ pub fn engine_ramp_limited(vm: &Vm, env: &mut dyn Callees, f: u64, n: i32) -> bo
         return false;
     }
     !bind(env, f, 0x2fb, 0) && !bind(env, f, 0x239, n)
+}
+
+/// `0x14119cb70(M, B, F, n, level)`: the kind 3 handler (a carburetted engine with a variable load): the
+/// lever limited by the starter and the throttle ramp, the manifold terms `M+0x240/0x244/0x248`, the load terms
+/// from the speed, the fuel thrust term, the integration of the engine speed `M+0x90` by the frame time, the speed
+/// ratio `M+0x98` and the power `M+0xb8`.
+pub fn update_engine_kind3(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    m: u64,
+    b: u64,
+    f: u64,
+    n: i32,
+    level: f32,
+) {
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let running = vm.i32(m + 0x74);
+    let mut level = level;
+    if running != 0 {
+        let speed = (f64::from(vm.f32(m + 0x90)) * 0.01) as f32;
+        let v0 = (f64::from(vm.f32(b + 0x9d8)) * 0.2) as f32;
+        let a0 = (f64::from(vm.f32(b + 0x9c4)) * 0.01) as f32;
+        let mut k = curve(a0, v0, 1.0, 1.0, speed, 1.75);
+        if starter_ready_of(vm, env, f, n) {
+            let d4 = vm.f32(b + 0x1a74) / vm.f32(b + 0x1a80);
+            let low = sse_min(1.0, d4);
+            let t = (d4 - 1.0) * (level - 0.0) + 1.0;
+            let mut c = if low > t {
+                low
+            } else {
+                sse_min(sse_max(1.0, d4), t)
+            };
+            c *= k;
+            if 0.0 > level {
+                level = 0.0;
+            } else if level > c {
+                level = c;
+            }
+        }
+        k = level / k;
+        let e4 = vm.f32(engine(vm) + 4);
+        let manifold =
+            (f64::from(k) * 1.05 / ((f64::from(vm.f32(m + 0x24c)) - 1.0) * 0.25 + 1.0)) as f32;
+        vm.set_f32(m + 0x244, manifold);
+        vm.set_f32(m + 0x240, manifold);
+        let x1 = (vm.f32(m + 0x25c) / e4 - 0.05) * f32::from_bits(0x3f4a1af3) + 0.25;
+        let y = if 0.25 > x1 { 0.25 } else { sse_min(1.0, x1) };
+        vm.set_f32(m + 0x248, y * manifold);
+    }
+    let r13 = running as f32 * vm.f32(m + 0x22c);
+    let feedback = vm.f32(b + 0x9d0);
+    if feedback > 0.0 && f64::from(vm.f32(m + 0x22c)) > 0.99 {
+        let t = (vm.f32(m + 0x90) / feedback - 0.5) * ((level - r13) + (level - r13)) + r13;
+        let low = sse_min(r13, level);
+        level = if low > t {
+            low
+        } else {
+            sse_min(sse_max(r13, level), t)
+        };
+    }
+    let p1 = signed_pow(level, f32::from_bits(0x3e924925));
+    let p1 = (f64::from((f64::from(p1) * 100.0) as f32) * 0.01) as f32;
+    let pw1 = signed_pow(p1, 3.5);
+    let m258 = vm.f32(m + 0x258);
+    let m90 = vm.f32(m + 0x90);
+    let mut x7 = m258 * pw1 * r13;
+    let pw2 = signed_pow((f64::from(m90) * 0.01) as f32, 3.5);
+    let a = (f64::from(vm.f32(f + 0x400)) * 0.002) as f32;
+    let mut a2 = a * a;
+    if a < 0.0 || a.is_nan() {
+        a2 = neg(a2);
+    }
+    let x5 = (f64::from(vm.f32(b + 0x9f0)) * 0.01) as f32;
+    let lo = sse_min(x5, 2.0);
+    let t = x5 - (vm.f32(m + 0x2bc) - 1.0) * (2.0 - x5);
+    let y2 = if lo > t {
+        lo
+    } else {
+        sse_min(sse_max(x5, 2.0), t)
+    };
+    let s = (f64::from(m90) * 100.0) as f32;
+    let u = if -1.0 > s { -1.0 } else { sse_min(1.0, s) };
+    let x15 = m258 * pw2 - m258 * a2 + y2 * u;
+    if bind(env, f, 0x1d1, n) {
+        let x1 = vm.f32(m + 0x90) - 10.0;
+        let low = sse_min(x7, 0.0);
+        let t = (0.0 - x7) / 10.0 * x1 + x7;
+        x7 = if low > t {
+            low
+        } else {
+            sse_min(sse_max(x7, 0.0), t)
+        };
+    }
+    if bind(env, f, 0x181, n) {
+        let t = (vm.f64(0x142f01910) * 2.0) as f32;
+        let mut a = CallArgs::ints(&[0, u64::from(n as u32)]);
+        a.xmm[0] = Some(t.to_bits());
+        a.int[0] = None;
+        let noise = reply_f32(env.call(vm, 0x1408bd9d0, a));
+        x7 = ((f64::from(noise) * 0.05 + 0.95) * f64::from(x7)) as f32;
+    }
+    if bind(env, f, 0x171, n) {
+        x7 = 0.0;
+    }
+    let start = bind(env, f, 0x1b1, n);
+    starter_delay(vm, env, f, m, start);
+    x7 *= vm.f32(m + 0x2c8);
+    let speed = (f64::from(vm.f32(m + 0x90)) * 0.01) as f32;
+    let pw = signed_pow(speed, 4.5) * vm.f32(engine(vm) + 8) / 0.95;
+    let x11 = vm.f32(m + 0x268) / sse_max(pw, 1.0);
+    let pw3 = signed_pow(speed, 2.0);
+    let x11 = if 0.0 > x11 {
+        0.0
+    } else if x11 > pw3 {
+        pw3
+    } else {
+        x11
+    };
+    let e64 = vm.f32(engine(vm) + 0x64);
+    let g = if 0.1 > e64 { 0.1 } else { sse_min(2.0, e64) };
+    let thrust = thrust_term_of(vm, env, f, n);
+    let power = thrust + g.sqrt() * x7 - x15 - x11;
+    let dt = frame_time(env);
+    let power = power / vm.f32(b + 0xa20);
+    let m78 = vm.f32(m + 0x78);
+    let integrated = (f64::from(vm.f32(m + 0x90)) + dt * f64::from(power) * 200.0) as f32;
+    let speed_new = sse_max(integrated, 0.0);
+    vm.set_f32(m + 0x90, speed_new);
+    let rated = sse_max(vm.f32(engine(vm) + 0x18), 1.0);
+    let ratio = m78 / rated;
+    let m98 = (f64::from(ratio) * 100.0) as f32;
+    let v = if -1.5 > m98 { -1.5 } else { sse_min(1.5, m98) };
+    let e64 = vm.f32(engine(vm) + 0x64);
+    let g2 = if 0.1 > e64 { 0.1 } else { sse_min(2.0, e64) };
+    let mut args = CallArgs::ints(&[b]);
+    args.xmm[1] = Some(speed_new.to_bits());
+    args.xmm[2] = Some(ratio.to_bits());
+    args.xmm[3] = Some(vm.f32(m + 0x258).to_bits());
+    let efficiency = reply_f32(env.call(vm, 0x141a6a650, args));
+    let d7 = f64::from(efficiency) - f64::from(v) * 0.01 * (1.0 - f64::from(r13));
+    vm.set_f32(m + 0x98, m98);
+    let e10 = f64::from(vm.f32(engine(vm) + 0x10));
+    vm.set_f32(m + 0xb8, (f64::from(g2.sqrt()) * (e10 * d7)) as f32);
 }

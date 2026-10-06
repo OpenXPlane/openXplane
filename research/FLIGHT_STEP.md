@@ -196,6 +196,15 @@ through `engine_env` (the environment queries are the original's callees, replay
 running engine `M+0x240/0x244/0x248` come from the lever with exponents 0.1, 5 and 3. The query mode argument of
 the binding call (2 for the first fuel cut-off test of `0x141238c20`, otherwise 1) is not modelled by `EngineEnv`.
 
-Not ported: the kind handlers for kinds 0 (`0x14119bc00`), 1 and 2 (`0x14119d380`, 1000 instructions) and 3
-(`0x14119cb70`), and the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
+The kind 3 handler `update_engine_kind3` (`0x14119cb70(M, B, F, n, level)`, 469 instructions) is ported too: for a
+running engine the lever is limited by the starter (`0x1411a2d90`, `starter_ready_of`) and the throttle curve
+(`0x1411a2bf0`, the same code as `0x14082b800`), giving the manifold terms `M+0x240/0x244/0x248`; the lever goes
+through the feedback blend on `B+0x9d0`, the 2/7 power and the 3.5 power of the speed give the load terms (with the
+`F+0x400` term, the lubrication `M+0x2bc` blend and the bindings `0x1d1`, `0x181` (noise), `0x171` (cut) and `0x1b1`
+(the starter delay)); the thrust term of the fuel supply, the friction (`M+0x268` over the 4.5 power of the speed)
+and the frame time integrate the speed `M+0x90` (200 per second per unit of power over `B+0xa20`), `M+0x98` is the
+speed ratio in percent, and `M+0xb8` is the power from the propeller curve `0x141a6a650` (replayed).
+
+Not ported: the kind handlers for kind 0 (`0x14119bc00`) and kinds 1 and 2 (`0x14119d380`, 1000 instructions), the
+propeller curve `0x141a6a650`, and the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
 the global clock).

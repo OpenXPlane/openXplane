@@ -159,7 +159,12 @@ impl Record {
 
 /// `0x1411a2d90`: the engine can be started: the aircraft allows it, the engine record has `+0x1e4` set, and
 /// neither input-binding query (`0x2fb` for index 0, `0x239` for the engine) is active.
-fn starter_ready(b: &dyn Mem, rec: &Record, index: i32, env: &mut dyn EngineEnv) -> bool {
+pub(crate) fn starter_ready(
+    b: &dyn Mem,
+    rec: &Record,
+    index: i32,
+    env: &mut dyn EngineEnv,
+) -> bool {
     if b.i32(0xaa4) == 0 || rec.i32(0x1e4) == 0 {
         return false;
     }
