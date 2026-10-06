@@ -141,3 +141,29 @@ be an input/binding state lookup (tables at `+0x55f0`, `+0xdc0`, command ids `0x
 
 Not established: what ids `0x2d9`..`0x2f0` stand for, and the final output values. Porting needs a model of the
 `0x1407ace10` state first, so this is the next reverse-engineering step.
+
+## Control-surface helper `0x141221220`: structure (second reading, not ported)
+
+The function is 0x1412212 20..0x1412234ce. About 1600 of its 2050 instructions are diagnostic output (C++ stream
+calls `0x1405e18d0`, `0x1422c675c`, `0x1422c6748`, `0x1408943e0`) that runs only when the flags at `+0xbcc8` and
+`+0xbcd0` of the object at `+0x61f8` are set; the arithmetic is the rest. Signature as called from
+`get_el_force`: `(aircraft, wing, element, code, ..., out_force_x, out_y, out_z, out_w)` with the four outputs
+accumulated by `+=` at the end (`0x1412230dd`).
+
+- Step 1: `0x141192870` (ported as `control_deflection`) gives the deflection, divided by the chord field.
+- Step 2: the binding-state queries (`0x1407ace10`) decide whether the surface is driven, setting two flags.
+- Step 3: by code the deflection becomes four additive terms:
+  - Codes `0xb`, `0xc`, `0x10..0x15`: trigonometric terms (`cos`/`sin` at `0x14230b380`/`0x14230be80`, a
+    `0x14230a740` call, a lookup on the aircraft field `+0x1f74` with values 1..5 selecting a double scale).
+  - Codes `0x14`, `0x15`: table lookups through `0x1411b1cf0` on the arrays at `+0x1f84`/`+0x1fc4`, with
+    limits (constants at `0x14253faf4`, `0x14250e1a0`), ratios against the fields `+0x1f78..+0x1f80` and
+    `+0x1fb8..+0x1fc0`.
+  - Codes `0xd`, `0xe`, `0x16`, `0x17`: a clamped term from the wing field `+0x1bc + 4i` squared, `sin` of the
+    deflection, and a double constant (`0x14253f860`).
+  - Codes `0xb`, `0xc`, `0x10..0x13`: `0x1406ea0b0` (a clamp/interpolation helper, called with four floats and a
+    fifth on the stack) scaled by the deflection and a gain chosen from `+0x1d20`/`+0x1d24`/`+0x1d28`
+    (values 0..3 select one of four constants).
+
+Not established: the meaning of each aircraft field, the helpers `0x1406ea0b0` and `0x1411b1cf0`, and all
+constants. Porting it needs an emulator harness that fills the aircraft and wing objects with plausible random
+data and compares the four outputs bit for bit.
