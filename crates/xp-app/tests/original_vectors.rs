@@ -600,6 +600,35 @@ fn geometry_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn aircraft_frame_transform_matches_the_original_machine_code() {
+    use openxplane::transform::{Frame, to_aircraft_frame};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/transform.txt"
+    ))
+    .unwrap();
+    let (mut cases, mut exact) = (0, 0);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let shift = t[0] == "1";
+        let disabled = t[1] == "1";
+        let d = |h: &str| f64::from_bits(u64::from_str_radix(h, 16).unwrap());
+        let frame = Frame {
+            origin: [d(t[2]), d(t[3]), d(t[4])],
+            rotation: [[f(t[5]), f(t[6])], [f(t[7]), f(t[8])], [f(t[9]), f(t[10])]],
+        };
+        let got = to_aircraft_frame(&frame, [f(t[11]), f(t[12]), f(t[13])], shift, disabled);
+        cases += 1;
+        exact += usize::from((0..3).all(|k| got[k].to_bits() == f(t[14 + k]).to_bits()));
+    }
+    println!("{cases} cases, exact {exact}");
+    assert_eq!(exact, cases);
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

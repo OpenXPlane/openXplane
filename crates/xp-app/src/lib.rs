@@ -2,7 +2,7 @@
 //! tests use.
 pub use xp_acf::{Aircraft, Property, aircraft, reference_candidates, wing};
 pub use xp_airfoil::{
-    aero, airfoil, buffet, element_force, profile, regimes, runtime, stall, wing_element,
+    aero, airfoil, buffet, element_force, profile, regimes, runtime, stall, transform, wing_element,
 };
 pub use xp_dataref::{commands, dataref, keymap};
 pub use xp_discord as discord;

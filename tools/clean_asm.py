@@ -52,11 +52,18 @@ def main():
         while s > 0 and c[0] - s < 6 and not ins[s - 1][1].startswith(('j', 'callq', 'cmp')):
             s -= 1
         skip.update(range(s, c[-1] + 1))
-    noise = re.compile(r'^leaq .*# 0x142f05e60|^cmpl \$0x0, 0xbc[cd][08]\(|^j(ne|e) 0x[0-9a-f]+$')
+    dbg = re.compile(r'^cmpl \$0x0, 0xbc[cd][08]\(')
     for i, (a, t) in enumerate(ins):
-        if i not in skip and not noise.search(t):
-            print(f'{a:x}: {t}')
-
+        if i in skip:
+            continue
+        if re.search(r'^leaq .*# 0x142f05e60', t):
+            continue
+        if dbg.search(t):
+            skip_jump = True
+            continue
+        if re.match(r'^j(ne|e) 0x[0-9a-f]+$', t) and i > 0 and dbg.search(ins[i - 1][1]):
+            continue
+        print(f'{a:x}: {t}')
 
 if __name__ == '__main__':
     main()
