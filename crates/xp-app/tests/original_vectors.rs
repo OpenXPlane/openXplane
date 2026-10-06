@@ -2712,3 +2712,23 @@ fn engine_start_state_matches_the_original_machine_code() {
         words_match(&case, n);
     }
 }
+
+#[test]
+fn wing_aspect_pass_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_aspect.txt");
+    assert!(cases.len() >= 20);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::wing_aspect_pass(&mut case.vm, &mut env, f)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert!(
+            env.calls.is_empty(),
+            "case {n}: {} recorded calls unused",
+            env.calls.len()
+        );
+        words_match(&case, n);
+    }
+}

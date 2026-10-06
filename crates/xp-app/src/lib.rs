@@ -3,8 +3,8 @@
 pub use xp_acf::{Aircraft, Property, aircraft, reference_candidates, wing};
 pub use xp_airfoil::{
     aero, airflow, airfoil, atmosphere, buffet, callees, controls, element_force, engine,
-    engine_env, forces, fuel, piston, profile, prop, regimes, runtime, scalar, stall, transform,
-    vm, wing_element,
+    engine_env, flight_step, forces, fuel, piston, profile, prop, regimes, runtime, scalar, stall,
+    transform, vm, wing_element,
 };
 pub use xp_dataref::{commands, dataref, keymap};
 pub use xp_discord as discord;
