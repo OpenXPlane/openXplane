@@ -18,6 +18,7 @@ Lines:
   X0..X3 off=word               initial words of the element records F[0x68e0 + b*0x18] (3 records of 0x2d8)
   L e retain ice x1 x2 x3 | out1 out2 out3 x4[4] x1bc stall   the get_el_force call (stubbed)
   J gate (double hex)           the double at 0x142f01920
+  h idx mode ret / a i ret / c n ret / m mask value   the held-back, limit and blend callees (stubbed)
   U n ratio                     the 0x1408154c0 answer (engine ratio, stubbed)
   K id arg                      the ground-strike event call (stubbed 0x1407cdce0)
   Z id                          the global 0x142f2e3dc (the recorded id)
@@ -42,7 +43,7 @@ XMM = {6: UC_X86_REG_XMM6, 7: UC_X86_REG_XMM7, 8: UC_X86_REG_XMM8, 9: UC_X86_REG
        11: UC_X86_REG_XMM11, 12: UC_X86_REG_XMM12, 13: UC_X86_REG_XMM13, 14: UC_X86_REG_XMM14, 15: UC_X86_REG_XMM15}
 
 ENTRY = 0x1411bd470
-CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82, 6: 0x1411c1935, 7: 0x1411c2145, 8: 0x1411c22ba, 9: 0x1411c2d35}
+CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82, 6: 0x1411c1935, 7: 0x1411c2145, 8: 0x1411c22ba, 9: 0x1411c2d35, 10: 0x1411c32b6, 11: 0x6e0000000000}
 NOISE_TABLE = 0x14578f1f0
 EXE = sys.argv[1]
 SEGMENT, TRIALS, SEED = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
@@ -169,6 +170,33 @@ def main():
         e.uc.reg_write(UC_X86_REG_XMM0, struct.unpack('<I', struct.pack('<f', v))[0])
         log.append(f'U {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {struct.unpack("<I", struct.pack("<f", v))[0]:08x}')
 
+    def hx(v):
+        return f'{struct.unpack("<I", struct.pack("<f", v))[0]:08x}'
+
+    def stub_held(e):
+        ret = fz.rng.randrange(2)
+        e.uc.reg_write(UC_X86_REG_RAX, ret)
+        log.append(f'h {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {e.uc.reg_read(UC_X86_REG_R8) & 0xffffffff} {ret}')
+
+    def stub_limit_a(e):
+        ret = fz.rng.randrange(2)
+        e.uc.reg_write(UC_X86_REG_RAX, ret)
+        log.append(f'a {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {ret}')
+
+    def stub_limit_b(e):
+        ret = fz.rng.randrange(2)
+        e.uc.reg_write(UC_X86_REG_RAX, ret)
+        log.append(f'c {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {ret}')
+
+    def stub_blend(e):
+        v = fz.rng.uniform(0, 1)
+        e.uc.reg_write(UC_X86_REG_XMM0, struct.unpack('<I', struct.pack('<f', v))[0])
+        log.append(f'm {e.uc.reg_read(UC_X86_REG_RDX) & 0xffffffff} {hx(v)}')
+
+    emu.stubs[0x1411d9f60] = stub_held
+    emu.stubs[0x1411a0900] = stub_limit_a
+    emu.stubs[0x141218060] = stub_limit_b
+    emu.stubs[0x1411daa80] = stub_blend
     emu.stubs[0x1408154c0] = stub_ratio
     emu.stubs[0x1407cdce0] = stub_strike
     emu.stubs[0x141219d90] = stub_record
@@ -192,10 +220,11 @@ def main():
         E = emu.alloc(0x68 * 3)
         X = [emu.alloc(0x2d8 * 3) for _ in range(4)]
         Yr = emu.alloc(0x388 * 3)
+        Mr = emu.alloc(0x2cc * 4)
         P = emu.alloc(0x3770 * 3)
         R = emu.alloc(0x2000)
         for name, addr, size in [('F', F, 0x44000), ('B', B, 0x7000), ('E', E, 0x68 * 3), ('P', P, 0x3770 * 3),
-                                 ('R', R, 0x2000)] + [(f'X{i}', X[i], 0x2d8 * 3) for i in range(4)] + [('N', Yr, 0x388 * 3)]:
+                                 ('R', R, 0x2000)] + [(f'X{i}', X[i], 0x2d8 * 3) for i in range(4)] + [('N', Yr, 0x388 * 3), ('M', Mr, 0x2cc * 4)]:
             fz.region(name, addr, size)
             emu.write(addr, bytes(size))
         n = fz.rng.randrange(3)
@@ -205,6 +234,8 @@ def main():
         fz.preset('B', 0x5ffc, E >> 32, record=False)
         fz.preset('B', 0x6010, P & 0xffffffff, record=False)
         fz.preset('B', 0x6014, P >> 32, record=False)
+        fz.preset('F', 0x68b0, Mr & 0xffffffff, record=False)
+        fz.preset('F', 0x68b4, Mr >> 32, record=False)
         fz.preset('F', 0x68c8, Yr & 0xffffffff, record=False)
         fz.preset('F', 0x68cc, Yr >> 32, record=False)
         gate = fz.rng.choice([0.5, 1.5, 3.0])
@@ -242,7 +273,7 @@ def main():
         rbp = entry_rsp - 0x8c8
         init = fz.initial()
         out = [f'T {n} {early} {flag["v"]}', f'Z {recording}', f'J {struct.unpack("<Q", struct.pack("<d", gate))[0]:016x}']
-        for name in ('F', 'B', 'E', 'P', 'R', 'X0', 'X1', 'X2', 'X3', 'N'):
+        for name in ('F', 'B', 'E', 'P', 'R', 'X0', 'X1', 'X2', 'X3', 'N', 'M'):
             out.append(f'{name} {words(init[name])}')
         out.extend(log)
         wr = fz.written()

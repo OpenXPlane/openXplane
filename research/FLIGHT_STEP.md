@@ -105,3 +105,27 @@ ulps of libm.
 - Loop structure of the original: an outer loop over the `P+0x8c` span elements `k` (frame slot `0x8d8`) and an inner
   loop of 4 azimuth positions (`inner * pi/2`, frame slots `8` and `0x30`).
 - Not ported yet: the code after the loop (`0x1411c22c9..0x1411c3531`) and the wash function `0x14117d970`.
+
+### The propeller force function: complete (`prop::prop_force`)
+
+All of `0x1411bd470` is now ported (`crates/xp-airfoil/src/prop.rs`) and compared with the original running to the end
+on random objects (`prop_force_matches_the_original_machine_code_to_the_end`, 120 trials; the segment tests compare
+each stage at its checkpoint). Every written word of `R` (the output record), `F` (the propeller force and moment
+totals `F+0x2bc/0x2d0/0x2e4` and `F+0x2f8/0x310/0x328`), the element-state records `X`, the strike record `N` and every
+frame slot the port models match the original (float words up to a few ulps of libm).
+
+Stages added after the loop:
+
+- Segment 9 (the post-loop section, up to `0x1411c2d35`): the lag of `R+0x84`, the thrust-vector clamp of
+  `R+0x48/0x4c` and the limit logic against `B+0x2094/0x2098` (the event calls `0x1f9`/`0x209`), the moment terms
+  added to `F+0x2f8/0x310/0x328` from the sums of the loop, with the two branches selected by the lever flag.
+- Segment 10 (`0x1411c32b6`): the output record `R+0x14..0x88` (efficiency-like ratios, the angle of the wind in the
+  disc `atan2`, the six factors of `R+0x5c`..`0x80`).
+- Segment 11 (the end): the pitch-limit force term of `R+0x64` from the engine record list at `F[0x68b0]`.
+
+Callees that are replayed from the original and not yet ported: the airflow wash `0x14117d970` (18 KB), the wind
+sampler `0x141ba80a0`, the terrain probe `0x14195f4b0`, the element force's profile callbacks (the function itself
+is `element_force`), `0x1407cdce0` (an event queue), `0x1408154c0`, `0x1411a0900`, `0x141218060`, `0x1411daa80`,
+`0x141219d90` (the pass record log) and the input-binding queries behind `0x1411d9f60`. The debug stream dump that
+the original performs when `F+0xbcc8/0xbcd0` are nonzero is not ported (the vectors keep both zero). The 2-D noise
+table `0x14578f1f0` is generated at run time; the vectors fill it with a fixed pseudo-random sequence.

@@ -24,6 +24,14 @@ const ABS: u32 = 0x7fff_ffff;
 /// The double `0.7071` of the original (not exactly the square root of one half).
 const ROOT_HALF: f64 = f64::from_bits(0x3fe6_a090_2de0_0d1b);
 
+fn sqrt_or_nan(x: f32) -> f32 {
+    if 0.0 > x { f32::NAN } else { x.sqrt() }
+}
+
+fn max_ss(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
 fn neg(v: f32) -> f32 {
     f32::from_bits(v.to_bits() ^ 0x8000_0000)
 }
@@ -78,6 +86,14 @@ pub trait PropEnv: AirflowEnv {
     fn event(&mut self, id: i32, arg: i32);
     /// `0x1408154c0(B, n)`: the ratio of engine record `n` (clamped) to the part record (not ported).
     fn engine_ratio(&mut self, n: i32) -> f32;
+    /// `0x1411d9f60(F, index, mode)`: [`crate::engine::engine_held_back`] on the input bindings (not wired here).
+    fn held_back(&mut self, index: i32, mode: i32) -> bool;
+    /// `0x1411a0900(F+0xbce0, i)` (not ported).
+    fn limit_a(&mut self, i: i32) -> bool;
+    /// `0x141218060(F+0xbce0, n)` (not ported).
+    fn limit_b(&mut self, n: i32) -> bool;
+    /// `0x1411daa80(F+0xbdd8, mask)`: a blend factor of the three components selected by `mask` (not ported).
+    fn blend(&mut self, mask: i32) -> f32;
     /// The global at `0x142f2e3dc`: the identifier that `F+0x28` is compared with to decide whether the pass
     /// is recorded.
     fn recording_id(&mut self) -> i32;
@@ -120,6 +136,10 @@ pub struct Objects<'a> {
     pub r: &'a mut Words,
     /// The element-state record of engine `n` for each station `b` (`F[0x68e0 + b*0x18] + n*0x2d8`).
     pub x: &'a mut [Words],
+    /// The engine record table at `B+0x5ff8` (absolute offsets: the first record is read at `+0xc`).
+    pub e_table: &'a Words,
+    /// The engine record array at `F[0x68b0]` (stride `0x2cc`, absolute offsets).
+    pub m: &'a Words,
     /// The strike record of engine `n` (`F[0x68c8] + n*0x388`), re-based to the record.
     pub y: &'a mut Words,
 }
@@ -145,6 +165,10 @@ pub enum Stop {
     Segment8,
     /// After the limit code of the post-loop section, at the join `0x1411c2d35`.
     Segment9,
+    /// After the output record is filled (`R+0x14..0x88`), at `0x1411c32b6`.
+    Segment10,
+    /// The end of the function.
+    End,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original, low 32 bits), for checkpoints. Only
@@ -179,6 +203,7 @@ pub fn prop_force(
 ) -> Result<(Frame, Regs), String> {
     let (f, b, e, p, r) = (&mut *o.f, o.b, o.e, o.p, &mut *o.r);
     let xs = &mut *o.x;
+    let (e_table, engine_records) = (o.e_table, o.m);
     let y = &mut *o.y;
     let mut fr = Frame::default();
     // 0x1411bd4da..0x1411bd54e
@@ -1315,5 +1340,174 @@ pub fn prop_force(
     if stop == Stop::Segment9 {
         return Ok((fr, regs));
     }
-    Err("post-loop code not ported".into())
+    // ---- segment 10: the output record R+0x14..0x88 ----
+    let lo = f32::from_bits(0xbc23d70a);
+    let hi = f32::from_bits(0x3c23d70a);
+    if kind_is_3_or_7(p.i32(0)) {
+        let x6l = r.f32(0x1c);
+        let x0 = r.f32(0x60) - p.f32(0x14);
+        x15 = hi;
+        x9 = lo;
+        x8 = snap(x0, x9, x15);
+        let half_count = p.i32(0x8c) / 2;
+        let values_x: Vec<f32> = (0..=elements.max(0) as usize)
+            .map(|i| p.f32(0x88 + 0x5bc + 4 * i))
+            .collect();
+        let bx = boundary_at(&values_x, elements, half_count as f32);
+        let x6sq = x6l * x6l;
+        let t = bx * x6sq * p.f32(0x14);
+        x6 = snap(t, x9, x15);
+        let dt = env.frame_time();
+        x7 = dt as f32;
+        x8 /= x6;
+        let a = clamp(
+            x8.atan(),
+            f32::from_bits(0xbe0efa36),
+            f32::from_bits(0x3e0efa36),
+        );
+        r.set_f32(0x70, lerp(r.f32(0x70), a, x7));
+    } else {
+        if b.i32(0xa78) != 0 {
+            let dt = env.frame_time();
+            x6 = dt as f32;
+            let ratio = b.f32(0x9f4) / p.f32(0x20);
+            let a = interpolate_clamped(0.0, f32::from_bits(0xbfc90fdc), ratio, 0.0, r.f32(0x1c));
+            r.set_f32(0x70, lerp(r.f32(0x70), a, x6));
+        } else {
+            r.set_i32(0x70, 0);
+        }
+        x15 = hi;
+    }
+    x13 = r.f32(0x1c);
+    x7 = x13 * r.f32(0x64);
+    x8 = fr.f(0xe0) * f.f32(0x400);
+    x6 = lo;
+    x8 /= snap(x7, x6, x15);
+    r.set_f32(0x68, x8);
+    let d0 = snap(fr.f(0xe4), x6, x15);
+    x11 = fr.f(-0x10);
+    r.set_f32(0x78, fr.f(0xe8) / d0 / x11);
+    r.set_f32(0x7c, fr.f(0xec) / d0 / x11);
+    x11 = r.f32(0x84);
+    x8 = fr.f(0x118) / max_ss(fr.f(0x10c), x15);
+    r.set_f32(0x58, x8);
+    let y0 = (f64::from(neg(x11)) * 0.5) as f32 + neg(fr.f(-0x18));
+    x6 = y0.atan2(fr.f(0x8e8)) * DEG;
+    r.set_f32(0x54, x6);
+    x9 = interpolate_clamped(0.0, 0.0, 15.0, x10, x8);
+    let g2898 = b.f32(0x2898) * f32::from_bits(0x411cc5c1);
+    x8 = f.f32(0x2d0) / g2898;
+    x6 = abs(x6);
+    let t = sqrt_or_nan(interpolate_clamped(0.0, x10, 30.0, 0.0, x6));
+    x9 *= x9;
+    x8 *= x8;
+    r.set_f32(0x5c, t * x9 * x8);
+    let m = max_ss(abs(fr.f(0x114)), fr.f(0x10));
+    fr.set(0x10, fr.f(0x10) / m);
+    let x12d = f64::from(x11) * 0.5;
+    x10 = r.f32(0x60);
+    x8 = abs(x10);
+    let f6c = f64::from(f.f32(0x6c));
+    let x1m = max_ss(((f6c + f6c) * f64::from(p.f32(0x4c))) as f32, x15);
+    x6 = sqrt_or_nan(x8 / x1m);
+    let p3730 = p.f32(0x3730);
+    fr.set(0x8d8, p3730);
+    x9 = x13 * p3730;
+    let x15d = f64::from(x6);
+    let x13d = x15d + x15d;
+    let x1w = (f64::from(fr.f(-0x18)) + x12d) as f32;
+    fr.set(0x8e8, x1w);
+    let x2a = abs(x1w);
+    r.set_f32(0x14, x7);
+    x8 *= x2a;
+    r.set_f32(0x6c, x8 / max_ss(x7, hi));
+    let x12a = abs(x12d as f32);
+    x7 = abs(x7 - x8);
+    let x3 = (f64::from(x7) * 0.5) as f32;
+    x7 = hi;
+    let x1b = max_ss(p.f32(0x4c) * f.f32(0x6c) * x2a, x7);
+    let sq = sqrt_or_nan(x3 / x1b);
+    let mut x3c = clamp(sq / f32::from_bits(0x3f594caf), 0.0, x12a);
+    x3c *= f32::from_bits(0x3f00_0000);
+    let mut x2d = f64::from(r.f32(0x1c)) * x13d;
+    x2d *= f64::from(fr.f(0x8d8));
+    x2d *= x15d;
+    x6 *= x6;
+    x9 *= x9;
+    x6 += x9;
+    x6 = max_ss(x6, x7);
+    let x2f = (x2d / f64::from(x6)) as f32;
+    let x4 = fr.f(0x10);
+    let x0s = (f64::from(x4) * x13d) as f32;
+    let x2g = x2f + x0s;
+    let x1f = ((f64::from(x2g) * 0.25) as f32) * f32::from_bits(0x3e80_0000);
+    x11 *= x4;
+    let x0h = ((f64::from(x11) * 0.5 / f64::from_bits(0x3feb_2995_e000_0000)) as f32)
+        * f32::from_bits(0x3e80_0000);
+    let x1g = x1f + x0h;
+    x3c += x1g;
+    x3c *= p.f32(0xc);
+    r.set_f32(0x80, x3c);
+    x6 = fr.f(-0x18);
+    let sg = sign(x6);
+    x10 = neg(x10);
+    x6 *= x6;
+    x6 *= f.f32(0x6c);
+    let x2h = ((f64::from(x6) * 0.5) as f32) * p.f32(0x4c);
+    x10 /= max_ss(x2h, x7);
+    r.set_f32(0x74, sg * x10);
+    r.set_f32(0x88, fr.f(0x8e8));
+    let mut regs = Regs::with(&[], 0);
+    regs.r15 = None;
+    if stop == Stop::Segment10 {
+        return Ok((fr, regs));
+    }
+    // ---- segment 11: the pitch-limit force term and the end ----
+    let blend_flag = |cond: bool| f64::from(i32::from(cond) as f32);
+    let flag1 = f.i32(0x651c) != 0 && kind_is_3_or_7(p.i32(0));
+    let edi = b.i32(0xe80);
+    let x0 = env.blend(edi);
+    let quarter = 0.25f64;
+    let mut x2d = blend_flag(flag1) * quarter;
+    x2d *= f64::from(f.f32(0x653c));
+    x6 = (f64::from(x0) * x2d) as f32;
+    let flag2 = f.i32(0x6520) != 0 && p.i32(8) != 0;
+    let x0 = env.blend(edi);
+    let mut x2d = blend_flag(flag2) * 0.5;
+    x2d *= f64::from(f.f32(0x6540));
+    x7 = (f64::from(x0) * x2d) as f32;
+    x7 += x6;
+    if x7 > 0.0 {
+        x7 *= e_table.f32(0xc);
+        x7 *= p.f32(0x20);
+        x7 *= b.i32(0x91c) as f32;
+        x7 /= b.i32(0x920) as f32;
+        x8 = sign(r.f32(0x1c)) * p.f32(0x18);
+        x8 *= (1.0 / env.frame_time()) as f32;
+        x6 = neg(r.f32(0x64));
+        if b.i32(0xb78) > 0 {
+            fr.set_i(0x8d8, n);
+            fr.set_i(0x8dc, 0);
+        }
+        for pass in 0..b.i32(0xb78) {
+            for station in 0..b.i32(0x91c) {
+                if b.i32(0xb7c + 4 * station as usize) == pass
+                    && b.i32(0xbbc + 4 * n as usize) == pass
+                    && env.held_back(station, 3)
+                    && env.held_back(n, 1)
+                    && env.limit_a(station)
+                    && env.limit_b(n)
+                {
+                    x6 += engine_records.f32(station as usize * 0x2cc + 0xb8);
+                }
+            }
+        }
+        if r.f32(0x1c) != 0.0 || r.f32(0x1c).is_nan() {
+            x6 = x8;
+        }
+        r.set_f32(0x64, clamp(x6, neg(x7), x7) + r.f32(0x64));
+    }
+    let mut regs = Regs::with(&[], 0);
+    regs.r15 = None;
+    Ok((fr, regs))
 }
