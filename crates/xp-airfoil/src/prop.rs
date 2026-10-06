@@ -8,7 +8,7 @@
 //!
 //! The debug dump the original performs when the object at `F+0xbcc8` is nonzero (a stream write of values)
 //! is not ported.
-use crate::airflow::airflow;
+use crate::airflow::{AirflowEnv, airflow};
 use crate::engine::signed_pow;
 use crate::forces::Words;
 use crate::scalar::{clamp, kind_is_3_or_7, lerp, max3, sign, snap};
@@ -42,11 +42,9 @@ impl Frame {
 }
 
 /// The callees outside this port.
-pub trait PropEnv {
+pub trait PropEnv: AirflowEnv {
     /// `0x1417f12c0`: the engine flag that disables the origin offsets.
     fn engine_flag(&mut self) -> bool;
-    /// `0x141ba80a0`: the wind at a world position.
-    fn wind(&mut self, x: f64, y: f64, z: f64) -> [f32; 3];
     /// `0x140c448c0`: the time step in seconds (a per-thread constant divided by a per-thread integer).
     fn frame_time(&mut self) -> f64;
     /// `0x140c81ea0(&0x142f01928)`: a double derived from the simulation time (used for the turbulence phase).
@@ -77,6 +75,8 @@ pub enum Stop {
     Segment2,
     /// First pass of the loop, before the second airflow call at `0x1411bf1c8`.
     Segment3,
+    /// First pass, before the `get_el_force` call at `0x1411bfc91`.
+    Segment4,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original, low 32 bits), for checkpoints. Only
@@ -142,7 +142,7 @@ pub fn prop_force(
     // 0x1411bd638: the airflow at the part's point
     let point = [p.f32(0x790), p.f32(0x794), p.f32(0x798)];
     let flag = env.engine_flag();
-    let wind = airflow(f, point, flag, |x, y, z| env.wind(x, y, z))?;
+    let wind = airflow(f, point, flag, env, false)?;
     fr.set(0x84, wind[0]);
     fr.set(0x8e8, wind[1]);
     fr.set(0x8d8, wind[2]);
@@ -675,6 +675,91 @@ pub fn prop_force(
         r15,
     );
     if stop == Stop::Segment3 {
+        return Ok((fr, regs));
+    }
+    // ---- segment 4: the second airflow call (with the wash adjustment) to the call of get_el_force ----
+    let flag = env.engine_flag();
+    let wind2 = airflow(f, [fr.f(0x108), x13, x15], flag, env, true)?;
+    let sf = fr.f(0x38);
+    fr.set(0x60, wind2[0] * sf);
+    fr.set(0x64, wind2[1] * sf);
+    fr.set(0x68, wind2[2] * sf);
+    let (c4, s4) = ((p.f32(0x7a4) * RAD).cos(), (p.f32(0x7a4) * RAD).sin());
+    let (ca, sa) = ((p.f32(0x7a0) * RAD).cos(), (p.f32(0x7a0) * RAD).sin());
+    let (c9, s9) = ((p.f32(0x79c) * RAD).cos(), (p.f32(0x79c) * RAD).sin());
+    let (v60, v64, v68) = (fr.f(0x60), fr.f(0x64), fr.f(0x68));
+    let w4 = v60 * c9 + v68 * s9;
+    let w3 = v68 * c9 - v60 * s9;
+    let w2 = sa * w3 + v64 * ca;
+    x6 = c4 * w4 - s4 * w2;
+    x10 = c4 * w2;
+    x9 = s4 * w4;
+    x10 += x9;
+    x15 = ca * w3 - v64 * sa;
+    fr.set(-8, x15);
+    x8 = x15 + r.f32(0x1e4 + 4 * rdi);
+    x9 = fr.f(0x120);
+    let hyp = (fr.f(0x78) * fr.f(0x78) + x9 * x9).sqrt();
+    let x2p = p.f32(0xc);
+    x10 *= x11;
+    x10 *= x2p;
+    let x1 = fr.f(4);
+    x6 *= x1;
+    x6 *= x2p;
+    x10 -= x6;
+    x10 += hyp * r.f32(0x1c);
+    x6 = r.f32(0xc) + p.f32(0x88 + 0x16c + 4 * k as usize);
+    if r15 != 0 {
+        let x0 = x1 * r.f32(0x3c) * x2p;
+        x6 -= x0;
+        let x1b = x11 * r.f32(0x38) * x2p;
+        x6 += x1b;
+    }
+    x7 = x8.atan2(x10) * DEG;
+    xs[inner as usize].set_f32(0x194 + 4 * k as usize, x7);
+    let mut x2q = (x10 * x10 + x8 * x8).sqrt();
+    x2q *= fr.f(0x18);
+    xs[inner as usize].set_f32(0x54 + 4 * k as usize, x2q);
+    let mut x1w = x6 - x7;
+    if -180.0 > x1w {
+        loop {
+            x1w += 360.0;
+            if !(-180.0 > x1w) {
+                break;
+            }
+        }
+    }
+    if x1w > 180.0 {
+        loop {
+            x1w += -360.0;
+            if !(x1w > 180.0) {
+                break;
+            }
+        }
+    }
+    xs[inner as usize].set_f32(0x2c + 4 * k as usize, x1w);
+    if 90.0 > abs(x1w) {
+        x2q *= x2q;
+        fr.set(0x10c, fr.f(0x10c) + x2q);
+        x1w *= x2q;
+        fr.set(0x118, fr.f(0x118) + x1w);
+    }
+    x12 = fr.f(0x78);
+    let regs = Regs::with(
+        &[
+            (6, x6),
+            (7, x7),
+            (8, x8),
+            (9, x9),
+            (10, x10),
+            (11, x11),
+            (12, x12),
+            (13, x13),
+            (15, x15),
+        ],
+        r15,
+    );
+    if stop == Stop::Segment4 {
         return Ok((fr, regs));
     }
     Err("rest of the loop not ported".into())

@@ -7,7 +7,8 @@
 //! non-finite value by zero.
 //!
 //! The original's last argument switches on a call of `0x14117d970` (18 KB), which is
-//! not ported (the caller passes zero there). The eighth argument of the frame transform is `r12d`, which the
+//! not ported: it is an environment call (`wash`, given the point and the three results, it returns the adjusted
+//! results). The eighth argument of the frame transform is `r12d`, which the
 //! function's first finite check clears (`xorl %r12d, %r12d` at `0x14121b735`) whatever the caller had in the
 //! register, so the origin offsets are never subtracted from the wind.
 use crate::element_force::Mem;
@@ -25,6 +26,15 @@ fn in_range(v: f32) -> bool {
     !below && !above
 }
 
+/// The callees of [`airflow`] that are outside this port.
+pub trait AirflowEnv {
+    /// `0x141ba80a0`: the wind at a world position (the three floats it stores).
+    fn wind(&mut self, x: f64, y: f64, z: f64) -> [f32; 3];
+    /// `0x14117d970`: adjusts the three results in place, given the point `[x, z, y]` (only when the last
+    /// argument of the original is nonzero).
+    fn wash(&mut self, point: [f32; 3], out: [f32; 3]) -> [f32; 3];
+}
+
 /// Results: the three velocity components in the aircraft frame (the original's `r14`, `rsi`, `rdi` outputs).
 /// `origin_disabled` is the engine flag tested by `0x1417f12c0`; `wind(x, y, z)` is the sampler `0x141ba80a0`
 /// for the world position and returns the three floats it stores (`+0xd8`, `+0xe8`, `+0xd0` of the frame).
@@ -32,7 +42,8 @@ pub fn airflow(
     f: &dyn Mem,
     point: [f32; 3],
     origin_disabled: bool,
-    wind: impl FnOnce(f64, f64, f64) -> [f32; 3],
+    env: &mut dyn AirflowEnv,
+    wash: bool,
 ) -> Result<[f32; 3], &'static str> {
     let [x, z, y] = point;
     let (a, b, c) = (f64::from(x), f64::from(z), f64::from(y));
@@ -56,7 +67,7 @@ pub fn airflow(
         checked(f.f32(0x36c)),
         checked(f.f32(0x370)),
     ];
-    let w = wind(world_x, world_y, world_z);
+    let w = env.wind(world_x, world_y, world_z);
     if !(in_range(w[0]) && in_range(w[1]) && in_range(w[2])) {
         return Err("wind outside the accepted range");
     }
@@ -79,5 +90,10 @@ pub fn airflow(
     let out1 = o1 - z * rx + y * rz;
     let out2 = y * ry + o2 + x * rx;
     let out3 = o3 - z * ry - x * rz;
-    Ok([checked(out1), checked(out2), checked(out3)])
+    let mut out = [checked(out1), checked(out2), checked(out3)];
+    if wash {
+        // 0x14117d970 (not ported) adjusts the three results in place; they are checked again afterwards
+        out = env.wash([x, z, y], out).map(checked);
+    }
+    Ok(out)
 }

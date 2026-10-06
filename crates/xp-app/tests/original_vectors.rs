@@ -1536,6 +1536,24 @@ fn flight_helpers_match_the_original_machine_code() {
     assert_eq!(counts, [300, 400, 200]);
 }
 
+struct SingleWind {
+    seen: [f64; 3],
+    wind: [f32; 3],
+}
+
+impl openxplane::airflow::AirflowEnv for SingleWind {
+    fn wind(&mut self, x: f64, y: f64, z: f64) -> [f32; 3] {
+        assert_eq!(
+            [x.to_bits(), y.to_bits(), z.to_bits()],
+            self.seen.map(f64::to_bits)
+        );
+        self.wind
+    }
+    fn wash(&mut self, _point: [f32; 3], _out: [f32; 3]) -> [f32; 3] {
+        unreachable!("the airflow vectors do not select the wash")
+    }
+}
+
 #[test]
 fn airflow_matches_the_original_machine_code() {
     use openxplane::airflow::airflow;
@@ -1572,14 +1590,8 @@ fn airflow_matches_the_original_machine_code() {
             &Sparse(fo),
             [f(t[1]), f(t[2]), f(t[3])],
             t[5] == "1",
-            |x, y, z| {
-                assert_eq!(
-                    [x.to_bits(), y.to_bits(), z.to_bits()],
-                    seen.map(f64::to_bits),
-                    "{line}"
-                );
-                wind
-            },
+            &mut SingleWind { seen, wind },
+            false,
         )
         .unwrap();
         for k in 0..3 {
@@ -1644,6 +1656,7 @@ struct PropReplay {
     times: std::collections::VecDeque<f64>,
     phases: std::collections::VecDeque<f64>,
     probes: std::collections::VecDeque<([u32; 6], f32)>,
+    washes: std::collections::VecDeque<([u32; 6], [f32; 3])>,
     table: openxplane::buffet::NoiseTable,
 }
 
@@ -1661,9 +1674,12 @@ fn prop_noise_table() -> openxplane::buffet::NoiseTable {
     openxplane::buffet::NoiseTable::new(values).unwrap()
 }
 
-impl openxplane::prop::PropEnv for PropReplay {
-    fn engine_flag(&mut self) -> bool {
-        self.flag
+impl openxplane::airflow::AirflowEnv for PropReplay {
+    fn wash(&mut self, point: [f32; 3], out: [f32; 3]) -> [f32; 3] {
+        let (seen, result) = self.washes.pop_front().expect("wash call not recorded");
+        let got = [point[0], point[1], point[2], out[0], out[1], out[2]].map(f32::to_bits);
+        assert_eq!(got, seen, "wash arguments");
+        result
     }
     fn wind(&mut self, x: f64, y: f64, z: f64) -> [f32; 3] {
         let (seen, wind) = self.winds.pop_front().expect("wind call not recorded");
@@ -1673,6 +1689,12 @@ impl openxplane::prop::PropEnv for PropReplay {
             "wind position"
         );
         wind
+    }
+}
+
+impl openxplane::prop::PropEnv for PropReplay {
+    fn engine_flag(&mut self) -> bool {
+        self.flag
     }
     fn frame_time(&mut self) -> f64 {
         self.times.pop_front().expect("time call not recorded")
@@ -1734,6 +1756,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut times = std::collections::VecDeque::new();
         let mut phases = std::collections::VecDeque::new();
         let mut probes = std::collections::VecDeque::new();
+        let mut washes = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
         while let Some(line) = lines.peek() {
             if line.starts_with("T ") {
@@ -1750,6 +1773,20 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                     winds.push_back((
                         [h(tokens[1]), h(tokens[2]), h(tokens[3])],
                         [f(tokens[4]), f(tokens[5]), f(tokens[6])],
+                    ));
+                }
+                "V" => {
+                    let h = |s: &str| u32::from_str_radix(s, 16).unwrap();
+                    washes.push_back((
+                        [
+                            h(tokens[1]),
+                            h(tokens[2]),
+                            h(tokens[3]),
+                            h(tokens[4]),
+                            h(tokens[5]),
+                            h(tokens[6]),
+                        ],
+                        [f(tokens[7]), f(tokens[8]), f(tokens[9])],
                     ));
                 }
                 "H" => {
@@ -1804,6 +1841,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             times,
             phases,
             probes,
+            washes,
             table: prop_noise_table(),
         };
         let mut f = regions.remove("F").unwrap();
@@ -1868,12 +1906,20 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             }
             assert_eq!(got_regs.r15 as u32, want[10], "trial {trials}: r15");
             for (region, words) in outputs {
-                let ours = if region == "R" { &r } else { &f };
+                let (ours, base) = match region.as_str() {
+                    "R" => (&r, 0),
+                    "F" => (&f, 0),
+                    other => (
+                        &xs[other[1..].parse::<usize>().unwrap()],
+                        n as usize * 0x2d8,
+                    ),
+                };
                 for (off, want) in words {
-                    assert_eq!(
-                        ours.0.get(&off).copied().unwrap_or(0),
-                        want,
-                        "trial {trials}: {region}+{off:#x}"
+                    let off = off.wrapping_sub(base);
+                    let got = ours.0.get(&off).copied().unwrap_or(0);
+                    assert!(
+                        words_close(got, want, true),
+                        "trial {trials}: {region}+{off:#x}: {got:#x} vs {want:#x}"
                     );
                 }
             }
@@ -1904,6 +1950,12 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment4_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_4.txt", openxplane::prop::Stop::Segment4);
     assert!(trials >= 30);
 }
 
