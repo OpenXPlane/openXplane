@@ -618,3 +618,101 @@ pub fn apply_engine_thrust(vm: &mut Vm, state: u64, f: u64, e: i32) {
     crate::callees::add_normal_force(vm, f, x12, p0, p2);
     crate::callees::add_axial_force(vm, f, x13, p0, p1);
 }
+
+/// The address of the runtime atmosphere table (pairs of floats, 0x803 entries) that `0x14119a570` reads.
+pub const ATMOSPHERE_TABLE: u64 = 0x1_4612_bd90;
+
+/// `0x14119a570(M, F, e)`: the update of an engine of kind 7: the speed terms `M+0x90/0x98` from the running
+/// engine's lever, the air density ratio from the atmosphere table at the altitude `B+0x930`, the thrust level
+/// `M+0x274` (blending `B+0x924/0x928/0x92c` by the density against sea level), its force through the three
+/// sinks (as in [`apply_engine_thrust`] without the scale), and the derived fuel and ratio words.
+pub fn update_engine_kind7(vm: &mut Vm, state: u64, f: u64, e: i32) {
+    let b = vm.u64(f + 0x20);
+    let running = vm.i32(state + 0x74);
+    vm.set_f32(state + 0x258, 1.0);
+    vm.set_i32(state + 0xb8, 0);
+    let on = running as f32;
+    for off in [0x240, 0x244, 0x248] {
+        vm.set_f32(state + off, on);
+    }
+    let (x6, d2);
+    if running != 0 {
+        let s = crate::wing_element::signed_sqrt(vm.f32(state + 4));
+        x6 = (f64::from(s) * 100.0 * f64::from(vm.f32(state + 0x2bc))) as f32;
+        vm.set_f32(state + 0x90, x6);
+        let s2 = crate::wing_element::signed_sqrt(vm.f32(state + 4));
+        vm.set_f32(
+            state + 0x98,
+            (f64::from(s2) * 100.0 * f64::from(vm.f32(state + 0x2bc))) as f32,
+        );
+        d2 = 1.0 / f64::from(vm.f32(b + 0xb74));
+    } else {
+        x6 = 0.0;
+        vm.set_i32(state + 0x98, 0);
+        vm.set_f32(state + 0x90, 0.0);
+        d2 = 0.0;
+    }
+    vm.set_f32(state + 0x278, d2 as f32);
+    vm.set_f32(state + 0x27c, d2 as f32);
+    let x3 = ((f64::from(vm.f32(b + 0x930)) + 5000.0) / 100.0) as f32;
+    let index = (x3 as i32).clamp(0, 0x801);
+    let v0 = vm.f32(ATMOSPHERE_TABLE + 8 * index as u64);
+    let v1 = vm.f32(ATMOSPHERE_TABLE + 8 * (index as u64 + 1));
+    let ratio = interpolate_clamped(index as f32, v0, (index + 1) as f32, v1, x3);
+    vm.set_i32(state + 0x274, 0);
+    let mut x10 = 0.0f32;
+    if running != 0 {
+        let f6c = vm.f32(f + 0x6c);
+        let x2 = vm.f32(b + 0x928);
+        x10 = (f64::from(x6) * 0.01) as f32;
+        if f6c > ratio {
+            let sea = f32::from_bits(0x3f9ccccd);
+            let low = vm.f32(b + 0x924);
+            if sea == ratio {
+                x10 = x10 * x10 * ((x2 + low) * 0.5);
+            } else {
+                let blend = (x2 - low) / (ratio - sea) * (f6c - sea) + low;
+                x10 = x10 * x10 * blend;
+            }
+        } else {
+            let x1 = vm.f32(b + 0x92c);
+            let blend = if ratio == 0.0 {
+                (x1 + x2) * 0.5
+            } else {
+                (x2 - x1) / (ratio - 0.0) * (f6c - 0.0) + x1
+            };
+            x10 = x10 * x10 * blend;
+        }
+        vm.set_f32(state + 0x274, x10);
+    }
+    let t = neg(x10);
+    let part = vm.u64(b + 0x6010) + (i64::from(e) * 0x3770) as u64;
+    let a0 = vm.f32(part + 0x7a0) * RAD;
+    let a4 = vm.f32(part + 0x7a4) * RAD;
+    let a9 = vm.f32(part + 0x79c) * RAD;
+    let (c0, s0) = (a0.cos(), a0.sin());
+    let (c9, s9) = (a9.cos(), a9.sin());
+    let c4 = a4.cos() * 0.0;
+    let s4 = a4.sin() * 0.0;
+    let x2 = s4 + c4;
+    let x6b = c4 - s4;
+    let x1 = s0 * x6b + c0 * t;
+    let x12 = c0 * x6b - s0 * t;
+    let x8 = c9 * x2 - s9 * x1;
+    let x13 = c9 * x1 + s9 * x2;
+    let (p0, p1, p2) = (
+        vm.f32(part + 0x790),
+        vm.f32(part + 0x794),
+        vm.f32(part + 0x798),
+    );
+    crate::callees::add_side_force(vm, f, x8, p1, p2);
+    crate::callees::add_normal_force(vm, f, x12, p0, p2);
+    crate::callees::add_axial_force(vm, f, x13, p0, p1);
+    let level = vm.f32(state + 0x274);
+    vm.set_f32(state + 0x25c, level * vm.f32(state + 0x278));
+    if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
+        let v = level * vm.f32(b + 0xb74) * vm.i32(state + 0x70) as f32;
+        vm.set_f32(state + 0xcc, v);
+    }
+    vm.set_f32(state + 0x1d8, vm.f32(state + 0xc4) / level);
+}

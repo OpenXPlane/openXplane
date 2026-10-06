@@ -2549,3 +2549,31 @@ fn engine_thrust_matches_the_original_machine_code() {
         }
     }
 }
+
+#[test]
+fn engine_kind7_update_matches_the_original_machine_code() {
+    for (n, mut case) in parse_vm_cases("engine_funcs_14119a570.txt")
+        .into_iter()
+        .enumerate()
+    {
+        let state = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let f = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let e: i32 = case.header[2].parse().unwrap();
+        for i in 0..0x803u64 * 2 {
+            let v = (0.3 + ((i * 37) % 101) as f64 / 100.0) as f32;
+            case.vm
+                .set_f32(openxplane::controls::ATMOSPHERE_TABLE + 4 * i, v);
+        }
+        openxplane::controls::update_engine_kind7(&mut case.vm, state, f, e);
+        for (addr, want) in &case.expected {
+            let got = case.vm.u32(*addr);
+            let (g, w) = (f32::from_bits(got), f32::from_bits(*want));
+            assert!(
+                got == *want
+                    || (g.is_nan() && w.is_nan())
+                    || (g - w).abs() <= 1e-5 * (1.0 + w.abs()),
+                "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
+            );
+        }
+    }
+}

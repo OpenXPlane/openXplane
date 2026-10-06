@@ -3,6 +3,7 @@
 
     python3 tools/gen_engine_funcs_vectors.py Xplane12/X-Plane.exe FUNC TRIALS SEED > crates/xp-app/tests/data/engine_funcs_FUNC.txt
 """
+import struct
 import sys
 from pathlib import Path
 
@@ -28,6 +29,9 @@ def main():
         fz.preset('B', 0x6014, P >> 32)
         for off in (0xbcc8, 0xbcd0):
             fz.preset('F', off, 0)
+        # the runtime atmosphere table (pairs of floats): a deterministic fill the Rust test regenerates
+        for i in range(0x803 * 2):
+            case.emu.write_u32(0x14612bd90 + 4 * i, struct.unpack('<I', struct.pack('<f', 0.3 + ((i * 37) % 101) / 100.0))[0])
         e = case.rng.randrange(3)
         case.run(FUNC, ints=[M + 0x2cc * e, F, e])
         print(case.dump(f'{M + 0x2cc * e:x} {F:x} {e}'))
