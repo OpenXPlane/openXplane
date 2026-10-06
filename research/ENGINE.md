@@ -139,3 +139,12 @@ identical to 2 ulp. What the engine asks of the rest of the simulation is in `En
 accessors (a table filled by the weather system), the engine flag, the frame time, the input bindings by id, the
 random generator, a global threshold and the fuel draw from the tanks (`0x14117c380`, tank state at `F+0xbd00`,
 not ported). The wing, descriptor and aircraft fields are read through `Mem` at the original offsets.
+
+## Fuel tanks
+
+`fuel::Tanks::draw` (`0x14117c380`, the object at `F+0xbd00`): three tanks with capacities `+0x40/0x44/0x48` and
+drawn totals `+0x34/0x38/0x3c`; the flags `+0x18` and `+0x1c` say whether the left and right tanks are paired with
+the centre one. Modes: 1 left, 3 right, 2 centre, 5 all three (modes 1, 2 and 3 take from all three when both
+flags are set); each draw needs `capacity - used > amount * interval`, then adds the amount (shared evenly over the
+tanks used) to the totals; any other mode draws nothing. 1500 emulator cases identical, no libm involved. The tank
+selector `0x141189dc0` is in `engine.rs`.

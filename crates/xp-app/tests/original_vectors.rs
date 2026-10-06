@@ -835,6 +835,37 @@ fn engine_update_matches_the_original_machine_code() {
 }
 
 #[test]
+fn fuel_draw_matches_the_original_machine_code() {
+    use openxplane::fuel::Tanks;
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/fuel.txt"))
+        .unwrap();
+    let (mut cases, mut drawn, mut by_mode) = (0, 0, [0usize; 6]);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let mut tanks = Tanks {
+            flags: [t[0].parse().unwrap(), t[1].parse().unwrap()],
+            used: [f(t[2]), f(t[3]), f(t[4])],
+            capacity: [f(t[5]), f(t[6]), f(t[7])],
+        };
+        let mode: i32 = t[10].parse().unwrap();
+        let got = tanks.draw(f(t[8]), f(t[9]), mode);
+        assert_eq!(got, t[11] == "1", "{line}");
+        for k in 0..3 {
+            assert_eq!(tanks.used[k].to_bits(), f(t[12 + k]).to_bits(), "{line}");
+        }
+        cases += 1;
+        drawn += usize::from(got);
+        by_mode[mode as usize] += usize::from(got);
+    }
+    println!("{cases} cases, {drawn} draws, by mode {by_mode:?}");
+    assert!(cases >= 1000 && drawn > 400);
+    assert!(by_mode[1] > 20 && by_mode[2] > 20 && by_mode[3] > 20 && by_mode[5] > 20);
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,
