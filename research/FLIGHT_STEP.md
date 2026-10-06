@@ -14,3 +14,14 @@ aircraft mass (moments only) and a plug-in, plus the total: `+0x2bc..+0x2cc` axi
 (gear) is set, that group's six values are replaced from the override area `+0x6780..+0x67c0`; the totals are the
 aerodynamic term plus the propeller, gear, mass and plug-in terms in that order. When `+0x675c` is set the
 block does nothing (the totals come from outside). 300 emulator cases are identical.
+
+## Small functions of the step, ported
+
+Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc_vectors.py`):
+
+- `rotate_pairs` (`0x1407ac180`): rotation of three values by three sine/cosine pairs; `from_aircraft_frame`
+  (`0x1407ac020`): that rotation with the frame's pairs, then the origin offsets added in double precision
+  (counterpart of `to_aircraft_frame`); `rotate_euler_offset` (`0x14120cf60`): the same from three angles in
+  degrees, plus the offsets `+0x90..+0x98` of the object. Identical (the angle version within libm error).
+- `boundary_at` (`0x1411c5950`, `0x1411c59b0`, `0x1411c5a10`): a wing boundary coordinate array at a span position.
+- `signed_sqrt` (`0x14122d4b0`), `element_dihedral` (`0x1411a02f0`).

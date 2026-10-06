@@ -1011,6 +1011,76 @@ fn wing_misc_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn frame_rotations_match_the_original_machine_code() {
+    use openxplane::transform::{Frame, from_aircraft_frame, rotate_euler_offset, rotate_pairs};
+    use openxplane::wing_element::boundary_at;
+    let text =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/frame.txt"))
+            .unwrap();
+    let (mut counts, mut worst) = ([0usize; 4], [0u32; 4]);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let d = |h: &str| f64::from_bits(u64::from_str_radix(h, 16).unwrap());
+        let (kind, got, want): (usize, Vec<f32>, Vec<f32>) = match t[0] {
+            "R" => {
+                let p = [f(t[4]), f(t[5]), f(t[6]), f(t[7]), f(t[8]), f(t[9])];
+                let r = rotate_pairs(f(t[1]), f(t[2]), f(t[3]), p);
+                (0, r.to_vec(), t[10..13].iter().map(|h| f(h)).collect())
+            }
+            "E" => {
+                let r = rotate_euler_offset(
+                    [f(t[1]), f(t[2]), f(t[3])],
+                    [f(t[4]), f(t[5]), f(t[6])],
+                    t[7] == "1",
+                    f(t[8]),
+                    f(t[9]),
+                    f(t[10]),
+                );
+                (1, r.to_vec(), t[11..14].iter().map(|h| f(h)).collect())
+            }
+            "A" => {
+                let frame = Frame {
+                    origin: [d(t[1]), d(t[2]), d(t[3])],
+                    rotation: [[f(t[6]), f(t[7])], [f(t[4]), f(t[5])], [f(t[8]), f(t[9])]],
+                };
+                let r = from_aircraft_frame(
+                    &frame,
+                    [f(t[12]), f(t[13]), f(t[14])],
+                    t[10] == "1",
+                    t[11] == "1",
+                );
+                (2, r.to_vec(), t[15..18].iter().map(|h| f(h)).collect())
+            }
+            "B" => {
+                let els: i32 = t[1].parse().unwrap();
+                let vals: Vec<f32> = t[3..14].iter().map(|h| f(h)).collect();
+                (3, vec![boundary_at(&vals, els, f(t[2]))], vec![f(t[14])])
+            }
+            other => panic!("unknown record {other}"),
+        };
+        counts[kind] += 1;
+        for (a, b) in got.iter().zip(&want) {
+            let off = if a.is_nan() && b.is_nan() {
+                0
+            } else {
+                ulps(*a, *b)
+            };
+            worst[kind] = worst[kind].max(off);
+        }
+    }
+    println!("cases {counts:?}, worst ulp {worst:?}");
+    assert!(counts.iter().all(|c| *c >= 300));
+    assert_eq!(worst[0], 0);
+    assert_eq!(worst[3], 0);
+    // sin and cos come from the platform's libm here and from the C runtime in the original
+    assert!(worst[1] <= 256, "{worst:?}");
+    assert_eq!(worst[2], 0, "{worst:?}");
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

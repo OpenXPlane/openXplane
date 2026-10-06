@@ -746,6 +746,20 @@ pub fn element_dihedral(b: &Boundary, i: usize) -> f32 {
     dz.atan2(distance) * 57.295_776
 }
 
+/// `0x1411c5950`, `0x1411c59b0`, `0x1411c5a10`: the value of a boundary coordinate array (`+0x5bc`, `+0x5e8`,
+/// `+0x614`) at the span position `u` in elements: the clamped interpolation between the entries on either side
+/// (the entry index is `u` truncated, limited to `0..elements`).
+pub fn boundary_at(values: &[f32], elements: i32, u: f32) -> f32 {
+    let index = (u as i32).clamp(0, elements - 1) as usize;
+    crate::wing_element::interpolate_clamped(
+        index as f32,
+        values[index],
+        (index + 1) as f32,
+        values[index + 1],
+        u,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
