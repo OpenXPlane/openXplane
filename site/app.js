@@ -17,6 +17,7 @@ const DOCS = [
   ["research/AFL_REGIMES", "AFL regimes"],
   ["research/PROFILE_PIPELINE", "Profile evaluator"],
   ["research/WING_ELEMENT", "Wing element (partial)"],
+  ["research/FLIGHT_MODEL", "Approximate flight model"],
   ["research/RUNTIME_TIME", "Runtime clock"],
   ["research/ACF_SCHEMA", "ACF loader schema"],
   ["research/DATAREFS", "Datarefs"],
@@ -35,7 +36,7 @@ const STATUS = [
   ["apt.dat", "part", "Airports, runways, metadata; no taxiways or frequencies"],
   ["Datarefs and commands", "part", "Typed dataref registry (5503-record catalog), six ACF-backed datarefs, command registry (3012-command catalog); nothing drives aircraft state yet"],
   ["Viewer", "part", "wgpu, Metal; static, no simulation"],
-  ["Flight model", "todo", "Wing forces, engine, landing gear"],
+  ["Flight model", "part", "Approximate model (not the original's): wing elements from the verified airfoil code, thrust, gear, controls; takes off and flies"],
   ["World", "part", "Airport ground from apt.dat (runways, taxiways, aprons) with the aircraft on a runway; no terrain, DSF or objects"],
   ["Cockpit, Lua, audio, network", "todo", ""],
 ];

@@ -37,6 +37,7 @@ See README.md for full CLI argument semantics.
 - `install`: the folder layout of an X-Plane installation and folder precedence (`Custom Data` over `Resources/default data`, scenery packs before Global Airports, aircraft `airfoils/` before `Airfoils/`); the flat provided layout is still accepted. Which rules are build-confirmed vs documentation-based is in `research/INSTALL_LAYOUT.md`.
 - `discord`: Rich Presence over Discord's local IPC (std only), enabled by `OPENXPLANE_DISCORD_APP_ID`; used by `view`. Tested against a mock socket only (`docs/DISCORD.md`).
 - `world`: airport ground geometry from apt.dat (projection, bezier flattening, ear-clip triangulation, layered triangles); `scene::airport` in the binary places the aircraft on a runway for `airport-render`/`airport-view`. Rules are apt.dat conventions, not build-confirmed (`research/WORLD_GEOMETRY.md`).
+- `wing`, `flight`: typed wing surfaces from the ACF and an approximate rigid-body flight model (`fly-test`, `tests/flight_local.rs`). Not the original's model; `research/FLIGHT_MODEL.md` lists which parts are original and which are assumed.
 - `apt`: streaming apt.dat (format 1200) reader for one airport at a time (`airport-info`); derived from observing the data file, not from the EXE (see `research/APT_DAT.md`).
 - Rendering: `obj8` (OBJ8 geometry reader), `scene`, `gpu`, `viewer`, `shader.wgsl` (wgpu + winit).
 

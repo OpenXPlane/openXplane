@@ -194,6 +194,19 @@ mass, CG Y/Z, engine count) with the type and writability of the reference build
 5503 registration records of the original's table. Layout, evidence and limits:
 [research/DATAREFS.md](research/DATAREFS.md).
 
+## Flight model (approximate)
+
+```sh
+cargo run --release --offline -- wing-info "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 60
+```
+
+An approximate rigid-body model on the Cessna's real ACF and airfoil data: the wing is split into elements and
+each one uses the airfoil code verified against the original; thrust, landing gear and control surfaces are
+openXplane's own simplifications. It takes off and climbs under a scripted pilot. It is **not** the original's
+flight model; what is original and what is assumed is listed in
+[research/FLIGHT_MODEL.md](research/FLIGHT_MODEL.md).
+
 ## Verification against the original machine code
 
 `tools/emulate_xp.py` runs isolated functions of `X-Plane.exe` in a CPU emulator on synthetic inputs, and

@@ -237,6 +237,113 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         eprintln!("{shown} of {count} commands");
         return Ok(true);
     }
+    if args.len() == 2 && args[0] == "wing-info" {
+        let aircraft = Aircraft::parse(&fs::read_to_string(&args[1])?)?;
+        let wings = openxplane::wing::Wing::all_from_acf(&aircraft)?;
+        let ars = openxplane::wing::aspect_ratios(&wings);
+        let mut total = 0.0;
+        println!("Lifting surfaces (metres, degrees; body frame x right, y up, z aft):");
+        for (w, ar) in wings.iter().zip(&ars) {
+            total += w.area();
+            let carries: Vec<&str> = ["aileron", "elevator", "rudder", "flap"]
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| w.controls.iter().any(|c| c[*i] > 0.0))
+                .map(|(_, n)| *n)
+                .collect();
+            println!(
+                "  wing {:>2}: root ({:6.2}, {:5.2}, {:5.2}) semilen {:5.2} chord {:4.2}->{:4.2} dihedral {:5.1} sweep {:5.1} elements {} area {:6.3} m2 AR {:5.2} {} [{}]",
+                w.index,
+                w.root.x,
+                w.root.y,
+                w.root.z,
+                w.semilen,
+                w.root_chord,
+                w.tip_chord,
+                w.dihedral_deg,
+                w.sweep_deg,
+                w.elements,
+                w.area(),
+                ar,
+                w.airfoils[0],
+                carries.join(",")
+            );
+        }
+        println!("Total planform area of all surfaces: {total:.2} m2");
+        return Ok(true);
+    }
+    if (args.len() == 3 || args.len() == 4) && args[0] == "fly-test" {
+        // Scripted takeoff for checking the approximate flight model without a window.
+        let install = openxplane::install::Install::open(Path::new(&args[1]))?;
+        let acf = Path::new(&args[2]);
+        let seconds: f32 = args
+            .get(3)
+            .and_then(|s| s.to_str()?.parse().ok())
+            .unwrap_or(60.0);
+        let scene = scene::load(acf)?;
+        let wheel_bottom = scene
+            .meshes
+            .iter()
+            .flat_map(|m| m.vertices.iter().map(|v| v.position[1]))
+            .fold(f32::INFINITY, f32::min);
+        let mut model = openxplane::flight::FlightModel::load(acf, &install, 80.0, 90.0)?;
+        model.rest_on_ground(wheel_bottom, [0.0, 0.0], glam::Vec3::NEG_Z);
+        println!(
+            "mass {:.0} kg, inertia {:?}, {} gears, {} wings",
+            model.mass,
+            model.inertia,
+            model.gears.len(),
+            model.wings().len()
+        );
+        let mut c = openxplane::flight::Controls::default();
+        let dt = 1.0 / 200.0;
+        let mut liftoff = None;
+        for i in 0..(seconds * 200.0) as usize {
+            let t = model.telemetry(&c);
+            if model.state.time > 2.0 {
+                c.throttle = 1.0;
+            }
+            // rotate at 55 knots, then hold 8 degrees of pitch with a damped controller
+            if t.airspeed_kt > 55.0 {
+                let pitch_rate = model.state.omega.x.to_degrees();
+                c.elevator =
+                    (0.12 + 0.10 * (8.0 - t.pitch_deg) - 0.06 * pitch_rate).clamp(-0.5, 0.9);
+            }
+            if !t.on_ground && liftoff.is_none() {
+                liftoff = Some((model.state.time, t.airspeed_kt));
+            }
+            model.step(dt, &c);
+            if i % 400 == 0 {
+                let t = model.telemetry(&c);
+                if std::env::var_os("FLY_DEBUG").is_some() {
+                    for (w, f, m) in &model.wing_report {
+                        println!(
+                            "    wing {w:>2}: force ({:8.1} {:8.1} {:8.1}) N  moment ({:8.1} {:8.1} {:8.1}) Nm",
+                            f.x, f.y, f.z, m.x, m.y, m.z
+                        );
+                    }
+                }
+                println!(
+                    "t {:5.1}s  IAS {:5.1} kt  alt {:7.1} ft  vs {:6.0} fpm  pitch {:5.1}  roll {:5.1}  hdg {:5.1}  alpha {:5.1}  gnd {}  stalled {}",
+                    model.state.time,
+                    t.airspeed_kt,
+                    t.altitude_ft,
+                    t.vertical_speed_fpm,
+                    t.pitch_deg,
+                    t.roll_deg,
+                    t.heading_deg,
+                    t.alpha_deg,
+                    t.on_ground,
+                    t.stalled_elements
+                );
+            }
+        }
+        match liftoff {
+            Some((t, v)) => println!("liftoff at {t:.1} s, {v:.0} kt"),
+            None => println!("no liftoff"),
+        }
+        return Ok(true);
+    }
     if args.len() == 2 && args[0] == "datarefs" {
         let aircraft = Aircraft::parse(&fs::read_to_string(&args[1])?)?;
         let p = openxplane::aircraft::AircraftParameters::from_acf(&aircraft)?;
