@@ -863,3 +863,18 @@ pub fn engine_held_back(
     }
     fallback(h.index, h.mode)
 }
+
+/// `0x1411d9ec0`: the enabled flag of record `index` of the table at `B+0x6040` (stride `0x34c8`): zero when the
+/// record's mode word (`+0x5f0`) is at most `0x26` and the binding `0x179` queried with that mode is set, or when
+/// the record's word at `+0x54` is nonzero; otherwise the byte at `+0x588`.
+pub fn record_flag_6040(
+    mode: u32,
+    blocked_word: i32,
+    flag: u8,
+    mut binding: impl FnMut(u32, i32) -> bool,
+) -> u8 {
+    if (mode <= 0x26 && binding(0x179, mode as i32)) || blocked_word != 0 {
+        return 0;
+    }
+    flag
+}

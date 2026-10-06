@@ -1471,3 +1471,26 @@ fn engine_held_back_matches_the_original_machine_code() {
     }
     assert_eq!(cases, 600);
 }
+
+#[test]
+fn record_flag_6040_matches_the_original_machine_code() {
+    use openxplane::engine::record_flag_6040;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/record_flag.txt"
+    ))
+    .unwrap();
+    let mut cases = 0;
+    for line in text.lines().filter(|l| l.starts_with("G ")) {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let got = record_flag_6040(
+            t[1].parse().unwrap(),
+            t[2].parse().unwrap(),
+            t[3].parse().unwrap(),
+            |id, _| id == 0x179 && t[4] == "1",
+        );
+        assert_eq!(got, t[5].parse::<u8>().unwrap(), "{line}");
+        cases += 1;
+    }
+    assert_eq!(cases, 400);
+}

@@ -34,3 +34,6 @@ Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc
   (`F+0x64b4`) is never held; the binding pair `0x179`/`0x1f9` blocks modes 2/1; the bindings `0x2f6..0x2f9`
   block by the sign combination of the record's `+0x790`/`+0x798` floats; otherwise `0x140822620` decides (not
   ported). 600 vectors with stubbed binding answers (`tools/gen_engine_held_vectors.py`).
+- `record_flag_6040` (`0x1411d9ec0`): the enabled byte of a record of the `B+0x6040` table (stride `0x34c8`),
+  blocked by binding `0x179` (queried with the record's mode word) and by the word at `+0x54`. 400 vectors
+  (`tools/gen_record_flag_vectors.py`). What these records are is not established.
