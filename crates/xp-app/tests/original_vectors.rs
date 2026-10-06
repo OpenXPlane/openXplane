@@ -1658,6 +1658,8 @@ struct PropReplay {
     probes: std::collections::VecDeque<([u32; 6], f32)>,
     washes: std::collections::VecDeque<([u32; 6], [f32; 3])>,
     elements: std::collections::VecDeque<([u32; 6], openxplane::prop::ElementResult)>,
+    recording: i32,
+    records: std::collections::VecDeque<[u32; 20]>,
     table: openxplane::buffet::NoiseTable,
 }
 
@@ -1707,6 +1709,20 @@ impl openxplane::prop::PropEnv for PropReplay {
     }
     fn noise2(&mut self, x: f32, y: f32, seed: i32) -> f32 {
         self.table.basis2(x, y, seed)
+    }
+    fn recording_id(&mut self) -> i32 {
+        self.recording
+    }
+    fn record(&mut self, words: [u32; 20]) {
+        let want = self.records.pop_front().expect("record not recorded");
+        for i in 0..20 {
+            assert!(
+                words_close(words[i], want[i], !matches!(i, 0 | 1 | 4)),
+                "pass record word {i}: {:#x} vs {:#x}",
+                words[i],
+                want[i]
+            );
+        }
     }
     fn element_force(
         &mut self,
@@ -1778,6 +1794,8 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut probes = std::collections::VecDeque::new();
         let mut washes = std::collections::VecDeque::new();
         let mut elements = std::collections::VecDeque::new();
+        let mut recording = 0i32;
+        let mut records = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
         while let Some(line) = lines.peek() {
             if line.starts_with("T ") {
@@ -1795,6 +1813,14 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                         [h(tokens[1]), h(tokens[2]), h(tokens[3])],
                         [f(tokens[4]), f(tokens[5]), f(tokens[6])],
                     ));
+                }
+                "Z" => recording = tokens[1].parse().unwrap(),
+                "Q" => {
+                    let mut words = [0u32; 20];
+                    for (i, w) in words.iter_mut().enumerate() {
+                        *w = u32::from_str_radix(tokens[1 + i], 16).unwrap();
+                    }
+                    records.push_back(words);
                 }
                 "L" => {
                     let h = |s: &str| u32::from_str_radix(s, 16).unwrap();
@@ -1883,6 +1909,8 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             probes,
             washes,
             elements,
+            recording,
+            records,
             table: prop_noise_table(),
         };
         let mut f = regions.remove("F").unwrap();
@@ -1991,6 +2019,12 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment6_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_6.txt", openxplane::prop::Stop::Segment6);
     assert!(trials >= 30);
 }
 

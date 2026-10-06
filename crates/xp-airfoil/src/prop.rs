@@ -12,7 +12,7 @@ use crate::airflow::{AirflowEnv, airflow};
 use crate::engine::signed_pow;
 use crate::forces::Words;
 use crate::scalar::{clamp, kind_is_3_or_7, lerp, max3, sign, snap};
-use crate::transform::rotate_euler_offset;
+use crate::transform::{rotate_euler_offset, rotate_pairs};
 use crate::wing_element::{
     Boundary, boundary_at, element_dihedral, hypot2, hypot3, interpolate_clamped, rotate_euler,
 };
@@ -54,6 +54,11 @@ pub trait PropEnv: AirflowEnv {
     /// `0x14195f4b0(F+0x42e40, a, b, &height, 0, 0, &flag)`: the terrain probe between two points; the height
     /// starts at -500 and the probe may store a new one.
     fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> f32;
+    /// The global at `0x142f2e3dc`: the identifier that `F+0x28` is compared with to decide whether the pass
+    /// is recorded.
+    fn recording_id(&mut self) -> i32;
+    /// `0x141219d90`: appends the 0x50-byte pass record (the frame words `0x1b0..0x200`) to the log vector.
+    fn record(&mut self, words: [u32; 20]);
     /// `0x1411b9840` (`get_el_force`, verified separately as `element_force`): the forces of one element.
     fn element_force(&mut self, call: &ElementCall) -> ElementResult;
 }
@@ -106,6 +111,8 @@ pub enum Stop {
     Segment4,
     /// First pass, after the force terms and before the finite checks at `0x1411c0a82`.
     Segment5,
+    /// First pass, after the force accumulation and the record, at `0x1411c1935`.
+    Segment6,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original, low 32 bits), for checkpoints. Only
@@ -873,6 +880,100 @@ pub fn prop_force(
         r15,
     );
     if stop == Stop::Segment5 {
+        return Ok((fr, regs));
+    }
+    // ---- segment 6: the finite checks, the rotation of the three vectors and the force accumulation ----
+    if !x10.is_finite() {
+        fr.set(0x18, 0.0);
+    }
+    if !x6.is_finite() {
+        fr.set(0x120, 0.0);
+    }
+    if !x7.is_finite() {
+        fr.set(4, 0.0);
+    }
+    let x13_pass = x13;
+    let t13 = p.f32(0x7a4) * RAD;
+    let t12 = p.f32(0x7a0) * RAD;
+    let t11 = p.f32(0x79c) * RAD;
+    x13 = t13;
+    x12 = t12;
+    x11 = t11;
+    x9 = t13.sin();
+    x10 = t13.cos();
+    let pairs = [
+        t11.sin(),
+        t11.cos(),
+        t12.sin(),
+        t12.cos(),
+        t13.sin(),
+        t13.cos(),
+    ];
+    let r1 = rotate_pairs(fr.f(0x18), fr.f(0x98), x15, pairs);
+    fr.set(0x148, r1[0]);
+    fr.set(0x88, r1[1]);
+    fr.set(0x90, r1[2]);
+    let r2 = rotate_pairs(fr.f(0x120), fr.f(0x5c), fr.f(0x58), pairs);
+    fr.set(0x1dc, r2[0]);
+    fr.set(0x1e0, r2[1]);
+    fr.set(0x1e4, r2[2]);
+    let r3 = rotate_pairs(fr.f(4), fr.f(0x78), fr.f(0), pairs);
+    fr.set(0x1e8, r3[0]);
+    fr.set(0x1ec, r3[1]);
+    fr.set(0x1f0, r3[2]);
+    x8 = finite(fr.f(0x148));
+    x7 = finite(fr.f(0x88));
+    x6 = finite(fr.f(0x90));
+    fr.set(0x1f4, x8);
+    fr.set(0x1f8, x7);
+    fr.set(0x1fc, x6);
+    fr.set(0x1d0, fr.f(0x60));
+    fr.set(0x1d4, fr.f(0x64));
+    fr.set(0x1d8, fr.f(0x68));
+    for (offset, add) in [(0x2e4usize, x8), (0x2d0, x7), (0x2bc, x6)] {
+        let sum = add + f.f32(offset);
+        f.set_f32(offset, if sum.is_finite() { sum } else { 0.0 });
+    }
+    // the pass record (frame words 0x1b0..0x200) is appended to the log when F+0x28 names the recorded object
+    if env.recording_id() == f.i32(0x28) {
+        let mut words = [0u32; 20];
+        let x = &xs[inner as usize];
+        let e4 = 4 * e_idx.max(0) as usize;
+        let _ = e4;
+        words[0] = 1;
+        words[1] = 1;
+        words[2] = x.f32(0x2c + kk).to_bits();
+        words[3] = x.f32(0x1bc + kk).to_bits();
+        words[4] = x.i32(0x1e4 + kk) as u32;
+        words[5] = fr.f(0x108).to_bits();
+        words[6] = x13_pass.to_bits();
+        words[7] = fr.f(0x80).to_bits();
+        for (i, slot) in [
+            0x60, 0x64, 0x68, 0x1dc, 0x1e0, 0x1e4, 0x1e8, 0x1ec, 0x1f0, 0x1f4, 0x1f8, 0x1fc,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            words[8 + i] = fr.f(slot).to_bits();
+        }
+        env.record(words);
+    }
+    xs[inner as usize].set_f32(0x234 + kk, neg(x15));
+    let regs = Regs::with(
+        &[
+            (6, x6),
+            (7, x7),
+            (8, x8),
+            (9, x9),
+            (10, x10),
+            (11, x11),
+            (12, x12),
+            (13, x13),
+            (15, x15),
+        ],
+        r15,
+    );
+    if stop == Stop::Segment6 {
         return Ok((fr, regs));
     }
     Err("rest of the loop not ported".into())

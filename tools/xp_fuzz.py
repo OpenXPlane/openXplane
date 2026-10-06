@@ -147,6 +147,16 @@ class Fuzz:
         self.reads += 1
         self._fill(name, offset, size, self.ops.get(pc, ''))
 
+    def note_write(self, address, size=4):
+        """Marks words written by a Python stub (not seen by the write hook) as written, so a later read of
+        them is not filled randomly."""
+        name, offset = self._locate(address)
+        if name is None:
+            return
+        for off in range(offset & ~3, (offset + size + 3) & ~3, 4):
+            self._written[name].add(off)
+            self._known[name][off] = True
+
     def _on_write(self, uc, access, address, size, value, user):
         name, offset = self._locate(address)
         if name is None:
