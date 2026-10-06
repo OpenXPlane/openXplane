@@ -54,6 +54,33 @@ pub trait PropEnv: AirflowEnv {
     /// `0x14195f4b0(F+0x42e40, a, b, &height, 0, 0, &flag)`: the terrain probe between two points; the height
     /// starts at -500 and the probe may store a new one.
     fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> f32;
+    /// `0x1411b9840` (`get_el_force`, verified separately as `element_force`): the forces of one element.
+    fn element_force(&mut self, call: &ElementCall) -> ElementResult;
+}
+
+/// The arguments of the `get_el_force` call that are not in the objects.
+#[derive(Clone, Copy, Debug)]
+pub struct ElementCall {
+    /// The element index (frame slot `0x8d8`).
+    pub index: i32,
+    pub retain: i32,
+    /// `F[0xb7e8 + n*4]`.
+    pub ice: f32,
+    /// The three trailing float arguments (zero in this caller).
+    pub extra: [f32; 3],
+    /// Which station's element-state record is passed.
+    pub station: usize,
+}
+
+/// What `get_el_force` stores: the three outputs and the element arrays of the record.
+#[derive(Clone, Copy, Debug)]
+pub struct ElementResult {
+    pub out: [f32; 3],
+    /// `X+0xf4+4e`, `+0x11c`, `+0x144`, `+0x16c`.
+    pub x4: [f32; 4],
+    /// The new `X+0x1bc+4e` and the stall word stored at `X+0x1e4+4e`.
+    pub x_1bc: f32,
+    pub stall: i32,
 }
 
 pub struct Objects<'a> {
@@ -77,6 +104,8 @@ pub enum Stop {
     Segment3,
     /// First pass, before the `get_el_force` call at `0x1411bfc91`.
     Segment4,
+    /// First pass, after the force terms and before the finite checks at `0x1411c0a82`.
+    Segment5,
 }
 
 /// Registers that live across blocks (the `xmm` registers of the original, low 32 bits), for checkpoints. Only
@@ -722,19 +751,13 @@ pub fn prop_force(
     xs[inner as usize].set_f32(0x54 + 4 * k as usize, x2q);
     let mut x1w = x6 - x7;
     if -180.0 > x1w {
-        loop {
+        while -180.0 > x1w {
             x1w += 360.0;
-            if !(-180.0 > x1w) {
-                break;
-            }
         }
     }
     if x1w > 180.0 {
-        loop {
+        while x1w > 180.0 {
             x1w += -360.0;
-            if !(x1w > 180.0) {
-                break;
-            }
         }
     }
     xs[inner as usize].set_f32(0x2c + 4 * k as usize, x1w);
@@ -760,6 +783,96 @@ pub fn prop_force(
         r15,
     );
     if stop == Stop::Segment4 {
+        return Ok((fr, regs));
+    }
+    // ---- segment 5: get_el_force and the force terms of the pass ----
+    let e_idx = fr.i(0x8d8);
+    let res = env.element_force(&ElementCall {
+        index: e_idx,
+        retain: 0,
+        ice: f.f32(0xb7e8 + 4 * n as usize),
+        extra: [0.0; 3],
+        station: inner as usize,
+    });
+    fr.set(0x128, res.out[0]);
+    fr.set(0x140, res.out[1]);
+    fr.set(0x130, res.out[2]);
+    {
+        let x = &mut xs[inner as usize];
+        let e4 = 4 * e_idx.max(0) as usize;
+        x.set_f32(0xf4 + e4, res.x4[0]);
+        x.set_f32(0x11c + e4, res.x4[1]);
+        x.set_f32(0x144 + e4, res.x4[2]);
+        x.set_f32(0x16c + e4, res.x4[3]);
+        x.set_f32(0x1bc + e4, res.x_1bc);
+        x.set_i32(0x1e4 + e4, res.stall);
+    }
+    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+    x8 = finite(fr.f(0x128));
+    x6 = finite(fr.f(0x140));
+    fr.set(0x130, finite(fr.f(0x130)));
+    let x0 = fr.f(0x48 + 4 * s30 as i32);
+    x8 *= x0;
+    fr.set(0x128, x8);
+    x9 = x0 * x6;
+    fr.set(0x140, x9);
+    let kk = 4 * k as usize;
+    x6 = xs[inner as usize].f32(0x194 + kk) * RAD;
+    x7 = x6.sin();
+    x6 = x6.cos();
+    let neg = |v: f32| f32::from_bits(v.to_bits() ^ 0x8000_0000);
+    let p0c = p.f32(0xc);
+    fr.set(0xf0, neg(x8) * x7 * fr.f(4) * p0c);
+    fr.set(0x5c, x8 * x7 * x11 * p0c);
+    fr.set(0x58, neg(x8) * x6);
+    fr.set(0xf8, neg(x9) * x6 * fr.f(4) * p0c);
+    fr.set(0x78, x9 * x6 * x11 * p0c);
+    fr.set(0, x9 * x7);
+    fr.set(0x18, fr.f(0xf8) + fr.f(0xf0));
+    x6 = fr.f(0x78) + fr.f(0x5c);
+    fr.set(0x98, x6);
+    x15 = fr.f(0) + fr.f(0x58);
+    fr.set(0x114, fr.f(0x114) + abs(x15));
+    x10 = fr.f(0x18);
+    fr.set(0x18, x10);
+    let x0 = abs(x10) + abs(x6);
+    fr.set(0x10, fr.f(0x10) + x0);
+    x12 = x12 * x12 + fr.f(0x120) * fr.f(0x120);
+    let hyp = x12.sqrt();
+    x11 *= x6;
+    x11 -= fr.f(4) * x10;
+    x11 *= hyp;
+    x11 *= p0c;
+    r.set_f32(0x60, r.f32(0x60) - x15);
+    r.set_f32(0x64, x11 + r.f32(0x64));
+    fr.set(0xe4, fr.f(0xe4) + x15);
+    fr.set(0xe8, fr.f(0xe8) + fr.f(0x100) * x15);
+    fr.set(0xec, fr.f(0xec) + fr.f(0x6c) * x15);
+    x11 *= r.f32(0x1c);
+    let (lo, hi) = (f32::from_bits(0xba83126f), f32::from_bits(0x3a83126f));
+    if (lo..=hi).contains(&x11) || x11.is_nan() {
+        x11 = if 0.0 > x11 { lo } else { hi };
+    }
+    xs[inner as usize].set_f32(0x20c + kk, neg(x15) * fr.f(-8) / x11);
+    x6 = fr.f(0xf0);
+    fr.set(0x120, x6);
+    x7 = fr.f(0xf8);
+    fr.set(4, x7);
+    let regs = Regs::with(
+        &[
+            (6, x6),
+            (7, x7),
+            (8, x8),
+            (9, x9),
+            (10, x10),
+            (11, x11),
+            (12, x12),
+            (13, x13),
+            (15, x15),
+        ],
+        r15,
+    );
+    if stop == Stop::Segment5 {
         return Ok((fr, regs));
     }
     Err("rest of the loop not ported".into())

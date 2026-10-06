@@ -16,6 +16,7 @@ Lines:
   S off=word ...               frame words (signed rbp offsets, decimal) in the checked ranges
   Y xmm6 .. xmm15 (low words) r15
   X0..X3 off=word               initial words of the element records F[0x68e0 + b*0x18] (3 records of 0x2d8)
+  L e retain ice x1 x2 x3 | out1 out2 out3 x4[4] x1bc stall   the get_el_force call (stubbed)
   V x z y in1 in2 in3 out1 out2 out3   the wash adjustment of the second airflow call (0x14117d970)
   H phase (double hex) / G a b h  time-phase and terrain-probe answers
 """
@@ -36,7 +37,7 @@ XMM = {6: UC_X86_REG_XMM6, 7: UC_X86_REG_XMM7, 8: UC_X86_REG_XMM8, 9: UC_X86_REG
        11: UC_X86_REG_XMM11, 12: UC_X86_REG_XMM12, 13: UC_X86_REG_XMM13, 14: UC_X86_REG_XMM14, 15: UC_X86_REG_XMM15}
 
 ENTRY = 0x1411bd470
-CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91}
+CHECKPOINTS = {1: 0x1411bda66, 2: 0x1411be62a, 3: 0x1411bf1c8, 4: 0x1411bfc91, 5: 0x1411c0a82}
 NOISE_TABLE = 0x14578f1f0
 EXE = sys.argv[1]
 SEGMENT, TRIALS, SEED = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
@@ -122,6 +123,29 @@ def main():
         newf = [struct.unpack('<f', struct.pack('<f', v))[0] for v in new]
         log.append('V ' + ' '.join(hx(v) for v in (x, z, y, *old, *newf)))
 
+    def stub_element(e):
+        rsp = e.uc.reg_read(UC_X86_REG_RSP)
+        idx = e.read_u32(rsp + 0x28)
+        ice = e.read_f32(rsp + 0x30)
+        outs = [e.read_u64(rsp + 0x38 + 8 * i) for i in range(3)]
+        extras = [e.read_f32(rsp + 0x50 + 8 * i) for i in range(3)]
+        xptr = e.uc.reg_read(UC_X86_REG_R8)
+        retain = e.uc.reg_read(UC_X86_REG_R9) & 0xffffffff
+        hx = lambda v: f'{struct.unpack("<I", struct.pack("<f", v))[0]:08x}'
+        vals = [fz.rng.uniform(-3, 3) for _ in range(3)]
+        for p, v in zip(outs, vals):
+            e.write_f32(p, v)
+        x4 = [fz.rng.uniform(-2, 2) for _ in range(4)]
+        for off, v in zip((0xf4, 0x11c, 0x144, 0x16c), x4):
+            e.write_f32(xptr + off + 4 * idx, v)
+        x1bc = fz.rng.uniform(-2, 2)
+        e.write_f32(xptr + 0x1bc + 4 * idx, x1bc)
+        stall = fz.rng.randrange(2)
+        e.write_u32(xptr + 0x1e4 + 4 * idx, stall)
+        log.append('L ' + ' '.join([str(idx), str(retain), hx(ice)] + [hx(v) for v in extras]) + ' | '
+                   + ' '.join(hx(struct.unpack('<f', struct.pack('<f', v))[0]) for v in vals + x4 + [x1bc]) + f' {stall}')
+
+    emu.stubs[0x1411b9840] = stub_element
     emu.stubs[0x14117d970] = stub_wash
     emu.stubs[0x140c81ea0] = stub_phase
     emu.stubs[0x14195f4b0] = stub_terrain

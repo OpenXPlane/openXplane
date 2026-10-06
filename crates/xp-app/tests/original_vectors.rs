@@ -1657,6 +1657,7 @@ struct PropReplay {
     phases: std::collections::VecDeque<f64>,
     probes: std::collections::VecDeque<([u32; 6], f32)>,
     washes: std::collections::VecDeque<([u32; 6], [f32; 3])>,
+    elements: std::collections::VecDeque<([u32; 6], openxplane::prop::ElementResult)>,
     table: openxplane::buffet::NoiseTable,
 }
 
@@ -1706,6 +1707,25 @@ impl openxplane::prop::PropEnv for PropReplay {
     }
     fn noise2(&mut self, x: f32, y: f32, seed: i32) -> f32 {
         self.table.basis2(x, y, seed)
+    }
+    fn element_force(
+        &mut self,
+        call: &openxplane::prop::ElementCall,
+    ) -> openxplane::prop::ElementResult {
+        let (seen, result) = self
+            .elements
+            .pop_front()
+            .expect("element call not recorded");
+        let got = [
+            call.index as u32,
+            call.retain as u32,
+            call.ice.to_bits(),
+            call.extra[0].to_bits(),
+            call.extra[1].to_bits(),
+            call.extra[2].to_bits(),
+        ];
+        assert_eq!(got, seen, "element call arguments");
+        result
     }
     fn terrain(&mut self, a: [f32; 3], b: [f32; 3], height: f32) -> f32 {
         let (seen, out) = self.probes.pop_front().expect("terrain call not recorded");
@@ -1757,6 +1777,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
         let mut phases = std::collections::VecDeque::new();
         let mut probes = std::collections::VecDeque::new();
         let mut washes = std::collections::VecDeque::new();
+        let mut elements = std::collections::VecDeque::new();
         let (mut slots, mut regs, mut outputs) = (None, None, Vec::new());
         while let Some(line) = lines.peek() {
             if line.starts_with("T ") {
@@ -1773,6 +1794,25 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
                     winds.push_back((
                         [h(tokens[1]), h(tokens[2]), h(tokens[3])],
                         [f(tokens[4]), f(tokens[5]), f(tokens[6])],
+                    ));
+                }
+                "L" => {
+                    let h = |s: &str| u32::from_str_radix(s, 16).unwrap();
+                    elements.push_back((
+                        [
+                            tokens[1].parse::<u32>().unwrap(),
+                            tokens[2].parse::<u32>().unwrap(),
+                            h(tokens[3]),
+                            h(tokens[4]),
+                            h(tokens[5]),
+                            h(tokens[6]),
+                        ],
+                        openxplane::prop::ElementResult {
+                            out: [f(tokens[8]), f(tokens[9]), f(tokens[10])],
+                            x4: [f(tokens[11]), f(tokens[12]), f(tokens[13]), f(tokens[14])],
+                            x_1bc: f(tokens[15]),
+                            stall: tokens[16].parse().unwrap(),
+                        },
                     ));
                 }
                 "V" => {
@@ -1842,6 +1882,7 @@ fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
             phases,
             probes,
             washes,
+            elements,
             table: prop_noise_table(),
         };
         let mut f = regions.remove("F").unwrap();
@@ -1950,6 +1991,12 @@ fn prop_force_segment1_matches_the_original_machine_code() {
 #[test]
 fn prop_force_segment2_matches_the_original_machine_code() {
     let trials = prop_segment("prop_2.txt", openxplane::prop::Stop::Segment2);
+    assert!(trials >= 30);
+}
+
+#[test]
+fn prop_force_segment5_matches_the_original_machine_code() {
+    let trials = prop_segment("prop_5.txt", openxplane::prop::Stop::Segment5);
     assert!(trials >= 30);
 }
 
