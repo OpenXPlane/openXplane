@@ -127,3 +127,15 @@ variable pitch (5, 6) and reverse (3) paths: all 19 compared fields identical to
 Not ported: the helpers `0x141238c20` (thrust term, writes `+0x21c`) and `0x1411924e0` (starter timer, writes
 `+0x2c4` and `+0x2c8`), which are replayed from recordings, and the diagnostic recording of the end of the function
 (`0x14120cf60`, `0x141176e30`, ...).
+
+## The engine update is complete
+
+`engine_update` now includes the starter delay (`0x1411924e0`, with the simulation's random generator behind
+`EngineEnv::random_unit`) and the thrust term (`0x141238c20`: engine fuel supply, tank selection `0x141189dc0`,
+the cut-off and fuel request bindings `0x1b9`/`0x1c9`), so every field the function writes is ported: `+0x78`,
+`+0x90`, `+0x98`, `+0xb0`, `+0xc4`, `+0xcc`, `+0x1d8`, `+0x1dc`, `+0x21c`, `+0x22c`, `+0x240`, `+0x244`, `+0x248`,
+`+0x258`, `+0x25c`, `+0x270`, `+0x274`, `+0x278`, `+0x27c`, `+0x28c`, `+0x2c4`, `+0x2c8`. 160 emulator cases are
+identical to 2 ulp. What the engine asks of the rest of the simulation is in `EngineEnv`: the two atmosphere
+accessors (a table filled by the weather system), the engine flag, the frame time, the input bindings by id, the
+random generator, a global threshold and the fuel draw from the tanks (`0x14117c380`, tank state at `F+0xbd00`,
+not ported). The wing, descriptor and aircraft fields are read through `Mem` at the original offsets.

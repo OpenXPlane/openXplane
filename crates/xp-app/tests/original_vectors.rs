@@ -696,12 +696,22 @@ fn engine_functions_match_the_original_machine_code() {
 struct Replay<'a> {
     calls: std::slice::Iter<'a, (String, Vec<u32>, u64)>,
     problems: Vec<String>,
+    threshold: f64,
 }
 
 impl Replay<'_> {
     fn next(&mut self, name: &str, args: &[u32]) -> u64 {
         match self.calls.next() {
-            Some((n, a, ret)) if n == name && a.as_slice() == args => *ret,
+            // arguments are equal bit for bit, or both NaN (the sign of a NaN differs between the CPU and Rust)
+            Some((n, a, ret))
+                if n == name
+                    && a.len() == args.len()
+                    && a.iter().zip(args).all(|(x, y)| {
+                        x == y || (f32::from_bits(*x).is_nan() && f32::from_bits(*y).is_nan())
+                    }) =>
+            {
+                *ret
+            }
             other => {
                 self.problems
                     .push(format!("call {name} {args:?} against {other:?}"));
@@ -727,8 +737,11 @@ impl openxplane::engine::EngineEnv for Replay<'_> {
     fn binding(&mut self, id: u32, index: i32) -> bool {
         self.next("bind", &[id, index as u32]) != 0
     }
-    fn thrust_term(&mut self, index: i32) -> f32 {
-        f32::from_bits(self.next("thrust", &[index as u32]) as u32)
+    fn thrust_threshold(&mut self) -> f64 {
+        self.threshold
+    }
+    fn fuel_draw(&mut self, amount: f32, interval: f32, mode: i32) {
+        self.next("fuel", &[amount.to_bits(), interval.to_bits(), mode as u32]);
     }
     fn random_unit(&mut self) -> f32 {
         f32::from_bits(self.next("rand", &[]) as u32)
@@ -769,22 +782,25 @@ fn engine_update_matches_the_original_machine_code() {
             calls.push((name, args, ret));
             i += 3 + nargs;
         }
-        let (fm, bm, dm) = (
+        let (fm, bm, dm, wm) = (
             Sparse::parse(parts[2]),
             Sparse::parse(parts[3]),
             Sparse::parse(parts[4]),
+            Sparse::parse(parts[5]),
         );
-        let words: Vec<u32> = parts[5]
+        let threshold = f64::from(f32::from_bits(u32::from_str_radix(parts[0], 16).unwrap()));
+        let words: Vec<u32> = parts[6]
             .split_whitespace()
             .map(|h| u32::from_str_radix(h, 16).unwrap())
             .collect();
-        let changed = Sparse::parse(parts[6]);
+        let changed = Sparse::parse(parts[7]);
         let mut record = Record(words.clone());
         let mut replay = Replay {
             calls: calls.iter(),
             problems: Vec::new(),
+            threshold,
         };
-        engine_update(&fm, &bm, &dm, &mut record, 0, &mut replay);
+        engine_update(&fm, &bm, &dm, &wm, &mut record, 0, &mut replay);
         cases += 1;
         let mut off = 0;
         for &o in &ported {

@@ -121,8 +121,10 @@ pub trait EngineEnv {
     fn engine_flag(&mut self) -> bool;
     fn frame_time(&mut self) -> f64;
     fn binding(&mut self, id: u32, index: i32) -> bool;
-    /// `0x141238c20(F, index)`: a thrust term of the engine (it also updates `+0x21c` of the record).
-    fn thrust_term(&mut self, index: i32) -> f32;
+    /// The global double at `0x142f01918` that the engine fuel check compares `+0x218` with.
+    fn thrust_threshold(&mut self) -> f64;
+    /// `0x14117c380(F+0xbd00, amount, interval, mode)`: draws fuel from the tanks (state outside the engine).
+    fn fuel_draw(&mut self, amount: f32, interval: f32, mode: i32);
     /// `0x14067b2f0`: the next number of the simulation's random generator, in 0..1 (a Mersenne twister).
     fn random_unit(&mut self) -> f32;
 }
@@ -174,6 +176,7 @@ pub fn engine_update(
     f: &dyn Mem,
     b: &dyn Mem,
     descs: &dyn Mem,
+    wings: &dyn Mem,
     rec: &mut Record,
     index: usize,
     env: &mut dyn EngineEnv,
@@ -368,7 +371,18 @@ pub fn engine_update(
     engine_speed += term_168;
     engine_speed -= term_10;
     engine_speed -= sign_a;
-    engine_speed += env.thrust_term(index as i32);
+    engine_speed += thrust_term(
+        f,
+        b,
+        desc,
+        &Shifted {
+            mem: wings,
+            base: 0x3770 * index,
+        },
+        rec,
+        index as i32,
+        env,
+    );
     let spread = sse_max(rpm_curve - rec90, 0.0) * 0.1f32;
     let term_158b = ((f64::from(signed_pow((f64::from(rpm_curve) * 0.01) as f32, shape_b) * q))
         * (f64::from(loss_b) + 1.0)
@@ -691,4 +705,115 @@ fn starter_timer(rec: &mut Record, start: bool, env: &mut dyn EngineEnv) {
     let c = ((dt + dt) as f32).clamp(0.0, 1.0);
     let state = rec.f32(0x2c8);
     rec.set_f32(0x2c8, (1.0 - c) * state + c);
+}
+
+fn byte(m: &dyn Mem, offset: usize) -> u32 {
+    ((m.i32(offset & !3) as u32) >> (8 * (offset & 3))) & 0xff
+}
+
+/// `0x141189dc0`: the tank to draw from among the allowed ones (a bit mask): the one with the highest level
+/// that is above the 0.99 offset, the first one when none qualifies.
+fn select_tank(f: &dyn Mem, mask: u32) -> usize {
+    let mut best = -1.0f32;
+    let mut chosen = 0;
+    if mask & 1 != 0 {
+        let v = f.f32(0xd18);
+        if f64::from(v) - 0.99 > -1.0 {
+            best = v;
+        }
+    }
+    for k in 1..=5usize {
+        if mask & (1 << k) != 0 {
+            let v = f.f32(0xd18 + 4 * k);
+            if f64::from(v) - 0.99 > f64::from(best) {
+                chosen = k;
+                best = v;
+            }
+        }
+    }
+    chosen
+}
+
+/// `0x141238c20`: the thrust term of the engine from its fuel supply, written smoothed to `+0x21c` and returned.
+/// Zero (and `+0x21c` cleared) when `+0x218` is not above the global threshold or the cut-off input binding is
+/// active. The fuel is drawn from the tanks through the environment.
+fn thrust_term(
+    f: &dyn Mem,
+    b: &dyn Mem,
+    desc: &dyn Mem,
+    wing: &dyn Mem,
+    rec: &mut Record,
+    index: i32,
+    env: &mut dyn EngineEnv,
+) -> f32 {
+    if f64::from(rec.f32(0x218)) <= env.thrust_threshold() {
+        rec.set_i32(0x21c, 0);
+        return 0.0;
+    }
+    if env.binding(0x1b9, index) {
+        rec.set_i32(0x21c, 0);
+        return 0.0;
+    }
+    let mut level = b.f32(0xc18);
+    if env.binding(0x1c9, index) {
+        let t = (rec.f32(0x90) - 0.0) * 0.1f32;
+        let u = 1.0 - t;
+        level *= if 0.0 > u { 0.0 } else { sse_min(1.0, u) };
+    }
+    let speed = match desc.i32(0) {
+        1..=3 => (f64::from(rec.f32(0x90)) * 0.01) as f32,
+        4..=6 => (f64::from(rec.f32(0x98)) * 0.01) as f32,
+        _ => 0.0,
+    };
+    let flag = byte(f, 0x58d);
+    let reference = b.f32(0xc1c);
+    let mut limit = f64::from(reference);
+    if flag == 1 {
+        limit *= 1.7;
+    }
+    let limit = limit as f32;
+    let ratio = limit / sse_max(speed, limit);
+    level *= ratio * ratio;
+    if b.i32(0xc20) != 0 {
+        let (tank_level, mode) = if b.i32(4) > 0x1bb5c {
+            let w = wing.f32(0x790);
+            if 0.0 > w {
+                (f.f32(0xbd2c), 1)
+            } else if w > 0.0 {
+                (f.f32(0xbd30), 3)
+            } else {
+                (f.f32(0xbd28), 2)
+            }
+        } else {
+            (f.f32(0xbd28), 2)
+        };
+        let fraction = if 0.0 > tank_level {
+            0.0
+        } else {
+            sse_min(1.0, tank_level)
+        };
+        let heights = sse_max(
+            sse_max(b.f32(0xc7c), b.f32(0xc80)),
+            sse_max(b.f32(0xc84), b.f32(0xc88)),
+        );
+        let scaled_speed = speed / reference;
+        level *= fraction;
+        let amount = (f64::from(b.f32(0xc7c) / heights) * (1.0 - f64::from(scaled_speed))) as f32;
+        env.fuel_draw(amount, 1.0, mode);
+    } else {
+        let tank = select_tank(f, byte(b, 0x2b51 + index as usize));
+        let tank_ratio = f.f32(0xd18 + 4 * tank) / b.f32(0x1b94);
+        let squared = tank_ratio * tank_ratio;
+        let fraction = if 0.0 > squared {
+            0.0
+        } else {
+            sse_min(1.2, squared)
+        };
+        level *= fraction;
+        // the original also passes the flow request (`level / B+0xc18`, doubled for flag 1) with this query
+        let _ = env.binding(0x1b9, index);
+    }
+    let smoothed = level * 0.7f32 + rec.f32(0x21c) * 0.3f32;
+    rec.set_f32(0x21c, smoothed);
+    level
 }

@@ -34,7 +34,7 @@ def main():
     rng = random.Random(20261016)
     F, B, eng = emu.alloc(0x10000), emu.alloc(0x8000), emu.alloc(0x2cc * 2)
     desc, wings = emu.alloc(0x68 * 4), emu.alloc(0x3770 * 2)
-    regions = {'F': (F, 0x10000), 'B': (B, 0x8000), 'D': (desc, 0x68 * 4), 'E': (eng, 0x2cc * 2)}
+    regions = {'F': (F, 0x10000), 'B': (B, 0x8000), 'D': (desc, 0x68 * 4), 'W': (wings, 0x3770 * 2), 'E': (eng, 0x2cc * 2)}
     touched = {k: set() for k in regions}
 
     def on_read(uc, access, address, size, value, user):
@@ -70,6 +70,10 @@ def main():
                 value = rng.uniform(0.0, 0.02)
                 e.set_xmm_f32(0, value)
                 calls.append((name, [], bits_f(value)))
+            elif ret_kind == 'u':
+                value = rng.randrange(2)
+                e.uc.reg_write(UC_X86_REG_RAX, value)
+                calls.append((name, [xmm[1], xmm[3], regs[2] & 0xffffffff], value))
             elif ret_kind == 'v':
                 calls.append((name, [regs[1] & 0xffffffff], 0))
             elif ret_kind == 'b':
@@ -87,7 +91,8 @@ def main():
     emu.stubs[0x1417f12c0] = record('flag', 'b')
     emu.stubs[0x140c448c0] = record('dt', 'd')
     emu.stubs[0x1407ace10] = record('bind', 'i')
-    emu.stubs[0x141238c20] = record('thrust', 'a')
+    emu.stubs[0x14117c380] = record('fuel', 'u')
+    global_918 = 0x142f01918
     emu.stubs[0x14067b2f0] = record('rand', 'r')
     rng_state = emu.alloc(0x2000)
 
@@ -123,6 +128,8 @@ def main():
         for k in touched:
             touched[k].clear()
         calls.clear()
+        threshold = rng.choice([0, 0, bits_f(rng.uniform(0.2, 1.0))])
+        emu.write_u64(global_918, struct.unpack('<Q', struct.pack('<d', struct.unpack('<f', struct.pack('<I', threshold))[0]))[0])
         snapshot = {k: emu.read(base, length) for k, (base, length) in regions.items()}
         try:
             emu.call(FUNC, ints=[eng, F, 0, 0])
@@ -132,10 +139,10 @@ def main():
         before = snapshot['E'][:0x2cc]
         changed = [(o, struct.unpack_from('<I', after, o)[0]) for o in range(0, 0x2cc, 4)
                    if before[o:o + 4] != after[o:o + 4]]
-        tokens = ['0', '|', str(len(calls))]
+        tokens = [f'{threshold:x}', '|', str(len(calls))]
         for name, args, ret in calls:
             tokens += [name, str(len(args)), *[f'{a:08x}' for a in args], f'{ret:x}']
-        for k in ('F', 'B', 'D'):
+        for k in ('F', 'B', 'D', 'W'):
             tokens += ['|']
             for off in sorted(touched[k]):
                 tokens.append(f'{off:x}={struct.unpack_from("<I", snapshot[k], off)[0]:08x}')

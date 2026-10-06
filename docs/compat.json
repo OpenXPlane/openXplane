@@ -26,9 +26,9 @@
   {
    "name": "Flight model",
    "weight": 28,
-   "implemented": 0.36,
-   "verified": 0.17,
-   "note": "An approximate rigid-body model that takes off and flies. The per-element force function is the original's (control surfaces, wing element, supersonic regime; verified); the flight loop, engine, gear and the model's use of those forces are our own."
+   "implemented": 0.42,
+   "verified": 0.23,
+   "note": "An approximate rigid-body model that takes off and flies. Verified against the original: the airfoil and per-element aerodynamics (control surfaces, wing element, supersonic regime) and the whole engine update (power, propeller speed, thrust, starter). The flight loop, gear, fuel tanks, atmosphere and the connection of these parts to the model are not ported."
   },
   {
    "name": "Datarefs and commands",
