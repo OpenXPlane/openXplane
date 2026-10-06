@@ -26,7 +26,7 @@ fn binder(env: &mut dyn Callees, f: u64) -> impl FnMut(u32, i32) -> bool + '_ {
 }
 
 /// `0x1411d9f60(F, index, mode)` through its ported rule.
-fn held_back(vm: &Vm, env: &mut dyn Callees, f: u64, index: i32, mode: i32) -> bool {
+pub(crate) fn held_back(vm: &Vm, env: &mut dyn Callees, f: u64, index: i32, mode: i32) -> bool {
     let b = vm.u64(f + 0x20);
     let part = vm.u64(b + 0x6010) + (i64::from(index) * 0x3770) as u64;
     let h = HoldInputs {

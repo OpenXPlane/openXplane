@@ -25,4 +25,5 @@ pub mod scalar;
 pub mod stall;
 pub mod transform;
 pub mod vm;
+pub mod wash;
 pub mod wing_element;
