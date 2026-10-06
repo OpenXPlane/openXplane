@@ -18,7 +18,7 @@ pub struct Boundary<'a> {
 /// Radians to degrees as the original multiplies it (a double constant).
 const DEGREES_PER_RADIAN: f64 = 57.295_776_367_187_5;
 /// The float32 degrees to radians factor.
-const RADIANS_PER_DEGREE: f32 = 0.017_453_294_247_388_84;
+const RADIANS_PER_DEGREE: f32 = f32::from_bits(0x3c8e_fa36);
 
 /// `0x1411a0230`: the sweep angle in degrees of the quarter-chord line of element `i`, the slope of
 /// the quarter-chord point's z (the third coordinate minus a quarter of the chord) over the distance
