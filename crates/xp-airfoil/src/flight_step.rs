@@ -486,3 +486,84 @@ pub fn body_pass(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result
     }
     Ok(())
 }
+
+/// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
+/// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
+/// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density
+/// ratio and pressure `F+0x6c/0x68`, `F+0x70` (the density over 1.225), the speed of sound `F+0x74` and the total
+/// temperature `F+0x64`. The accessors of the weather object at `F+0xbfa8` are called through the environment.
+pub fn atmosphere_step(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    let object = f + 0xbfa8;
+    let altitude = |vm: &mut Vm, env: &mut dyn Callees| -> f64 {
+        let flag = env
+            .call(vm, 0x1417f12c0, CallArgs::ints(&[0x1424_f5648]))
+            .rax as u8
+            != 0;
+        if flag { 0.0 } else { vm.f64(f + 0x3a0) }
+    };
+    let accessor = |vm: &mut Vm, env: &mut dyn Callees, address: u64, value: f32| -> f32 {
+        let mut args = CallArgs::ints(&[object]);
+        args.xmm[1] = Some(value.to_bits());
+        f32::from_bits(env.call(vm, address, args).xmm0 as u32)
+    };
+    let h = altitude(vm, env);
+    let r = (h + 6378145.0) as f32;
+    vm.set_f32(f + 0x78, (398601200000000.0 / f64::from(r * r)) as f32);
+    let a = altitude(vm, env);
+    let temperature = accessor(vm, env, 0x141ba6750, a as f32);
+    vm.set_f32(f + 0x5c, temperature);
+    let a8 = altitude(vm, env);
+    let a = altitude(vm, env);
+    let t2 = accessor(vm, env, 0x141ba6750, a as f32);
+    let offset = accessor(vm, env, 0x141ba6290, a8 as f32);
+    vm.set_f32(f + 0x58, t2 - offset);
+    // the table temperature at the altitude (the second float of the entries at 0x14612bd90)
+    let flag = env
+        .call(vm, 0x1417f12c0, CallArgs::ints(&[0x1424_f5648]))
+        .rax as u8
+        != 0;
+    let probe = if flag { 0.0 } else { vm.f64(f + 0x3a0) };
+    let position = ((f64::from(probe as f32) + 5000.0) / 100.0) as f32;
+    // `cvttss2si`: out-of-range and NaN positions give `i32::MIN`, which the original's sign test sends to 0
+    let truncated = if (-2147483648.0..2147483648.0).contains(&position) {
+        position as i32
+    } else {
+        i32::MIN
+    };
+    let index = if truncated < 0 {
+        0
+    } else {
+        truncated.min(0x801)
+    };
+    let entry = |i: i32| vm.f32(0x1_4612_bd90 + 8 * i as u64 + 4);
+    let table = interpolate_clamped(
+        index as f32,
+        entry(index),
+        (index + 1) as f32,
+        entry(index + 1),
+        position,
+    );
+    vm.set_f32(f + 0x60, vm.f32(f + 0x5c) - table);
+    let a6 = altitude(vm, env);
+    let a7 = altitude(vm, env);
+    let scale = accessor(vm, env, 0x141ba6df0, a6 as f32);
+    let d = accessor(
+        vm,
+        env,
+        0x141ba63a0,
+        (f64::from(scale * 0.3048f32) + a7) as f32,
+    );
+    let kelvin = vm.f32(f + 0x5c) + 273.15f32;
+    vm.set_f32(f + 0x6c, d);
+    vm.set_f32(f + 0x70, d / f32::from_bits(0x3f9ccccd));
+    vm.set_f32(f + 0x68, d * f32::from_bits(0x438f86c9) * kelvin);
+    let tk = f64::from(kelvin);
+    let sqrt = tk * f64::from_bits(0x40791dfcc6666666);
+    vm.set_f32(
+        f + 0x74,
+        (if sqrt < 0.0 { f64::NAN } else { sqrt.sqrt() }) as f32,
+    );
+    let mach = vm.f32(f + 0x420);
+    let total = (f64::from(mach * mach) * 0.2 + 1.0) * tk - f64::from_bits(0x4071126660000000);
+    vm.set_f32(f + 0x64, total as f32);
+}

@@ -282,3 +282,11 @@ jet; `R+4` is set to the third result over the dynamic pressure times `R+0x10`; 
 `F+0xdac` the three results are scaled by 0.05; the force is applied along the air direction at the rotated point
 by `0x140f26ef0`. 25 emulator cases identical. The argument order of `0x14120cf60`'s three inputs is
 `(xmm1, xmm3, stack float)`, and its outputs go to `r8`, the fifth and the seventh argument.
+
+`atmosphere_step` (`0x1412763c0(F)`, the first call of the step after the force clearing): from the altitude `F+0x3a0`
+(zero under the engine flag) it sets the gravity `F+0x78 = 3.986012e14 / (6378145 + h)^2`, the temperature `F+0x5c`
+(`0x141ba6750`), `F+0x58` (that temperature less `0x141ba6290`), `F+0x60` (the temperature less the table value of
+the runtime atmosphere table at the altitude, second floats of the entries), the density ratio `F+0x6c`
+(`0x141ba63a0` of the altitude `0x141ba6df0 * 0.3048 + h`), `F+0x70 = ratio / 1.225`, the pressure `F+0x68 = ratio *
+287.053 * T` (Kelvin), the speed of sound `F+0x74 = sqrt(401.874 T)` and the total temperature `F+0x64 = (1 + 0.2 M^2)
+T - 273.15` with the Mach number `F+0x420`. The three weather-object accessors are replayed. 150 cases identical.
