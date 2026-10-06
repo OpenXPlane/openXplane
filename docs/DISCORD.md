@@ -8,7 +8,8 @@ While the viewer is open, your Discord status can show what you are looking at (
 aircraft - Cessna_172SP", with the elapsed time). It talks to the Discord desktop app on the same computer over
 its local IPC socket (a named pipe on Windows) and sends nothing anywhere else.
 
-It is off by default because it needs a Discord application id:
+openXplane uses its own Discord application (id `1556989566160994374`, public; it only gives the name Discord
+shows after "Playing"), so nothing needs to be set. To use a different application:
 
 1. Open the [Discord developer portal](https://discord.com/developers/applications) and create an application.
    The application name is what Discord shows after "Playing".
@@ -27,7 +28,7 @@ It is off by default because it needs a Discord application id:
    cargo run --offline -- view "Xplane12\Cessna 172 SP\Cessna_172SP.acf"
    ```
 
-Without the variable nothing happens. If it is set but Discord is not running, openXplane prints
+Set the variable to an empty value to turn presence off. If Discord is not running, openXplane prints
 `discord: no running Discord client found` and continues normally. Discord must be the desktop app, running as
 the same user.
 

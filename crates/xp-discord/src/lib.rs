@@ -4,12 +4,14 @@
 //! little-endian u32 payload length and a JSON payload. Opcode 0 is the handshake
 //! `{"v":1,"client_id":"..."}`, 1 is a command/event frame, 2 is close. The server answers the
 //! handshake with a `READY` event; `SET_ACTIVITY` sets or (with a null activity) clears the status.
-//! It needs a Discord application id, read from `OPENXPLANE_DISCORD_APP_ID`; without one presence
-//! is simply off. Not verified against a running Discord client in this repository: the frame
+//! It uses the project's Discord application id (public; it only names the "Playing" entry), which
+//! `OPENXPLANE_DISCORD_APP_ID` overrides; an empty value turns presence off. Not verified against a running Discord client in this repository: the frame
 //! encoding and the handshake/activity exchange are tested against a local mock socket.
 use std::io::{Read, Write};
 
 pub const APP_ID_VAR: &str = "OPENXPLANE_DISCORD_APP_ID";
+/// The openXplane application on the Discord developer portal.
+pub const DEFAULT_APP_ID: &str = "1556989566160994374";
 const OP_HANDSHAKE: u32 = 0;
 const OP_FRAME: u32 = 1;
 const OP_CLOSE: u32 = 2;
@@ -136,12 +138,14 @@ impl Presence {
         })
     }
 
-    /// Connects to the local Discord client using the application id in `OPENXPLANE_DISCORD_APP_ID`.
-    /// `Ok(None)` when no id is configured; an error when one is set but Discord cannot be reached.
+    /// Connects to the local Discord client with the application id in `OPENXPLANE_DISCORD_APP_ID`, or the
+    /// project's own when the variable is unset. `Ok(None)` when it is set to an empty value; an error when
+    /// Discord cannot be reached.
     pub fn connect_from_env() -> Result<Option<Self>, String> {
-        let Ok(id) = std::env::var(APP_ID_VAR) else {
+        let id = std::env::var(APP_ID_VAR).unwrap_or_else(|_| DEFAULT_APP_ID.to_string());
+        if id.trim().is_empty() {
             return Ok(None);
-        };
+        }
         Self::connect(id.trim()).map(Some)
     }
 

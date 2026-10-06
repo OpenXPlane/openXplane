@@ -369,8 +369,9 @@ counted. Exit code 2 if the ICAO code is not found. Limits and verification:
 
 ## Discord
 
-While the viewer is open, Discord Rich Presence can show what you are looking at. It is off until you set a
-Discord application id in `OPENXPLANE_DISCORD_APP_ID`; setup and limits: [docs/DISCORD.md](docs/DISCORD.md). The
+While the viewer is open, Discord Rich Presence can show what you are looking at. It uses the project's own
+Discord application (set `OPENXPLANE_DISCORD_APP_ID` to an empty value to turn it off, or to another id to use your
+own); details and limits: [docs/DISCORD.md](docs/DISCORD.md). The
 website gets a Discord button as soon as an invite link is set in `site/app.js`.
 
 ## Roadmap

@@ -491,7 +491,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     if (args.len() == 2 || (args.len() == 3 && args[2] == "--smoke")) && args[0] == "view" {
         let scene = scene::load(Path::new(&args[1]))?;
-        // Rich Presence is optional: it needs OPENXPLANE_DISCORD_APP_ID and a running Discord.
+        // Rich Presence is optional: it needs a running Discord (OPENXPLANE_DISCORD_APP_ID overrides the application).
         let _presence = match openxplane::discord::Presence::connect_from_env() {
             Ok(Some(mut presence)) => {
                 let name = Path::new(&args[1])
