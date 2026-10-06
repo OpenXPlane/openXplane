@@ -2752,3 +2752,24 @@ fn thrust_effects_pass_matches_the_original_machine_code() {
         words_match(&case, n);
     }
 }
+
+#[test]
+fn element_pass_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_element.txt");
+    assert!(cases.len() >= 20);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::element_pass(&mut case.vm, &mut env, f, rbp)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert!(
+            env.calls.is_empty(),
+            "case {n}: {} recorded calls unused",
+            env.calls.len()
+        );
+        words_match(&case, n);
+    }
+}

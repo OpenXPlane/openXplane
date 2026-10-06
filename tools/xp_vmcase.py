@@ -37,7 +37,7 @@ class Call:
         self.ints = [e.reg(r) for r in (UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9)]
         self.xmm = [e.uc.reg_read(r) & 0xffffffff for r in XMM]
         rsp = e.reg(UC_X86_REG_RSP)
-        self.stack = [e.read_u64(rsp + 0x28 + 8 * i) for i in range(4)]
+        self.stack = [e.read_u64(rsp + 0x28 + 8 * i) for i in range(12)]
         self.effects = []
         self.rax = 0
         self.xmm0 = 0
@@ -109,7 +109,7 @@ class VmCase:
         out.append('W ' + ' '.join(f'{a:x}={w:08x}' for a, w in sorted(words.items())))
         for c in self.calls:
             line = ['C', f'{c.address:x}'] + [f'{v:x}' for v in c.ints] + [f'{v:08x}' for v in c.xmm] \
-                + [f'{v:x}' for v in c.stack] + ['|', f'{c.rax:x}', f'{c.xmm0:x}', '|']
+                + [f'{v:x}' for v in c.stack[:4]] + ['|', f'{c.rax:x}', f'{c.xmm0:x}', '|']
             line += [f'{a:x}={w:08x}' for a, w in c.effects]
             out.append(' '.join(line))
         written = self.fz.written()
