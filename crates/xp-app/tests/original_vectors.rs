@@ -1494,3 +1494,44 @@ fn record_flag_6040_matches_the_original_machine_code() {
     }
     assert_eq!(cases, 400);
 }
+
+#[test]
+fn flight_helpers_match_the_original_machine_code() {
+    use openxplane::engine::{cosine_blend, record_flag_6028, root_ratio};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/flight_helpers.txt"
+    ))
+    .unwrap();
+    let mut counts = [0usize; 3];
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        match t[0] {
+            "C" => {
+                let got = cosine_blend(f(t[1]), f(t[2]), f(t[3]), f(t[4]), f(t[5]), f(t[6]));
+                let want = f64::from_bits(u64::from_str_radix(t[7], 16).unwrap());
+                // cosf of the original and of the host differ in the last bit or two
+                assert!(
+                    (got - want).abs() <= 1e-5 * (1.0 + want.abs()),
+                    "{line}: {got} vs {want}"
+                );
+                counts[0] += 1;
+            }
+            "N" => {
+                let got = root_ratio(f(t[1]), f(t[2]), f(t[3]));
+                let want = f(t[5]);
+                assert_eq!(got.to_bits(), want.to_bits(), "{line}");
+                counts[1] += 1;
+            }
+            _ => {
+                let got = record_flag_6028(t[1].parse().unwrap(), t[2] == "1");
+                assert_eq!(got, t[3].parse::<u8>().unwrap(), "{line}");
+                counts[2] += 1;
+            }
+        }
+    }
+    assert_eq!(counts, [300, 400, 200]);
+}

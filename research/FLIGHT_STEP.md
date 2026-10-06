@@ -37,3 +37,7 @@ Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc
 - `record_flag_6040` (`0x1411d9ec0`): the enabled byte of a record of the `B+0x6040` table (stride `0x34c8`),
   blocked by binding `0x179` (queried with the record's mode word) and by the word at `+0x54`. 400 vectors
   (`tools/gen_record_flag_vectors.py`). What these records are is not established.
+- `cosine_blend` (`0x14121b4d0`, double result, `0x14230b380` is `cosf`), `root_ratio` (`0x1411b5ee0`: `2*sqrt(v/pi)`
+  over `max(record - f664, 0.01)`, held to 0..1; negative `v` reaches the CRT's sqrt error handler `0x142300430`,
+  whose result is not established) and `record_flag_6028` (`0x1411da150`, binding `0x251`): 900 vectors
+  (`tools/gen_flight_helper_vectors.py`). Meaning of the quantities is not established.

@@ -878,3 +878,41 @@ pub fn record_flag_6040(
     }
     flag
 }
+
+/// `maxss`/`minss` operand semantics: the second operand wins when either is NaN or both are equal.
+fn max_ss(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
+fn min_ss(a: f32, b: f32) -> f32 {
+    if a < b { a } else { b }
+}
+
+/// `0x14121b4d0`: `r70 - cos(a14 * rad) * (r18 - (1 - a10) * r20) * cos(a18 * rad)` in double precision, with the
+/// two cosines taken in float32 (`0x14230b380` is `cosf`). `a` are the floats of the object at `+0x10/+0x14/+0x18`
+/// and `r` the floats of the object it points to at `+0x18/+0x20/+0x70`.
+pub fn cosine_blend(a10: f32, a14: f32, a18: f32, r18: f32, r20: f32, r70: f32) -> f64 {
+    const RAD: f32 = f32::from_bits(0x3c8efa36);
+    let first = f64::from((a14 * RAD).cos());
+    let second = (a18 * RAD).cos();
+    let inner = f64::from(r18) - (1.0 - f64::from(a10)) * f64::from(r20);
+    f64::from(r70) - first * inner * f64::from(second)
+}
+
+/// `0x1411b5ee0`: `2 * sqrt(v10 / pi) / max(record - f664, 0.01)`, held to `0..=1` (`v10` is the object's float at
+/// `+0x10`, `record` the float at `+0x58c + index * 0xd8` with the index at `+0x654`, `f664` the float at `+0x664`).
+pub fn root_ratio(v10: f32, record: f32, f664: f32) -> f32 {
+    let root = f64::from((v10 / f32::from_bits(0x40490fdb)).sqrt());
+    let divisor = f64::from(max_ss(record - f664, f32::from_bits(0x3c23d70a)));
+    let ratio = (root * 2.0 / divisor) as f32;
+    if 0.0 > ratio {
+        return 0.0;
+    }
+    min_ss(1.0, ratio)
+}
+
+/// `0x1411da150`: the byte at `+0x678` of record `index` of the `B+0x6028` table (stride `0x36c8`), or zero when
+/// the binding `0x251` queried with the index is set.
+pub fn record_flag_6028(flag: u8, bound: bool) -> u8 {
+    if bound { 0 } else { flag }
+}
