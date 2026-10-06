@@ -173,11 +173,15 @@ fn starter_ready(b: &dyn Mem, rec: &Record, index: i32, env: &mut dyn EngineEnv)
 pub fn engine_update(
     f: &dyn Mem,
     b: &dyn Mem,
-    desc: &dyn Mem,
+    descs: &dyn Mem,
     rec: &mut Record,
     index: usize,
     env: &mut dyn EngineEnv,
 ) {
+    let desc = &Shifted {
+        mem: descs,
+        base: 0x68 * index,
+    };
     let mach = f.f32(0x420);
     let inverse_mach = if 1.0 > mach {
         f64::from(mach)
@@ -341,8 +345,7 @@ pub fn engine_update(
     let shape_b = crate::wing_element::interpolate_clamped(0.0, 1.0, 2.0, curve_90, rec90);
     let inverse_exponent = (1.0 / f64::from(exponent)) as f32;
     let scaled_idle = (f64::from(signed_pow(idle, inverse_exponent)) * 100.0) as f32;
-    // the original also evaluates the response curve of the idle level here; the value is not used afterwards
-    let _ = response_curve(b, scaled_idle);
+    let idle_curve = response_curve(b, scaled_idle);
     let scaled_response = (f64::from(signed_pow(response, inverse_exponent)) * 100.0) as f32;
     let rpm_curve = response_curve(b, rpm_now);
     let mach_scaled = inverse_mach * 50.0;
@@ -435,6 +438,204 @@ pub fn engine_update(
         0x78,
         (f64::from(prop_new) * 0.01 * f64::from(b.f32(0x96c)) * f64::from(0.104_719_77_f32)) as f32,
     );
+    // the original zeroes the propeller speed when it is NaN or infinite
+    if !prop_new.is_finite() {
+        rec.set_f32(0x90, 0.0);
+    }
+
+    // third part: the power from the four engine map points, the thrust and the air flow lag
+    if !rec.f32(0x258).is_finite() {
+        rec.set_f32(0x258, 0.0);
+    }
+    let sigma = rec.f32(0x258);
+    let d20 = desc.f32(0x20);
+    let prop_speed_now = rec.f32(0x90);
+    let mach_now = f.f32(0x420);
+    let distance = |rpm_at: usize, mach_at: usize| -> f32 {
+        let a = (f64::from(b.f32(rpm_at) - prop_speed_now) * 0.01) as f32;
+        let m = b.f32(mach_at) - mach_now;
+        let sum = m * m + a * a;
+        if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+    };
+    let mut d0 = distance(0xb38, 0xb3c);
+    if !d0.is_finite() {
+        d0 = 0.0;
+    }
+    let mut d1 = distance(0xb44, 0xb48);
+    if !d1.is_finite() {
+        d1 = 0.0;
+    }
+    let d2 = distance(0xb50, 0xb54);
+    let d3 = distance(0xb5c, 0xb60);
+    let inverse = |d: f32| (1.0 / f64::from(sse_max(d, 0.001))) as f32;
+    let (i0, i1, i2, i3) = (inverse(d0), inverse(d1), inverse(d2), inverse(d3));
+    let total = i3 + i2 + i1 + i0;
+    let (w0, w1, w2, w3) = (i0 / total, i1 / total, i2 / total, i3 / total);
+    let ambient = f.f32(0x424);
+    let drag = ((f64::from(-b.f32(0x950)) * 0.3) * f64::from(ambient)) as f32;
+    let pitch_curve = engine_curve(b, idle_curve);
+    let idle_thrust = (f64::from(pitch_curve * (sigma * d20))
+        - (f64::from(b.f32(0x950)) * 0.3) * f64::from(ambient)) as f32;
+    let map_a = engine_curve(b, prop_speed_now);
+    let map_b = engine_curve(b, gain_c);
+    let drag_blend = if map_b == 1.0 {
+        (drag + 0.0) * 0.5
+    } else {
+        ((0.0 - drag) / (1.0 - map_b)) * (map_a - map_b) + drag
+    };
+    let point = |at: usize, weight: f32| engine_curve(b, b.f32(at)) * ((sigma * d20) * weight);
+    // the original adds the terms in this order: the second map point, then the first, the third, the fourth
+    let power = {
+        let t1 = point(0xb44, w1);
+        let t0 = point(0xb38, w0);
+        let t2 = point(0xb50, w2);
+        let t3 = point(0xb5c, w3);
+        t3 + (t2 + (t0 + t1)) + drag_blend
+    };
+    let q_term = b.f32(0xb64) * b.f32(0xb68) * (sigma * d20);
+    let mut r_term = (w1 * b.f32(0xb4c)) * power;
+    r_term += (w0 * b.f32(0xb40)) * power;
+    r_term += (w2 * b.f32(0xb58)) * power;
+    r_term += (b.f32(0xb64) * w3) * power;
+    let sd = sigma * d20;
+    let thrust_blend = if map_b == 1.0 {
+        (sd + drag) * 0.5
+    } else {
+        (sd - drag) / (1.0 - map_b) * (map_a - map_b) + drag
+    };
+    rec.set_f32(0x270, thrust_blend);
+    let live = f.i32(0x28) != 0 || f.i32(0x6880) == 0;
+    if live {
+        let lerp = linear(idle_thrust, q_term, drag_blend, r_term, rec.f32(0x270));
+        rec.set_f32(0xc4, lerp * rec.i32(0x74) as f32);
+    }
+    rec.set_f32(0x274, rec.f32(0x270));
+    let mut second = if live {
+        let v = rec.f32(0xc4);
+        rec.set_f32(0xcc, v);
+        v
+    } else {
+        rec.f32(0xcc)
+    };
+    let first = second;
+    let mut third = rec.f32(0x274);
+    let fuel = rec.f32(0x234);
+    if fuel > 0.0 {
+        let extra = fuel * desc.f32(0x24) * rec.f32(0x258);
+        third += extra;
+        rec.set_f32(0x274, third);
+        if live {
+            second = extra * b.f32(0xb70) + first;
+            rec.set_f32(0xcc, second);
+        }
+    }
+    if live {
+        let one = rec.i32(0x70) as f32;
+        second = one * second;
+        rec.set_f32(0xcc, second);
+        rec.set_f32(0xc4, one * rec.f32(0xc4));
+    }
+    rec.set_f32(0x1d8, second / third);
+    rec.set_f32(0x1dc, -third / sse_max(b.f32(0x950) * f.f32(0x424), 0.01));
+    let mut count = 0.0f32;
+    for i in 0..b.i32(0x91c).max(0) as usize {
+        let kind = descs.i32(0x68 * i);
+        if kind == 5 || kind == 6 {
+            count = (f64::from(count) + 1.0) as f32;
+        }
+    }
+    let count = sse_max(count, 1.0);
+    let lift = sse_max(rec.f32(0x270), 0.001);
+    let ratio = lift / (sse_max(f.f32(0x6c), 0.001) * sse_max(b.f32(0x950), 0.001));
+    let root = if ratio >= 0.0 {
+        if 0.0 > ratio { f32::NAN } else { ratio.sqrt() }
+    } else {
+        -(-ratio).sqrt()
+    };
+    let spread = sse_max(count * root, 0.001);
+    let limit = (f64::from(f.f32(0x64b8) / spread) * 1.15) as f32;
+    let reduced = if 0.0 > limit {
+        0.0
+    } else {
+        sse_min(lift, limit)
+    };
+    let mut net = rec.f32(0x274) - reduced;
+    rec.set_f32(0x274, net);
+    if rec.i32(0x298) == 3 {
+        if net > 0.0 {
+            net *= -0.5;
+            rec.set_f32(0x274, net);
+        }
+        let reverse = f64::from(b.f32(0x954)) * 1.2 * f64::from(ambient);
+        net = (f64::from(net) - reverse) as f32;
+        rec.set_f32(0x274, net);
+    }
+    let dt = env.frame_time() as f32;
+    let state = rec.f32(0x278);
+    let half = (f64::from(state) * 0.5) as f32;
+    let filtered = lag_filter(
+        rec.f32(0x274),
+        f.f32(0x6c),
+        b.f32(0x950),
+        f.f32(0x400),
+        state,
+        half,
+        dt,
+    );
+    rec.set_f32(0x278, filtered);
+    let thrust_total = f.f32(0x400) + rec.f32(0x278);
+    rec.set_f32(0x27c, thrust_total);
+    rec.set_f32(0x25c, thrust_total * rec.f32(0x274));
+    let sign = if rec.i32(0x298) == 3 { -1.0f32 } else { 1.0 };
+    rec.set_f32(
+        0xb0,
+        (f64::from(sign * rec.f32(0x274) / b.f32(0x950) / f.f32(0x68)) + 1.0) as f32,
+    );
+}
+
+/// `0x14081df10`: the linear interpolation between `(a0, v0)` and `(a1, v1)` at `x`, without limits; the mean
+/// of the values when `a0 == a1`.
+fn linear(a0: f32, v0: f32, a1: f32, v1: f32, x: f32) -> f32 {
+    if a0 == a1 {
+        (v0 + v1) * 0.5
+    } else {
+        (v1 - v0) / (a1 - a0) * (x - a0) + v0
+    }
+}
+
+/// `0x1411e3700`: the engine map curve: `(x / B+0x9a8)` to the power read off a line from `B+0x9b0` at 0 to
+/// `B+0x9b4` at 100 (limited to that range); zero when the result is not finite.
+fn engine_curve(b: &dyn Mem, x: f32) -> f32 {
+    let power = crate::wing_element::interpolate_clamped(0.0, b.f32(0x9b0), 100.0, b.f32(0x9b4), x);
+    let r = signed_pow(x / b.f32(0x9a8), power);
+    if r.is_finite() { r } else { 0.0 }
+}
+
+/// `0x1410c98f0`: one step of the air flow lag: the new value of the state is a blend of the old one and
+/// `v` over the reference speed, weighted by the frame time limited to 0..1.
+fn lag_filter(v: f32, f6c: f32, b950: f32, f400: f32, state: f32, half: f32, dt: f32) -> f32 {
+    let reference = {
+        let magnitude = sse_max(f400.abs(), ((f64::from(state) * 0.5) as f32).abs());
+        let m = sse_max(1.0, magnitude);
+        let x = f400 + half;
+        let snapped = if -m > x || x > m {
+            x
+        } else if 0.0 > x {
+            -m
+        } else {
+            m
+        };
+        snapped.abs()
+    };
+    let a = if 0.0 > dt {
+        0.0
+    } else if dt > 1.0 {
+        1.0
+    } else {
+        dt
+    };
+    let rate = v / (reference * (sse_max(f6c, 0.001) * b950));
+    (1.0 - a) * state + a * rate
 }
 
 /// `0x1411dd610`: the throttle gain between `B+0x9d8` and `B+0x9dc` for the record's `+0x4c`; the lever is
@@ -453,5 +654,20 @@ fn throttle_gain(f: &dyn Mem, b: &dyn Mem, rec: &Record) -> f32 {
         lowest
     } else {
         sse_min(sse_max(low, high), value)
+    }
+}
+
+/// A view of a memory starting at `base`.
+struct Shifted<'a> {
+    mem: &'a dyn Mem,
+    base: usize,
+}
+
+impl Mem for Shifted<'_> {
+    fn f32(&self, offset: usize) -> f32 {
+        self.mem.f32(self.base + offset)
+    }
+    fn i32(&self, offset: usize) -> i32 {
+        self.mem.i32(self.base + offset)
     }
 }

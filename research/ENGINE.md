@@ -113,3 +113,17 @@ integration with the frame time. The starter-timer helper `0x1411924e0` and the 
 `0x141238c20` (170 lines: bindings `0x1b9`/`0x1c9`, compressor and bleed paths) are replayed from recordings, not
 ported. 120 emulator cases: fields compared are identical to 2 ulp (libm `pow`).
 `throttle_gain` (`0x1411dd610`) takes the lever as 1.0 when `B+0xa98` is set and `F+0x24c` is clear.
+
+## Engine update, whole function ported (except two helpers)
+
+`engine_update` now covers the third part of `0x141197b00` as well: the engine map (four points at `B+0xb38..0xb60`,
+weighted by the inverse of their distance to the propeller speed and the Mach number), the power and drag blend, the
+fuel and thrust terms (`+0x1d8`, `+0x1dc`, `+0xc4`, `+0xcc`), the thrust level with the number of variable pitch
+propellers (`+0x270`, `+0x274`), the air flow lag filter (`0x1410c98f0`, state `+0x278`) and the final power
+(`+0x25c`) and pressure ratio (`+0xb0`). The NaN guards of the original are included (`+0x90`, `+0x258` and two
+distances are zeroed when not finite). 160 emulator cases, random objects with kinds and modes including the
+variable pitch (5, 6) and reverse (3) paths: all 19 compared fields identical to 2 ulp (libm `pow`).
+
+Not ported: the helpers `0x141238c20` (thrust term, writes `+0x21c`) and `0x1411924e0` (starter timer, writes
+`+0x2c4` and `+0x2c8`), which are replayed from recordings, and the diagnostic recording of the end of the function
+(`0x14120cf60`, `0x141176e30`, ...).

@@ -93,11 +93,11 @@ def main():
             if rng.random() < 0.7:
                 words.append(bits_f(rng.uniform(0.2, 2.0)))
             else:
-                words.append(rng.choice([0, 1, 1, 2]))
+                words.append(rng.choice([0, 1, 1, 2, 3, 4, 5, 6]))
         emu.write(addr, b''.join(struct.pack('<I', w) for w in words))
 
     produced = attempts = 0
-    while produced < 120 and attempts < 3000:
+    while produced < 160 and attempts < 6000:
         attempts += 1
         for base, length in regions.values():
             randomise(base, length)

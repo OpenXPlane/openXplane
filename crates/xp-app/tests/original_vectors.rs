@@ -736,7 +736,7 @@ impl openxplane::engine::EngineEnv for Replay<'_> {
 }
 
 #[test]
-fn engine_update_ported_part_matches_the_original_machine_code() {
+fn engine_update_matches_the_original_machine_code() {
     use openxplane::engine::{Record, engine_update};
     let text = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),

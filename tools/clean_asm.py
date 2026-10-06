@@ -41,11 +41,25 @@ def main():
             ins.append((int(m.group(1), 16), re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', '', m.group(2))).strip()))
     index = {a: i for i, (a, _) in enumerate(ins)}
     skip = set()
+    guards = {}
     for i, (a, t) in enumerate(ins):
         if t.startswith('callq') and t.endswith(FPCLASSIFY):
             for j in range(i + 1, i + 9):
                 if ins[j][1].startswith('ja ') and int(ins[j][1].split()[-1], 16) in index:
                     skip.update(range(i, index[int(ins[j][1].split()[-1], 16)]))
+                    # the repair store of the guard (the value is zeroed when it is NaN or infinite) is kept
+                    # as a marker line
+                    repairs = []
+                    for k in range(j + 1, index[int(ins[j][1].split()[-1], 16)]):
+                        u = ins[k][1]
+                        nxt = ins[k + 1][1] if k + 1 < len(ins) else ''
+                        m2 = re.match(r'xorps (%xmm\d+), (%xmm\d+)$', u)
+                        if (m2 and m2.group(1) == m2.group(2) and not nxt.startswith('movup')) or re.match(
+                            r'movl (\$0x0|%r\d+d), 0x[0-9a-f]+\(%r(si|di|bx|14|15|13)\)', u
+                        ):
+                            repairs.append(u)
+                    if repairs:
+                        guards[i] = '; if non-finite: ' + '; '.join(repairs)
                     break
         if t.startswith('callq') and t.endswith(CHECK_CALLS):
             k = i
@@ -69,6 +83,8 @@ def main():
         skip.update(range(s, c[-1] + 1))
     dbg = re.compile(r'^cmpl \$0x0, 0xbc[cd][08]\(')
     for i, (a, t) in enumerate(ins):
+        if i in guards:
+            print(f'{a:x}: {guards[i]}   <- value in xmm0')
         if i in skip:
             continue
         if re.search(r'^leaq .*# 0x142f05e60', t):
