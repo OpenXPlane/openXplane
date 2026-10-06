@@ -17,6 +17,7 @@ const DOCS = [
   ["research/VERIFICATION", "Verification against the original"],
   ["research/ACF_LOADING", "ACF loading"],
   ["research/AIRCRAFT_LAYOUT", "Aircraft object layout"],
+  ["research/FLIGHT_LAYOUT", "Flight object layout"],
   ["research/AIRFOILS", "AFL airfoils"],
   ["research/AERO_LOOKUP", "Aerodynamic lookup"],
   ["research/STALL_STATE", "Stall state"],
