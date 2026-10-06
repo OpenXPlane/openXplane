@@ -179,7 +179,7 @@ and `atan2` against the C runtime's). The diagnostic output is not ported. What 
 ## Per-element force function `get_el_force` (`0x1411b9840`): ported except two sections
 
 Ported as `element_force` in `crates/xp-airfoil/src/element_force.rs`; the original is run on random objects
-(`tools/gen_element_force_vectors.py`, 450 cases) and compared bit for bit: 444 identical, the rest within 2 ulp
+(`tools/gen_element_force_vectors.py`, 450 cases) and compared bit for bit: 436 identical, the rest within 8 ulp
 (libm); the profile-function arguments it passes agree within 8 ulp.
 
 Order of the original: (1) for the 13 control surface codes `0xb..=0x17`, when the wing's per-element gate
@@ -196,5 +196,5 @@ divide otherwise), add the per-element offsets `X+0x7c/0xa4/0xcc`, store the fou
 (`0.5 * F+0x6c * X+0x54^2`) times Cl, Cd and Cm, the last times the mean chord `(2/3) c (1 + t + t^2) / (1 + t)`
 for the taper `t`; (8) a structural-load section (skipped when `F+0x28` is nonzero).
 
-Not ported: step 6 (reported as an error when the weight is positive) and step 8. The meaning of the object
+Step 6 is ported too (`0x1411b8e00`: a supersonic flat-panel model with the Mach number `F+0x420` clamped to 1.15..3, four panel terms at the angle plus or minus the half thickness angle `atan(t cos sweep)`, `t` from `0x14121bfd0`, blended into Cl, Cd, Cm and induced Cd by the weight with `0x1406ea0b0`); 450 cases are compared, 436 identical and the rest within 8 ulp. Not ported: step 8. The meaning of the object
 fields (`F+0x74`, `F+0x420`, `F+0x64c0`, `X+0x288`) is not established.

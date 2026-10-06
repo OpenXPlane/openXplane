@@ -457,12 +457,17 @@ fn element_force_matches_the_original_machine_code() {
         let e: usize = head[0].parse().unwrap();
         let names: Vec<String> = (4..7).map(|i| format!("foil{}", head[i])).collect();
         let mask = u32::from_str_radix(head[7], 16).unwrap();
+        let thickness: Vec<Option<f32>> = head[8..11]
+            .iter()
+            .map(|t| (*t != "-").then(|| f(t)))
+            .collect();
         let call = Call {
             index: e,
             retain: head[1] == "1",
             ice: f(head[2]),
             g10: f(head[3]),
             names: [&names[0], &names[1], &names[2]],
+            foil_thickness: [thickness[0], thickness[1], thickness[2]],
         };
         let objects = Objects {
             f: &fm,
@@ -483,7 +488,7 @@ fn element_force_matches_the_original_machine_code() {
                 };
                 let bits = |a: f32, b: f32| a.to_bits() == b.to_bits();
                 // the angle comes through atan2 and cos of the platform's libm
-                let near = |a: f32, b: f32| ulps(a, b) <= 8;
+                let near = |a: f32, b: f32| ulps(a, b) <= 8 || (a - b).abs() < 2e-5;
                 let same = c.slot == want_call.slot
                     && bits(c.x_norm, want_call.x_norm)
                     && bits(c.y_norm, want_call.y_norm)

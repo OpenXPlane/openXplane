@@ -5,12 +5,13 @@
 //! arrays).
 //!
 //! Ported: the control surface loop, the flap and slat terms, the dihedral geometry, the call to the wing
-//! element function, the flow-separation weight, the output scaling and the per-element arrays. Not ported:
-//! the alternative regime function `0x1411b8e00` (reached when the weight is positive, reported as an error)
-//! and the structural-load section at the end (skipped by the original when `F+0x28` is nonzero).
+//! element function, the flow-separation weight, the supersonic regime function `0x1411b8e00` with its blend,
+//! the output scaling and the per-element arrays. Not ported: the structural-load section at the end (skipped
+//! by the original when `F+0x28` is nonzero).
 use crate::wing_element::{
     Aircraft, Boundary, ControlSurface, ElementInputs, ElementState, Flow, FoilCall, FoilResult,
     WingFields, angle_floor, control_deflection, control_surface_terms, element_area, evaluate,
+    interpolate_clamped,
 };
 
 /// Read access to one object of the original by byte offset.
@@ -38,6 +39,9 @@ pub struct Call<'a> {
     pub g10: f32,
     /// The airfoil names at `W+0x3618`, `+0x3638`, `+0x3658`.
     pub names: [&'a str; 3],
+    /// The thickness-like value at `+0x58` of the root, middle and tip airfoil objects (`None` for a null
+    /// pointer at `W+0x3678`, `+0x3680`, `+0x3688`).
+    pub foil_thickness: [Option<f32>; 3],
 }
 
 /// What the function writes: the three outputs and the element arrays of `X`.
@@ -75,6 +79,89 @@ const SURFACES: [(u32, usize, usize); 13] = [
 const DEGREES: f32 = 57.295_776;
 const RADIANS_PER_DEGREE: f32 = f32::from_bits(0x3c8e_fa36);
 const SEPARATION_LIMIT: f32 = 0.99;
+const HALF_PI: f32 = f32::from_bits(0x3fc9_0fdb);
+const PI: f32 = f32::from_bits(0x4049_0fdb);
+
+/// `minss`: the first operand when it is smaller, otherwise the second.
+fn sse_min(a: f32, b: f32) -> f32 {
+    if a < b { a } else { b }
+}
+
+/// `maxss`: the first operand when it is larger, otherwise the second.
+fn sse_max(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
+/// `0x14121bfd0`: the thickness-like value at the span position `x` (in elements): between the root and
+/// middle airfoils up to the ratio at `W+0x60`, the middle airfoil's value up to `W+0x64`, then between
+/// the middle and tip airfoils.
+fn thickness(w: &dyn Mem, foils: &[Option<f32>; 3], x: f32) -> f32 {
+    let u = x / (w.i32(4) as f32);
+    if w.f32(0x60) > u
+        && let (Some(root), Some(mid)) = (foils[0], foils[1])
+    {
+        return interpolate_clamped(w.f32(0x5c), root, w.f32(0x60), mid, u);
+    }
+    if u > w.f32(0x64)
+        && let (Some(mid), Some(tip)) = (foils[1], foils[2])
+    {
+        return interpolate_clamped(w.f32(0x64), mid, w.f32(0x68), tip, u);
+    }
+    foils[1].unwrap_or(0.0)
+}
+
+/// `0x141239050`: adds one supersonic panel term for the angle `a` (radians) to the two sums.
+fn panel_term(mut a: f32, inverse_beta: f32, cl: &mut f32, cd: &mut f32) {
+    while -HALF_PI > a {
+        a += PI;
+    }
+    while a > HALF_PI {
+        a += -PI;
+    }
+    let t = (f64::from(a) * 4.0 * f64::from(inverse_beta)) as f32;
+    let k0 = if -1.0 > t { -1.0 } else { sse_min(1.0, t) };
+    let k = (f64::from(k0) * 0.25) as f32;
+    *cl += a.cos() * k;
+    *cd += a.sin() * k;
+}
+
+/// `0x1411b8e00`: Cl, Cd, Cm and induced Cd of the supersonic regime (a flat diamond-airfoil model with
+/// the Mach number `F+0x420`), with the control surface terms added.
+fn supersonic(o: &Objects, call: &Call, terms: [f32; 3]) -> [f32; 4] {
+    let (f, w, x) = (o.f, o.w, o.x);
+    let e = call.index;
+    let mach = f.f32(0x420);
+    let m = if 1.15 > mach {
+        1.15
+    } else {
+        sse_min(3.0, mach)
+    };
+    let beta = (f64::from(m * m) - 1.0).sqrt();
+    let inverse_beta = (1.0 / beta) as f32;
+    let alpha = x.f32(0x2c + 4 * e) * RADIANS_PER_DEGREE;
+    let position = ((e as f32) as f64 + 0.5) as f32;
+    let section = thickness(w, &call.foil_thickness, position);
+    let half_angle = (section * (w.f32(0x38) * RADIANS_PER_DEGREE).cos()).atan();
+    let (lower, upper) = (alpha - half_angle, half_angle + alpha);
+    let (mut cl, mut cd) = (0.0f32, 0.0f32);
+    for a in [lower, upper, upper, lower] {
+        panel_term(a, inverse_beta, &mut cl, &mut cd);
+    }
+    let rise = (mach - 1.0) * f32::from_bits(0x4055_5558);
+    let low = {
+        let t = rise + 0.0;
+        if 0.0 > t { 0.0 } else { sse_min(1.0, t) }
+    };
+    let high = {
+        let t = 1.0 - rise;
+        if 0.0 > t { 0.0 } else { sse_min(1.0, t) }
+    };
+    let scale = (f64::from(sse_max(high, low)) * 0.5 + 0.5) as f32;
+    cl *= scale;
+    cd = (f64::from(cd) + 0.0046) as f32;
+    let cm = (f64::from(cl) * -0.25) as f32;
+    [terms[0] + cl, terms[1] + cd, terms[2] + cm, 0.0]
+}
 
 /// `get_el_force` for one element. `foil` is the profile function (see [`evaluate`]); `driven` answers the
 /// input-binding queries of the control surface function.
@@ -219,22 +306,22 @@ where
     } else {
         ((1.0 / (1.0 - limited)) * (f.f32(0x420) - limited) + 0.0).clamp(0.0, 1.0)
     };
+    let (mut cl0, mut cd0, mut cm0, mut cdi0) =
+        (element.cl, element.cd, element.cm, element.induced_drag);
     if weight > 0.0 {
-        return Err(format!(
-            "the alternative regime function 0x1411b8e00 is not ported (weight {weight})"
-        ));
+        let alt = supersonic(o, call, [acc[1], acc[2], acc[3]]);
+        cl0 = interpolate_clamped(0.0, cl0, 1.0, alt[0], weight);
+        cd0 = interpolate_clamped(0.0, cd0, 1.0, alt[1], weight);
+        cm0 = interpolate_clamped(0.0, cm0, 1.0, alt[2], weight);
+        cdi0 = interpolate_clamped(0.0, cdi0, 1.0, alt[3], weight);
     }
 
     // scale and offsets
     let scale = x.f32(0x288);
-    let scaled = if element.cl > 0.0 {
-        scale * element.cl
-    } else {
-        element.cl / scale
-    };
+    let scaled = if cl0 > 0.0 { scale * cl0 } else { cl0 / scale };
     let cl = scaled + x.f32(at(0x7c));
-    let cd = element.cd + x.f32(at(0xa4));
-    let cm = element.cm + x.f32(at(0xcc));
+    let cd = cd0 + x.f32(at(0xa4));
+    let cm = cm0 + x.f32(at(0xcc));
     let dynamic = ((x.f32(at(0x54)) * x.f32(at(0x54)) * f.f32(0x6c)) as f64 * 0.5) as f32;
     let area = element_area(w.f32(0x30), w.f32(0x10), &chord, e, elements);
     let out1 = area * (dynamic * cl);
@@ -251,7 +338,7 @@ where
         x_f4: cl,
         x_11c: cd,
         x_144: cm,
-        x_16c: cd - element.induced_drag,
+        x_16c: cd - cdi0,
         element,
     })
 }

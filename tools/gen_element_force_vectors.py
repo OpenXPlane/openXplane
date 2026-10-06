@@ -5,10 +5,11 @@ The flight object F, the aircraft object B (= [F+0x20]), the wing W and the elem
 with random values at the offsets the port reads (everything else stays zero). The profile function
 0x141a44350 is replaced by a recording stub (as in gen_wing_element_vectors.py), the input-binding query
 0x1407ace10 by a mask stub (as in gen_control_surface_vectors.py), and the alternative regime function
-0x1411b8e00 by a stub that marks the case as unsupported (such cases are dropped). F+0x28 is set so the
-original skips its structural-load section.
+0x1411b8e00 runs for real (the supersonic regime); the foil thickness values at +0x58 of the three airfoil
+objects are random. F+0x28 is set so the original skips its
+structural-load section.
 
-Line: e retain ice g10 name0 name1 name2 mask | F off=hex ... | B ... | W ... | X ... |
+Line: e retain ice g10 name0 name1 name2 mask thick0 thick1 thick2 | F off=hex ... | B ... | W ... | X ... |
       ncalls { slot x y z retain diag re arg6 alpha mult div dac stalled | ret cl cd cm ratio stall } |
       out1 out2 out3 x_f4 x_11c x_144 x_16c x_1bc_after stall_after
 
@@ -79,7 +80,6 @@ def main():
         state['alt'] = True
 
     emu.stubs[EVAL] = eval_stub
-    emu.stubs[ALT] = alt_stub
     print('# element force vectors from the original 0x1411b9840 (see tools/gen_element_force_vectors.py)')
     produced = 0
     attempts = 0
@@ -126,6 +126,7 @@ def main():
         put('', 'W', 0x10, rng.uniform(1, 20))
         put('', 'W', 0x20, rng.choice([rng.uniform(0, 90), rng.uniform(0, 45), rng.uniform(-90, 0)]))
         put('', 'W', 0x30, rng.uniform(-20, 20))
+        put('', 'W', 0x38, rng.uniform(-30, 30))
         for off, r in zip((0x5c, 0x60, 0x64, 0x68), ratios):
             put('', 'W', off, r)
         for i in (e, e + 1):
@@ -146,6 +147,16 @@ def main():
             put('', 'W', la, last)
             put('', 'B', aa, rng.uniform(-1, 1))
             put('', 'B', ba, rng.uniform(-1, 1))
+        thick = []
+        for k, off in enumerate((0x3678, 0x3680, 0x3688)):
+            if False:  # a null airfoil pointer would also reach the profile function stub
+                emu.write_u64(W + off, 0)
+                thick.append(None)
+            else:
+                emu.write_u64(W + off, foils[k])
+                value = rng.uniform(0.02, 0.25)
+                emu.write_f32(foils[k] + 0x58, value)
+                thick.append(value)
         for off, n in zip((0x3618, 0x3638, 0x3658), names):
             txt = f'foil{n}'.encode()
             emu.write(W + off, txt + b'\0' * (16 - len(txt)))
@@ -159,7 +170,7 @@ def main():
         put('', 'F', 0x1a4, rng.uniform(-1, 1))
         put('', 'F', 0x408, rng.uniform(-3, 3))
         # the flow-separation weight is zero unless F+0x420 exceeds the limited ratio
-        put('', 'F', 0x420, rng.choice([-5.0, -1.0, 0.005, 0.5, 2.0]))
+        put('', 'F', 0x420, rng.choice([-5.0, -1.0, 0.005, 0.5, 0.9, 1.0, 1.15, 1.5, 2.0, 3.5]))
         put('', 'F', 0x64c0, rng.uniform(-0.5, 0.5))
         put('', 'F', 0xdac, rng.randrange(2), True)
         emu.write_u32(F + 0x28, 1)
@@ -205,7 +216,8 @@ def main():
         stall_after = emu.read_u32(X + 0x1e4 + 4 * e)
         if not all(math.isfinite(v) for v in outs + arrays):
             continue
-        tokens = [str(e), str(retain), hx(ice), hx(g10), *map(str, names), f'{mask:06x}']
+        tokens = [str(e), str(retain), hx(ice), hx(g10), *map(str, names), f'{mask:06x}',
+                  *['-' if v is None else hx(v) for v in thick]]
         for name in ('F', 'B', 'W', 'X'):
             tokens += ['|', *[f'{o:x}={v:08x}' for o, v in sorted(regs[name].items())]]
         tokens += ['|', str(len(recorded))]
