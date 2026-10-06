@@ -2527,3 +2527,25 @@ fn engine_controls_groups_match_the_original_machine_code() {
 fn engine_controls_match_the_original_machine_code_to_the_end() {
     controls_stage("controls_4.txt", None);
 }
+
+#[test]
+fn engine_thrust_matches_the_original_machine_code() {
+    for (n, mut case) in parse_vm_cases("engine_funcs_1411975a0.txt")
+        .into_iter()
+        .enumerate()
+    {
+        let state = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let f = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let e: i32 = case.header[2].parse().unwrap();
+        openxplane::controls::apply_engine_thrust(&mut case.vm, state, f, e);
+        for (addr, want) in &case.expected {
+            let got = case.vm.u32(*addr);
+            assert!(
+                got == *want
+                    || (f32::from_bits(got) - f32::from_bits(*want)).abs()
+                        <= 1e-5 * (1.0 + f32::from_bits(*want).abs()),
+                "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
+            );
+        }
+    }
+}

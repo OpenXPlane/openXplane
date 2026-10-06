@@ -584,3 +584,37 @@ fn rate_follow(
     vm.set_f32(state, (f64::from(x6) * dt + f64::from(s)) as f32);
     x7
 }
+
+/// `0x1411975a0(M, F, e)`: the thrust of engine `e` (`M+0x25c` scaled by two constants and `B+0x970`, floored at zero)
+/// along the propeller axis, rotated by the part's angles and added at the part's position through the three
+/// force sinks of [`crate::callees`].
+pub fn apply_engine_thrust(vm: &mut Vm, state: u64, f: u64, e: i32) {
+    const C1: f32 = f32::from_bits(0x3aafc53a);
+    const C2: f32 = f32::from_bits(0x408e38be);
+    let b = vm.u64(f + 0x20);
+    let part = vm.u64(b + 0x6010) + (i64::from(e) * 0x3770) as u64;
+    let raw = vm.f32(state + 0x25c) * C1 * vm.f32(b + 0x970) * C2;
+    let thrust = if 0.0 > raw { 0.0 } else { raw };
+    let t = neg(thrust);
+    let a0 = vm.f32(part + 0x7a0) * RAD;
+    let a4 = vm.f32(part + 0x7a4) * RAD;
+    let a9 = vm.f32(part + 0x79c) * RAD;
+    let (c0, s0) = (a0.cos(), a0.sin());
+    let (c9, s9) = (a9.cos(), a9.sin());
+    let c4 = a4.cos() * 0.0;
+    let s4 = a4.sin() * 0.0;
+    let x2 = s4 + c4;
+    let x6 = c4 - s4;
+    let x1 = s0 * x6 + c0 * t;
+    let x12 = c0 * x6 - s0 * t;
+    let x8 = c9 * x2 - s9 * x1;
+    let x13 = c9 * x1 + s9 * x2;
+    let (p0, p1, p2) = (
+        vm.f32(part + 0x790),
+        vm.f32(part + 0x794),
+        vm.f32(part + 0x798),
+    );
+    crate::callees::add_side_force(vm, f, x8, p1, p2);
+    crate::callees::add_normal_force(vm, f, x12, p0, p2);
+    crate::callees::add_axial_force(vm, f, x13, p0, p1);
+}
