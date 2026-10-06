@@ -2322,6 +2322,21 @@ fn pointer_following_callees_match_the_original_machine_code() {
                     );
                 }
             }
+            "S" => {
+                let d = |h: &str| f64::from_bits(u64::from_str_radix(h, 16).unwrap());
+                let ang = [f(t[8]), f(t[9]), f(t[10])];
+                let off = [f(t[11]), f(t[12]), f(t[13])];
+                let got = openxplane::transform::rotate_euler_f64(
+                    ang,
+                    off,
+                    t[4] == "1",
+                    [d(t[5]), d(t[6]), d(t[7])],
+                );
+                for k in 0..3 {
+                    let want = d(t[14 + k]);
+                    assert!((got[k] - want).abs() <= 1e-5 * (1.0 + want.abs()), "{head}");
+                }
+            }
             "D" => {
                 let got = openxplane::callees::direction_angles(f(t[5]), f(t[6]), f(t[7]));
                 for k in 0..4 {

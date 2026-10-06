@@ -111,3 +111,28 @@ pub fn rotate_pairs_f64(a: f64, b: f64, c: f64, p: [f64; 6]) -> [f64; 3] {
         w * p[1] + v * p[0],
     ]
 }
+
+/// `0x140f33900(obj, a, b, c, out1, out2, out3, add)`: [`rotate_pairs_f64`] of `(a, b, c)` by three angles in
+/// degrees, `angles = [+0x80, +0x84, +0x88]` of the object (cosine and sine in float32 widened to double: the
+/// pairs are `(sin88, cos88)`, `(sin84, cos84)`, `(sin80, cos80)`), plus the float offsets `+0x64/+0x68/+0x6c`
+/// when `add` is 1.
+pub fn rotate_euler_f64(
+    angles: [f32; 3],
+    offsets: [f32; 3],
+    add: bool,
+    point: [f64; 3],
+) -> [f64; 3] {
+    const RAD: f32 = f32::from_bits(0x3c8efa36);
+    let t = angles.map(|a| a * RAD);
+    let pair = |x: f32| (f64::from(x.sin()), f64::from(x.cos()));
+    let (s0, c0) = pair(t[0]);
+    let (s1, c1) = pair(t[1]);
+    let (s2, c2) = pair(t[2]);
+    let mut r = rotate_pairs_f64(point[0], point[1], point[2], [s2, c2, s1, c1, s0, c0]);
+    if add {
+        for k in 0..3 {
+            r[k] += f64::from(offsets[k]);
+        }
+    }
+    r
+}
