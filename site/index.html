@@ -121,24 +121,32 @@
 <template id="download">
   <div class="content">
     <h1>Install</h1>
-    <div class="card card-warning elevation-2">
-      <span class="material-icons card-icon">construction</span>
-      <div><h3>No prebuilt releases yet</h3>
-      <p>The engine is built from source. Automatic builds for macOS, Windows and Linux are planned.</p></div>
+    <div class="card elevation-2">
+      <span class="material-icons card-icon">download</span>
+      <div><h3>Nightly builds</h3>
+      <p>Every change to <code>main</code> is built for Linux (x64), macOS (Apple silicon) and Windows (x64) and
+      published as the rolling <a id="nightly-link" href="#">nightly release</a>. Unpack the archive and run
+      <code>openxplane</code> from a terminal; there is no launcher yet.</p></div>
     </div>
-    <h2>Requirements</h2>
+    <div class="card card-warning elevation-2">
+      <span class="material-icons card-icon">warning</span>
+      <div><h3>You need the original X-Plane&nbsp;12</h3>
+      <p>The builds contain no game content. Place or link your X-Plane&nbsp;12 installation as
+      <code>Xplane12/</code> in the folder you run from, or pass its path to the commands.</p></div>
+    </div>
+    <h2>Run</h2>
+    <pre><code>openxplane inspect Xplane12
+openxplane fly Xplane12 KSEA "Xplane12/Aircraft/Laminar Research/Cessna 172 SP/Cessna_172SP.acf"
+openxplane airport-render Xplane12 KSEA "Xplane12/Aircraft/Laminar Research/Cessna 172 SP/Cessna_172SP.acf" ksea.png</code></pre>
+    <p>The standard installation layout and the flat layout used in the provided test data are both accepted. Keys
+      are in the <a href="#/doc/KEYBOARD">keyboard reference</a>; all commands in the <a href="#/doc/README">README</a>.</p>
+    <h2>Build from source</h2>
     <ul>
       <li>The latest <a href="https://rustup.rs">Rust stable</a>.</li>
-      <li>An original X-Plane&nbsp;12 installation (with <code>X-Plane.exe</code>, <code>Cessna 172 SP</code>,
-        <code>Airfoils</code>, <code>Earth nav data</code>). Place or link it as
-        <code>Xplane12/</code> next to the project; it is kept out of Git.</li>
     </ul>
-    <h2>Build and run</h2>
-    <pre><code>cargo test --offline
-cargo run --offline -- inspect Xplane12
-cargo run --offline -- view "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
-cargo run --offline -- airport-info "Xplane12/Earth nav data/apt.dat" KSEA</code></pre>
-    <p>The other commands are in the <a href="#/doc/README">README</a>.</p>
+    <pre><code>cargo build --release
+cargo test</code></pre>
+    <p>Tests that need the original installation skip themselves when <code>Xplane12/</code> is absent.</p>
   </div>
 </template>
 

@@ -149,7 +149,11 @@ function route() {
   window.scrollTo(0, 0);
   if (path === "/") renderHome();
   else if (path === "/status") renderStatus();
-  else if (path === "/download") view.replaceChildren(clone("download"));
+  else if (path === "/download") {
+    view.replaceChildren(clone("download"));
+    const n = view.querySelector("#nightly-link");
+    if (n && REPO) n.href = `${REPO}/releases/tag/nightly`;
+  }
   else if (path.startsWith("/doc/")) renderDoc(path.slice(5));
   else notFound();
 }
