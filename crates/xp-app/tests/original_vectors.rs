@@ -2180,7 +2180,8 @@ fn prop_force_segment3_matches_the_original_machine_code() {
 fn pointer_following_callees_match_the_original_machine_code() {
     use openxplane::callees::{
         AeroForce, add_aero_force, add_axial_force, add_normal_force, add_side_force,
-        add_world_force, blend, engine_ratio, limit_a, limit_b,
+        add_world_force, blend, body_blend, engine_ratio, lever_curve, limit_a, limit_b,
+        wing_area_factor,
     };
     use openxplane::vm::Vm;
     let text = std::fs::read_to_string(concat!(
@@ -2303,6 +2304,20 @@ fn pointer_following_callees_match_the_original_machine_code() {
                     let got = vm.u32(*addr);
                     assert!(got == *want, "{head}: {addr:#x}: {got:#x} vs {want:#x}");
                 }
+            }
+            "T" | "U" | "C" => {
+                let got = match t[1] {
+                    "T" => wing_area_factor(&vm, address),
+                    "U" => body_blend(f(t[5]), f(t[6]), f(t[7])),
+                    _ => lever_curve(&vm, address, f(t[5])),
+                };
+                let want = f(t[t.len() - 1]);
+                assert!(
+                    got.to_bits() == want.to_bits()
+                        || (got.is_nan() && want.is_nan())
+                        || (got - want).abs() <= 1e-6 * (1.0 + want.abs()),
+                    "{head}: {got} vs {want}"
+                );
             }
             "V" => {
                 let v: Vec<f32> = (5..11).map(|i| f(t[i])).collect();

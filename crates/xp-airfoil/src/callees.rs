@@ -286,3 +286,60 @@ pub fn add_aero_force(vm: &mut Vm, f_addr: u64, a: &AeroForce) -> bool {
     add(vm, 0x32c, x6 * a.a9 - x7 * a.a11);
     ok
 }
+
+fn sse_max(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
+fn sse_min(a: f32, b: f32) -> f32 {
+    if a < b { a } else { b }
+}
+
+/// `0x141294180(W)`: a taper-ratio area factor of a wing: with `r = chord[count] / chord[0]` (`W+0x6c+4*count` over
+/// `W+0x70`), `(r*r + 1 + r) / (1 + r) * chord[0] * 2/3` ... evaluated as the original does in double precision.
+pub fn wing_area_factor(vm: &Vm, w: u64) -> f32 {
+    let c0 = vm.f32(w + 0x70);
+    let count = i64::from(vm.i32(w + 4));
+    let r = vm.f32(w + 0x6c + (count * 4) as u64) / c0;
+    let d1 = f64::from(r) + 1.0;
+    let d2 = f64::from(r * r) + d1;
+    (d2 / d1 * (f64::from(c0) * f64::from_bits(0x3fe5_5555_5555_5555))) as f32
+}
+
+/// `0x141a6b610(_, a, b, c)`: a body blend factor from `a`, `b` and `|c|`.
+pub fn body_blend(a: f32, b: f32, c: f32) -> f32 {
+    let c = c.abs() + b;
+    let d = f64::from((f64::from(c) + f64::from(c)) as f32) + 1.0;
+    let t = d as f32;
+    let limited = if 1.0 > t { 1.0 } else { sse_min(4.0, t) };
+    let root = if 0.0 > limited {
+        f32::NAN
+    } else {
+        limited.sqrt()
+    };
+    let inv = 1.0 / root;
+    if inv == 1.0 {
+        return 0.5;
+    }
+    let numerator = a - inv;
+    let denominator = 1.0 - inv;
+    let v = 1.0 / denominator * numerator + 0.0;
+    if 0.0 > v { 0.0 } else { sse_min(1.0, v) }
+}
+
+/// `0x140f29bb0(obj, x)`: a signed-cube-root-like curve of `x * 0.0111 - 1` held to -1..1, mapped linearly
+/// between the floats at `obj+0x24` and `obj+0x28`.
+pub fn lever_curve(vm: &Vm, obj: u64, x: f32) -> f32 {
+    let u = (x - 0.0) * f32::from_bits(0x3c360b61) - 1.0;
+    let v = if -1.0 > u { -1.0 } else { sse_min(1.0, u) };
+    let shaped = crate::engine::signed_pow(v, 3.0);
+    let s = shaped - -1.0;
+    let (lo, hi) = (vm.f32(obj + 0x24), vm.f32(obj + 0x28));
+    let low = sse_min(lo, hi);
+    let target = (hi - lo) * 0.5 * s + lo;
+    if low > target {
+        low
+    } else {
+        sse_min(sse_max(lo, hi), target)
+    }
+}

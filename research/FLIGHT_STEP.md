@@ -129,3 +129,23 @@ is `element_force`), `0x1407cdce0` (an event queue), `0x1408154c0`, `0x1411a0900
 `0x141219d90` (the pass record log) and the input-binding queries behind `0x1411d9f60`. The debug stream dump that
 the original performs when `F+0xbcc8/0xbcd0` are nonzero is not ported (the vectors keep both zero). The 2-D noise
 table `0x14578f1f0` is generated at run time; the vectors fill it with a fixed pseudo-random sequence.
+
+### Pointer-following callees and force sinks (`crates/xp-airfoil/src/callees.rs`, `vm.rs`)
+
+Ported on a sparse view of the original's memory (`Vm`: objects at the emulator's absolute addresses, so stored pointers
+are followed as the original does) and checked word by word against the original running on lazily random-filled
+objects (`tools/gen_callee_vectors.py`, `pointer_following_callees_match_the_original_machine_code`):
+`engine_ratio` (`0x1408154c0`), `blend` (`0x1411daa80`), the lever limits `limit_a` (`0x1411a0900` with `0x1411a0970`,
+`0x1411a0a10`) and `limit_b` (`0x141218060` with `0x1412180d0`, `0x141218180`), the force sinks `add_axial_force`
+(`0x1411767f0`), `add_normal_force` (`0x141176be0`), `add_side_force` (`0x141176e30`) and `add_world_force`
+(`0x141176a30`, which also stores the magnitude at `F+0x294`), `add_aero_force` (`0x140f26ef0`, "addFaero": builds a
+frame from the direction, accumulates `F+0x2e8/0x2d4/0x2c0` and the moments `F+0x2fc/0x314/0x32c`, and pushes the
+0x50-byte record to the log vector at `0x146125768` when `F+0x28` names the recorded object), and three small
+curves (`0x141294180`, `0x141a6b610`, `0x140f29bb0`).
+
+Read but not ported: the airflow wash `0x14117d970` (1400 instructions: a jet-wash loop over the engines and a wing-wake
+loop over the 48 wings with downwash, swirl and radius ratios; it also calls `0x141186930`), the wind sampler
+`0x141ba80a0` and the 11 KB tire-contact function `0x1411c8690`. `update_flight` (`0x1412656b0`, 8400 instructions
+after removing diagnostics) assembles these: the wing and element loops, the body forces (`0x6040` table), landing
+gear, radiators, arresting cable, speed brakes, chute, water rudder, anchor and water pick-up, then the force
+totals already ported.
