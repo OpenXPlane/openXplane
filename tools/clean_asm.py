@@ -4,11 +4,16 @@
 Removed: clusters around the C++ stream and string calls used for logging, finite-value guards (`fpclassify`
 call followed by a jump over a repair block), and the named debug-check calls.
 
-    python3 tools/clean_asm.py Xplane12/X-Plane.exe 0x1411bd470 0x1411c3584 > clean.asm
+    python3 tools/clean_asm.py Xplane12/X-Plane.exe 0x1411bd470 [0x1411c3584] > clean.asm
+
+The end address is optional: the function's end comes from the exception table.
 """
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 LOG_CALLS = ('0x1405e18d0', '0x1422c675c', '0x1422c6748', '0x1408943e0', '0x140a31900', '0x1405dcad0')
 CHECK_CALLS = ('0x1411764a0', '0x1408e25a0', '0x141a67610')
@@ -16,7 +21,15 @@ FPCLASSIFY = '0x14230c290'
 
 
 def main():
-    exe, start, stop = sys.argv[1], int(sys.argv[2], 16), int(sys.argv[3], 16)
+    exe, start = sys.argv[1], int(sys.argv[2], 16)
+    if len(sys.argv) > 3:
+        stop = int(sys.argv[3], 16)
+    else:
+        from pe_functions import load
+        import bisect
+        table = load(exe)
+        i = bisect.bisect_right([b for b, e in table], start - 0x140000000) - 1
+        stop = 0x140000000 + table[i][1]
     asm = subprocess.run(['llvm-objdump', '-d', '--no-show-raw-insn', f'--start-address={start:#x}',
                           f'--stop-address={stop:#x}', exe], capture_output=True, text=True).stdout
     ins = []
