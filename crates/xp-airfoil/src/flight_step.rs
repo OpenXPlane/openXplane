@@ -359,3 +359,130 @@ pub fn element_pass(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Res
     }
     Ok(())
 }
+
+/// `0x1411d9ec0(F, i)`: the enabled byte (`+0x588`) of body record `i` (`B+0x6040`, stride `0x34c8`), zero when the
+/// binding `0x179` queried with the record's mode word (`+0x5f0`, when at most 0x26) is set or `+0x54` is nonzero.
+pub fn body_enabled(vm: &Vm, env: &mut dyn Callees, f: u64, i: i32) -> u8 {
+    let b = vm.u64(f + 0x20);
+    let r = vm.u64(b + 0x6040) + (i64::from(i) * 0x34c8) as u64;
+    let mode = vm.u32(r + 0x5f0);
+    crate::engine::record_flag_6040(mode, vm.i32(r + 0x54), vm.u8(r + 0x588), |id, _| {
+        bind(env, f, id, mode as i32)
+    })
+}
+
+/// `0x141267978..0x1412686a9`: the body loop (39 bodies, `B+0x6040`): the body's reference point is rotated into
+/// the aircraft frame (`0x14120cf60` with the lever curve of the record), the air velocity there
+/// (`0x14121b580`, replayed) is turned back into the body's axes (`0x141291580`) and into the angles
+/// (`0x141183bf0`); [`body_aero`](crate::body::body_aero) gives the three cross-flow results, blended with
+/// the wave drag ([`body_wave_drag`](crate::body::body_wave_drag)) above the Mach-dependent blend factor
+/// unless the record's engine index is a jet; the drag coefficient `+4` is stored and the force is applied at the
+/// point by `0x140f26ef0` along the air direction.
+pub fn body_pass(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+    use crate::body::{body_aero, body_wave_drag};
+    use crate::callees::{AeroForce, add_aero_force, body_blend, direction_angles, lever_curve};
+    use crate::engine::root_ratio;
+    use crate::transform::rotate_euler_offset;
+    use crate::wing_element::rotate_euler;
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let b = vm.u64(f + 0x20);
+    const DEG: f32 = f32::from_bits(0x42652ee0);
+    for i in 0..0x27 {
+        if body_enabled(vm, env, f, i) == 0 {
+            continue;
+        }
+        if debug_dump_active(vm, f) {
+            return Err("debug dump not ported".into());
+        }
+        let r = vm.u64(b + 0x6040) + (i64::from(i) * 0x34c8) as u64;
+        let obj = r + 0x588;
+        let angles = [vm.f32(obj + 0x9c), vm.f32(obj + 0xa0), vm.f32(obj + 0xa4)];
+        let offsets = [vm.f32(obj + 0x90), vm.f32(obj + 0x94), vm.f32(obj + 0x98)];
+        let lever = lever_curve(vm, r, 0.0);
+        let p = rotate_euler_offset(
+            angles,
+            offsets,
+            true,
+            vm.f32(r + 0x1c),
+            vm.f32(r + 0x20),
+            lever,
+        );
+        let mut args = CallArgs::ints(&[f, 0, slot(-0x70)]);
+        args.int[1] = None;
+        args.xmm[1] = Some(p[0].to_bits());
+        args.xmm[3] = Some(p[1].to_bits());
+        args.stack[0] = Some(slot(-0x60));
+        args.stack[2] = Some(slot(0x1758));
+        env.call(vm, 0x14121b580, args);
+        let air = [
+            vm.f32(slot(-0x70)),
+            vm.f32(slot(-0x60)),
+            vm.f32(slot(0x1758)),
+        ];
+        let q = rotate_euler(angles, air[0], air[1], air[2]);
+        let [roll, pitch, yaw, speed] = direction_angles(q[0], q[1], q[2]);
+        let (t_air, t_dir) = (vm.f32(f + 0x6c), vm.f32(f + 0x74));
+        let forces = body_aero(vm, r, t_air, roll, pitch, yaw, speed);
+        let (mut out1, mut out2, mut out3, magnitude) = match forces {
+            Some(x) => (x.axial, x.side, x.normal, x.magnitude),
+            // the outputs keep the zeros the original stored before the call
+            None => (0.0, 0.0, 0.0, 0.0),
+        };
+        let mach = speed / t_dir;
+        let ratio = root_ratio(
+            vm.f32(r + 0x10),
+            vm.f32(r + 0x58c + (i64::from(vm.i32(r + 0x654)) * 0xd8) as u64),
+            vm.f32(r + 0x664),
+        );
+        let blend = body_blend(mach, ratio, magnitude);
+        if blend > 0.0 {
+            let index = vm.i32(r + 0x68);
+            let jet = index >= 0 && {
+                let engine = vm.u64(b + 0x5ff8) + (i64::from(index) * 0x68) as u64;
+                (vm.i32(engine).wrapping_sub(5) as u32) <= 1
+            };
+            if !jet {
+                let wave = body_wave_drag(vm, r, t_air, t_dir, speed);
+                out3 = interpolate_clamped(0.0, out3, 1.0, wave, blend * vm.f32(r + 8));
+            }
+        }
+        let dynamic = (f64::from(speed * speed * t_air) * 0.5) as f32;
+        vm.set_f32(
+            r + 4,
+            out3 / sse_max(dynamic * vm.f32(r + 0x10), f32::from_bits(0x38d1b717)),
+        );
+        if f64::from(vm.f32(b + 0x2894)) > 0.01 && vm.i32(f + 0xdac) != 0 {
+            for v in [&mut out1, &mut out3, &mut out2] {
+                *v = (f64::from(*v) * 0.05) as f32;
+            }
+        }
+        let lever = lever_curve(vm, r, yaw * DEG);
+        let p = rotate_euler_offset(
+            angles,
+            offsets,
+            true,
+            vm.f32(r + 0x1c),
+            vm.f32(r + 0x20),
+            lever,
+        );
+        let force = AeroForce {
+            a2: air[0],
+            a3: out1,
+            a5: air[1],
+            a6: out3,
+            a7: air[2],
+            a8: out2,
+            a9: p[0],
+            a10: p[1],
+            a11: p[2],
+            a12: 0.0,
+            a13: 0.0,
+            a14: 0,
+            a15: 0.0,
+            a16: 0.0,
+            a17: 0.0,
+        };
+        add_aero_force(vm, f, &force);
+    }
+    Ok(())
+}

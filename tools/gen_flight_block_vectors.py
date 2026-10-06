@@ -15,16 +15,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from xp_vmcase import VmCase  # noqa: E402
-from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_XMM11,  # noqa: E402
+from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978)}
+BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
+          'body': (0x141267978, 0x1412686a9)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
           (0x141220000, 0x141230000), (0x140810000, 0x140820000), (0x1407d0000, 0x1407e0000), (0x1408b0000, 0x1408c0000),
-          (0x140900000, 0x140910000), (0x140620000, 0x140630000), (0x140f20000, 0x140f30000), (0x141170000, 0x141180000)]
+          (0x140900000, 0x140910000), (0x141a50000, 0x141a60000), (0x1411b0000, 0x1411c0000), (0x141180000, 0x141190000),
+          (0x1411e0000, 0x1411f0000), (0x141a60000, 0x141a70000), (0x140620000, 0x140630000), (0x140f20000, 0x140f30000), (0x141170000, 0x141180000)]
 RECORD_VECTOR = 0x146125768
 RECORDING_ID = 0x142f2e3dc
 
@@ -46,6 +48,7 @@ def main():
             call.put_f32(pointer, rng.uniform(-1, 1))
 
     case.stub(0x14121b580, airflow)
+    case.stub(0x141260090, lambda call, rng: None)
     case.stub(0x1411b9840, element_force)
     case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0.005, 0.06)))
     print('# update_flight block vectors', BLOCK, hex(start), hex(end))
@@ -92,11 +95,42 @@ def main():
             fz.preset_f32('B', 0x21e8, rng.choice([-1.0, 1.0, 2.5]))
             fz.preset_f32('B', 0x21e4, rng.uniform(0.0, 1.0))
             fz.preset_f32('F', 0x184, rng.uniform(0.0, 1.5))
-        if BLOCK == 'element':
+        if BLOCK == 'body':
+            T = case.region('T', 0x34c8 * 39)
+            E = case.region('E', 0x68 * 4)
+            for base, off, ptr in ((B, 0x6040, T), (B, 0x5ff8, E)):
+                name = {F: 'F', B: 'B'}[base]
+                fz.preset(name, off, ptr & 0xffffffff, record=True)
+                fz.preset(name, off + 4, ptr >> 32, record=True)
+            for e in range(4):
+                fz.preset('E', 0x68 * e, rng.choice([0, 1, 5, 6, 7]))
+            for k in range(39):
+                base = 0x34c8 * k
+                fz.preset('T', base + 0x588, 1 if k < 3 else 0)
+                fz.preset('T', base + 0x54, 0)
+                fz.preset('T', base + 0x5f0, rng.randrange(0, 0x30))
+                fz.preset('T', base + 0x68, rng.randrange(-1, 4))
+                if k < 3:
+                    for off in (0x10, 0x14, 0x18):
+                        fz.preset_f32('T', base + off, rng.uniform(0.05, 20.0))
+                    for off in (0x58, 0x5c, 0x60):
+                        fz.preset_f32('T', base + off, rng.uniform(-5.0, 0.0))
+                    for off in (0x64, 0x68, 0x6c):
+                        fz.preset_f32('T', base + off, rng.uniform(0.0, 5.0))
+                    fz.preset('T', base + 0x654, rng.randrange(1, 4))
+                    fz.preset('T', base + 0x658, rng.randrange(2, 19))
+                    for row in range(4):
+                        for col in range(18):
+                            for axis in range(3):
+                                fz.preset_f32('T', base + 0x65c + row * 0xd8 + col * 12 + 4 * axis, rng.uniform(-3.0, 3.0))
+            for off in (0x6c, 0x74):
+                fz.preset_f32('F', off, rng.uniform(0.5, 400.0))
+            fz.preset('F', 0x28, 7)
+        if BLOCK in ('element', 'body'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
             fz.preset('F', 0x28, rng.choice([7, 12345]))
-            for w in range(48):
+            for w in range(48) if BLOCK == 'element' else []:
                 fz.preset('W', 0x36c8 * w + 0x58, rng.choice([0, 1]))
             case.emu.write_u32(RECORDING_ID, 12345)
             for address, value in ((RECORD_VECTOR + 8, V), (RECORD_VECTOR + 16, V + 0x4000)):
@@ -110,6 +144,7 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_RBP, rbp)
             case.emu.uc.reg_write(UC_X86_REG_XMM15, 0x80000000)
             case.emu.uc.reg_write(UC_X86_REG_XMM11, 0x3c8efa36)
+            case.emu.uc.reg_write(UC_X86_REG_R13, 0xffffffffffffffff)
         case.emu.uc.reg_write(UC_X86_REG_R15, F)
         case.emu.uc.reg_write(UC_X86_REG_R14, 0)
         case.emu.uc.reg_write(UC_X86_REG_R12, 0)
@@ -121,9 +156,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK == 'element' else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body') else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK == 'element':
+        if BLOCK in ('element', 'body'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)

@@ -272,3 +272,13 @@ and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the su
 surface, area-weighted mean normals of the triangle pairs of the grid cells with the Ackeret factor
 `2/sqrt(M^2-1)`; 70 cases). A negative argument of the original's square root goes through a domain handler the
 emulator cannot run, so the vectors keep those arguments non-negative.
+
+`body_pass` (`0x141267978..0x1412686a9`, 39 bodies of `B+0x6040`): the record's reference point is rotated with
+its angles (`+0x588` object: angles `+0x9c..0xa4`, offsets `+0x90..0x98`; third argument the lever curve), the air
+velocity there (`0x14121b580`, replayed) is rotated into the body axes and converted to angles and speed
+(`0x141183bf0`); `body_aero` gives three results, the wave drag replaces the third (blend factor from
+`body_blend` of the Mach number, `root_ratio` and the cross-flow magnitude) unless the record's engine index is a
+jet; `R+4` is set to the third result over the dynamic pressure times `R+0x10`; with `B+0x2894 > 0.01` and
+`F+0xdac` the three results are scaled by 0.05; the force is applied along the air direction at the rotated point
+by `0x140f26ef0`. 25 emulator cases identical. The argument order of `0x14120cf60`'s three inputs is
+`(xmm1, xmm3, stack float)`, and its outputs go to `r8`, the fifth and the seventh argument.
