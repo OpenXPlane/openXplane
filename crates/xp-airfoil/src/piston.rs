@@ -4,7 +4,8 @@
 //! Compared with the original on random objects at absolute addresses (`tools/gen_piston_vectors.py`).
 use crate::callees::engine_ratio;
 use crate::controls::ATMOSPHERE_TABLE;
-use crate::engine::curve;
+use crate::engine::{curve, signed_pow};
+use crate::engine_env::{starter_delay, thrust_term_of};
 use crate::scalar::clamp;
 use crate::vm::{CallArgs, Callees, Vm};
 use crate::wing_element::interpolate_clamped;
@@ -266,10 +267,7 @@ fn piston_levers(
         }
     }
     x6 *= vm.f32(m + 0x22c);
-    let limited = env
-        .call(vm, 0x1411a2e40, CallArgs::ints(&[f, u64::from(n as u32)]))
-        .rax as u32
-        != 0;
+    let limited = engine_ramp_limited(vm, env, f, n);
     if limited {
         let e18 = f64::from(vm.f32(engine(vm) + 0x18));
         let a0 = (e18 + f64::from_bits(0x4014f1a6e9000000)) as f32;
@@ -308,7 +306,7 @@ fn piston_levers(
         call_void(vm, env, 0x14119d380, scaled);
     }
     if vm.i32(engine(vm)) == 4 {
-        call_void(vm, env, 0x14119c610, x6);
+        update_engine_kind4(vm, env, m, b, f, n, x6);
     }
     if vm.i32(engine(vm)) == 3 {
         call_void(vm, env, 0x14119cb70, x6);
@@ -375,4 +373,101 @@ fn power_from_tables(vm: &mut Vm, env: &mut dyn Callees, m: u64, f: u64, b: u64,
     );
     let running = vm.i32(m + 0x74) as f32 * vm.f32(m + 0x22c);
     vm.set_f32(m + 0xcc, c1 * c2 * running);
+}
+
+/// `0x14119c610(M, B, F, n, level)`: the kind 4 handler: the engine's torque from the speed `M+0x78` against its
+/// rated speed (`E+0x18`), the thrust term of the fuel supply, the starter delay, the noise, the speeds
+/// `M+0x90/0x98` and, for a running engine, the manifold-pressure terms `M+0x240/0x244/0x248`.
+pub fn update_engine_kind4(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    m: u64,
+    b: u64,
+    f: u64,
+    n: i32,
+    level: f32,
+) {
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let rated = sse_max(vm.f32(engine(vm) + 0x18), 1.0);
+    let x6 = vm.f32(m + 0x78) / rated;
+    let root = signed_pow(x6, 0.5);
+    let m258 = f64::from(vm.f32(m + 0x258));
+    let running = vm.i32(m + 0x74);
+    let h = (f64::from(root) * 1.26 * m258 * f64::from(running) * f64::from(level)) as f32;
+    let squared = signed_pow(x6, 2.0);
+    let w = (f64::from(squared) * 0.25 * m258) as f32;
+    let s = (f64::from(x6) * 100.0) as f32;
+    let u = if -1.0 > s { -1.0 } else { sse_min(1.0, s) };
+    let v6 = ((f64::from(vm.f32(b + 0x9f0)) * 0.02 + 1.0 - f64::from(vm.f32(m + 0x2bc)))
+        * f64::from(u)) as f32;
+    let thrust = thrust_term_of(vm, env, f, n);
+    let power = thrust + (sse_max(0.0, h) - w - v6);
+    vm.set_f32(m + 0xb8, power * vm.f32(engine(vm) + 0x10));
+    let start = bind(env, f, 0x1b1, n);
+    starter_delay(vm, env, f, m, start);
+    let speed = sse_max(vm.f32(m + 0x78), 0.01);
+    let drag = vm.f32(m + 0x268) / speed;
+    let start_state = vm.f32(m + 0x2c8);
+    let ramp = if 1.0 > start_state {
+        vm.i32(m + 0x74) as f32 * start_state
+    } else {
+        1.0
+    };
+    let b8 = ramp * (vm.f32(m + 0xb8) - drag);
+    vm.set_f32(m + 0xb8, b8);
+    if bind(env, f, 0x181, n) {
+        let t = (vm.f64(0x142f01910) * 2.0) as f32;
+        let mut a = CallArgs::ints(&[0, u64::from(n as u32)]);
+        a.xmm[0] = Some(t.to_bits());
+        a.int[0] = None;
+        let noise = reply_f32(env.call(vm, 0x1408bd9d0, a));
+        let v = ((f64::from(noise) * 0.05 + 0.95) * f64::from(vm.f32(m + 0xb8))) as f32;
+        vm.set_f32(m + 0xb8, v);
+    }
+    let rated_ratio = vm.f32(engine(vm) + 0x64);
+    let g = if 0.1 > rated_ratio {
+        0.1
+    } else {
+        sse_min(2.0, rated_ratio)
+    };
+    let sqrt = g.sqrt();
+    let s_pos = sse_max(s, 0.0);
+    let b8 = sqrt * vm.f32(m + 0xb8);
+    vm.set_f32(m + 0x90, s_pos);
+    vm.set_f32(m + 0x98, s_pos);
+    vm.set_f32(m + 0xb8, b8);
+    if running == 0 {
+        return;
+    }
+    let low = f64::from(vm.f32(b + 0x9c4));
+    let q = ((f64::from(x6) * 100.0 - low) / (100.0 - low)) as f32;
+    let q3 = signed_pow(q, 3.0);
+    let lever = running as f32 * level;
+    let lever_a = signed_pow(lever, 0.1);
+    let lever_b = signed_pow(lever, 5.0);
+    let blend = (f64::from(lever_b) * 0.3 + f64::from(lever_a) * 1.7) as f32;
+    let m258 = vm.f32(m + 0x258);
+    let blend = (blend - q3) / vm.f32(m + 0x24c);
+    let density = sse_max(signed_pow(m258, 0.25), 0.01);
+    let o = sse_max(0.0, blend / density);
+    vm.set_f32(m + 0x240, o);
+    vm.set_f32(m + 0x244, o);
+    let x0 =
+        (vm.f32(m + 0x25c) / vm.f32(engine(vm) + 4) - 0.05) * f32::from_bits(0x3f4a1af3) + 0.25;
+    let y = if 0.25 > x0 { 0.25 } else { sse_min(1.0, x0) };
+    vm.set_f32(m + 0x248, y * o);
+}
+
+/// `0x1411a2e40(F, n)`: whether the engine's lever is limited by its ramp: the aircraft has `B+0xaac` set, the
+/// engine's state has `+0x1e4` set, and neither input binding (`0x2fb` for index 0, `0x239` for the engine) is active.
+pub fn engine_ramp_limited(vm: &Vm, env: &mut dyn Callees, f: u64, n: i32) -> bool {
+    let b = vm.u64(f + 0x20);
+    if vm.i32(b + 0xaac) == 0 {
+        return false;
+    }
+    let state = vm.u64(f + 0x68b0) + (i64::from(n) * 0x2cc) as u64;
+    if vm.i32(state + 0x1e4) == 0 {
+        return false;
+    }
+    !bind(env, f, 0x2fb, 0) && !bind(env, f, 0x239, n)
 }

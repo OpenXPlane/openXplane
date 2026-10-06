@@ -686,7 +686,7 @@ impl Mem for Shifted<'_> {
 /// frame time.
 const STARTER_THRESHOLD: f64 = 0.9;
 
-fn starter_timer(rec: &mut Record, start: bool, env: &mut dyn EngineEnv) {
+pub(crate) fn starter_timer(rec: &mut Record, start: bool, env: &mut dyn EngineEnv) {
     if !start {
         rec.set_i32(0x2c4, 0);
         rec.set_f32(0x2c8, 1.0);
@@ -737,7 +737,7 @@ fn select_tank(f: &dyn Mem, mask: u32) -> usize {
 /// `0x141238c20`: the thrust term of the engine from its fuel supply, written smoothed to `+0x21c` and returned.
 /// Zero (and `+0x21c` cleared) when `+0x218` is not above the global threshold or the cut-off input binding is
 /// active. The fuel is drawn from the tanks through the environment.
-fn thrust_term(
+pub(crate) fn thrust_term(
     f: &dyn Mem,
     b: &dyn Mem,
     desc: &dyn Mem,

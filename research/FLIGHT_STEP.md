@@ -182,9 +182,20 @@ noise `0x140984e50` when input `0x1a1` is bound). Then the throttle gain `0x1411
 by an interpolation on `E+0x18` (`0x1411a2e40`), and limited for kind 3 (`B+0xa9c` 2) and kind 4 (3) by the extremes
 of the bound elements' values against the engine ratio (factors 1.05, 0.95, 1.06). The kind handlers
 (`0x14119bc00` kind 0 with the lever input, `0x14119d380` kinds 1 and 2, `0x14119c610` kind 4, `0x14119cb70` kind 3)
-are called with the resulting lever and are replayed, not ported. For kinds 3 and 4, when `F+0x28 != 0` or
+are called with the resulting lever; the kind 4 handler is ported (below), the others are replayed. For kinds 3 and 4, when `F+0x28 != 0` or
 `F+0x6880 == 0`, the power `M+0xcc` is two curves (`0x14082b800`) of the engine speed `M+0x90`, from a bilinear
 lookup of the temperature and altitude in the runtime atmosphere table.
 
-Not ported: the four kind handlers, `0x1411a2e40`, and the callees already listed as environment (frame time, bindings,
-atmosphere queries, noise).
+`engine_ramp_limited` (`0x1411a2e40`) is ported (`B+0xaac`, the state's `+0x1e4` and the two bindings `0x2fb`/`0x239`).
+
+The kind 4 handler `update_engine_kind4` (`0x14119c610(M, B, F, n, level)`, 311 instructions) is ported: the root
+(exponent 0.5) and square of the speed ratio `M+0x78 / E+0x18` give the torque terms, the thrust term of the fuel
+supply (`0x141238c20`) and the starter delay (`0x1411924e0`) come from the already ported helpers of `engine.rs`
+through `engine_env` (the environment queries are the original's callees, replayed in the tests), the noise
+(`0x1408bd9d0`, argument twice the global clock `0x142f01910`) scales the power by 0.95 + 0.05 noise, and for a
+running engine `M+0x240/0x244/0x248` come from the lever with exponents 0.1, 5 and 3. The query mode argument of
+the binding call (2 for the first fuel cut-off test of `0x141238c20`, otherwise 1) is not modelled by `EngineEnv`.
+
+Not ported: the kind handlers for kinds 0 (`0x14119bc00`), 1 and 2 (`0x14119d380`, 1000 instructions) and 3
+(`0x14119cb70`), and the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
+the global clock).
