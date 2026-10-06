@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
 
 EXE, STAGE, TRIALS, SEED = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
-UNTIL = {1: 0x14117e266, 2: 0x14117f79f, 3: None}
+UNTIL = {1: 0x14117e266, 2: 0x14117f79f, 3: 0x1411819c2, 4: 0x141181f0d}
 FUNC = 0x14117d970
 
 
@@ -26,6 +26,11 @@ def main():
                               (0x14120c000, 0x14120d000), (0x141296000, 0x141297000), (0x1407ac000, 0x1407ad000),
                               (0x1406e0000, 0x1406f0000)])
     case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.randrange(2) if rng.random() < 0.3 else 0))
+    def shadow(call, rng):
+        flag = rng.choice([0, 0, 0, 1])
+        call.put(call.ints[1], flag)
+        call.put_f32(call.ints[1] + 4, rng.uniform(-0.5, 1.5))
+    case.stub(0x141186930, shadow)
     print('# wash vectors (tools/gen_wash_vectors.py), stage', STAGE)
     rng = case.rng
     done = attempts = 0
@@ -39,6 +44,11 @@ def main():
         M = case.region('M', 0x2cc * 4)
         N = case.region('N', 0x388 * 4)
         O = case.region('O', 0x40)
+        if STAGE >= 3:
+            W = case.region('W', 0x36c8 * 48)
+            X = case.region('X', 0x2d8 * 48)
+            D = case.region('D', 0x34c8 * 2)
+            A = case.region('A', 0x100 * 3)
         fz = case.fz
         sp = entry_rsp(6)
         fz.region('S', sp - 0x800, 0x900)
@@ -46,6 +56,39 @@ def main():
             name = {F: 'F', B: 'B'}[base]
             fz.preset(name, off, ptr & 0xffffffff, record=True)
             fz.preset(name, off + 4, ptr >> 32, record=True)
+        if STAGE >= 3:
+            for base, off, ptr in ((B, 0x6028, W), (F, 0x6940, X), (B, 0x6040, D)):
+                name = {F: 'F', B: 'B'}[base]
+                fz.preset(name, off, ptr & 0xffffffff, record=True)
+                fz.preset(name, off + 4, ptr >> 32, record=True)
+            live = set(rng.sample(range(48), 4))
+            for j in range(48):
+                if j not in live:
+                    fz.preset('W', 0x36c8 * j + 0x678, 0)
+                    continue
+                fz.preset('W', 0x36c8 * j + 4, rng.randrange(1, 4))
+                fz.preset('W', 0x36c8 * j + 0x678, 1)
+                fz.preset_f32('W', 0x36c8 * j + 0x710, rng.uniform(-6, 6))
+                for k, off in enumerate((0x3678, 0x3680, 0x3688)):
+                    ptr = rng.choice([0, A + 0x100 * k, A + 0x100 * rng.randrange(3)])
+                    fz.preset('W', 0x36c8 * j + off, ptr & 0xffffffff, record=True)
+                    fz.preset('W', 0x36c8 * j + off + 4, ptr >> 32, record=True)
+                for k in range(4):
+                    fz.preset_f32('W', 0x36c8 * j + 0x70 + 4 * k, rng.uniform(0.3, 3.0))
+                    fz.preset_f32('W', 0x36c8 * j + 0x74 + 4 * k, rng.uniform(0.0, 3.0))
+                    fz.preset_f32('W', 0x36c8 * j + 0x144 + 4 * k, rng.uniform(0.0, 1.5))
+                    fz.preset_f32('W', 0x36c8 * j + 0x16c + 4 * k, rng.uniform(-30.0, 30.0))
+                    fz.preset_f32('X', 0x2d8 * j + 0xf4 + 4 * k, rng.uniform(0.0, 1.5))
+                    fz.preset_f32('X', 0x2d8 * j + 0x16c + 4 * k, rng.uniform(-0.5, 2.0))
+                    fz.preset_f32('X', 0x2d8 * j + 4 + 4 * k, rng.uniform(0.5, 8.0))
+                for k in range(5):
+                    fz.preset_f32('W', 0x36c8 * j + 0x5bc + 4 * k, rng.uniform(-6, 6))
+                    fz.preset_f32('W', 0x36c8 * j + 0x5e8 + 4 * k, rng.uniform(-6, 6))
+                    fz.preset_f32('W', 0x36c8 * j + 0x614 + 4 * k, rng.uniform(-6, 6))
+                fz.preset_f32('W', 0x36c8 * j + 0x36a8, rng.uniform(0.5, 10.0))
+                fz.preset_f32('X', 0x2d8 * j + 0x290, rng.uniform(0.0, 2.0))
+            fz.preset_f32('F', 0x74, rng.uniform(100.0, 400.0))
+            fz.preset_f32('F', 0x524, rng.uniform(-120.0, 120.0))
         for off in (0xbcc8, 0xbcd0):
             fz.preset('F', off, 0)
         fz.preset('B', 0x91c, rng.randrange(1, 4))
@@ -73,6 +116,15 @@ def main():
             fz.preset_f32('O', 4 * k, rng.uniform(-5, 5))
         x, y, z = (rng.uniform(-8, 8) for _ in range(3))
         i1, i2, i3 = rng.choice([-1, 0, 1, 5]), rng.choice([-1, 0, 1]), rng.choice([-1, -1, -1, 0])
+        if STAGE >= 3:
+            i1, i2, i3 = rng.choice([-1, 0, 1, 5]), rng.choice([-1, 0, 1] + sorted(live)), rng.choice([-1, -1, 0, 1])
+            import os
+            if os.environ.get('NOEX'):
+                i2 = i3 = -1
+            if os.environ.get('ONLYWING'):
+                i3 = -1
+            if os.environ.get('ONLYBODY'):
+                i2 = -1
         # the stack arguments are written by the call; preset them so the lazy fill keeps them
         args = [O + 4, bits(y), O + 8, i1 & 0xffffffff, i2 & 0xffffffff, i3 & 0xffffffff]
         for k, value in enumerate(args):

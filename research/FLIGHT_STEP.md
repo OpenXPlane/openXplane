@@ -298,7 +298,11 @@ the jet exhaust of the engines of kinds 5 and 6, and the propeller slipstream of
 function entry to a checkpoint, 80 cases): for an engine part the point is rotated into the propeller axes
 (`0x141296900`, whose six stack floats are `sin, cos` of the angles `+0x79c`, `+0x7a0`, `+0x7a4`), the normalized
 radius and axial position give the swirl and thrust velocity profiles, and the result is rotated back and added to the
-three outputs after finite-value guards. Not ported: the wake of the wings and bodies and the last stage
-(`0x141186930`, 526 instructions) of the wash, the radiator/gear loop of the step (it uses the terrain probe and
+three outputs after finite-value guards. The wing wake (`0x14117f79f..0x1411819c2`: per wing and element, a downwash
+from two tangents blended by the body blend factor, a decay factor from the swirl term, with the excluded wing and
+body area ratios) and the tail (the body shadow scales the outputs by `sqrt(1/2)` inside a body or by
+`sqrt(1 - min(1, value))`) are ported too; 80 more cases, with the shadow function `0x141186930` replayed (it writes a
+flag at `rbp+0x670` and a value at `rbp+0x674`). So the whole wash is ported except that function (526 instructions,
+a ray-box test and a mesh crossing). Not ported: the radiator/gear loop of the step (it uses the terrain probe and
 standard containers) and the gear contact function `0x1411c8690` (2300 instructions, terrain-driven; no DSF scenery
 is available to verify it).

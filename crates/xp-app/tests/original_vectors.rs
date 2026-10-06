@@ -2910,6 +2910,16 @@ fn wash_parts_match_the_original_machine_code() {
 }
 
 #[test]
+fn wash_wings_match_the_original_machine_code() {
+    wash_stage("wash_3.txt", Some(openxplane::wash::Stop::Wings));
+}
+
+#[test]
+fn wash_matches_the_original_machine_code() {
+    wash_stage("wash_4.txt", None);
+}
+
+#[test]
 fn wing_chain_factor_matches_the_original_machine_code() {
     let cases = parse_vm_cases("chain.txt");
     assert!(cases.len() >= 100);

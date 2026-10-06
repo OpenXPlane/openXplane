@@ -12,7 +12,8 @@ Every entry that changes what you can see carries a screenshot or an animation (
 - Every engine kind of the reference build is ported and runs inside the engine controls: electric, carburetted and
   injected piston (the Cessna 172 SP), free and fixed turboprop, with the starter, the thrust term and the propeller
   power curve. Blocks of the flight step (wing aspect factors, rocket and blown-flap effects, the wing element loop,
-  the body loop, the atmosphere step), the body aerodynamic functions and two sections of the wash are ported too.
+  the body loop, the atmosphere step), the body aerodynamic functions and the whole airflow wash (jets, propeller
+  slipstream, wing wake, body shadow) are ported too.
   Each is compared with the original machine code in an emulator.
 
 ![Takeoff from Seattle-Tacoma with the approximate flight model](site/assets/anim/takeoff.gif)
