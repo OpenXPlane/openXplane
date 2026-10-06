@@ -28,4 +28,4 @@ The drawing routine `0x1416cc3a0`, the meaning of the cell kinds, the screen pos
 and the value sources of every line. Lines 0 (frame rate), 3, 4, 8, 13, 17, 18, 20, 21 and 25 are drawn with values from the approximate flight
 model (`dout::line_values`); cells without a source are empty (no GPU time, g-loads, magnetic values,
 latitude and longitude). The numbers of the other lines of the table need engine, weather and electrical
-systems that do not exist here. A `-` inside a label is drawn as a space (assumption).
+systems that do not exist here.

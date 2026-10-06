@@ -4,7 +4,7 @@
 //! What is taken from the reference build (`tools/extract_dout.py`, `assets/dout/lines.tsv`): the 173 line
 //! label strings. A label is 8 cells of 12 characters; `_` stands for a space; the first six characters of a
 //! cell are its upper label row and the last six its lower row; a cell whose label is `_____-_____` is empty.
-//! A `-` inside a label is drawn as a space (the photograph shows no dashes; this is an assumption).
+//! Dashes inside a label (`f-act`, `Mach-`) are drawn as they are.
 //! The frame-rate line has a second form without the `vblnk sync` cell, which the reference build uses when
 //! that value is not available.
 //!
@@ -45,7 +45,7 @@ pub fn line_count() -> usize {
 pub fn cell_labels(label: &str) -> [Option<(String, String)>; CELLS] {
     let chars: Vec<char> = label
         .chars()
-        .map(|c| if matches!(c, '_' | '-') { ' ' } else { c })
+        .map(|c| if c == '_' { ' ' } else { c })
         .collect();
     let raw: Vec<char> = label.chars().collect();
     std::array::from_fn(|i| {
