@@ -123,8 +123,8 @@ pub trait EngineEnv {
     fn binding(&mut self, id: u32, index: i32) -> bool;
     /// `0x141238c20(F, index)`: a thrust term of the engine (it also updates `+0x21c` of the record).
     fn thrust_term(&mut self, index: i32) -> f32;
-    /// `0x1411924e0(record, flag)`: the starter timer (it updates `+0x2c4` and `+0x2c8` of the record).
-    fn starter_timer(&mut self, flag: bool);
+    /// `0x14067b2f0`: the next number of the simulation's random generator, in 0..1 (a Mersenne twister).
+    fn random_unit(&mut self) -> f32;
 }
 
 /// `0x141170810`: the response curve of the aircraft: `100 * (0.01 x)^p` with the sign of `x` and the exponent
@@ -384,7 +384,7 @@ pub fn engine_update(
     let limit_ratio = rec.f32(0x268) / sse_max(desc.f32(0x20) * f.f32(0x74), 0.01);
     let friction = limit_ratio / sse_max((f64::from(rpm_now) * 0.01) as f32, 0.01);
     let bound = env.binding(0x1b1, index as i32);
-    env.starter_timer(bound);
+    starter_timer(rec, bound, env);
     engine_speed -= friction;
     let lube = {
         let t = 0.0 - (rec.f32(0x2bc) - 1.0 + (rec.f32(0x2bc) - 1.0));
@@ -664,4 +664,31 @@ impl Mem for Shifted<'_> {
     fn i32(&self, offset: usize) -> i32 {
         self.mem.i32(self.base + offset)
     }
+}
+
+/// `0x1411924e0`: the starter delay. Without the start command the delay state `+0x2c8` is reset to 1 and the
+/// start flag `+0x2c4` cleared. With it, once `+0x2c8` is above the threshold, the start flag is set (and the
+/// state cleared) when the frame time exceeds a random number; otherwise the state moves towards 1 at twice the
+/// frame time.
+const STARTER_THRESHOLD: f64 = 0.9;
+
+fn starter_timer(rec: &mut Record, start: bool, env: &mut dyn EngineEnv) {
+    if !start {
+        rec.set_i32(0x2c4, 0);
+        rec.set_f32(0x2c8, 1.0);
+        return;
+    }
+    if f64::from(rec.f32(0x2c8)) > STARTER_THRESHOLD {
+        let random = f64::from(env.random_unit() + 0.0);
+        if env.frame_time() > random {
+            rec.set_i32(0x2c4, 1);
+            rec.set_f32(0x2c8, 0.0);
+            return;
+        }
+    }
+    rec.set_i32(0x2c4, 0);
+    let dt = env.frame_time();
+    let c = ((dt + dt) as f32).clamp(0.0, 1.0);
+    let state = rec.f32(0x2c8);
+    rec.set_f32(0x2c8, (1.0 - c) * state + c);
 }

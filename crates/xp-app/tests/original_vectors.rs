@@ -730,8 +730,8 @@ impl openxplane::engine::EngineEnv for Replay<'_> {
     fn thrust_term(&mut self, index: i32) -> f32 {
         f32::from_bits(self.next("thrust", &[index as u32]) as u32)
     }
-    fn starter_timer(&mut self, flag: bool) {
-        self.next("timer", &[u32::from(flag)]);
+    fn random_unit(&mut self) -> f32 {
+        f32::from_bits(self.next("rand", &[]) as u32)
     }
 }
 

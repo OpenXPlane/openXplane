@@ -66,6 +66,10 @@ def main():
                 value = rng.uniform(-0.5, 0.5)
                 e.set_xmm_f32(0, value)
                 calls.append((name, [regs[1] & 0xffffffff], bits_f(value)))
+            elif ret_kind == 'r':
+                value = rng.uniform(0.0, 0.02)
+                e.set_xmm_f32(0, value)
+                calls.append((name, [], bits_f(value)))
             elif ret_kind == 'v':
                 calls.append((name, [regs[1] & 0xffffffff], 0))
             elif ret_kind == 'b':
@@ -84,7 +88,13 @@ def main():
     emu.stubs[0x140c448c0] = record('dt', 'd')
     emu.stubs[0x1407ace10] = record('bind', 'i')
     emu.stubs[0x141238c20] = record('thrust', 'a')
-    emu.stubs[0x1411924e0] = record('timer', 'v')
+    emu.stubs[0x14067b2f0] = record('rand', 'r')
+    rng_state = emu.alloc(0x2000)
+
+    def rng_pointer(e):
+        e.uc.reg_write(UC_X86_REG_RAX, rng_state)
+
+    emu.stubs[0x1410c9c60] = rng_pointer
     print('# engine update vectors from the original 0x141197b00 (see tools/gen_engine_update_vectors.py)')
 
     def randomise(addr, size):
