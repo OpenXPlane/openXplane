@@ -21,6 +21,8 @@ use std::collections::BTreeMap;
 const RAD: f32 = f32::from_bits(0x3c8efa36);
 const DEG: f32 = f32::from_bits(0x42652ee0);
 const ABS: u32 = 0x7fff_ffff;
+/// The double `0.7071` of the original (not exactly the square root of one half).
+const ROOT_HALF: f64 = f64::from_bits(0x3fe6_a090_2de0_0d1b);
 
 fn neg(v: f32) -> f32 {
     f32::from_bits(v.to_bits() ^ 0x8000_0000)
@@ -1276,8 +1278,8 @@ pub fn prop_force(
         }
         let r1c = r.f32(0x1c);
         x11 = fr.f(-0x10);
-        let q = f64::from(r1c * r1c * x11) * 0.7071 * f64::from(p.f32(0x14));
-        let q7 = f64::from(q as f32) * 0.7071;
+        let q = f64::from(r1c * r1c * x11) * ROOT_HALF * f64::from(p.f32(0x14));
+        let q7 = f64::from(q as f32) * ROOT_HALF;
         let b2134 = f64::from(b.f32(0x2134));
         let rr = RAD;
         let s44 = (r.f32(0x44) * rr).sin();
