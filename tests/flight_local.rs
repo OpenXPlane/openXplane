@@ -107,6 +107,15 @@ fn control_signs_follow_the_pilot() {
         back.x > neutral.x + 0.02,
         "elevator back should pitch up: {back:?} vs {neutral:?}"
     );
+    let trim = rate(Controls {
+        throttle: 0.6,
+        elevator_trim: 0.3,
+        ..Controls::default()
+    });
+    assert!(
+        trim.x > neutral.x + 0.01,
+        "pitch trim up should pitch up: {trim:?} vs {neutral:?}"
+    );
     let right = rate(Controls {
         throttle: 0.6,
         aileron: 0.6,

@@ -59,6 +59,10 @@ pub struct Controls {
     pub brake: f32,
     /// Flap handle 0..1 (up to the largest ACF detent).
     pub flaps: f32,
+    /// Trim added to the matching stick axis, -1..1.
+    pub elevator_trim: f32,
+    pub aileron_trim: f32,
+    pub rudder_trim: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -208,10 +212,11 @@ fn control_deflection(
     // range = (up, down) limits in degrees; the result is positive for the trailing edge down.
     let (up, down) = range;
     let signed = |s: f32| if s >= 0.0 { -s * up } else { -s * down };
+    let sum = |stick: f32, trim: f32| (stick + trim).clamp(-1.0, 1.0);
     match control {
-        0 => signed(c.aileron * side),
-        1 => signed(c.elevator),
-        2 => signed(-c.rudder),
+        0 => signed(sum(c.aileron, c.aileron_trim) * side),
+        1 => signed(sum(c.elevator, c.elevator_trim)),
+        2 => signed(-sum(c.rudder, c.rudder_trim)),
         _ => flap_deg,
     }
 }
@@ -637,7 +642,7 @@ impl FlightModel {
                     0.0
                 };
             // wheel heading: the nose direction in the ground plane, steered for the nose wheel
-            let steer = -c.rudder * g.steer_max_rad;
+            let steer = -(c.rudder + c.rudder_trim).clamp(-1.0, 1.0) * g.steer_max_rad;
             let heading = st.orientation * (Quat::from_rotation_y(steer) * Vec3::NEG_Z);
             let long_dir = Vec3::new(heading.x, 0.0, heading.z).normalize_or_zero();
             let lat_dir = Vec3::new(-long_dir.z, 0.0, long_dir.x);

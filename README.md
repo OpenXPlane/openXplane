@@ -36,7 +36,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 | 3D models (OBJ8) | 7 | 35% | 5% | Geometry, nested transforms, rotation/translation animation, textures. No normal/lit maps, instruments, panels or most dynamic animation. |
 | Airfoil evaluation (AFL) | 6 | 90% | 60% | All 34 airfoils; angle correction, lookup, stall, buffet and blending. The profile stage matches the original bit for bit on 1200 vectors. |
 | Flight model | 28 | 25% | 2% | An approximate rigid-body model that takes off and flies. The original's wing element function is mapped but not ported. |
-| Datarefs and commands | 8 | 25% | 15% | Registries and catalogs of 5503 datarefs and 3012 commands from the original; values exist for 6 datarefs; no command handlers. |
+| Datarefs and commands | 8 | 28% | 15% | Registries and catalogs of 5503 datarefs and 3012 commands from the original, its default keyboard map (71 keys), values for 6 datarefs; 30 key commands act in the flight viewer. |
 | Scenery and world | 14 | 10% | 0% | Airport ground from apt.dat (runways, taxiways, aprons). No DSF, terrain, objects, lights or weather. |
 | Cockpit, instruments, Lua systems | 10 | 0% | 0% | Not started. |
 | Rendering | 6 | 20% | 0% | wgpu viewer with lighting and glass. No PBR, shadows, sky, clouds or instrument screens. |
@@ -250,11 +250,15 @@ cargo run --release --offline -- wing-info "Xplane12/Cessna 172 SP/Cessna_172SP.
 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 60
 ```
 
-`fly` opens a window with the Cessna on the first runway of the airport. Keys: Down/Up arrows pitch (Down =
-nose up), Left/Right roll, Z/X rudder, PageUp/PageDown or W/S throttle, Space or B brakes, F/V flaps, P pause,
-R reset, mouse drag to look around, scroll to zoom, Esc to quit. The window title shows speed, altitude, vertical
-speed, pitch, bank, heading, throttle and a stall warning. `fly-render` runs a scripted takeoff and saves
-chase-camera frames at the given times.
+`fly` opens a window with the Cessna on the first runway of the airport. It uses the **original's default
+keyboard map**, read from the reference build: F1/F2/F3 throttle down/up/full, `1`/`2` flaps up/down, `B` brakes
+(hold), `V` maximum brakes, `[` `]` pitch trim, `5 6 7` rudder trim, `8 9 0` aileron trim, `P` pause, `W` default
+view, `Q E R F` and `= -` move the camera. The original has no keyboard stick, so openXplane adds one: arrow keys
+pitch and roll, `Z`/`X` rudder (`Tab` gives them their original meaning back), `Delete` resets, `Esc` quits.
+Commands without anything to act on yet (mixture, magnetos, carb heat...) are reported in the window title as not
+simulated. The title also shows speed, altitude, vertical speed, pitch, bank, heading, throttle, flaps and a stall
+warning. Full table: [docs/KEYBOARD.md](docs/KEYBOARD.md); source of the map: [research/KEYMAP.md](research/KEYMAP.md).
+`fly-render` runs a scripted takeoff and saves chase-camera frames at the given times.
 
 ![Cessna climbing out of KSEA](assets/screenshots/flight-climb.png)
 
