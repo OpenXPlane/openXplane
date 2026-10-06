@@ -1,0 +1,14 @@
+[package]
+name = "xp-sim"
+description = "The approximate flight model and pilot commands"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+glam.workspace = true
+xp-acf.workspace = true
+xp-airfoil.workspace = true
+xp-dataref.workspace = true
+xp-scenery.workspace = true

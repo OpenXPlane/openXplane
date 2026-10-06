@@ -1,24 +1,7 @@
-//! Initial ACF reader. Preserve unknown properties rather than guessing their meaning.
-pub mod aero;
+//! The ACF aircraft file: a property reader that preserves unknown properties rather than guessing their
+//! meaning, typed parameters confirmed in the reference build, and the lifting surfaces.
 pub mod aircraft;
-pub mod airfoil;
-pub mod apt;
-pub mod buffet;
-pub mod commands;
-pub mod dataref;
-pub mod discord;
-pub mod flight;
-pub mod install;
-pub mod keymap;
-pub mod obj8;
-pub mod pilot;
-pub mod profile;
-pub mod regimes;
-pub mod runtime;
-pub mod stall;
 pub mod wing;
-pub mod wing_element;
-pub mod world;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]

@@ -1,0 +1,10 @@
+[package]
+name = "xp-acf"
+description = "The ACF aircraft file: properties, typed parameters, lifting surfaces"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+glam.workspace = true

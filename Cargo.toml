@@ -1,14 +1,28 @@
-[package]
-name = "openxplane"
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+default-members = ["crates/xp-app"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "Independent X-Plane-compatible engine research and content loader"
 license = "MIT"
+repository = "https://github.com/OpenXPlane/openXplane"
 
-[dependencies]
+[workspace.dependencies]
 bytemuck = { version = "1.25.2", features = ["derive"] }
 glam = "0.30.10"
 image = { version = "0.25.10", default-features = false, features = ["png", "dds"] }
 pollster = "0.4.0"
 wgpu = "29.0.4"
 winit = "0.30.13"
+xp-acf = { path = "crates/xp-acf" }
+xp-airfoil = { path = "crates/xp-airfoil" }
+xp-dataref = { path = "crates/xp-dataref" }
+xp-discord = { path = "crates/xp-discord" }
+xp-obj = { path = "crates/xp-obj" }
+xp-scenery = { path = "crates/xp-scenery" }
+xp-sim = { path = "crates/xp-sim" }
+
+[profile.release]
+debug = false

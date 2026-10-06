@@ -2,7 +2,8 @@
 //! The keys come from `keymap`; only the commands that mean something to the approximate flight
 //! model act (throttle, flaps, brakes, trims, pause, view); the others are recognised and reported
 //! as not simulated. Step sizes are openXplane's choice: the original's are not recovered.
-use crate::{commands::Phase, flight::Controls};
+use crate::flight::Controls;
+use xp_dataref::commands::Phase;
 
 /// Throttle change per press or key repeat for "a bit".
 pub const THROTTLE_STEP: f32 = 0.05;
@@ -122,7 +123,7 @@ pub fn apply_command(c: &mut Controls, command: &str, phase: Phase) -> Effect {
         "sim/general/forward" if acts => return Effect::View(ViewAction::Zoom(-2.0)),
         "sim/general/backward" if acts => return Effect::View(ViewAction::Zoom(2.0)),
         _ if is_stateless_noop(command, phase) => return Effect::Controls,
-        _ if crate::keymap::key_for_command(command).is_some() => return Effect::NotSimulated,
+        _ if xp_dataref::keymap::key_for_command(command).is_some() => return Effect::NotSimulated,
         _ => return Effect::Unknown,
     }
     Effect::Controls

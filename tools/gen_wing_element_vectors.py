@@ -14,7 +14,7 @@ Line layout (float32 hex, integers decimal):
   ncalls { slot x y z retain diag re arg6 alpha mult div dac stalled | ret cl cd cm ratio stall_out } |
   ret cl cd cm ratio cdi stall_final
 
-    python3 tools/gen_wing_element_vectors.py Xplane12/X-Plane.exe > tests/data/wing_element.txt
+    python3 tools/gen_wing_element_vectors.py Xplane12/X-Plane.exe > crates/xp-app/tests/data/wing_element.txt
 Needs: pip install unicorn numpy
 """
 import math

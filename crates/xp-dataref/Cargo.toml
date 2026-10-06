@@ -1,0 +1,11 @@
+[package]
+name = "xp-dataref"
+description = "Dataref and command registries and the default keyboard map"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+xp-acf.workspace = true
+xp-airfoil.workspace = true

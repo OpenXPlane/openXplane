@@ -4,7 +4,7 @@
 The function (angle correction, fixed-grid lookup, normalised angle, stall flag, active-stall noise
 perturbation) is executed in the Unicorn emulator (tools/emulate_xp.py) on synthetic airfoil tables and
 a synthetic noise table, and its outputs are written as bit patterns. The Rust test
-tests/original_vectors.rs recomputes every case with the port and requires identical bits.
+crates/xp-app/tests/original_vectors.rs recomputes every case with the port and requires identical bits.
 
 Synthetic data (so both sides build the same inputs without shipping any airfoil file):
   table k : Cl[i] = ((i*131 + k*977) % 4001 - 2000) / 1000
@@ -12,7 +12,7 @@ Synthetic data (so both sides build the same inputs without shipping any airfoil
             Cm[i] = ((i*61 + k*389) % 2003 - 1000) / 5000
   noise   : v[i] = ((i * 2654435761) mod 2^32 >> 8) / 2^24 * 2 - 1          (262144 float32 values)
 
-Usage: python3 tools/gen_profile_vectors.py Xplane12/X-Plane.exe > tests/data/profile_stage.txt
+Usage: python3 tools/gen_profile_vectors.py Xplane12/X-Plane.exe > crates/xp-app/tests/data/profile_stage.txt
 Needs: pip install unicorn numpy
 """
 import random

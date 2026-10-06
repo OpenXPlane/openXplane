@@ -8,22 +8,24 @@
 //! surface effectiveness, the fuselage drag area, published Cessna 172 inertias scaled by mass,
 //! and a synthetic stall-buffet noise table. Treat results as plausible, not as agreement with
 //! X-Plane.
-use crate::{
+use glam::{Mat3, Quat, Vec3};
+use std::{collections::BTreeMap, path::Path};
+use xp_acf::{
     Aircraft,
     aircraft::{ACF_FT_TO_M, AircraftParameters},
+    wing::{Element, Wing, aspect_ratios},
+};
+use xp_airfoil::{
     airfoil::Airfoil,
     buffet::{NoiseTable, TABLE_LEN},
-    install::Install,
     profile::{self, OuterInputs},
     runtime::RunningTime,
-    wing::{Element, Wing, aspect_ratios},
     wing_element::{
         self, Aircraft as ElementAircraft, ElementInputs, ElementState, Flow, FoilCall, FoilResult,
         WingFields,
     },
 };
-use glam::{Mat3, Quat, Vec3};
-use std::{collections::BTreeMap, path::Path};
+use xp_scenery::install::Install;
 
 const G: f32 = 9.80665;
 const LB_TO_N: f32 = 4.448_222;

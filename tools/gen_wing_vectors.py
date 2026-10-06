@@ -6,7 +6,7 @@ chord at +0x70) and two float fields (+0x18, +0x1c) of a wing object. A syntheti
 emulator for each random case. Output per line (float32 bit patterns in hex):
   x0 x1 y0 y1 z0 z1 c0 c1 f18 f1c | sweep weight
 
-    python3 tools/gen_wing_vectors.py Xplane12/X-Plane.exe > tests/data/wing_geometry.txt
+    python3 tools/gen_wing_vectors.py Xplane12/X-Plane.exe > crates/xp-app/tests/data/wing_geometry.txt
 Needs: pip install unicorn numpy
 """
 import math

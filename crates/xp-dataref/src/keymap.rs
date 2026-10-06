@@ -13,7 +13,7 @@ pub struct Binding {
     pub description: String,
 }
 
-const TABLE: &str = include_str!("../assets/keymap/default_keys.tsv");
+const TABLE: &str = include_str!("../../../assets/keymap/default_keys.tsv");
 
 /// Parses `command<TAB>key<TAB>0xCC<TAB>description` rows. Fails on a malformed row or a key that
 /// two commands share.

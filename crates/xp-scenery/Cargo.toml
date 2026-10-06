@@ -1,0 +1,9 @@
+[package]
+name = "xp-scenery"
+description = "Installation layout, apt.dat and airport ground geometry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]

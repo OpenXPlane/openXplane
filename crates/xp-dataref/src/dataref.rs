@@ -2,9 +2,9 @@
 //! Access is strictly typed. Cross-type conversions of the original (e.g. reading a
 //! float dataref as int) have not been established, so a mismatch is an error.
 //! The one confirmed conversion is a float32-exposed dataref backed by a double.
-use crate::aircraft::AircraftParameters;
-use crate::runtime::{RUNNING_TIME_DATAREF, RunningTime};
 use std::collections::BTreeMap;
+use xp_acf::aircraft::AircraftParameters;
+use xp_airfoil::runtime::{RUNNING_TIME_DATAREF, RunningTime};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DataType {

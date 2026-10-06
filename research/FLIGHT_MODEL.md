@@ -44,7 +44,7 @@ X-Plane. The code is `src/wing.rs` and `src/flight.rs`.
 
 ## Behaviour on the provided Cessna 172 SP
 
-Mass 951 kg (empty plus 80 kg fuel and 90 kg payload). Checked by `tests/flight_local.rs` and `fly-test`
+Mass 951 kg (empty plus 80 kg fuel and 90 kg payload). Checked by `crates/xp-app/tests/flight_local.rs` and `fly-test`
 (these need the reference installation and are skipped without it):
 
 - Rests on its gear without drifting (height, speed and attitude constant over 10 s).

@@ -9,26 +9,26 @@ The difference from openOMSI: X-Plane is a flight simulator, so the core is the 
 not timetables and AI traffic. Behaviour is confirmed by analysing the original EXE (`research/*.md`) and by
 comparison with the reference build.
 
-## Target structure (workspace)
+## Crates
 
-For now everything lives in one crate, `openxplane`. It should be split into crates as a second consumer of a
-module appears, not in advance.
+The repository is a Cargo workspace with one crate per subsystem, in the manner of openOMSI. `xp-app` is the
+only binary (`openxplane`); it re-exports the other crates through a small facade so the tools and tests name
+everything in one place.
 
-| Crate | Contents | Today |
-| --- | --- | --- |
-| `xp-cfg` | text formats, virtual file system, content roots | `lib.rs` (ACF) |
-| `xp-acf` | typed ACF, PANEL_3D | `aircraft.rs`, `lib.rs` |
-| `xp-airfoil` | AFL, lookup, stall, buffet, regimes | `airfoil`, `aero`, `stall`, `buffet`, `regimes`, `profile` |
-| `xp-obj` | OBJ8, animations, materials | `obj8.rs` |
-| `xp-texture` | DDS/PNG, mipmaps, normal/lit | `image` in `gpu.rs` |
-| `xp-scenery` | apt.dat, earth_nav.dat, DSF, libraries | `apt.rs`, `world.rs`, `install.rs` |
-| `xp-dataref` | registry of datarefs and commands | `dataref.rs`, `commands.rs` |
-| `xp-sim` | flight model, engines, landing gear, weather | none |
-| `xp-script` | runtime for the stock Lua scripts | none |
-| `xp-render` | wgpu renderer | `gpu.rs`, `scene.rs`, `viewer.rs` |
-| `xp-audio`, `xp-net`, `xp-plugin` | audio, multiplayer, plugins | none |
-| `xp-app` | binary, launcher, HUD | `main.rs` |
-| `tools/xp-check` | format coverage over a content directory | the `inspect` command |
+| Crate | Contents |
+| --- | --- |
+| `xp-acf` | the ACF property reader, typed aircraft parameters, lifting surfaces and their geometry |
+| `xp-airfoil` | AFL tables, angle correction and lookup, stall, buffet, regimes, the profile function, the wing element function (all verified against the original) |
+| `xp-obj` | the OBJ8 model reader |
+| `xp-scenery` | the installation folder layout and precedence, apt.dat, airport ground geometry |
+| `xp-dataref` | dataref and command registries, the original's default keyboard map |
+| `xp-sim` | the approximate flight model, pilot commands |
+| `xp-discord` | Discord Rich Presence |
+| `xp-app` | the binary: viewer, flight, command line tools; the tests against the original |
+
+Planned splits as the work grows: the renderer (`gpu`, `scene`, `viewer`) into `xp-render`, the Lua runtime into
+`xp-script`, audio, networking and plugins into their own crates, a `tools/xp-check` coverage tool over a
+content folder.
 
 ## Milestones
 

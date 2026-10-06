@@ -1,0 +1,11 @@
+[package]
+name = "xp-obj"
+description = "The OBJ8 model reader"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+glam.workspace = true

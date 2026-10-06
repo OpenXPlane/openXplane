@@ -10,7 +10,7 @@ use std::path::Path;
 const ACF: &str = "Xplane12/Cessna 172 SP/Cessna_172SP.acf";
 
 fn model() -> Option<FlightModel> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("Xplane12");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Xplane12");
     let acf = root.join("Cessna 172 SP/Cessna_172SP.acf");
     if !acf.is_file() {
         eprintln!("skipped: {ACF} not found");

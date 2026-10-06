@@ -1,0 +1,30 @@
+[package]
+name = "xp-app"
+description = "The openxplane application: viewer, flight and command line tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "openxplane"
+path = "src/lib.rs"
+
+[[bin]]
+name = "openxplane"
+path = "src/main.rs"
+
+[dependencies]
+bytemuck.workspace = true
+glam.workspace = true
+image.workspace = true
+pollster.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+xp-acf.workspace = true
+xp-airfoil.workspace = true
+xp-dataref.workspace = true
+xp-discord.workspace = true
+xp-obj.workspace = true
+xp-scenery.workspace = true
+xp-sim.workspace = true

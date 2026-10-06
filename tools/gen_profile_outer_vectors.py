@@ -8,7 +8,7 @@ calls) runs on random arguments, with a synthetic noise table and running time a
 Line: n_tables { k p0 p1 p2 p3 p4 } scalar | x y z retain re mach alpha mult div dac time stall_in |
       cl cd cm ratio ret stall_out        (float32 bit patterns in hex, time as double bits)
 
-    python3 tools/gen_profile_outer_vectors.py Xplane12/X-Plane.exe > tests/data/profile_outer.txt
+    python3 tools/gen_profile_outer_vectors.py Xplane12/X-Plane.exe > crates/xp-app/tests/data/profile_outer.txt
 """
 import random
 import struct

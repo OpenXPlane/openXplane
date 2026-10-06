@@ -17,6 +17,65 @@ reference build. The first reference is a provided X-Plane 12.
 Architecture and milestones, modelled on [openOMSI](https://github.com/openOMSI-Project/openOMSI):
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Download
+
+Every change to `main` is built by GitHub Actions and published as the rolling
+[nightly release](https://github.com/OpenXPlane/openXplane/releases/tag/nightly):
+
+| Platform | File |
+| --- | --- |
+| Windows x64 | `openXplane-<version>-windows-x64.zip`, run `openxplane.exe` |
+| macOS (Apple silicon) | `openXplane-<version>-macos-arm64.zip`, run `openxplane` |
+| Linux x64 | `openXplane-<version>-linux-x64.zip`, run `openxplane` |
+
+There is no launcher yet: run it from a terminal and point it at your X-Plane 12 folder (see the commands below).
+
+## Goals
+
+1. **1:1 behaviour.** The formats and algorithms of X-Plane 12 behave as in the original, confirmed in the
+   reference build and verified against its machine code.
+2. **No original code or assets.** Nothing is copied; formats are described in the research notes.
+3. **A better engine.** Rust, wgpu (Metal, Vulkan, DirectX 12), 64-bit, multithreaded loading.
+
+## Documentation
+
+| Document | What is in it |
+| --- | --- |
+| [Keyboard](docs/KEYBOARD.md) | the original's default keys and openXplane's own |
+| [Architecture](docs/ARCHITECTURE.md) | crates and roadmap |
+| [Compatibility](docs/COMPATIBILITY.md) | how close it is to the original, and how that is estimated |
+| [Discord](docs/DISCORD.md) | Rich Presence |
+| [Research notes](research/) | every recovered format and algorithm, with evidence |
+| [Verification](research/VERIFICATION.md) | comparing ports against the original machine code |
+| [Changelog](CHANGELOG.md) | what changed in each version |
+
+## Repository layout
+
+```
+openXplane/
+├── VERSION            MAJOR.MINOR of the next release (edited by hand)
+├── crates/            the engine, one crate per subsystem
+│   ├── xp-acf/          ACF aircraft files, typed parameters, lifting surfaces
+│   ├── xp-airfoil/      AFL tables, the verified evaluation chain, the wing element function
+│   ├── xp-obj/          OBJ8 model reader
+│   ├── xp-scenery/      installation layout, apt.dat, airport ground geometry
+│   ├── xp-dataref/      dataref and command registries, default keyboard map
+│   ├── xp-sim/          the approximate flight model and pilot commands
+│   ├── xp-discord/      Discord Rich Presence
+│   └── xp-app/          the `openxplane` binary (viewer, flight, tools) and the tests against the original
+├── tools/             research tools: emulator, extractors, vector generators, logo, scoring
+├── scripts/           build scripts for every platform, version.sh
+├── assets/            logos, screenshots, the keymap table
+├── docs/              user documentation (also published on the website)
+├── research/          research notes
+├── site/              the GitHub Pages website
+└── .github/workflows/ CI, nightly builds, the website
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).
+
 <!-- compat:start -->
 ## How close to the original is it?
 

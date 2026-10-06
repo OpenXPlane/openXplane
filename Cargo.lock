@@ -1237,18 +1237,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "openxplane"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "glam",
- "image",
- "pollster",
- "wgpu",
- "winit",
-]
-
-[[package]]
 name = "orbclient"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2617,6 +2605,71 @@ name = "xml-rs"
 version = "0.8.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
+
+[[package]]
+name = "xp-acf"
+version = "0.1.0"
+dependencies = [
+ "glam",
+]
+
+[[package]]
+name = "xp-airfoil"
+version = "0.1.0"
+
+[[package]]
+name = "xp-app"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "image",
+ "pollster",
+ "wgpu",
+ "winit",
+ "xp-acf",
+ "xp-airfoil",
+ "xp-dataref",
+ "xp-discord",
+ "xp-obj",
+ "xp-scenery",
+ "xp-sim",
+]
+
+[[package]]
+name = "xp-dataref"
+version = "0.1.0"
+dependencies = [
+ "xp-acf",
+ "xp-airfoil",
+]
+
+[[package]]
+name = "xp-discord"
+version = "0.1.0"
+
+[[package]]
+name = "xp-obj"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam",
+]
+
+[[package]]
+name = "xp-scenery"
+version = "0.1.0"
+
+[[package]]
+name = "xp-sim"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "xp-acf",
+ "xp-airfoil",
+ "xp-dataref",
+ "xp-scenery",
+]
 
 [[package]]
 name = "zerocopy"

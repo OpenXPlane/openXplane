@@ -1,0 +1,9 @@
+[package]
+name = "xp-airfoil"
+description = "Airfoil tables and the verified evaluation chain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]

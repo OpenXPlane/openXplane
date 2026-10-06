@@ -1,0 +1,9 @@
+[package]
+name = "xp-discord"
+description = "Discord Rich Presence over the local IPC socket"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
