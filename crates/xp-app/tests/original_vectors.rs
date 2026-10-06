@@ -2305,6 +2305,23 @@ fn pointer_following_callees_match_the_original_machine_code() {
                     assert!(got == *want, "{head}: {addr:#x}: {got:#x} vs {want:#x}");
                 }
             }
+            "R" => {
+                let d = |h: &str| f64::from_bits(u64::from_str_radix(h, 16).unwrap());
+                let p: Vec<f64> = (8..14).map(|i| d(t[i])).collect();
+                let got = openxplane::transform::rotate_pairs_f64(
+                    d(t[5]),
+                    d(t[6]),
+                    d(t[7]),
+                    [p[0], p[1], p[2], p[3], p[4], p[5]],
+                );
+                for k in 0..3 {
+                    assert_eq!(
+                        got[k].to_bits(),
+                        u64::from_str_radix(t[14 + k], 16).unwrap(),
+                        "{head}"
+                    );
+                }
+            }
             "D" => {
                 let got = openxplane::callees::direction_angles(f(t[5]), f(t[6]), f(t[7]));
                 for k in 0..4 {

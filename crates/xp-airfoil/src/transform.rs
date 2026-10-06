@@ -97,3 +97,17 @@ pub fn from_aircraft_frame(
     }
     out
 }
+
+/// `0x140f2ab00`: [`rotate_pairs`] in double precision: rotates `(a, b, c)` by the sine/cosine pairs
+/// `p = [p0 .. p5]` (stack slots `+0x80..+0xa8` of the original). Returns the three results in the order of the
+/// original's output pointers.
+pub fn rotate_pairs_f64(a: f64, b: f64, c: f64, p: [f64; 6]) -> [f64; 3] {
+    let u = b * p[5] - a * p[4];
+    let v = b * p[4] + a * p[5];
+    let w = u * p[2] + c * p[3];
+    [
+        v * p[1] - w * p[0],
+        u * p[3] - c * p[2],
+        w * p[1] + v * p[0],
+    ]
+}

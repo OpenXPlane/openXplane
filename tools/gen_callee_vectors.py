@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from emulate_xp import Emulator  # noqa: E402
 from xp_fuzz import Fuzz  # noqa: E402
-from unicorn.x86_const import UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RAX, UC_X86_REG_XMM0  # noqa: E402
+from unicorn.x86_const import UC_X86_REG_XMM1, UC_X86_REG_XMM2, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RAX, UC_X86_REG_XMM0  # noqa: E402
 
 EXE = sys.argv[1]
 SEED = 31
@@ -45,7 +45,7 @@ def main():
 
     emu.stubs[0x1407ace10] = stub_binding
     print('# callee vectors (tools/gen_callee_vectors.py)')
-    for kind in 'EBAPXYZVGTUCD':
+    for kind in 'EBAPXYZVGTUCDR':
         for trial in range(150 if kind in 'EBAP' else 50):
             emu.heap_top = mark
             fz.policy = {}
@@ -97,6 +97,17 @@ def main():
                 emu.call(0x141218060, ints=[O, abs(n)])
                 result = str(emu.reg(UC_X86_REG_RAX) & 0xff)
                 head = f'R P {O:x} {abs(n)} 0'
+            elif kind == 'R':
+                dq = lambda v: struct.unpack('<Q', struct.pack('<d', v))[0]
+                a, b, c = (fz.rng.uniform(-5, 5) for _ in range(3))
+                p = [fz.rng.uniform(-1, 1) for _ in range(6)]
+                outs = [emu.alloc(16) for _ in range(3)]
+                emu.uc.reg_write(UC_X86_REG_XMM0, dq(a))
+                emu.uc.reg_write(UC_X86_REG_XMM1, dq(b))
+                emu.uc.reg_write(UC_X86_REG_XMM2, dq(c))
+                emu.call(0x140f2ab00, ints=[0, 0, 0, outs[0]], stack=[outs[1], outs[2]] + [dq(v) for v in p])
+                result = ' '.join(f'{emu.read_u64(o):016x}' for o in outs)
+                head = f'R R {O:x} 0 0 ' + ' '.join(f'{dq(v):016x}' for v in [a, b, c] + p)
             elif kind == 'D':
                 a, b, c = (fz.rng.uniform(-5, 5) for _ in range(3))
                 outs = [emu.alloc(16) for _ in range(4)]
