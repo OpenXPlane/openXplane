@@ -63,3 +63,10 @@ at `0x14612bd90` (the image holds zeros; index `(altitude_m + 5000) / 100`, pair
 scaled by 101325). Where that table is built has not been found yet. Plan: build the harness the way the wing
 element one was built, with the unported callees replaced by stubs that record their arguments, and port the
 atmosphere table first because every flight function depends on it.
+
+Update: `tools/engine_harness.py` runs the update to its end in the emulator (random floats in the objects, the
+counts `B+0x91c`/`+0x920` set to 1, diagnostics off, four stubs). The function is about 1400 instructions
+after cleaning with `tools/clean_asm.py` and calls about 25 helpers, among them the input-binding query
+`0x1407ace10` (ids `0x1d1`, `0x2fb`, `0x239`...), the interpolation `0x1406ea0b0`, a signed power
+`0x1408625a0`, and several small engine helpers (`0x1411a2bf0`, `0x1411a2d90`, `0x1411e39a0`, `0x1411dd610`,
+`0x141170810`). Nothing is ported yet.
