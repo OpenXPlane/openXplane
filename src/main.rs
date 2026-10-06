@@ -18,8 +18,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             }
             Some(openxplane::buffet::NoiseTable::new(
                 bytes
-                    .chunks_exact(4)
-                    .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|b| f32::from_le_bytes(*b))
                     .collect(),
             )?)
         };
@@ -58,8 +60,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             return Err("expected exactly 262144 little-endian float32 table entries".into());
         }
         let values = bytes
-            .chunks_exact(4)
-            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f32::from_le_bytes(*b))
             .collect();
         let table = openxplane::buffet::NoiseTable::new(values)?;
         let number = |i: usize| -> Result<f32, Box<dyn std::error::Error>> {
