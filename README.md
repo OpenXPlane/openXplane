@@ -313,7 +313,7 @@ cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessn
 keyboard map**, read from the reference build: F1/F2/F3 throttle down/up/full, `1`/`2` flaps up/down, `B` brakes
 (hold), `V` maximum brakes, `[` `]` pitch trim, `5 6 7` rudder trim, `8 9 0` aileron trim, `P` pause, `W` default
 view, `Q E R F` and `= -` move the camera. The original has no keyboard stick, so openXplane adds one: arrow keys
-pitch and roll, `Z`/`X` rudder (`Tab` gives them their original meaning back), `Delete` resets, `Esc` quits.
+pitch and roll, `Z`/`X` rudder (`Tab` gives them their original meaning back), `H` shows an on-screen key help, `Delete` resets, `Esc` quits. The window draws instruments over the scene (speed, altitude, vertical speed, heading, attitude, throttle, flaps, stall warning).
 Commands without anything to act on yet (mixture, magnetos, carb heat...) are reported in the window title as not
 simulated. The title also shows speed, altitude, vertical speed, pitch, bank, heading, throttle, flaps and a stall
 warning. Full table: [docs/KEYBOARD.md](docs/KEYBOARD.md); source of the map: [research/KEYMAP.md](research/KEYMAP.md).

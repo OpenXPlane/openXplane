@@ -1,5 +1,6 @@
 use openxplane::{Aircraft, reference_candidates};
 mod gpu;
+mod hud;
 mod scene;
 mod viewer;
 use std::{collections::BTreeSet, env, fs, path::Path, process::ExitCode};
@@ -382,6 +383,22 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
             camera.pitch = 0.18;
             camera.distance = 24.0;
+            if std::env::var_os("OPENXPLANE_HUD").is_some() {
+                let tel = session.model.telemetry(&c);
+                let (fw, fh) = offscreen.size();
+                let mut hud = hud::Hud::new(fw, fh);
+                hud::draw_flight(
+                    &mut hud,
+                    &hud::FlightHud {
+                        telemetry: &tel,
+                        controls: &c,
+                        paused: false,
+                        help: std::env::var_os("OPENXPLANE_HUD_HELP").is_some(),
+                        note: None,
+                    },
+                );
+                offscreen.set_hud(&hud.vertices);
+            }
             let out = format!("{prefix}-{t:06.2}s.png");
             offscreen.render(
                 &session.scene,

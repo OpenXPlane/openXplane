@@ -1,5 +1,6 @@
 use crate::{
     gpu::{Camera, Renderer},
+    hud,
     scene::{AircraftBody, FlightSession, Scene},
 };
 use glam::Vec3;
@@ -139,6 +140,7 @@ struct Flight {
     free_camera: bool,
     view_offset: Vec3,
     message: Option<(String, Instant)>,
+    help: bool,
 }
 
 const STEP: f32 = 1.0 / 200.0;
@@ -213,6 +215,10 @@ impl Flight {
                 } else {
                     "arrows and X use their original meaning"
                 });
+                return None;
+            }
+            "H" if phase == Phase::Begin => {
+                self.help = !self.help;
                 return None;
             }
             "Delete" if phase == Phase::Begin => {
@@ -357,6 +363,23 @@ impl ApplicationHandler for App {
                         .renderer
                         .update_meshes(flight.body.first_mesh, &self.scene);
                     state.window.set_title(&flight.title());
+                    let telemetry = flight.model.telemetry(&flight.controls);
+                    let note = match &flight.message {
+                        Some((m, at)) if at.elapsed().as_secs_f32() < 3.0 => Some(m.as_str()),
+                        _ => None,
+                    };
+                    let mut interface = hud::Hud::new(state.config.width, state.config.height);
+                    hud::draw_flight(
+                        &mut interface,
+                        &hud::FlightHud {
+                            telemetry: &telemetry,
+                            controls: &flight.controls,
+                            paused: flight.paused,
+                            help: flight.help,
+                            note,
+                        },
+                    );
+                    state.renderer.set_hud(&interface.vertices);
                 }
                 match state.draw() {
                     Ok(drawn) => {
@@ -485,7 +508,7 @@ pub fn run_flight(session: FlightSession, smoke: bool) -> Result<(), Box<dyn std
         "Fly with the original's default keys: F1/F2/F3 throttle down/up/full, 1/2 flaps up/down, B brakes (hold), \
          V brakes max, [ ] pitch trim, 5/6/7 and 8/9/0 rudder and aileron trim, P pause, W default view. \
          openXplane's keyboard stick: arrows pitch/roll, Z/X rudder (Tab switches them to their original \
-         meaning). Delete resets, Esc quits."
+         meaning). H shows the key help, Delete resets, Esc quits."
     );
     let FlightSession { scene, body, model } = session;
     let flight = Flight {
@@ -501,6 +524,7 @@ pub fn run_flight(session: FlightSession, smoke: bool) -> Result<(), Box<dyn std
         free_camera: false,
         view_offset: Vec3::ZERO,
         message: None,
+        help: false,
     };
     run_app(scene, Some(flight), smoke)
 }

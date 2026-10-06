@@ -1,4 +1,7 @@
-use crate::scene::Scene;
+use crate::{
+    hud::{HudVertex, MAX_VERTICES},
+    scene::Scene,
+};
 use glam::{Mat4, Vec3};
 use openxplane::obj8::Vertex;
 use wgpu::util::DeviceExt;
@@ -58,6 +61,10 @@ pub struct Renderer {
     meshes: Vec<GpuMesh>,
     format: wgpu::TextureFormat,
     clear: wgpu::Color,
+    hud_pipeline: wgpu::RenderPipeline,
+    hud_group: wgpu::BindGroup,
+    hud_buffer: wgpu::Buffer,
+    hud_count: u32,
 }
 
 pub struct Targets {
@@ -193,6 +200,113 @@ impl Renderer {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+        // screen-space interface: font atlas, pipeline and a dynamic vertex buffer
+        let atlas =
+            image::load_from_memory(include_bytes!("../assets/font/roboto-mono-atlas.png"))?
+                .to_rgba8();
+        let atlas_size = wgpu::Extent3d {
+            width: atlas.width(),
+            height: atlas.height(),
+            depth_or_array_layers: 1,
+        };
+        let atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("hud font"),
+            size: atlas_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &atlas_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &atlas,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(atlas.width() * 4),
+                rows_per_image: Some(atlas.height()),
+            },
+            atlas_size,
+        );
+        let atlas_view = atlas_texture.create_view(&Default::default());
+        let hud_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("hud font"),
+            layout: &texture_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&atlas_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        let hud_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("hud"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("hud.wgsl").into()),
+        });
+        let hud_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("hud"),
+            bind_group_layouts: &[Some(&texture_layout)],
+            immediate_size: 0,
+        });
+        let hud_attributes =
+            wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4];
+        let hud_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("hud"),
+            layout: Some(&hud_layout),
+            vertex: wgpu::VertexState {
+                module: &hud_shader,
+                entry_point: Some("vs"),
+                compilation_options: Default::default(),
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<HudVertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &hud_attributes,
+                }],
+            },
+            primitive: wgpu::PrimitiveState {
+                cull_mode: None,
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::Always),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &hud_shader,
+                entry_point: Some("fs"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+        let hud_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("hud vertices"),
+            size: (MAX_VERTICES * std::mem::size_of::<HudVertex>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let mut meshes = Vec::new();
         for mesh in &scene.meshes {
             let vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -268,6 +382,10 @@ impl Renderer {
                 b: scene.background[2],
                 a: 1.0,
             },
+            hud_pipeline,
+            hud_group,
+            hud_buffer,
+            hud_count: 0,
         })
     }
 
@@ -279,6 +397,19 @@ impl Renderer {
                 .write_buffer(&gpu.vertex, 0, bytemuck::cast_slice(&mesh.vertices));
             gpu.center = mesh.center;
         }
+    }
+
+    /// Sets the screen-space interface drawn over the next frames (an empty slice hides it).
+    pub fn set_hud(&mut self, vertices: &[HudVertex]) {
+        let count = vertices.len().min(MAX_VERTICES);
+        if count > 0 {
+            self.queue.write_buffer(
+                &self.hud_buffer,
+                0,
+                bytemuck::cast_slice(&vertices[..count]),
+            );
+        }
+        self.hud_count = count as u32;
     }
 
     pub fn targets(&self, width: u32, height: u32) -> Targets {
@@ -382,6 +513,12 @@ impl Renderer {
             pass.set_vertex_buffer(0, mesh.vertex.slice(..));
             pass.draw(0..mesh.count, 0..1);
         }
+        if self.hud_count > 0 {
+            pass.set_pipeline(&self.hud_pipeline);
+            pass.set_bind_group(0, &self.hud_group, &[]);
+            pass.set_vertex_buffer(0, self.hud_buffer.slice(..));
+            pass.draw(0..self.hud_count, 0..1);
+        }
     }
 }
 
@@ -447,6 +584,15 @@ impl Offscreen {
             width,
             height,
         })
+    }
+
+    /// Sets the interface drawn on the next frames (see `Renderer::set_hud`).
+    pub fn set_hud(&mut self, vertices: &[HudVertex]) {
+        self.renderer.set_hud(vertices);
+    }
+
+    pub fn size(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 
     /// Re-uploads the vertices of the meshes from `first_mesh` on, draws the scene and saves a PNG.
