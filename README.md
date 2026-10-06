@@ -43,6 +43,7 @@ There is no launcher yet: run it from a terminal and point it at your X-Plane 12
 | --- | --- |
 | [Keyboard](docs/KEYBOARD.md) | the original's default keys and openXplane's own |
 | [Architecture](docs/ARCHITECTURE.md) | crates and roadmap |
+| [Plan](docs/PLAN.md) | phased plan for a full implementation |
 | [Compatibility](docs/COMPATIBILITY.md) | how close it is to the original, and how that is estimated |
 | [Discord](docs/DISCORD.md) | Rich Presence |
 | [Research notes](research/) | every recovered format and algorithm, with evidence |

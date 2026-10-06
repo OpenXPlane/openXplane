@@ -7,6 +7,7 @@ const DISCORD = "";
 const DOCS = [
   ["README", "Overview and commands"],
   ["ARCHITECTURE", "Architecture and roadmap"],
+  ["PLAN", "Plan for a full implementation"],
   ["COMPATIBILITY", "Compatibility estimate"],
   ["research/BASELINE", "Reference build"],
   ["research/VERIFICATION", "Verification against the original"],
