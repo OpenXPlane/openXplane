@@ -2179,8 +2179,8 @@ fn prop_force_segment3_matches_the_original_machine_code() {
 #[test]
 fn pointer_following_callees_match_the_original_machine_code() {
     use openxplane::callees::{
-        add_axial_force, add_normal_force, add_side_force, add_world_force, blend, engine_ratio,
-        limit_a, limit_b,
+        AeroForce, add_aero_force, add_axial_force, add_normal_force, add_side_force,
+        add_world_force, blend, engine_ratio, limit_a, limit_b,
     };
     use openxplane::vm::Vm;
     let text = std::fs::read_to_string(concat!(
@@ -2277,6 +2277,31 @@ fn pointer_following_callees_match_the_original_machine_code() {
                             || (f32::from_bits(got).is_nan() && f32::from_bits(*want).is_nan()),
                         "{head}: {addr:#x}: {got:#x} vs {want:#x}"
                     );
+                }
+            }
+            "G" => {
+                let g = |i: usize| f(t[5 + i]);
+                let force = AeroForce {
+                    a2: g(0),
+                    a3: g(1),
+                    a5: g(2),
+                    a6: g(3),
+                    a7: g(4),
+                    a8: g(5),
+                    a9: g(6),
+                    a10: g(7),
+                    a11: g(8),
+                    a12: g(9),
+                    a13: g(10),
+                    a14: t[16].parse().unwrap(),
+                    a15: f(t[17]),
+                    a16: f(t[18]),
+                    a17: f(t[19]),
+                };
+                assert!(add_aero_force(&mut vm, address, &force));
+                for (addr, want) in &expected {
+                    let got = vm.u32(*addr);
+                    assert!(got == *want, "{head}: {addr:#x}: {got:#x} vs {want:#x}");
                 }
             }
             "V" => {

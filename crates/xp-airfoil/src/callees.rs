@@ -177,3 +177,112 @@ pub fn add_world_force(vm: &mut Vm, f_addr: u64, point: [f32; 3], force: [f32; 3
         if 0.0 > sum { f32::NAN } else { sum.sqrt() },
     );
 }
+
+/// `0x1406e2f20`: the cross product `a x b` normalised; returns the length of the cross product before
+/// normalisation (the result is `[0, 1, 0]`-like `out = [0, 1, 0]` order `(+0, +4, +8) = (0, 1, 0)` for zero length).
+fn cross_normalised(a: [f32; 3], b: [f32; 3]) -> ([f32; 3], f32) {
+    let c0 = b[2] * a[1] - a[2] * b[1];
+    let c1 = a[2] * b[0] - a[0] * b[2];
+    let c2 = a[0] * b[1] - a[1] * b[0];
+    let sum = c0 * c0 + c1 * c1 + c2 * c2;
+    let len = if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+    if len == 0.0 {
+        return ([0.0, 1.0, 0.0], len);
+    }
+    let inv = 1.0 / len;
+    ([c0 * inv, c1 * inv, c2 * inv], len)
+}
+
+/// The inputs of [`add_aero_force`] (`0x140f26ef0`, "addFaero"), named by the original's argument positions.
+#[derive(Clone, Copy, Debug)]
+pub struct AeroForce {
+    pub a2: f32,
+    pub a3: f32,
+    pub a5: f32,
+    pub a6: f32,
+    pub a7: f32,
+    pub a8: f32,
+    pub a9: f32,
+    pub a10: f32,
+    pub a11: f32,
+    pub a12: f32,
+    pub a13: f32,
+    pub a14: i32,
+    pub a15: f32,
+    pub a16: f32,
+    pub a17: f32,
+}
+
+const RECORD_VECTOR_END: u64 = 0x1461_25770;
+const RECORD_VECTOR_CAP: u64 = 0x1461_25778;
+const RECORDING_ID: u64 = 0x142f_2e3dc;
+
+/// Appends a 0x50-byte record to the log vector at `0x146125768` (the inline path of the original; a full vector
+/// would reallocate through `0x140f0f660`, which is not ported: `false` is returned then).
+pub fn push_record(vm: &mut Vm, words: &[u32; 20]) -> bool {
+    let end = vm.u64(RECORD_VECTOR_END);
+    if end == vm.u64(RECORD_VECTOR_CAP) {
+        return false;
+    }
+    for (i, w) in words.iter().enumerate() {
+        vm.set_u32(end + 4 * i as u64, *w);
+    }
+    vm.set_u64(RECORD_VECTOR_END, end + 0x50);
+    true
+}
+
+/// `0x140f26ef0(F, name, a2, a3, ...)`: adds an aerodynamic force given by its direction vector
+/// `(a2, a5, a7)` (magnitudes in the original's argument slots) to the aerodynamic totals `F+0x2e8/0x2d4/0x2c0`
+/// (forces) and `F+0x2fc/0x314/0x32c` (moments about the point `(a9, a10, a11)`), after building the frame from
+/// the direction and logging the record when `F+0x28` names the recorded object. Returns false when the
+/// record vector is full. A zero-length direction does nothing.
+pub fn add_aero_force(vm: &mut Vm, f_addr: u64, a: &AeroForce) -> bool {
+    let a3 = finite_or_zero(a.a3);
+    let a6 = finite_or_zero(a.a6);
+    let len = {
+        let sum = a.a2 * a.a2 + a.a5 * a.a5 + a.a7 * a.a7;
+        if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+    };
+    let positive = len > 0.0;
+    if !positive {
+        return true;
+    }
+    let n = [a.a2 / len, a.a5 / len, a.a7 / len];
+    let (c1, _) = cross_normalised(n, [1.0, 0.0, 0.0]);
+    let (c2, _) = cross_normalised(c1, n);
+    let mut record = [0u32; 20];
+    record[1] = u32::from(a.a12 != 0.0 || a.a13 != 0.0);
+    record[2] = a.a12.to_bits();
+    record[3] = a.a13.to_bits();
+    record[4] = a.a14 as u32;
+    record[5] = (a.a9 + a.a15).to_bits();
+    record[6] = (a.a10 + a.a16).to_bits();
+    record[7] = (a.a11 + a.a17).to_bits();
+    record[8] = a.a2.to_bits();
+    record[9] = a.a5.to_bits();
+    record[10] = a.a7.to_bits();
+    let t1 = [c1[0] * a3, c1[1] * a3, c1[2] * a3];
+    let t2 = [n[0] * a6, n[1] * a6, n[2] * a6];
+    let t3 = [c2[0] * a.a8, c2[1] * a.a8, c2[2] * a.a8];
+    for k in 0..3 {
+        record[11 + k] = t1[k].to_bits();
+        record[14 + k] = t2[k].to_bits();
+        record[17 + k] = t3[k].to_bits();
+    }
+    let x7 = t1[0] + t2[0] + t3[0];
+    let x8 = t1[1] + t2[1] + t3[1];
+    let x6 = t2[2] + t1[2] + t3[2];
+    let mut ok = true;
+    if vm.i32(RECORDING_ID) == vm.i32(f_addr + 0x28) {
+        ok = push_record(vm, &record);
+    }
+    let add =
+        |vm: &mut Vm, offset: u64, v: f32| vm.set_f32(f_addr + offset, v + vm.f32(f_addr + offset));
+    add(vm, 0x2e8, x7);
+    add(vm, 0x2fc, x7 * a.a10 - x8 * a.a9);
+    add(vm, 0x2d4, x8);
+    add(vm, 0x314, x6 * a.a10 - x8 * a.a11);
+    add(vm, 0x2c0, x6);
+    add(vm, 0x32c, x6 * a.a9 - x7 * a.a11);
+    ok
+}

@@ -45,21 +45,24 @@ def main():
 
     emu.stubs[0x1407ace10] = stub_binding
     print('# callee vectors (tools/gen_callee_vectors.py)')
-    for kind in 'EBAPXYZV':
+    for kind in 'EBAPXYZVG':
         for trial in range(150 if kind in 'EBAP' else 50):
             emu.heap_top = mark
             fz.policy = {}
             log.clear()
-            F = emu.alloc(0x100)
+            F = emu.alloc(0xc000)
             Bx = emu.alloc(0x7000)
+            Gq = emu.alloc(0x200)
             Et = emu.alloc(0x68 * 4)
             Pt = emu.alloc(0x3770 * 4)
             O = emu.alloc(0x100)
             G = emu.alloc(0x1000)
-            for name, addr, size in (('F', F, 0x100), ('B', Bx, 0x7000), ('E', Et, 0x68 * 4), ('P', Pt, 0x3770 * 4),
+            for name, addr, size in (('F', F, 0xc000), ('B', Bx, 0x7000), ('E', Et, 0x68 * 4), ('P', Pt, 0x3770 * 4),
                                      ('O', O, 0x100), ('G', G, 0x1000)):
                 fz.region(name, addr, size)
                 emu.write(addr, bytes(size))
+            fz.preset('F', 0xbcc8, 0)
+            fz.preset('F', 0xbcd0, 0)
             fz.preset('B', 0x5ff8, Et & 0xffffffff)
             fz.preset('B', 0x5ffc, Et >> 32)
             fz.preset('B', 0x6010, Pt & 0xffffffff)
@@ -94,6 +97,25 @@ def main():
                 emu.call(0x141218060, ints=[O, abs(n)])
                 result = str(emu.reg(UC_X86_REG_RAX) & 0xff)
                 head = f'R P {O:x} {abs(n)} 0'
+            elif kind == 'G':
+                fz.region('Q', Gq, 0x200)
+                emu.write(Gq, bytes(0x200))
+                f28 = fz.rng.randrange(1, 4)
+                fz.preset('F', 0x28, f28)
+                rec = f28 if fz.rng.random() < 0.5 else 0
+                emu.write_u32(0x142f2e3dc, rec)
+                emu.write_u64(0x146125770, Gq)
+                emu.write_u64(0x146125778, Gq + 0x100)
+                extra = {0x142f2e3dc: rec, 0x146125770: Gq & 0xffffffff, 0x146125774: Gq >> 32,
+                         0x146125778: (Gq + 0x100) & 0xffffffff, 0x14612577c: (Gq + 0x100) >> 32}
+                v = [fz.rng.choice([0.0, fz.rng.uniform(-3, 3)]) for _ in range(14)]
+                a14 = fz.rng.randrange(0, 3)
+                name = emu.alloc(16)
+                emu.write(name, b'x\0')
+                stack = [v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], a14, v[11], v[12], v[13]]
+                emu.call(0x140f26ef0, ints=[F, name], floats=[0, 0, v[0], v[1]], stack=stack)
+                result = '0'
+                head = f'R G {F:x} 0 0 ' + ' '.join(hx(x) for x in v[:11]) + f' {a14} ' + ' '.join(hx(x) for x in v[11:])
             else:
                 # a non-finite force reaches the logging code of the original, which is not emulated
                 vals = [fz.rng.uniform(-5, 5) for _ in range(3)]
@@ -116,6 +138,8 @@ def main():
                 base = fz.regions[name][0]
                 for off, w in fz.initial()[name].items():
                     words[base + off] = w
+            if kind == 'G':
+                words.update(extra)
             print('W', ' '.join(f'{a:x}={w:08x}' for a, w in sorted(words.items())))
             for l in log:
                 print(l)
