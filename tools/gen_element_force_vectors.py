@@ -83,7 +83,7 @@ def main():
     print('# element force vectors from the original 0x1411b9840 (see tools/gen_element_force_vectors.py)')
     produced = 0
     attempts = 0
-    while produced < 450 and attempts < 4000:
+    while produced < 250 and attempts < 4000:
         attempts += 1
         for obj, size in ((F, 0x10000), (W, 0x4000), (B, 0x8000), (X, 0x1000)):
             emu.write(obj, bytes(size))

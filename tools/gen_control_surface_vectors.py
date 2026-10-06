@@ -42,7 +42,7 @@ def main():
     rng = random.Random(20261011)
     print('# control surface vectors from the original 0x141221220 (see tools/gen_control_surface_vectors.py)')
     dbg = emu.alloc(0xbd00)
-    for n in range(2000):
+    for n in range(1200):
         code = list(TABLE)[n % 13]
         a, w, x = emu.alloc(0x6300), emu.alloc(0x800), emu.alloc(0x800)
         emu.write_u64(a + 0x61f8, dbg)

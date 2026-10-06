@@ -90,3 +90,15 @@ after cleaning with `tools/clean_asm.py` and calls about 25 helpers, among them 
 The small engine helpers `0x1411dd610` (throttle gain between `B+0x9d8` and `B+0x9dc`), `0x1411a2d90` (engine
 starter conditions from two input-binding queries) and `0x141170810` (a response curve with the exponent
 `B+0x9ac`) are read but not yet ported.
+
+## Engine update, first part ported
+
+`engine::engine_update` (`crates/xp-airfoil/src/engine.rs`) ports the first part of `0x141197b00`: the intake
+power factor stored at `+0x258`, the spool-up timer `+0x22c` (advanced by the frame time, doubled when `+0x228`
+is set, reset when the aircraft limit `B+0x9bc` exceeds `+0x98`), the throttle response (a power law with the
+exponent from `B+0x9b0/0x9b4`, optionally limited by two starter conditions and the speed limit), and the
+results at `+0x240`, `+0x244` and `+0x248`. 120 emulator cases (`tools/gen_engine_update_vectors.py`; the
+atmosphere accessors, the engine flag, the frame time and the input-binding query are replayed from the
+recording) are identical for these five fields, NaN results included. The other written fields (`+0x78`, `+0x90`,
+`+0x98`, `+0xb0`, `+0xc4`, `+0xcc`, `+0x1d8`, `+0x1dc`, `+0x21c`, `+0x25c`, `+0x270..+0x27c`, `+0x28c`, `+0x2c4`,
+`+0x2c8`) belong to the rest of the function, which is not ported.

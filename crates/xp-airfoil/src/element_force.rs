@@ -18,6 +18,12 @@ use crate::wing_element::{
 pub trait Mem {
     fn f32(&self, offset: usize) -> f32;
     fn i32(&self, offset: usize) -> i32;
+    /// A double at `offset` (two consecutive words, low word first).
+    fn f64(&self, offset: usize) -> f64 {
+        let low = u64::from(self.i32(offset) as u32);
+        let high = u64::from(self.i32(offset + 4) as u32);
+        f64::from_bits(high << 32 | low)
+    }
 }
 
 pub struct Objects<'a> {

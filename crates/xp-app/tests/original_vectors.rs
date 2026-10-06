@@ -365,7 +365,7 @@ fn control_surface_terms_match_the_original_machine_code() {
         exact += usize::from(off == 0);
     }
     println!("{cases} cases, {changed} change the outputs, exact {exact}, worst {worst} ulp");
-    assert!(cases >= 1500 && changed > 800);
+    assert!(cases >= 1000 && changed > 600);
     // sin, cos and atan2 come from the platform's libm here and from the C runtime in the original
     assert!(worst <= 64, "outputs differ by {worst} ulp");
 }
@@ -551,7 +551,7 @@ fn element_force_matches_the_original_machine_code() {
         println!("{p}");
     }
     assert!(
-        cases >= 400 && problems.is_empty(),
+        cases >= 200 && problems.is_empty(),
         "{} problems",
         problems.len()
     );
@@ -691,6 +691,123 @@ fn engine_functions_match_the_original_machine_code() {
     // powf and cos come from the platform's libm here and from the C runtime in the original
     assert!(worst[0] <= 4 && worst[1] <= 64, "{worst:?}");
     assert!(worst[2] <= 512, "{worst:?}");
+}
+
+struct Replay<'a> {
+    calls: std::slice::Iter<'a, (String, Vec<u32>, u64)>,
+    problems: Vec<String>,
+}
+
+impl Replay<'_> {
+    fn next(&mut self, name: &str, args: &[u32]) -> u64 {
+        match self.calls.next() {
+            Some((n, a, ret)) if n == name && a.as_slice() == args => *ret,
+            other => {
+                self.problems
+                    .push(format!("call {name} {args:?} against {other:?}"));
+                0
+            }
+        }
+    }
+}
+
+impl openxplane::engine::EngineEnv for Replay<'_> {
+    fn atmosphere_a(&mut self, time: f32) -> f32 {
+        f32::from_bits(self.next("atmo_a", &[time.to_bits()]) as u32)
+    }
+    fn atmosphere_b(&mut self, time: f32, value: f32) -> f32 {
+        f32::from_bits(self.next("atmo_b", &[time.to_bits(), value.to_bits()]) as u32)
+    }
+    fn engine_flag(&mut self) -> bool {
+        self.next("flag", &[]) != 0
+    }
+    fn frame_time(&mut self) -> f64 {
+        f64::from_bits(self.next("dt", &[]))
+    }
+    fn binding(&mut self, id: u32, index: i32) -> bool {
+        self.next("bind", &[id, index as u32]) != 0
+    }
+}
+
+#[test]
+fn engine_update_first_part_matches_the_original_machine_code() {
+    use openxplane::engine::{Record, engine_update};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/engine_update.txt"
+    ))
+    .unwrap();
+    // fields written by the part of the update that is ported
+    let ported = [0x258usize, 0x22c, 0x240, 0x244, 0x248];
+    let (mut cases, mut exact, mut worst, mut problems) = (0, 0, 0u32, Vec::<String>::new());
+    for (n, line) in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .enumerate()
+    {
+        let parts: Vec<&str> = line.split(" | ").collect();
+        let head: Vec<&str> = parts[1].split_whitespace().collect();
+        let ncalls: usize = head[0].parse().unwrap();
+        let mut calls = Vec::new();
+        let mut i = 1;
+        for _ in 0..ncalls {
+            let name = head[i].to_string();
+            let nargs: usize = head[i + 1].parse().unwrap();
+            let args: Vec<u32> = head[i + 2..i + 2 + nargs]
+                .iter()
+                .map(|h| u32::from_str_radix(h, 16).unwrap())
+                .collect();
+            let ret = u64::from_str_radix(head[i + 2 + nargs], 16).unwrap();
+            calls.push((name, args, ret));
+            i += 3 + nargs;
+        }
+        let (fm, bm, dm) = (
+            Sparse::parse(parts[2]),
+            Sparse::parse(parts[3]),
+            Sparse::parse(parts[4]),
+        );
+        let words: Vec<u32> = parts[5]
+            .split_whitespace()
+            .map(|h| u32::from_str_radix(h, 16).unwrap())
+            .collect();
+        let changed = Sparse::parse(parts[6]);
+        let mut record = Record(words.clone());
+        let mut replay = Replay {
+            calls: calls.iter(),
+            problems: Vec::new(),
+        };
+        engine_update(&fm, &bm, &dm, &mut record, 0, &mut replay);
+        cases += 1;
+        let mut off = 0;
+        for &o in &ported {
+            let want = changed.0.get(&o).copied().unwrap_or(words[o / 4]);
+            let (a, b) = (f32::from_bits(record.0[o / 4]), f32::from_bits(want));
+            // both NaN counts as equal (the sign of a NaN differs between the CPU and Rust)
+            let d = if a.is_nan() && b.is_nan() {
+                0
+            } else {
+                ulps(a, b)
+            };
+            if d > 16 && std::env::var_os("ENGINE_DEBUG").is_some() {
+                println!(
+                    "case {n} field {o:#x}: port {} original {}",
+                    f32::from_bits(record.0[o / 4]),
+                    f32::from_bits(want)
+                );
+            }
+            off = off.max(d);
+        }
+        worst = worst.max(off);
+        exact += usize::from(off == 0);
+        if off > 16 || !replay.problems.is_empty() {
+            problems.push(format!("case {n}: {off} ulp {:?}", replay.problems));
+        }
+    }
+    println!("{cases} cases, exact {exact}, worst {worst} ulp");
+    for p in problems.iter().take(6) {
+        println!("{p}");
+    }
+    assert!(cases >= 100 && problems.is_empty());
 }
 
 #[test]

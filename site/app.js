@@ -6,6 +6,10 @@ const DISCORD = "";
 
 const DOCS = [
   ["README", "Overview and commands"],
+  ["USER_GUIDE", "User guide"],
+  ["BUILDING", "Building"],
+  ["FAQ", "FAQ"],
+  ["RELEASING", "Releasing"],
   ["ARCHITECTURE", "Architecture and roadmap"],
   ["PLAN", "Plan for a full implementation"],
   ["COMPATIBILITY", "Compatibility estimate"],

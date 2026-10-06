@@ -1,0 +1,9 @@
+openXplane is an independent project. It is not made by, affiliated with or endorsed by Laminar Research.
+"X-Plane" is a trademark of Laminar Research; it is used here only to say which content the software reads.
+
+The repository contains no code, data or assets of X-Plane. The software reads an X-Plane installation that
+the user owns. Documents in `research/` describe the observed behaviour of the reference build in our own
+words, with addresses and constants as evidence.
+
+The Roboto Mono font in `crates/xp-app/assets/font` is under the SIL Open Font License (see the licence file
+next to it).

@@ -173,3 +173,6 @@ blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--prim
 
 /* the hidden attribute must win over display rules such as .icon-btn and .lightbox */
 [hidden] { display: none !important; }
+
+.steps { margin: 12px 0 28px; padding-left: 1.4em; line-height: 1.6; }
+.steps li { margin: 6px 0; }

@@ -42,6 +42,10 @@ There is no launcher yet: run it from a terminal and point it at your X-Plane 12
 | Document | What is in it |
 | --- | --- |
 | [Keyboard](docs/KEYBOARD.md) | the original's default keys and openXplane's own |
+| [User guide](docs/USER_GUIDE.md) | install, first flights, data output |
+| [Building](docs/BUILDING.md) | toolchain, tests, regenerating vectors |
+| [FAQ](docs/FAQ.md) | common questions |
+| [Releasing](docs/RELEASING.md) | versions, nightly builds |
 | [Architecture](docs/ARCHITECTURE.md) | crates and roadmap |
 | [Plan](docs/PLAN.md) | phased plan for a full implementation |
 | [Compatibility](docs/COMPATIBILITY.md) | how close it is to the original, and how that is estimated |
