@@ -165,7 +165,7 @@ const DEAD_ZONE: f32 = 0.01;
 /// The magnitude floor the original applies to a divisor: values below -0.01 or above 0.01 stay,
 /// the rest become -0.01 (negative input) or 0.01.
 #[allow(clippy::manual_range_contains)]
-fn floor_magnitude(v: f32) -> f32 {
+pub fn angle_floor(v: f32) -> f32 {
     if -DEAD_ZONE > v || v > DEAD_ZONE {
         v
     } else if 0.0 > v {
@@ -313,22 +313,22 @@ pub fn control_surface_terms(i: &ControlSurface, driven: &dyn Fn(u32) -> bool) -
         }
         0x14 => {
             let shape = angle_shape(i.table_a);
-            let floor = floor_magnitude(shape);
+            let floor = angle_floor(shape);
             let applied = angle_shape(angle);
             let second = applied * i.ratios[0] / floor;
-            let divisor = floor_magnitude(sine_ratio(i.table_a.abs()));
+            let divisor = angle_floor(sine_ratio(i.table_a.abs()));
             let third = sine_ratio(angle.abs()) * i.ratios[1] / divisor;
-            let fourth = applied * i.ratios[2] / floor_magnitude(shape);
+            let fourth = applied * i.ratios[2] / angle_floor(shape);
             [first, second, third, fourth]
         }
         0x15 => {
             let shape = angle_shape(i.table_b);
-            let floor = floor_magnitude(shape);
+            let floor = angle_floor(shape);
             let applied = angle_shape(angle);
             let second = applied * i.ratios[3] / floor;
-            let divisor = floor_magnitude(sine_ratio(i.table_b.abs()));
+            let divisor = angle_floor(sine_ratio(i.table_b.abs()));
             let third = sine_ratio(angle.abs()) * i.ratios[4] / divisor;
-            let fourth = applied * i.ratios[5] / floor_magnitude(shape);
+            let fourth = applied * i.ratios[5] / angle_floor(shape);
             [first, second, third, fourth]
         }
         _ => [0.0; 4],

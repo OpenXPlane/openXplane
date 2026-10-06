@@ -5,6 +5,7 @@
 pub mod aero;
 pub mod airfoil;
 pub mod buffet;
+pub mod element_force;
 pub mod profile;
 pub mod regimes;
 pub mod runtime;

@@ -175,3 +175,26 @@ Ported as `control_surface_terms` in `crates/xp-airfoil/src/wing_element.rs` wit
 by a stub that answers from a bit mask): 1951 bit-identical, the rest within 16 ulp (the platform's `sin`, `cos`
 and `atan2` against the C runtime's). The diagnostic output is not ported. What the aircraft fields stand for
 (`+0x1d20..+0x1d28`, `+0x1f74`, `+0x1f78..+0x1fc4`) and the meaning of the binding ids are still not established.
+
+## Per-element force function `get_el_force` (`0x1411b9840`): ported except two sections
+
+Ported as `element_force` in `crates/xp-airfoil/src/element_force.rs`; the original is run on random objects
+(`tools/gen_element_force_vectors.py`, 450 cases) and compared bit for bit: 444 identical, the rest within 2 ulp
+(libm); the profile-function arguments it passes agree within 8 ulp.
+
+Order of the original: (1) for the 13 control surface codes `0xb..=0x17`, when the wing's per-element gate
+(`W+gate+4e`, offsets in `SURFACES`) is nonzero, call the control surface function with the element's angle from
+`X` and accumulate its four terms into (angle, Cl, Cd, Cm) offsets; (2) add the flap (`B+0x1f04 * F+0x1a0`) and
+slat (`B+0x1f40 * F+0x1a4`) terms to Cd and `F+0x64c0` to Cl for the codes `0x14`/`0x15` gates; (3) dihedral
+`atan2(dz, hypot(dx, dy))` of the element's boundary points plus `W[0] * F+0x408`; its cosine, floored at 0.01 in
+magnitude, divides the element result; (4) the wing element function with the four accumulators as its angle and
+Cl/Cd/Cm offsets; (5) separation ratio `ret / sqrt(cos)` limited to 0.01..0.99 and weight
+`clamp((F+0x420 - r) / (1 - r))`; (6) when the weight is positive, the alternative regime function
+`0x1411b8e00` and a blend of the four results by the weight; (7) scale Cl by `X+0x288` (multiply when positive,
+divide otherwise), add the per-element offsets `X+0x7c/0xa4/0xcc`, store the four per-element arrays
+`X+0xf4/0x11c/0x144/0x16c`, and write three outputs: area times dynamic pressure
+(`0.5 * F+0x6c * X+0x54^2`) times Cl, Cd and Cm, the last times the mean chord `(2/3) c (1 + t + t^2) / (1 + t)`
+for the taper `t`; (8) a structural-load section (skipped when `F+0x28` is nonzero).
+
+Not ported: step 6 (reported as an error when the weight is positive) and step 8. The meaning of the object
+fields (`F+0x74`, `F+0x420`, `F+0x64c0`, `X+0x288`) is not established.
