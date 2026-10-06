@@ -8,6 +8,7 @@ pub mod airfoil;
 pub mod atmosphere;
 pub mod buffet;
 pub mod callees;
+pub mod controls;
 pub mod element_force;
 pub mod engine;
 pub mod forces;

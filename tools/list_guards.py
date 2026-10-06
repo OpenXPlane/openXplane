@@ -17,6 +17,7 @@ for i, (a, t) in enumerate(ins):
     if t.startswith('callq') and t.endswith('0x14230c290'):
         operand = ins[i - 1][1]
         target = None
+        repair = '?'
         for j in range(i + 1, i + 10):
             if ins[j][1].startswith('ja '):
                 target = ins[j][1].split()[-1]

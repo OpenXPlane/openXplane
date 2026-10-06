@@ -2377,3 +2377,144 @@ fn pointer_following_callees_match_the_original_machine_code() {
     }
     assert!(counts.values().all(|c| *c >= 50));
 }
+
+/// One recorded case of `tools/xp_vmcase.py`.
+struct VmCaseData {
+    header: Vec<String>,
+    vm: openxplane::vm::Vm,
+    calls: std::collections::VecDeque<RecordedCall>,
+    expected: Vec<(u64, u32)>,
+}
+
+struct RecordedCall {
+    address: u64,
+    ints: [u64; 4],
+    rax: u64,
+    xmm0: u64,
+    effects: Vec<(u64, u32)>,
+}
+
+fn parse_vm_cases(path: &str) -> Vec<VmCaseData> {
+    let text = std::fs::read_to_string(format!("{}/tests/data/{path}", env!("CARGO_MANIFEST_DIR")))
+        .unwrap();
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let word = |tok: &str| {
+        let (a, w) = tok.split_once('=').unwrap();
+        (hex(a), hex(w) as u32)
+    };
+    let mut cases: Vec<VmCaseData> = Vec::new();
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let tokens: Vec<&str> = line.split_whitespace().collect();
+        match tokens[0] {
+            "H" => cases.push(VmCaseData {
+                header: tokens[1..].iter().map(|s| s.to_string()).collect(),
+                vm: openxplane::vm::Vm::default(),
+                calls: Default::default(),
+                expected: Vec::new(),
+            }),
+            "W" => {
+                let case = cases.last_mut().unwrap();
+                for tok in &tokens[1..] {
+                    let (a, w) = word(tok);
+                    case.vm.set_u32(a, w);
+                }
+            }
+            "O" => {
+                cases.last_mut().unwrap().expected = tokens[1..].iter().map(|t| word(t)).collect()
+            }
+            "C" => {
+                let bar: Vec<usize> = tokens
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, t)| **t == "|")
+                    .map(|(i, _)| i)
+                    .collect();
+                cases.last_mut().unwrap().calls.push_back(RecordedCall {
+                    address: hex(tokens[1]),
+                    ints: [
+                        hex(tokens[2]),
+                        hex(tokens[3]),
+                        hex(tokens[4]),
+                        hex(tokens[5]),
+                    ],
+                    rax: hex(tokens[bar[0] + 1]),
+                    xmm0: hex(tokens[bar[0] + 2]),
+                    effects: tokens[bar[1] + 1..].iter().map(|t| word(t)).collect(),
+                });
+            }
+            other => panic!("unknown line {other}"),
+        }
+    }
+    cases
+}
+
+struct VmReplay {
+    calls: std::collections::VecDeque<RecordedCall>,
+}
+
+impl openxplane::vm::Callees for VmReplay {
+    fn call(
+        &mut self,
+        vm: &mut openxplane::vm::Vm,
+        address: u64,
+        args: openxplane::vm::CallArgs,
+    ) -> openxplane::vm::Reply {
+        let c = self
+            .calls
+            .pop_front()
+            .unwrap_or_else(|| panic!("call {address:#x} not recorded"));
+        assert_eq!(c.address, address, "call order");
+        for (i, want) in args.int.iter().enumerate() {
+            if let Some(v) = want {
+                assert_eq!(*v, c.ints[i], "argument {i} of {address:#x}");
+            }
+        }
+        for (a, w) in &c.effects {
+            vm.set_u32(*a, *w);
+        }
+        openxplane::vm::Reply {
+            rax: c.rax,
+            xmm0: c.xmm0,
+        }
+    }
+}
+
+fn controls_stage(path: &str, stop: openxplane::controls::Stop) {
+    let cases = parse_vm_cases(path);
+    assert!(cases.len() >= 20);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let entry = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let result =
+            openxplane::controls::engine_controls(&mut case.vm, &mut env, f, entry, Some(stop));
+        result.unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert!(
+            env.calls.is_empty(),
+            "case {n}: {} recorded calls unused",
+            env.calls.len()
+        );
+        for (addr, want) in &case.expected {
+            let got = case.vm.u32(*addr);
+            assert!(
+                got == *want || (f32::from_bits(got) - f32::from_bits(*want)).abs() <= 1e-5,
+                "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
+            );
+        }
+    }
+}
+
+#[test]
+fn engine_controls_dispatch_matches_the_original_machine_code() {
+    controls_stage("controls_1.txt", openxplane::controls::Stop::Dispatch);
+}
+
+#[test]
+fn engine_controls_blend_matches_the_original_machine_code() {
+    controls_stage("controls_2.txt", openxplane::controls::Stop::Blend);
+}

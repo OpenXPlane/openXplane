@@ -92,3 +92,36 @@ impl crate::element_force::Mem for (&Vm, u64) {
         self.0.i32(self.1 + offset as u64)
     }
 }
+
+/// The arguments of a call to a function outside a port, as the original passed them: the four integer
+/// registers, the four vector registers (low 32 bits) and the first four stack arguments. Only the `Some` fields
+/// are compared with the recorded call.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CallArgs {
+    pub int: [Option<u64>; 4],
+    pub xmm: [Option<u32>; 4],
+    pub stack: [Option<u64>; 4],
+}
+
+impl CallArgs {
+    pub fn ints(values: &[u64]) -> Self {
+        let mut a = CallArgs::default();
+        for (i, v) in values.iter().enumerate() {
+            a.int[i] = Some(*v);
+        }
+        a
+    }
+}
+
+/// What a recorded call returned (`rax`, the low 64 bits of `xmm0`).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Reply {
+    pub rax: u64,
+    pub xmm0: u64,
+}
+
+/// The functions a port calls that are not ported: the test replays the recorded calls in order, and applies the
+/// memory writes the original callee made.
+pub trait Callees {
+    fn call(&mut self, vm: &mut Vm, address: u64, args: CallArgs) -> Reply;
+}
