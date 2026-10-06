@@ -54,3 +54,12 @@
 What the update computes step by step (power, propeller torque and thrust, manifold pressure, fuel flow,
 temperatures), and the meaning of the unnamed fields. Nothing of the engine is ported yet; the viewer's engine
 is the approximate model of `crates/xp-sim/src/flight.rs`.
+
+## Attempt to run the engine update in the emulator
+
+Running `0x141197b00` on random objects fails early: the engine update asks the atmosphere (`0x141ba64e0`,
+`0x141ba6750`, `0x141baf810`, object at `F+0xbfa8`), which interpolates a runtime-filled table of 0x801 entries
+at `0x14612bd90` (the image holds zeros; index `(altitude_m + 5000) / 100`, pairs of floats per entry, pressure
+scaled by 101325). Where that table is built has not been found yet. Plan: build the harness the way the wing
+element one was built, with the unported callees replaced by stubs that record their arguments, and port the
+atmosphere table first because every flight function depends on it.
