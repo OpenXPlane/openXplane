@@ -54,6 +54,18 @@ cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessn
 FLY_DEBUG=1 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 40
 ```
 
+## Flying it
+
+```sh
+cargo run --release --offline -- fly Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+```
+
+The window follows the aircraft with a chase camera and shows telemetry in the title. The aircraft meshes are
+posed each frame from the model's state (`scene::AircraftBody`) and re-uploaded to the GPU; the ground is
+static geometry from apt.dat ([WORLD_GEOMETRY.md](WORLD_GEOMETRY.md)). Keys are listed in the README. The
+simulation advances in fixed 1/200 s steps from real elapsed time (at most 0.1 s per frame), so a slow frame
+does not change the physics.
+
 ## Not done
 
 Trim, flap and gear controls beyond the flap handle, engine start and fuel flow, the propeller as a blade

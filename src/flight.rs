@@ -133,6 +133,21 @@ pub struct FlightModel {
     main_wing_ar: f32,
     reference_area: f32,
     reference_chord: f32,
+    rest: Option<(State, Vec<Gear>)>,
+}
+
+/// A simple scripted pilot for tests and demonstrations: full power after two seconds, rotation at 55
+/// knots to 11 degrees of pitch below 30 feet and 8 degrees above, with pitch-rate damping.
+pub fn takeoff_pilot(model: &FlightModel, c: &mut Controls) {
+    let t = model.telemetry(c);
+    if model.state.time > 2.0 {
+        c.throttle = 1.0;
+    }
+    if t.airspeed_kt > 55.0 {
+        let target = if t.altitude_ft < 30.0 { 11.0 } else { 8.0 };
+        let rate = model.state.omega.x.to_degrees();
+        c.elevator = (0.12 + 0.10 * (target - t.pitch_deg) - 0.06 * rate).clamp(-0.5, 0.9);
+    }
 }
 
 pub fn isa(height_m: f32) -> (f32, f32) {
@@ -388,6 +403,7 @@ impl FlightModel {
             main_wing_ar: main_ar,
             reference_area: ref_area,
             reference_chord: ref_chord,
+            rest: None,
         })
     }
 
@@ -429,6 +445,19 @@ impl FlightModel {
             omega: Vec3::ZERO,
             time: 0.0,
         };
+        self.rest = Some((self.state, self.gears.clone()));
+    }
+
+    /// Puts the aircraft back where `rest_on_ground` placed it, at rest.
+    pub fn reset(&mut self) {
+        if let Some((state, gears)) = &self.rest {
+            self.state = *state;
+            self.gears = gears.clone();
+            for e in &mut self.elements {
+                e.stalled = [false; 3];
+            }
+            self.downwash_cl = 0.0;
+        }
     }
 
     /// Gives the aircraft an airspeed along its nose (for starting in the air).

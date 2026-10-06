@@ -198,7 +198,7 @@ impl Renderer {
             let vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("OBJ8 triangles"),
                 contents: bytemuck::cast_slice(&mesh.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
             let size = wgpu::Extent3d {
                 width: mesh.texture.width(),
@@ -269,6 +269,16 @@ impl Renderer {
                 a: 1.0,
             },
         })
+    }
+
+    /// Re-uploads the vertices of the meshes from `first` on (the moving aircraft) and updates their
+    /// centres used for sorting glass. The vertex counts must not change.
+    pub fn update_meshes(&mut self, first: usize, scene: &Scene) {
+        for (gpu, mesh) in self.meshes.iter_mut().zip(&scene.meshes).skip(first) {
+            self.queue
+                .write_buffer(&gpu.vertex, 0, bytemuck::cast_slice(&mesh.vertices));
+            gpu.center = mesh.center;
+        }
     }
 
     pub fn targets(&self, width: u32, height: u32) -> Targets {
@@ -379,6 +389,14 @@ pub async fn render_png(
     scene: &Scene,
     output: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    render_png_camera(scene, &Camera::new(scene), output).await
+}
+
+pub async fn render_png_camera(
+    scene: &Scene,
+    camera: &Camera,
+    output: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     let instance = instance();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions::default())
@@ -402,7 +420,7 @@ pub async fn render_png(
     let view = texture.create_view(&Default::default());
     let targets = renderer.targets(width, height);
     let mut encoder = renderer.device.create_command_encoder(&Default::default());
-    renderer.draw(&mut encoder, &view, &targets, &Camera::new(scene));
+    renderer.draw(&mut encoder, &view, &targets, camera);
     let row_bytes = (width * 4).div_ceil(256) * 256;
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),

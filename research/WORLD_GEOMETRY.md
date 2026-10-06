@@ -25,7 +25,8 @@ and the bezier handle rule come from public apt.dat documentation and are not co
 a sphere of radius 6,371,000 m. There is no datum model, no elevation (everything is on y = 0) and no curvature,
 which is fine for an airport-sized area. Polygons are triangulated with ear clipping (either winding; a
 self-intersecting loop yields only the triangles that could be clipped). Layers are drawn in order with small
-height offsets (pavement 0.10 m, holes 0.14 m, runway 0.20 m, markings 0.26 m). Colours by surface code
+height offsets just below the flight model's ground plane at height 0 (ground -0.20 m, pavement -0.12 m, holes
+-0.09 m, runway -0.03 m, markings -0.01 m). Colours by surface code
 (1 asphalt, 2 concrete, 3 turf, 4 dirt, 5 gravel, 12 lakebed, 13 water, 14 snow, anything else asphalt grey)
 are openXplane policy; the codes `50`/`51` used by KSEA runways are not decoded and so draw as asphalt.
 

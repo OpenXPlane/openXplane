@@ -199,14 +199,49 @@ fn solid_texture(color: [u8; 4]) -> image::RgbaImage {
     image::RgbaImage::from_pixel(2, 2, image::Rgba(color))
 }
 
-/// The aircraft preview placed on the first runway of an airport found in an installation, with the
-/// airport's ground, pavements, runways and markings. The aircraft stands 150 m from the first
-/// runway end, nose along the runway, wheels on the runway surface. The camera starts about 70 m away.
-pub fn airport(
+/// The aircraft's vertices in the body frame, kept so the moving aircraft can be re-posed each frame.
+pub struct AircraftBody {
+    /// Index of the first aircraft mesh in `Scene::meshes` (the ground layers come first).
+    pub first_mesh: usize,
+    base: Vec<Vec<Vertex>>,
+    base_center: Vec<Vec3>,
+}
+
+impl AircraftBody {
+    /// Poses the aircraft meshes of `scene` for the model's current state and centres the scene
+    /// (and so the camera target) on the aircraft.
+    pub fn apply(&self, scene: &mut Scene, model: &openxplane::flight::FlightModel) {
+        let rot = glam::Mat3::from_quat(model.state.orientation);
+        for ((mesh, base), center) in scene.meshes[self.first_mesh..]
+            .iter_mut()
+            .zip(&self.base)
+            .zip(&self.base_center)
+        {
+            for (v, b) in mesh.vertices.iter_mut().zip(base) {
+                v.position = model.to_world(Vec3::from_array(b.position)).to_array();
+                v.normal = (rot * Vec3::from_array(b.normal)).to_array();
+            }
+            mesh.center = model.to_world(*center);
+        }
+        scene.center = model.state.position;
+    }
+}
+
+/// An airport scene with the aircraft, its body vertices and a flight model resting on the first runway.
+pub struct FlightSession {
+    pub scene: Scene,
+    pub body: AircraftBody,
+    pub model: openxplane::flight::FlightModel,
+}
+
+/// The aircraft placed on the first runway of an airport found in an installation, with the airport's
+/// ground, pavements, runways and markings. The aircraft stands 150 m from the first runway end, nose
+/// along the runway, wheels on the runway surface, with an approximate flight model ready to fly.
+pub fn airport_flight(
     root: &Path,
     icao: &str,
     aircraft_path: &Path,
-) -> Result<Scene, Box<dyn std::error::Error>> {
+) -> Result<FlightSession, Box<dyn std::error::Error>> {
     let install = openxplane::install::Install::open(root)?;
     let (airport, source) = install
         .find_airport(icao)?
@@ -234,28 +269,16 @@ pub fn airport(
         airport.pavements.len()
     );
 
-    let mut aircraft = load(aircraft_path)?;
+    let aircraft = load(aircraft_path)?;
     let low_y = aircraft
         .meshes
         .iter()
         .flat_map(|m| m.vertices.iter().map(|v| v.position[1]))
         .fold(f32::INFINITY, f32::min);
-    // The aircraft nose points along local -Z; turn it onto the runway direction (x east, z south).
-    let heading = (-ux).atan2(-uz);
-    let rotation = glam::Mat4::from_rotation_y(heading);
-    let position = Vec3::new(a[0] + ux * 150.0, 0.2 - low_y, a[1] + uz * 150.0);
-    let placement = glam::Mat4::from_translation(position) * rotation;
-    for mesh in &mut aircraft.meshes {
-        for v in &mut mesh.vertices {
-            v.position = placement
-                .transform_point3(Vec3::from_array(v.position))
-                .to_array();
-            v.normal = rotation
-                .transform_vector3(Vec3::from_array(v.normal))
-                .to_array();
-        }
-        mesh.center = placement.transform_point3(mesh.center);
-    }
+    let mut model = openxplane::flight::FlightModel::load(aircraft_path, &install, 80.0, 90.0)?;
+    model.elevation_m = airport.elevation_ft * 0.3048;
+    let direction = Vec3::new(ux, 0.0, uz);
+    model.rest_on_ground(low_y, [a[0] + ux * 150.0, a[1] + uz * 150.0], direction);
 
     let mut meshes = Vec::new();
     for layer in layers {
@@ -284,12 +307,33 @@ pub fn airport(
             center: (low + high) * 0.5,
         });
     }
-    // Ground layers first so the opaque aircraft draws over them regardless of mesh order.
+    let first_mesh = meshes.len();
+    let base: Vec<Vec<Vertex>> = aircraft.meshes.iter().map(|m| m.vertices.clone()).collect();
+    let base_center: Vec<Vec3> = aircraft.meshes.iter().map(|m| m.center).collect();
     meshes.extend(aircraft.meshes);
-    Ok(Scene {
-        meshes,
-        center: position + Vec3::new(0.0, 1.0, 0.0),
-        radius: 40.0,
-        background: [0.30, 0.52, 0.80],
-    })
+    let mut session = FlightSession {
+        scene: Scene {
+            meshes,
+            center: Vec3::ZERO,
+            radius: 30.0,
+            background: [0.30, 0.52, 0.80],
+        },
+        body: AircraftBody {
+            first_mesh,
+            base,
+            base_center,
+        },
+        model,
+    };
+    session.body.apply(&mut session.scene, &session.model);
+    Ok(session)
+}
+
+/// The static airport scene (aircraft at rest on the first runway).
+pub fn airport(
+    root: &Path,
+    icao: &str,
+    aircraft_path: &Path,
+) -> Result<Scene, Box<dyn std::error::Error>> {
+    Ok(airport_flight(root, icao, aircraft_path)?.scene)
 }

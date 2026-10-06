@@ -194,12 +194,22 @@ mass, CG Y/Z, engine count) with the type and writability of the reference build
 5503 registration records of the original's table. Layout, evidence and limits:
 [research/DATAREFS.md](research/DATAREFS.md).
 
-## Flight model (approximate)
+## Flight (approximate flight model)
 
 ```sh
+cargo run --release --offline -- fly Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+cargo run --release --offline -- fly-render Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf" frame 0 20 30 45
 cargo run --release --offline -- wing-info "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 60
 ```
+
+`fly` opens a window with the Cessna on the first runway of the airport. Keys: Down/Up arrows pitch (Down =
+nose up), Left/Right roll, Z/X rudder, PageUp/PageDown or W/S throttle, Space or B brakes, F/V flaps, P pause,
+R reset, mouse drag to look around, scroll to zoom, Esc to quit. The window title shows speed, altitude, vertical
+speed, pitch, bank, heading, throttle and a stall warning. `fly-render` runs a scripted takeoff and saves
+chase-camera frames at the given times.
+
+![Cessna climbing out of KSEA](assets/screenshots/flight-climb.png)
 
 An approximate rigid-body model on the Cessna's real ACF and airfoil data: the wing is split into elements and
 each one uses the airfoil code verified against the original; thrust, landing gear and control surfaces are

@@ -300,15 +300,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         let mut liftoff = None;
         for i in 0..(seconds * 200.0) as usize {
             let t = model.telemetry(&c);
-            if model.state.time > 2.0 {
-                c.throttle = 1.0;
-            }
-            // rotate at 55 knots, then hold 8 degrees of pitch with a damped controller
-            if t.airspeed_kt > 55.0 {
-                let pitch_rate = model.state.omega.x.to_degrees();
-                c.elevator =
-                    (0.12 + 0.10 * (8.0 - t.pitch_deg) - 0.06 * pitch_rate).clamp(-0.5, 0.9);
-            }
+            openxplane::flight::takeoff_pilot(&model, &mut c);
             if !t.on_ground && liftoff.is_none() {
                 liftoff = Some((model.state.time, t.airspeed_kt));
             }
@@ -341,6 +333,48 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         match liftoff {
             Some((t, v)) => println!("liftoff at {t:.1} s, {v:.0} kt"),
             None => println!("no liftoff"),
+        }
+        return Ok(true);
+    }
+    if args.len() >= 5 && args[0] == "fly-render" {
+        // Renders chase-camera frames of the scripted takeoff at the given times (seconds).
+        let mut session = scene::airport_flight(
+            Path::new(&args[1]),
+            &args[2].to_string_lossy(),
+            Path::new(&args[3]),
+        )?;
+        let prefix = args[4].to_string_lossy().into_owned();
+        let mut times: Vec<f32> = args[5..]
+            .iter()
+            .filter_map(|a| a.to_str()?.parse().ok())
+            .collect();
+        if times.is_empty() {
+            times = vec![0.0, 18.0, 30.0, 50.0];
+        }
+        times.sort_by(f32::total_cmp);
+        let mut c = openxplane::flight::Controls::default();
+        for t in times {
+            while session.model.state.time < f64::from(t) {
+                openxplane::flight::takeoff_pilot(&session.model, &mut c);
+                session.model.step(1.0 / 200.0, &c);
+            }
+            session.body.apply(&mut session.scene, &session.model);
+            let mut camera = gpu::Camera::new(&session.scene);
+            let forward = session.model.state.orientation * glam::Vec3::NEG_Z;
+            camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
+            camera.pitch = 0.18;
+            camera.distance = 24.0;
+            let out = format!("{prefix}-{t:03.0}s.png");
+            pollster::block_on(gpu::render_png_camera(
+                &session.scene,
+                &camera,
+                Path::new(&out),
+            ))?;
+            let tel = session.model.telemetry(&c);
+            println!(
+                "t {t:5.1}s  IAS {:5.1} kt  alt {:6.1} ft  pitch {:5.1}  -> {out}",
+                tel.airspeed_kt, tel.altitude_ft, tel.pitch_deg
+            );
         }
         return Ok(true);
     }
@@ -417,6 +451,15 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             }
         };
         viewer::run(scene, args.len() == 3)?;
+        return Ok(true);
+    }
+    if (args.len() == 4 || (args.len() == 5 && args[4] == "--smoke")) && args[0] == "fly" {
+        let session = scene::airport_flight(
+            Path::new(&args[1]),
+            &args[2].to_string_lossy(),
+            Path::new(&args[3]),
+        )?;
+        viewer::run_flight(session, args.len() == 5)?;
         return Ok(true);
     }
     if (args.len() == 4 || (args.len() == 5 && args[4] == "--smoke")) && args[0] == "airport-view" {

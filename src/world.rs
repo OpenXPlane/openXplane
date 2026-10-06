@@ -3,7 +3,8 @@
 //!
 //! Projection: local frame x = east, y = up, z = south (the X-Plane OpenGL-style frame), with a flat
 //! equirectangular approximation around the airport datum on a sphere of radius 6,371,000 m; no
-//! datum or elevation model. Pavement holes (loops after the first), the bezier handle rule
+//! datum or elevation model. The surfaces lie just below the flight model's ground plane at height 0
+//! (ground -0.20 m, pavement -0.12, holes -0.09, runway -0.03, markings -0.01) so wheels rest on them. Pavement holes (loops after the first), the bezier handle rule
 //! (incoming handle mirrored through the node) and the surface colour table are the documented
 //! apt.dat conventions and openXplane policy, not behaviour confirmed in the reference build.
 use crate::apt::{Airport, Node, Pavement, Runway};
@@ -211,7 +212,7 @@ fn pavement_layers(p: &Pavement, frame: &Frame, layers: &mut Vec<Layer>) {
     for (i, nodes) in p.loops.iter().enumerate() {
         let poly = flatten_loop(nodes, frame);
         let target = if i == 0 { &mut tri } else { &mut holes };
-        let y = if i == 0 { 0.10 } else { 0.14 };
+        let y = if i == 0 { -0.12 } else { -0.09 };
         for t in triangulate(&poly) {
             for k in t {
                 target.push([poly[k][0], y, poly[k][1]]);
@@ -245,7 +246,7 @@ pub fn runway_ends(r: &Runway, frame: &Frame) -> [[f32; 2]; 2] {
 fn runway_layers(r: &Runway, frame: &Frame, layers: &mut Vec<Layer>) {
     let [a, b] = runway_ends(r, frame);
     let mut body = Vec::new();
-    strip(a, b, r.width_m, 0.20, &mut body);
+    strip(a, b, r.width_m, -0.03, &mut body);
     layers.push(Layer {
         kind: Kind::Runway,
         color: surface_color(r.surface),
@@ -263,7 +264,7 @@ fn runway_layers(r: &Runway, frame: &Frame, layers: &mut Vec<Layer>) {
     while s + 30.0 < len - 60.0 {
         let p = [a[0] + ux * s, a[1] + uz * s];
         let q = [a[0] + ux * (s + 30.0), a[1] + uz * (s + 30.0)];
-        strip(p, q, 0.9, 0.26, &mut marks);
+        strip(p, q, 0.9, -0.01, &mut marks);
         s += 50.0;
     }
     // edge lines and threshold bars
@@ -275,7 +276,7 @@ fn runway_layers(r: &Runway, frame: &Frame, layers: &mut Vec<Layer>) {
             [a[0] + off[0] + ux * 6.0, a[1] + off[1] + uz * 6.0],
             [b[0] + off[0] - ux * 6.0, b[1] + off[1] - uz * 6.0],
             0.4,
-            0.26,
+            -0.01,
             &mut marks,
         );
     }
@@ -291,7 +292,7 @@ fn runway_layers(r: &Runway, frame: &Frame, layers: &mut Vec<Layer>) {
                 [p[0] + c[0], p[1] + c[1]],
                 [q[0] + c[0], q[1] + c[1]],
                 1.1,
-                0.26,
+                -0.01,
                 &mut marks,
             );
         }
@@ -329,7 +330,7 @@ pub fn airport_layers(
     let frame = Frame::new(lat0, lon0);
     let h = ground_half_size;
     let mut ground = Vec::new();
-    quad([-h, -h], [h, -h], [h, h], [-h, h], 0.0, &mut ground);
+    quad([-h, -h], [h, -h], [h, h], [-h, h], -0.20, &mut ground);
     let mut layers = vec![Layer {
         kind: Kind::Ground,
         color: GROUND_COLOR,
