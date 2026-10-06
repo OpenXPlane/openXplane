@@ -25,3 +25,8 @@ Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc
   degrees, plus the offsets `+0x90..+0x98` of the object. Identical (the angle version within libm error).
 - `boundary_at` (`0x1411c5950`, `0x1411c59b0`, `0x1411c5a10`): a wing boundary coordinate array at a span position.
 - `signed_sqrt` (`0x14122d4b0`), `element_dihedral` (`0x1411a02f0`).
+- `boundary_ratio` (`0x14121b290`): from the three boundary arrays of a wing (`W+0x5bc`, `+0x5e8`, `+0x614`) at its
+  mid element (`count * 0.5` as float32, clamped interpolation), combined with the frame terms
+  `F+0x430/0x434/0x450/0x454`, the optional double `F+0x380` and the reference `F+0x42f5c`, divided by a
+  denominator whose magnitude is held to at least 0.01. 300 vectors, identical bits
+  (`tools/gen_boundary_ratio_vectors.py`). What the ratio means for the flight step is not established.

@@ -1398,3 +1398,45 @@ fn profile_function_with_compressibility_matches_the_original_machine_code() {
             .join("\n")
     );
 }
+
+#[test]
+fn boundary_ratio_matches_the_original_machine_code() {
+    use openxplane::element_force::boundary_ratio;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/boundary_ratio.txt"
+    ))
+    .unwrap();
+    let mut cases = 0;
+    for line in text.lines().filter(|l| l.starts_with("Q ")) {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let mut w = std::collections::HashMap::new();
+        w.insert(4usize, t[1].parse::<u32>().unwrap());
+        for (k, base) in [0x614usize, 0x5e8, 0x5bc].into_iter().enumerate() {
+            for i in 0..11 {
+                w.insert(
+                    base + 4 * i,
+                    u32::from_str_radix(t[9 + 11 * k + i], 16).unwrap(),
+                );
+            }
+        }
+        let bits = u64::from_str_radix(t[3], 16).unwrap();
+        let mut fo = std::collections::HashMap::new();
+        for (o, h) in [0x430usize, 0x434, 0x450, 0x454, 0x42f5c]
+            .into_iter()
+            .zip(&t[4..9])
+        {
+            fo.insert(o, u32::from_str_radix(h, 16).unwrap());
+        }
+        fo.insert(0x380, bits as u32);
+        fo.insert(0x384, (bits >> 32) as u32);
+        let got = boundary_ratio(&Sparse(w), &Sparse(fo), t[2] == "1");
+        let want = f(t[t.len() - 1]);
+        assert!(
+            got.to_bits() == want.to_bits() || (got.is_nan() && want.is_nan()),
+            "{line}: {got} vs {want}"
+        );
+        cases += 1;
+    }
+    assert_eq!(cases, 300);
+}

@@ -348,3 +348,38 @@ where
         element,
     })
 }
+
+/// `0x14121b290`: the distance of a point along the wing's reference line, taken from the three boundary
+/// arrays of wing `W` at its mid element, as a ratio of the aircraft's frame terms (`F+0x430/0x434/0x450/0x454`).
+/// `origin_disabled` is the result of the flag function `0x1417f12c0`; `F+0x42f5c` is the reference value subtracted.
+pub fn boundary_ratio(w: &dyn Mem, f: &dyn Mem, origin_disabled: bool) -> f32 {
+    let count = w.i32(4);
+    let t = (f64::from(count) * 0.5) as f32;
+    let truncated = t as i32;
+    let lower = if truncated < 0 {
+        0
+    } else {
+        truncated.min(count - 1)
+    };
+    let at = |base: usize| {
+        interpolate_clamped(
+            lower as f32,
+            w.f32(base + 4 * lower as usize),
+            (lower + 1) as f32,
+            w.f32(base + 4 * (lower + 1) as usize),
+            t,
+        )
+    };
+    let mut a8 = at(0x614);
+    let a7 = at(0x5e8) * f.f32(0x454);
+    let a0 = at(0x5bc) * f.f32(0x450);
+    a8 *= f.f32(0x430);
+    let x = (a7 - a0) * f.f32(0x434) - a8;
+    let base = if origin_disabled { 0.0 } else { f.f64(0x380) };
+    let shifted = (f64::from(x) + base) as f32;
+    let mut d = (f.f32(0x454) - f.f32(0x450) * 0.0) * f.f32(0x434) - f.f32(0x430) * 0.0;
+    if (-0.01..=0.01).contains(&d) || d.is_nan() {
+        d = if d < 0.0 { -0.01 } else { 0.01 };
+    }
+    ((shifted - f.f32(0x42f5c)) / d).abs()
+}
