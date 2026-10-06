@@ -140,10 +140,31 @@ struct Flight {
     free_camera: bool,
     view_offset: Vec3,
     message: Option<(String, Instant)>,
-    help: bool,
+    /// The data-output frame-rate line, off by default as in the reference build.
+    show_rate: bool,
+    rate: Rate,
 }
 
 const STEP: f32 = 1.0 / 200.0;
+
+/// Smoothed timings behind the frame-rate line.
+#[derive(Default)]
+struct Rate {
+    frame_time: f32,
+    cpu_time: f32,
+    sim_rate: f32,
+    ratio: f32,
+}
+
+impl Rate {
+    fn blend(old: f32, new: f32) -> f32 {
+        if old == 0.0 {
+            new
+        } else {
+            old + (new - old) * 0.1
+        }
+    }
+}
 
 fn approach(value: f32, target: f32, rate: f32, dt: f32) -> f32 {
     let step = rate * dt;
@@ -217,10 +238,6 @@ impl Flight {
                 });
                 return None;
             }
-            "H" if phase == Phase::Begin => {
-                self.help = !self.help;
-                return None;
-            }
             "Delete" if phase == Phase::Begin => {
                 self.model.reset();
                 self.controls = Controls::default();
@@ -266,15 +283,24 @@ impl Flight {
     /// Steps the simulation by real elapsed time (at most 0.1 s per frame) and poses the aircraft meshes.
     fn advance(&mut self, scene: &mut Scene, camera: &mut Camera) {
         let now = Instant::now();
-        let dt = (now - self.last).as_secs_f32().min(0.1);
+        let real = (now - self.last).as_secs_f32();
+        let dt = real.min(0.1);
         self.last = now;
         self.update_controls(dt);
+        let mut steps = 0;
         if !self.paused {
             self.accumulated += dt;
             while self.accumulated >= STEP {
                 self.model.step(STEP, &self.controls);
                 self.accumulated -= STEP;
+                steps += 1;
             }
+        }
+        if real > 0.0 {
+            let r = &mut self.rate;
+            r.frame_time = Rate::blend(r.frame_time, real);
+            r.sim_rate = Rate::blend(r.sim_rate, steps as f32 / real);
+            r.ratio = Rate::blend(r.ratio, steps as f32 * STEP / real);
         }
         self.body.apply(scene, &self.model);
         camera.target = self.model.state.position + self.view_offset;
@@ -363,23 +389,37 @@ impl ApplicationHandler for App {
                         .renderer
                         .update_meshes(flight.body.first_mesh, &self.scene);
                     state.window.set_title(&flight.title());
-                    let telemetry = flight.model.telemetry(&flight.controls);
-                    let note = match &flight.message {
-                        Some((m, at)) if at.elapsed().as_secs_f32() < 3.0 => Some(m.as_str()),
-                        _ => None,
-                    };
-                    let mut interface = hud::Hud::new(state.config.width, state.config.height);
-                    hud::draw_flight(
-                        &mut interface,
-                        &hud::FlightHud {
-                            telemetry: &telemetry,
-                            controls: &flight.controls,
-                            paused: flight.paused,
-                            help: flight.help,
-                            note,
-                        },
-                    );
-                    state.renderer.set_hud(&interface.vertices);
+                    if flight.show_rate {
+                        flight.rate.cpu_time =
+                            Rate::blend(flight.rate.cpu_time, flight.last.elapsed().as_secs_f32());
+                        let r = &flight.rate;
+                        let mut interface = hud::Hud::new(state.config.width, state.config.height);
+                        let scale = (state.config.height as f32 / 800.0).clamp(0.7, 1.6);
+                        let active = if r.frame_time > 0.0 {
+                            1.0 / r.frame_time
+                        } else {
+                            0.0
+                        };
+                        // no GPU timing is measured, so that cell has no value
+                        crate::dout::draw_line(
+                            &mut interface,
+                            16.0 * scale,
+                            16.0 * scale,
+                            scale,
+                            crate::dout::FRAME_RATE_NO_VSYNC,
+                            &[
+                                Some(active),
+                                Some(r.sim_rate),
+                                None,
+                                Some(r.frame_time),
+                                Some(r.cpu_time),
+                                None,
+                                Some(r.ratio),
+                                Some(r.ratio),
+                            ],
+                        );
+                        state.renderer.set_hud(&interface.vertices);
+                    }
                 }
                 match state.draw() {
                     Ok(drawn) => {
@@ -508,7 +548,7 @@ pub fn run_flight(session: FlightSession, smoke: bool) -> Result<(), Box<dyn std
         "Fly with the original's default keys: F1/F2/F3 throttle down/up/full, 1/2 flaps up/down, B brakes (hold), \
          V brakes max, [ ] pitch trim, 5/6/7 and 8/9/0 rudder and aileron trim, P pause, W default view. \
          openXplane's keyboard stick: arrows pitch/roll, Z/X rudder (Tab switches them to their original \
-         meaning). H shows the key help, Delete resets, Esc quits."
+         meaning). Delete resets, Esc quits."
     );
     let FlightSession { scene, body, model } = session;
     let flight = Flight {
@@ -524,7 +564,8 @@ pub fn run_flight(session: FlightSession, smoke: bool) -> Result<(), Box<dyn std
         free_camera: false,
         view_offset: Vec3::ZERO,
         message: None,
-        help: false,
+        show_rate: std::env::var_os("OPENXPLANE_FRAME_RATE").is_some(),
+        rate: Rate::default(),
     };
     run_app(scene, Some(flight), smoke)
 }

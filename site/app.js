@@ -19,6 +19,7 @@ const DOCS = [
   ["research/AFL_REGIMES", "AFL regimes"],
   ["research/PROFILE_PIPELINE", "Profile evaluator"],
   ["research/WING_ELEMENT", "Wing element (partial)"],
+  ["research/DATA_OUTPUT", "Data-output lines"],
   ["research/FLIGHT_MODEL", "Approximate flight model"],
   ["research/RUNTIME_TIME", "Runtime clock"],
   ["research/ACF_SCHEMA", "ACF loader schema"],
@@ -53,7 +54,7 @@ function totals(c) {
 
 const GALLERY = {
   anims: [
-    ["assets/anim/takeoff.gif", "Takeoff from Seattle-Tacoma", "The Cessna 172 accelerates down runway 16L and climbs out with the on-screen instruments; chase camera, approximate flight model."],
+    ["assets/anim/takeoff.gif", "Takeoff from Seattle-Tacoma", "The Cessna 172 accelerates down runway 16L and climbs out; chase camera, approximate flight model."],
     ["assets/anim/orbit.gif", "Orbiting the Cessna 172 SP", "The OBJ8 exterior with textures, lighting and glass, drawn by wgpu."],
   ],
   airports: [
@@ -70,8 +71,7 @@ const GALLERY = {
     ["assets/gallery/exterior-seaplane.jpg", "Cessna 172 SP seaplane", "The floats variant loads and flies in the model as well."],
   ],
   flight: [
-    ["assets/gallery/hud-flight.jpg", "Flight instruments", "The on-screen interface: speed, altitude, vertical speed, heading, attitude, throttle and flaps."],
-    ["assets/gallery/hud-help.jpg", "Key help", "H shows the original's default keys and openXplane's own."],
+    ["assets/gallery/ui-frame-rate.jpg", "Frame-rate line", "The reference build's data-output frame-rate line (labels from its code; layout, colour and the sample values are from a photograph of it)."],
     ["assets/gallery/flight-000.00s.jpg", "On the runway", "Standing on the gear at the start of runway 16L."],
     ["assets/gallery/flight-017.00s.jpg", "Takeoff roll", "About 17 seconds in, the nose rotating."],
     ["assets/gallery/flight-024.00s.jpg", "Liftoff", "The wheels leave the runway."],

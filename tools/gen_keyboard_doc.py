@@ -67,7 +67,6 @@ are additions, not part of the ported map:
 | Left / Right arrows | roll left / right |
 | Z / X | rudder left / right |
 | Tab | give the arrows and X back their original meaning (view movement, smoke toggle), and back |
-| H | show or hide the key help overlay |
 | Delete | reset the aircraft to the runway |
 | Esc | quit (the original opens its menu) |
 | Mouse drag, scroll | orbit and zoom the chase camera |

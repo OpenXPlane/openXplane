@@ -1,0 +1,173 @@
+0	f-act  /sec f-sim  /sec frame  time___cpu  time  gpu  time__vblnk  sync _grnd ratio  flit ratio
+1	 real  time  totl  time missn  time timer  time _____-_____  zulu  time local  time hobbs  time
+2	  USE puffs___TOT puffs___VIS  tris___vis _____-_____ _____-_____ _____-_____ _____-_____
+3	 Vind  kias  Vind  keas Vtrue  ktas Vtrue  ktgs _____-_____  Vind___mph Vtrue mphas Vtrue mphgs
+4	 Mach-ratio _____-_____ __VVI-__fpm toten-vario Gload norml Gload axial Gload  side _____-_____
+5	__vis ___sm _baro-_inHg +-ISA __sfc +-ISA FL140 +-ISA FL340 _dewp-deg C precp ratio thrml __fpm
+6	cloud _type cloud cover bases ftMSL _tops ftMSL _wind __alt _wind speed _wind __dir _wind _gust
+7	cloud _type cloud cover bases ftMSL _tops ftMSL _wind ftMSL _wind speed _wind __dir _wind _gust
+8	_elev stick ailrn stick ruddr stick _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+9	 vect  rqst sweep  rqst incid  rqst dihed  rqst retra  rqst _____-_____ _____-_____ water jetts
+10	_elev astab ailrn astab ruddr astab _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+11	_elev _surf ailrn _surf ruddr _surf _____-_____ nwhel steer _____-_____ _____-_____ _____-_____
+12	sweep 1,deg sweep 2,deg sweep h,deg  vect ratio sweep ratio incid ratio dihed ratio retra ratio
+13	 trim  elev  trim ailrn  trim ruddr  flap handl  flap postn  slat ratio sbrak handl sbrak postn
+14	 gear___0/1 wbrak___set lbrak___add rbrak___add wbrak  part _____-_____ _____-_____ _____-_____
+15	____M ft-lb____ L ft-lb____ N ft-lb _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+16	____P deg/s____ Q deg/s____ R deg/s _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+17	pitch___deg _roll___deg hding__true _____-_____ hding___mag mavar___deg _____-_____ __mag__comp
+18	alpha___deg  beta___deg hpath  true vpath___deg _____-_____ _____-_____ _____-_____  slip___deg
+19	load1 ___lb load2 ___lb load3 ___lb load4 ___lb load5 ___lb load6 ___lb load7 ___lb load8 ___lb
+20	__lat-__deg __lon-__deg ___CG-ftMSL _gear-ftagl terrn-ftMSL p-alt-ftMSL __lat-orign __lon-orign
+21	____X ____m ____Y ____m ____Z ____m ___vX __m/s ___vY __m/s ___vZ __m/s _dist ___ft _dist ___nm
+22	lat 1___deg lat 2___deg lat 3___deg lat 4___deg lat 5___deg lat 6___deg lat 7___deg lat 8___deg
+23	lon 1___deg lon 2___deg lon 3___deg lon 4___deg lon 5___deg lon 6___deg lon 7___deg lon 8___deg
+24	alt 1 ftMSL alt 2 ftMSL alt 3 ftMSL alt 4 ftMSL alt 5 ftMSL alt 6 ftMSL alt 7 ftMSL alt 8 ftMSL
+25	thro1 handl thro2 handl thro3 handl thro4 handl thro5 handl thro6 handl thro7 handl thro8 handl
+26	thro1 engin thro2 engin thro3 engin thro4 engin thro5 engin thro6 engin thro7 engin thro8 engin
+27	mode1  0123 mode2  0123 mode3  0123 mode4  0123 mode5  0123 mode6  0123 mode7  0123 mode8  0123
+28	prop1___set prop2___set prop3___set prop4___set prop5___set prop6___set prop7___set prop8___set
+29	mixt1 ratio mixt2 ratio mixt3 ratio mixt4 ratio mixt5 ratio mixt6 ratio mixt7 ratio mixt8 ratio
+30	heat1 ratio heat2 ratio heat3 ratio heat4 ratio heat5 ratio heat6 ratio heat7 ratio heat8 ratio
+31	cowl1 __set cowl2 __set cowl3 __set cowl4 __set cowl5 __set cowl6 __set cowl7 __set cowl8 __set
+32	magn1 __set magn2 __set magn3 __set magn4 __set magn5 __set magn6 __set magn7 __set magn8 __set
+33	star1 __sec star2 __sec star3 __sec star4 __sec star5 __sec star6 __sec star7 __sec star8 __sec
+34	engn1 ___hp engn2 ___hp engn3 ___hp engn4 ___hp engn5 ___hp engn6 ___hp engn7 ___hp engn8 ___hp
+35	thrst  1,lb thrst  2,lb thrst  3,lb thrst  4,lb thrst  5,lb thrst  6,lb thrst  7,lb thrst  8,lb
+36	engn1 trq_% engn2 trq_% engn3 trq_% engn4 trq_% engn5 trq_% engn6 trq_% engn7 trq_% engn8 trq_%
+37	engn1 __rpm engn2 __rpm engn3 __rpm engn4 __rpm engn5 __rpm engn6 __rpm engn7 __rpm engn8 __rpm
+38	prop1 __rpm prop2 __rpm prop3 __rpm prop4 __rpm prop5 __rpm prop6 __rpm prop7 __rpm prop8 __rpm
+39	ptch1 __deg ptch2 __deg ptch3 __deg ptch4 __deg ptch5 __deg ptch6 __deg ptch7 __deg ptch8 __deg
+40	pwash ___kt pwash ___kt pwash ___kt pwash ___kt pwash ___kt pwash ___kt pwash ___kt pwash ___kt
+41	N1  1  pcnt N1  2  pcnt N1  3  pcnt N1  4  pcnt N1  5  pcnt N1  6  pcnt N1  7  pcnt N1  8  pcnt
+42	N2  1  pcnt N2  2  pcnt N2  3  pcnt N2  4  pcnt N2  5  pcnt N2  6  pcnt N2  7  pcnt N2  8  pcnt
+43	MP  1  inhg MP  2  inhg MP  3  inhg MP  4  inhg MP  5  inhg MP  6  inhg MP  7  inhg MP  8  inhg
+44	EPR 1  part EPR 2  part EPR 3  part EPR 4  part EPR 5  part EPR 6  part EPR 7  part EPR 8  part
+45	FF  1 gal/h FF  2 gal/h FF  3 gal/h FF  4 gal/h FF  5 gal/h FF  6 gal/h FF  7 gal/h FF  8 gal/h
+46	ITT 1___deg ITT 2___deg ITT 3___deg ITT 4___deg ITT 5___deg ITT 6___deg ITT 7___deg ITT 8___deg
+47	EGT 1___deg EGT 2___deg EGT 3___deg EGT 4___deg EGT 5___deg EGT 6___deg EGT 7___deg EGT 8___deg
+48	CHT 1___deg CHT 2___deg CHT 3___deg CHT 4___deg CHT 5___deg CHT 6___deg CHT 7___deg CHT 8___deg
+49	OILP1___psi OILP2___psi OILP3___psi OILP4___psi OILP5___psi OILP6___psi OILP7___psi OILP8___psi
+50	OILT1___deg OILT2___deg OILT3___deg OILT4___deg OILT5___deg OILT6___deg OILT7___deg OILT8___deg
+51	FUEP1___psi FUEP2___psi FUEP3___psi FUEP4___psi FUEP5___psi FUEP6___psi FUEP7___psi FUEP8___psi
+52	genr1___amp genr2___amp genr3___amp genr4___amp genr5___amp genr6___amp genr7___amp genr8___amp
+53	batt1___amp batt2___amp batt3___amp batt4___amp batt5___amp batt6___amp batt7___amp batt8___amp
+54	batt1  volt batt2  volt batt3  volt batt4  volt batt5  volt batt6  volt batt7  volt batt8  volt
+55	pump1___0/1 pump2___0/1 pump3___0/1 pump4___0/1 pump5___0/1 pump6___0/1 pump7___0/1 pump8___0/1
+56	idle1___0/1 idle2___0/1 idle3___0/1 idle4___0/1 idle5___0/1 idle6___0/1 idle7___0/1 idle8___0/1
+57	batt1___0/1 batt2___0/1 batt3___0/1 batt4___0/1 batt5___0/1 batt6___0/1 batt7___0/1 batt8___0/1
+58	genr1___0/1 genr2___0/1 genr3___0/1 genr4___0/1 genr5___0/1 genr6___0/1 genr7___0/1 genr8___0/1
+59	invr1___0/1 invr2___0/1 _____-_____ _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+60	fadec___0/1 fadec___0/1 fadec___0/1 fadec___0/1 fadec___0/1 fadec___0/1 fadec___0/1 fadec___0/1
+61	igni1___0/1 igni2___0/1 igni3___0/1 igni4___0/1 igni5___0/1 igni6___0/1 igni7___0/1 igni8___0/1
+62	fuel1___gal fuel2___gal fuel3___gal fuel4___gal fuel5___gal fuel6___gal fuel7___gal fuel8___gal
+63	empty-___lb payld-___lb _fuel-___lb jetti-___lb __ice-___lb total-___lb gross-___lb ___cg-ftref
+64	 lift____lb  drag____lb  side____lb____ L lb-ft____ M lb-ft____ N lb-ft _____-_____ _____-_____
+65	norml____lb axial____lb  side____lb _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+66	 gear  vert  gear  vert  gear  vert  gear  vert  gear  vert  gear  vert___gear  vert  gear  vert
+67	 gear___rat  gear___rat  gear___rat  gear___rat  gear___rat  gear___rat___gear___rat  gear___rat
+68	__L/D _aero _____-_____ ___cl total ___cd total _____-_____ S-ref-ft*ft _____-________L/D *etaP
+69	Peff1 cruis Peff2 cruis Peff3 cruis Peff4 cruis Peff5 cruis Peff6 cruis Peff7 cruis Peff8 cruis
+70	Lailn 1,deg Railn 1,deg Lailn 1,deg Railn 1,deg Lailn 1,deg Railn 1,deg Lailn 1,deg Railn 1,deg
+71	Lailn 2,deg Railn 2,deg Lailn 2,deg Railn 2,deg Lailn 2,deg Railn 2,deg Lailn 2,deg Railn 2,deg
+72	Lsplr 1,deg Rsplr 1,deg Lsplr 1,deg Rsplr 1,deg Lsplr 1,deg Rsplr 1,deg Lsplr 1,deg Rsplr 1,deg
+73	Lsplr 2,deg Rsplr 2,deg Lsplr 2,deg Rsplr 2,deg Lsplr 2,deg Rsplr 2,deg Lsplr 2,deg Rsplr 2,deg
+74	elev1___deg elev1___deg elev2___deg elev2___deg _____-_____ _____-_____ _____-_____ _____-_____
+75	rudr1___deg rudr1___deg rudr2___deg rudr2___deg _____-_____ _____-_____ _____-_____ _____-_____
+76	Lyawb___deg Ryawb___deg Lyawb___deg Ryawb___deg Lyawb___deg Ryawb___deg Lyawb___deg Ryawb___deg
+77	pitch____lb  roll____lb  hdng____lb l-brk____lb r-brk____lb _____-_____ blown-_flap _____-_____
+78	vert1 tvect vert2 tvect vert3 tvect vert4 tvect vert5 tvect vert6 tvect vert7 tvect vert8 tvect
+79	latr1 tvect latr2 tvect latr3 tvect latr4 tvect latr5 tvect latr6 tvect latr7 tvect latr8 tvect
+80	pitch cycli pitch cycli pitch cycli pitch cycli pitch cycli pitch cycli pitch cycli pitch cycli
+81	 roll cycli  roll cycli  roll cycli  roll cycli  roll cycli  roll cycli  roll cycli  roll cycli
+82	pitch  flap pitch  flap pitch  flap pitch  flap pitch  flap pitch  flap pitch  flap pitch  flap
+83	 roll  flap  roll  flap  roll  flap  roll  flap  roll  flap  roll  flap  roll  flap  roll  flap
+84	wing1 L cl* wing1 R cl* wing2 L cl* wing2 R cl* wing3 L cl* wing3 R cl* wing4 L cl* wing4 R cl*
+85	wing1 Lcdi* wing1 Rcdi* wing2 Lcdi* wing2 Rcdi* wing3 Lcdi* wing3 Rcdi* wing4 Lcdi* wing4 Rcdi*
+86	wing1 wash* wing1 wash* wing2 wash* wing2 wash* wing3 wash* wing3 wash* wing4 wash* wing4 wash*
+87	hstab L cl* hstab R cl* vstb1___cl* vstb2___cl* _____-_____ _____-_____ _____-_____ _____-_____
+88	hstab Lcdi* hstab Rcdi* vstb1  cdi* vstb2  cdi* _____-_____ _____-_____ _____-_____ _____-_____
+89	hstab wash* hstab wash* vstb1 wash* vstb2 wash* _____-_____ _____-_____ _____-_____ _____-_____
+90	 GE 1 wash*  GE 2 wash*  GE 3 wash*  GE 4 wash*  GE 5 wash*  GE 6 wash*  GE 7 wash*  GE 8 wash*
+91	VRS 1 wash* VRS 2 wash* VRS 3 wash* VRS 4 wash* VRS 5 wash* VRS 6 wash* VRS 7 wash* VRS 8 wash*
+92	wing1  lift wing1  lift wing2  lift wing2  lift wing3  lift wing3  lift wing4  lift wing4  lift
+93	wing1  drag wing1  drag wing2  drag wing2  drag wing3  drag wing3  drag wing4  drag wing4  drag
+94	hstab  lift hstab  lift vstb1  lift vstb2  lift _____-_____ _____-_____ _____-_____ _____-_____
+95	hstab  drag hstab  drag vstb1  drag vstb2  drag _____-_____ _____-_____ _____-_____ _____-_____
+96	COM 1  freq COM 1  stby _____-_____ COM 2  freq COM 2  stby _____-________COM___xmt _____-_____
+97	NAV 1  freq NAV 1  stby NAV 1  type _____-_____ NAV 2  freq NAV 2  stby NAV 2  type _____-_____
+98	NAV 1___OBS NAV 1 s-crs NAV 1  flag _____-_____ NAV 2___OBS NAV 2 s-crs NAV 2  flag _____-_____
+99	pilN1 n-typ pilN1 to-fr pilN1 m-crs pilN1 r-brg pilN1 dme-d pilN1 h-def pilN1 v-def _____-_____
+100	pilN2 n-typ pilN2 to-fr pilN2 m-crs pilN2 r-brg pilN2 dme-d pilN2 h-def pilN2 v-def _____-_____
+101	ADF 1  freq ADF 1  card ADF 1 r-brg ADF 1 n-typ ADF 2  freq ADF 2  card ADF 2 r-brg ADF 2 n-typ
+102	  DME nav01___DME  mode___DME found___DME  dist___DME speed___DME  time___DME n-typ DME-3  freq
+103	  GPS  mode___GPS index  dist____nm___OBS___mag___crs___mag___rel  brng  hdef  dots  vdef  dots
+104	trans  mode trans  sett trans____ID trans inter _____-_____ _____-_____ _____-_____ _____-_____
+105	___OM morse____MM morse____IM morse audio activ _____-_____ _____-_____ _____-_____ _____-_____
+106	 avio___0/1___nav  lite beacn  lite strob  lite  land  lite  taxi  lite _____-_____ _____-_____
+107	 ECAM  mode  EFIS sel 1  EFIS sel 2___HSI sel 1___HSI sel 2___HSI___arc___map r-sel___map range
+108	___ap___src  fdir  mode  fdir  ptch  fdir  roll _____-________HUD power___HUD brite _____-_____
+109	deice inlet deice  prop deice windo deice pito1 deice pito2 deice___AOA deice___AOA deice  wing
+110	__alt air1A __alt air2A __alt air1B __alt air2B _auto ignit _auto ignit manul ignit manul ignit
+111	prero engag prero level clutc ratio _____-________art  ptch___art  roll___yaw  damp  auto brake
+112	  tot energ radal  feet  prop  sync fethr  mode puffr power water scoop _tail _hook chute deply
+113	 mastr  caut mastr  warn mastr accpt auto disco___low vacum___low  volt  fuel quant___hyd press
+114	yawda____on  sbrk____on  GPWS  warn___ice  warn pitot___off cabin althi afthr___arm  ospd  time
+115	 fuel press___oil press___oil  temp inver  warn gener  warn  chip detec engin  fire ignit___0/1
+116	  nav___arm___alt___arm___app___arm  vnav  enabl vnav___arm  vnav  time____gp enabl _____-_____
+117	 auto throt  mode hding  mode___alt _____-________bac___0/1___app _____-_____ butn  sync  butn
+118	  set speed___set hding___set___vvi  dial___alt  vnav___alt___use___alt  sync  roll  sync pitch
+119	_hdng delta _ptch delta ____R d/sec ____Q d/sec _rudd ratio _elev ratio ____V __kts __dis ___ft
+120	  set___alt___set___vvi cabin___alt cabin___vvi  test  time  diff___psi  dump___all bleed___src
+121	__APU runng __APU ___N1 __APU __rat __GPU __rat __RAT __rat __APU __amp __GPU __amp __RAT __amp
+122	 targ selct _____-_____ _____-_____ _____-_____ _____-_____ _____-_____ _____-_____ _____-_____ 
+123	eng-1  pump eng-2  pump___elec  pump___RAT  pump  hydr  qty1  hydr  qty2  hydr pres1  hydr pres2
+124	_bus1 _volt _bus2 _volt _bus3 _volt _bus1 __amp _bus2 __amp _bus3 __amp engin  in W solar out W
+125	inlet___ice inlet___ice  prop___ice  prop___ice pitot___ice pitot___ice statc___ice statc___ice
+126	frame ice__ aoa__ ice__ aoa__ ice__ lwing ice__ rwing ice__ windo ice__ carb1 ice__ carb2 ice__
+127	 warn  time  caut  time  warn  work  caut  work  gear  work  gear  warn stall  warn _____-_____
+128	  leg____ #___leg  type___leg___lat___leg___lon _____-_____ _____-_____ _____-_____ _____-_____
+129	pedal nobrk pedal wibrk  yoke___PFC pedal___PFC throt___PFC cecon___PFC switc___PFC btogg___PFC
+130	camra___lon camra___lat camra___ele camra  hdng camra pitch camra  roll _____-_____ camra  clou
+131	gear1-ftMSL gear2-ftMSL gear3-ftMSL gear4-ftMSL gear5-ftMSL gear6-ftMSL _gear-_cont _gear-_pave
+132	copN2 n-typ copN2 to-fr copN2 m-crs copN2 r-brg copN2 dme-d copN2 h-def copN2 v-def _____-_____
+133	___ff __pph ___ff __gph speed __mph __eta _smpg __eta nm/lb range ___sm endur hours _mult VxMPG
+134	 gear___deg  gear___deg  gear___deg  gear___deg  gear___deg  gear___deg___gear___deg  gear___deg
+135	acc-x _m/ss acc-y _m/ss acc-z _m/ss ____P deg/s ____Q deg/s ____R deg/s _____ _____ _____ _____
+136	axis1 ratio axis2 ratio axis3 ratio axis4 ratio axis5 ratio axis6 ratio butn1___sum butn2___sum
+137	norm l___lb axial____lb  side____lb____ L lb-ft____ M lb-ft____ N lb-ft _____-_____ _____-_____
+138	_elev servo ailrn servo ruddr servo _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+139	batt1  temp batt2  temp batt3  temp batt4  temp batt5  temp batt6  temp batt7  temp batt8  temp
+140	invr1___deg invr2___deg invr3___deg invr4___deg invr5___deg invr6___deg invr7___deg invr8___deg
+141	stat1___deg stat2___deg stat3___deg stat4___deg stat5___deg stat6___deg stat7___deg stat8___deg
+142	 gear  side  gear  side  gear  side  gear  side  gear  side  gear  side___gear  side  gear  side
+143	 gear  long  gear  long  gear  long  gear  long  gear  long  gear  long___gear  long  gear  long
+144	stat1___deg stat2___deg stat3___deg stat4___deg stat5___deg stat6___deg stat7___deg stat8___deg
+145	prop1 n-mtr prop2 n-mtr prop3 n-mtr prop4 n-mtr prop5 n-mtr prop6 n-mtr prop7 n-mtr prop8 n-mtr
+146	 gear____ft  gear____ft  gear____ft  gear____ft  gear____ft  gear____ft___gear____ft  gear____ft
+147	batt1 wt-hr batt2 wt-hr batt3 wt-hr batt4 wt-hr batt5 wt-hr batt6 wt-hr batt7 wt-hr batt8 wt-hr
+148	brake t-rat brake t-rat brake t-rat brake t-rat brake t-rat brake t-rat  brake t-rat brake t-rat
+149	burn1  part burn2  part burn3  part burn4  part burn5  part burn6  part burn7  part burn8  part
+150	cloud _type cloud cover bases ftMSL _tops ftMSL _wind ftMSL _wind speed _wind __dir _wind _gust
+151	AMprs  inHG AMtmp  degC LEtmp  degC  dens ratio____ A  ktas____ Q___psf _____-_____ gravi  m/ss
+152	_immr _locl _turb _locl _rain _locl _snow _locl _hail _locl _wind knots _wind __dir _wind v_fpm
+153	swirl maxkt swirl maxkt swirl maxkt swirl maxkt swirl maxkt swirl maxkt swirl maxkt swirl maxkt
+154	disc1 ___Cd disc2 ___Cd disc3 ___Cd disc4 ___Cd disc5 ___Cd disc6 ___Cd disc7 ___Cd disc8 ___Cd
+155	_disc alpha blade alpha rotor _slap _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+156	govnr___0/1 govnr___0/1 govnr___0/1 govnr___0/1 govnr___0/1 govnr___0/1 govnr___0/1 govnr___0/1
+157	star1 _fuel star2 _fuel star3 _fuel star4 _fuel star5 _fuel star6 _fuel star7 _fuel star8 _fuel
+158	copN1 n-typ copN1 to-fr copN1 m-crs copN1 r-brg copN1 dme-d copN1 h-def copN1 v-def _____-_____
+159	nozle ___kt nozle ___kt nozle ___kt nozle ___kt nozle ___kt nozle ___kt nozle ___kt nozle ___kt
+160	shaft ___hp shaft ___hp shaft ___hp shaft ___hp shaft ___hp shaft ___hp shaft ___hp shaft ___hp
+161	wash1 wash* wash2 wash* wash3 wash* wash4 wash* wash5 wash* wash6 wash* wash7 wash* wash8 wash*
+162	SFC 1 lbhph SFC 2 lbhph SFC 3 lbhph SFC 4 lbhph SFC 5 lbhph SFC 6 lbhph SFC 7 lbhph SFC 8 lbhph
+163	Peff1 hover Peff2 hover Peff3 hover Peff4 hover Peff5 hover Peff6 hover Peff7 hover Peff8 hover
+164	_take-groll _land-groll _____-_____ _____-_____ _take-50agl _land-50agl _____-_____ _____-_____
+165	_disc ___kt _disc ___kt _disc ___kt _disc ___kt _disc ___kt _disc ___kt _disc ___kt _disc ___kt
+166	__wet-ratio puddl-ratio _snow-ratio __ice-ratio _____-_____ _____-_____ _____-_____ _____-_____
+167	_Pdot _d/ss _Qdot _d/ss _Rdot _d/ss _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+168	stick ratio gload req g _C* ______g _elev astab _elev _surf _____ _____ _____ _____
+169	fuel1_tankC fuel2_tankC fuel3_tankC fuel4_tankC fuel5_tankC fuel6_tankC fuel7_tankC fuel8_tankC
+170	_fail index _fail __0/1 _____-_____ _____-_____ _____-_____ _____-_____ _____-_____
+171	fuel1_engnC fuel2_engnC fuel3_engnC fuel4_engnC fuel5_engnC fuel6_engnC fuel7_engnC fuel8_engnC
+172	engn1_tank# engn2_tank# engn3_tank# engn4_tank# engn5_tank# engn6_tank# engn7_tank# engn8_tank#

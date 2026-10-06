@@ -1,4 +1,5 @@
 use openxplane::{Aircraft, reference_candidates};
+mod dout;
 mod gpu;
 mod hud;
 mod scene;
@@ -383,19 +384,27 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
             camera.pitch = 0.18;
             camera.distance = 24.0;
-            if std::env::var_os("OPENXPLANE_HUD").is_some() {
-                let tel = session.model.telemetry(&c);
+            if std::env::var_os("OPENXPLANE_FRAME_RATE").is_some() {
+                // the sample values of the reference photograph, to compare the layout
                 let (fw, fh) = offscreen.size();
                 let mut hud = hud::Hud::new(fw, fh);
-                hud::draw_flight(
+                let scale = (fh as f32 / 800.0).clamp(0.7, 1.6);
+                dout::draw_line(
                     &mut hud,
-                    &hud::FlightHud {
-                        telemetry: &tel,
-                        controls: &c,
-                        paused: false,
-                        help: std::env::var_os("OPENXPLANE_HUD_HELP").is_some(),
-                        note: None,
-                    },
+                    16.0 * scale,
+                    16.0 * scale,
+                    scale,
+                    dout::FRAME_RATE_NO_VSYNC,
+                    &[
+                        Some(10.462),
+                        Some(19.9),
+                        None,
+                        Some(0.0956),
+                        Some(0.0698),
+                        Some(0.0956),
+                        Some(1.0),
+                        Some(1.0),
+                    ],
                 );
                 offscreen.set_hud(&hud.vertices);
             }
