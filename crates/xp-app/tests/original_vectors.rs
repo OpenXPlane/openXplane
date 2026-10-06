@@ -973,6 +973,44 @@ fn force_totals_match_the_original_machine_code() {
 }
 
 #[test]
+fn wing_misc_helpers_match_the_original_machine_code() {
+    use openxplane::wing_element::{Boundary, element_dihedral, signed_sqrt};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/wing_misc.txt"
+    ))
+    .unwrap();
+    let (mut counts, mut worst) = ([0usize; 2], 0u32);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        match t[0] {
+            "Q" => {
+                assert_eq!(signed_sqrt(f(t[1])).to_bits(), f(t[2]).to_bits(), "{line}");
+                counts[0] += 1;
+            }
+            "D" => {
+                let v: Vec<f32> = t[1..7].iter().map(|h| f(h)).collect();
+                let (x, y, z) = ([v[0], v[1]], [v[2], v[3]], [v[4], v[5]]);
+                let b = Boundary {
+                    x: &x,
+                    y: &y,
+                    z: &z,
+                    chord: &[],
+                };
+                worst = worst.max(ulps(element_dihedral(&b, 0), f(t[7])));
+                counts[1] += 1;
+            }
+            other => panic!("unknown record {other}"),
+        }
+    }
+    println!("cases {counts:?}, dihedral worst {worst} ulp");
+    assert!(counts.iter().all(|c| *c >= 300) && worst <= 4);
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

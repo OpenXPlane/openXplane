@@ -726,6 +726,26 @@ pub fn rotate_euler(angles: [f32; 3], a: f32, b: f32, c: f32) -> [f32; 3] {
     [cp * v - sp * w, cp * w + sp * v, cq * u - sq * b]
 }
 
+/// `0x14122d4b0`: the square root with the sign of the argument (`-sqrt(-x)` for negative `x`).
+pub fn signed_sqrt(x: f32) -> f32 {
+    if x >= 0.0 {
+        if 0.0 > x { f32::NAN } else { x.sqrt() }
+    } else {
+        -(-x).sqrt()
+    }
+}
+
+/// `0x1411a02f0`: the dihedral angle in degrees of span element `i`: `atan2` of the rise of the third boundary
+/// coordinate over the distance in the plane of the first two (arrays at `+0x5bc`, `+0x5e8`, `+0x614`).
+pub fn element_dihedral(b: &Boundary, i: usize) -> f32 {
+    let dz = b.z[i + 1] - b.z[i];
+    let d1 = b.x[i + 1] - b.x[i];
+    let d0 = b.y[i + 1] - b.y[i];
+    let sum = d1 * d1 + d0 * d0;
+    let distance = if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+    dz.atan2(distance) * 57.295_776
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
