@@ -31,16 +31,7 @@ pub fn blend(vm: &Vm, obj: u64, mask: i32) -> f32 {
         return 1.0;
     }
     let divisor = vm.f32(vm.u64(obj + 8) + 0xdb4);
-    let fraction = |offset: u64| {
-        let v = vm.f32(obj + offset) / divisor;
-        if 0.0 > v {
-            0.0
-        } else if 1.0 < v {
-            1.0
-        } else {
-            v
-        }
-    };
+    let fraction = |offset: u64| clamp(vm.f32(obj + offset) / divisor, 0.0, 1.0);
     let (a, b, c) = (fraction(0x60), fraction(0x64), fraction(0x68));
     let sse_max = |x: f32, y: f32| if x > y { x } else { y };
     let mut level = 0.0;
@@ -53,14 +44,7 @@ pub fn blend(vm: &Vm, obj: u64, mask: i32) -> f32 {
     if mask & 4 != 0 {
         level = sse_max(c, level);
     }
-    let v = (level - f32::from_bits(0x3dcccccd)) * 2.5 + 0.0;
-    if 0.0 > v {
-        0.0
-    } else if 1.0 < v {
-        1.0
-    } else {
-        v
-    }
+    clamp((level - f32::from_bits(0x3dcccccd)) * 2.5 + 0.0, 0.0, 1.0)
 }
 
 /// `0x1411a0970(obj, i)` / `0x1411a0a10(obj, i)`: the positive and negative lever levels of engine `i`
@@ -138,9 +122,4 @@ pub fn limit_b(vm: &Vm, obj: u64, n: i32, binding: &mut dyn FnMut(u32, i32) -> b
         return -0.99 > f64::from(negative);
     }
     false
-}
-
-#[allow(dead_code)]
-fn unit(v: f32) -> f32 {
-    clamp(v, 0.0, 1.0)
 }
