@@ -148,3 +148,16 @@ the centre one. Modes: 1 left, 3 right, 2 centre, 5 all three (modes 1, 2 and 3 
 flags are set); each draw needs `capacity - used > amount * interval`, then adds the amount (shared evenly over the
 tanks used) to the totals; any other mode draws nothing. 1500 emulator cases identical, no libm involved. The tank
 selector `0x141189dc0` is in `engine.rs`.
+
+## Atmosphere accessors (table path)
+
+`atmosphere::Atmosphere` (`crates/xp-airfoil/src/atmosphere.rs`) ports `0x141ba6750` (temperature), `0x141baf820`
+(pressure) and `0x141ba64e0` (density ratio) for the object at `F+0xbfa8` when `obj+0x64` is at or below absolute
+zero. The weather system fills a table of 0x803 entries at `0x14612bd90` (the image holds zeros); an entry is a pair
+of floats, the pressure side first and the temperature in Celsius second, one per 100 m from -5000 m. The
+temperature is the clamped interpolation of the second floats at `(altitude + 5000) / 100`. The pressure follows
+the barometric formula from the pressure setting `obj+0x98` and that temperature (lapse rate 0.0065, exponent
+5.25139, 1013.25 and 288.15 constants). The density ratio is the interpolated first floats times the pressure at the
+reference altitude `obj+0x9c` over 101325, divided by the ratio of the outside temperature to the table's.
+400 and 321 and 400 emulator cases are identical (even the C runtime's `pow` matches Rust's on these inputs). The
+layered path (`obj+0x64` above absolute zero, a blend of `obj+0x44..+0x58`) is not ported.

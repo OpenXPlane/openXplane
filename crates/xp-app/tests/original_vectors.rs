@@ -866,6 +866,73 @@ fn fuel_draw_matches_the_original_machine_code() {
 }
 
 #[test]
+fn atmosphere_accessors_match_the_original_machine_code() {
+    use openxplane::atmosphere::Atmosphere;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/atmosphere.txt"
+    ))
+    .unwrap();
+    let mut lines = text.lines().filter(|l| !l.is_empty());
+    let table: Vec<(f32, f32)> = {
+        let t: Vec<f32> = lines
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .skip(1)
+            .map(f)
+            .collect();
+        t.chunks(2).map(|c| (c[0], c[1])).collect()
+    };
+    assert_eq!(table.len(), 0x803);
+    let (mut counts, mut worst) = ([0usize; 3], [0u32; 3]);
+    for line in lines {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let (kind, got, want) = match t[0] {
+            "T" => {
+                let object = Fields([(0x64, f(t[2]))].into_iter().collect());
+                let a = Atmosphere {
+                    object: &object,
+                    table: &table,
+                };
+                (0, a.temperature(f(t[1])), f(t[3]))
+            }
+            "P" => {
+                let object = Fields([(0x64, -300.0), (0x98, f(t[2]))].into_iter().collect());
+                let a = Atmosphere {
+                    object: &object,
+                    table: &table,
+                };
+                (1, a.pressure(f(t[1])), f(t[3]))
+            }
+            "D" => {
+                let object = Fields(
+                    [(0x64, -300.0), (0x98, f(t[3])), (0x9c, f(t[4]))]
+                        .into_iter()
+                        .collect(),
+                );
+                let a = Atmosphere {
+                    object: &object,
+                    table: &table,
+                };
+                (2, a.density_ratio(f(t[1]), f(t[2])), f(t[5]))
+            }
+            other => panic!("unknown record {other}"),
+        };
+        // the layered path (object+0x64 above absolute zero) is not ported
+        let Some(got) = got else { continue };
+        counts[kind] += 1;
+        let both_nan = got.is_nan() && want.is_nan();
+        worst[kind] = worst[kind].max(if both_nan { 0 } else { ulps(got, want) });
+    }
+    println!("cases {counts:?}, worst ulp {worst:?}");
+    assert!(counts.iter().all(|c| *c >= 150));
+    assert_eq!(worst[0], 0);
+    // the power function comes from the platform's libm here and from the C runtime in the original
+    assert!(worst[1] <= 64 && worst[2] <= 64, "{worst:?}");
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

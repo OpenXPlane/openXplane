@@ -4,6 +4,7 @@
 //! code in `crates/xp-app/tests/original_vectors.rs` (research/VERIFICATION.md).
 pub mod aero;
 pub mod airfoil;
+pub mod atmosphere;
 pub mod buffet;
 pub mod element_force;
 pub mod engine;
