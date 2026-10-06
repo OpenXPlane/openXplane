@@ -727,10 +727,16 @@ impl openxplane::engine::EngineEnv for Replay<'_> {
     fn binding(&mut self, id: u32, index: i32) -> bool {
         self.next("bind", &[id, index as u32]) != 0
     }
+    fn thrust_term(&mut self, index: i32) -> f32 {
+        f32::from_bits(self.next("thrust", &[index as u32]) as u32)
+    }
+    fn starter_timer(&mut self, flag: bool) {
+        self.next("timer", &[u32::from(flag)]);
+    }
 }
 
 #[test]
-fn engine_update_first_part_matches_the_original_machine_code() {
+fn engine_update_ported_part_matches_the_original_machine_code() {
     use openxplane::engine::{Record, engine_update};
     let text = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -738,7 +744,9 @@ fn engine_update_first_part_matches_the_original_machine_code() {
     ))
     .unwrap();
     // fields written by the part of the update that is ported
-    let ported = [0x258usize, 0x22c, 0x240, 0x244, 0x248];
+    let ported = [
+        0x258usize, 0x22c, 0x240, 0x244, 0x248, 0x28c, 0x98, 0x90, 0x78,
+    ];
     let (mut cases, mut exact, mut worst, mut problems) = (0, 0, 0u32, Vec::<String>::new());
     for (n, line) in text
         .lines()

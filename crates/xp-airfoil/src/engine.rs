@@ -121,6 +121,17 @@ pub trait EngineEnv {
     fn engine_flag(&mut self) -> bool;
     fn frame_time(&mut self) -> f64;
     fn binding(&mut self, id: u32, index: i32) -> bool;
+    /// `0x141238c20(F, index)`: a thrust term of the engine (it also updates `+0x21c` of the record).
+    fn thrust_term(&mut self, index: i32) -> f32;
+    /// `0x1411924e0(record, flag)`: the starter timer (it updates `+0x2c4` and `+0x2c8` of the record).
+    fn starter_timer(&mut self, flag: bool);
+}
+
+/// `0x141170810`: the response curve of the aircraft: `100 * (0.01 x)^p` with the sign of `x` and the exponent
+/// `B+0x9ac`.
+pub fn response_curve(b: &dyn Mem, x: f32) -> f32 {
+    let scaled = (f64::from(x) * 0.01) as f32;
+    (f64::from(signed_pow(scaled, b.f32(0x9ac))) * 100.0) as f32
 }
 
 /// One engine record of `0x2cc` bytes (the array behind `F+0x68b0`).
@@ -211,7 +222,7 @@ pub fn engine_update(
     }
 
     let idle = ((f64::from(b.f32(0x9d8)) * 0.05) as f32, 0.0f32).0;
-    let gain = throttle_gain(b, rec);
+    let gain = throttle_gain(f, b, rec);
     let gain_scaled = (f64::from(gain) * 0.05) as f32;
     let lever = rec.f32(0x4) - 0.0;
     let mut response = sse_max(gain_scaled, (1.0 - idle) * lever + idle);
@@ -229,6 +240,7 @@ pub fn engine_update(
         response = signed_pow(scaled, exponent);
         zero_or_one = 0.0;
     }
+    let before_running = response;
     if rec.i32(0x74) != 0 {
         zero_or_one = 1.0;
     }
@@ -304,12 +316,142 @@ pub fn engine_update(
         rec.set_f32(0x244, c);
         rec.set_f32(0x248, ((f64::from(c + a)) * 0.5) as f32);
     }
+
+    // second part: the propeller and engine speeds
+    let desc_kind = desc.i32(0);
+    let (b9b0, b9b4) = (b.f32(0x9b0), b.f32(0x9b4));
+    let rpm_now = rec.f32(0x98);
+    let rec90 = rec.f32(0x90);
+    let curve_90 = crate::wing_element::interpolate_clamped(0.0, b9b0, 100.0, b9b4, rec90);
+    let mut pitch = 1.0f32;
+    if desc_kind == 6 {
+        pitch = b.f32(0x9ac);
+    } else if desc_kind == 5 {
+        pitch = curve_90;
+    }
+    let a2c = f64::from(b.f32(0xa2c));
+    let rate_a = (100.0 / a2c) as f32;
+    let rate_b = (300.0 / a2c) as f32;
+    let b9f0 = f64::from(b.f32(0x9f0));
+    let loss_a = (b9f0 * 0.0075) as f32;
+    let loss_b = (b9f0 * 0.00025) as f32;
+    let mixture = f64::from(b.f32(0x940)) + 1.0;
+    let mut gain_c = ((1.0 - 1.0 / mixture) * 25.0 + 25.0) as f32;
+    let shape_a = crate::wing_element::interpolate_clamped(0.0, 1.0, 2.0, pitch, rpm_now);
+    let shape_b = crate::wing_element::interpolate_clamped(0.0, 1.0, 2.0, curve_90, rec90);
+    let inverse_exponent = (1.0 / f64::from(exponent)) as f32;
+    let scaled_idle = (f64::from(signed_pow(idle, inverse_exponent)) * 100.0) as f32;
+    // the original also evaluates the response curve of the idle level here; the value is not used afterwards
+    let _ = response_curve(b, scaled_idle);
+    let scaled_response = (f64::from(signed_pow(response, inverse_exponent)) * 100.0) as f32;
+    let rpm_curve = response_curve(b, rpm_now);
+    let mach_scaled = inverse_mach * 50.0;
+    gain_c *= inverse_mach;
+    let scaled_before = (f64::from(signed_pow(before_running, inverse_exponent)) * 100.0) as f32;
+    rec.set_f32(0x28c, response_curve(b, scaled_before));
+    let impact = b.f32(0x980) * f.f32(0x400);
+    let mut q = (f64::from(impact * impact * f.f32(0x6c)) * 0.5) as f32;
+    let f68 = f.f32(0x68);
+    q += f68;
+    q /= sse_max(f68, 0.01);
+    q *= f.f32(0x70);
+    let term_168 = (f64::from(signed_pow((f64::from(scaled_response) * 0.01) as f32, shape_a) * q)
+        * (f64::from(loss_a) + 1.0)) as f32;
+    let term_158 = signed_pow((f64::from(mach_scaled) * 0.01) as f32, shape_a) * q;
+    let term_10 = signed_pow((f64::from(rpm_now) * 0.01) as f32, shape_a) * q;
+    let sign_a = if 0.0 > rpm_now { -1.0f32 } else { 1.0 } * loss_a;
+    let mut engine_speed =
+        crate::wing_element::interpolate_clamped(0.0, 1.0, 100.0, 0.0, rpm_now) * term_158;
+    engine_speed += term_168;
+    engine_speed -= term_10;
+    engine_speed -= sign_a;
+    engine_speed += env.thrust_term(index as i32);
+    let spread = sse_max(rpm_curve - rec90, 0.0) * 0.1f32;
+    let term_158b = ((f64::from(signed_pow((f64::from(rpm_curve) * 0.01) as f32, shape_b) * q))
+        * (f64::from(loss_b) + 1.0)
+        + f64::from(spread * q)) as f32;
+    let term_160b = signed_pow((f64::from(gain_c) * 0.01) as f32, shape_b) * q;
+    let term_168b = signed_pow((f64::from(rec90) * 0.01) as f32, shape_b) * q;
+    let sign_b = if 0.0 > rec90 { -1.0f32 } else { 1.0 } * loss_b;
+    let mut prop_speed =
+        crate::wing_element::interpolate_clamped(0.0, 1.0, 100.0, 0.0, rec90) * term_160b;
+    prop_speed += term_158b;
+    prop_speed -= term_168b;
+    prop_speed -= sign_b;
+    let limit_ratio = rec.f32(0x268) / sse_max(desc.f32(0x20) * f.f32(0x74), 0.01);
+    let friction = limit_ratio / sse_max((f64::from(rpm_now) * 0.01) as f32, 0.01);
+    let bound = env.binding(0x1b1, index as i32);
+    env.starter_timer(bound);
+    engine_speed -= friction;
+    let lube = {
+        let t = 0.0 - (rec.f32(0x2bc) - 1.0 + (rec.f32(0x2bc) - 1.0));
+        if 0.0 > t { 0.0 } else { sse_min(2.0, t) }
+    };
+    let drag_a = {
+        let x = (f64::from(rpm_now) * 100.0) as f32;
+        if -1.0 > x { -1.0 } else { sse_min(1.0, x) }
+    };
+    engine_speed -= lube * drag_a;
+    let drag_b = {
+        let x = (f64::from(rec90) * 100.0) as f32;
+        if -1.0 > x { -1.0 } else { sse_min(1.0, x) }
+    };
+    let factor = rec.f32(0x2c8);
+    engine_speed *= factor;
+    prop_speed -= lube * drag_b;
+    prop_speed *= factor;
+    let d64 = desc.f32(0x64);
+    let clamp_d = if 0.1 > d64 { 0.1 } else { sse_min(2.0, d64) };
+    engine_speed *= if 0.0 > clamp_d {
+        f32::NAN
+    } else {
+        clamp_d.sqrt()
+    };
+    prop_speed *= if 0.0 > clamp_d {
+        f32::NAN
+    } else {
+        clamp_d.sqrt()
+    };
+    let dt1 = env.frame_time();
+    engine_speed *= rate_a;
+    rec.set_f32(
+        0x98,
+        (f64::from(rec.f32(0x98)) + dt1 * f64::from(engine_speed)) as f32,
+    );
+    let dt2 = env.frame_time();
+    prop_speed *= rate_b;
+    let rpm_new = sse_max(rec.f32(0x98), 0.0);
+    rec.set_f32(0x98, rpm_new);
+    let mut prop_new = sse_max(
+        (f64::from(rec.f32(0x90)) + dt2 * f64::from(prop_speed)) as f32,
+        0.0,
+    );
+    rec.set_f32(0x90, prop_new);
+    if desc_kind == 5 {
+        rec.set_f32(0x90, rpm_new);
+        prop_new = rpm_new;
+    }
+    rec.set_f32(
+        0x78,
+        (f64::from(prop_new) * 0.01 * f64::from(b.f32(0x96c)) * f64::from(0.104_719_77_f32)) as f32,
+    );
 }
 
-/// `0x1411dd610`: the throttle gain between `B+0x9d8` and `B+0x9dc`, from the record's `+0x4c` (1.0 when the
-/// aircraft has `B+0xa98` set and `F+0x24c` is clear is not modelled here: the caller passes the record).
-fn throttle_gain(b: &dyn Mem, rec: &Record) -> f32 {
-    let t = rec.f32(0x4c);
+/// `0x1411dd610`: the throttle gain between `B+0x9d8` and `B+0x9dc` for the record's `+0x4c`; the lever is
+/// taken as 1.0 when the aircraft has `B+0xa98` set and `F+0x24c` is clear.
+fn throttle_gain(f: &dyn Mem, b: &dyn Mem, rec: &Record) -> f32 {
+    let mut t = rec.f32(0x4c);
+    if b.i32(0xa98) != 0 && f.i32(0x24c) == 0 {
+        t = 1.0;
+    }
     let (low, high) = (b.f32(0x9d8), b.f32(0x9dc));
-    crate::wing_element::interpolate_clamped(0.0, low, 1.0, high, t)
+    let t = t - 0.0;
+    // the clamped interpolation between (0, low) and (1, high), written as the original does
+    let value = (high - low) * t + low;
+    let lowest = sse_min(low, high);
+    if lowest > value {
+        lowest
+    } else {
+        sse_min(sse_max(low, high), value)
+    }
 }

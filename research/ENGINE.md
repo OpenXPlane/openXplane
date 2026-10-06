@@ -102,3 +102,14 @@ atmosphere accessors, the engine flag, the frame time and the input-binding quer
 recording) are identical for these five fields, NaN results included. The other written fields (`+0x78`, `+0x90`,
 `+0x98`, `+0xb0`, `+0xc4`, `+0xcc`, `+0x1d8`, `+0x1dc`, `+0x21c`, `+0x25c`, `+0x270..+0x27c`, `+0x28c`, `+0x2c4`,
 `+0x2c8`) belong to the rest of the function, which is not ported.
+
+## Engine update, second part (engine and propeller speed) ported
+
+`engine_update` now also ports the part that computes the engine and propeller speed changes and writes
+`+0x98` (engine speed), `+0x90` (propeller speed), `+0x78` (`tacrad`, the speed in rad/s) and `+0x28c`: torque
+and drag terms from the power law responses (`response_curve`, `0x141170810`), the propeller pitch shape from
+the descriptor kind (5 variable pitch, 6 with the exponent `B+0x9ac`), the lubrication and friction terms, and the
+integration with the frame time. The starter-timer helper `0x1411924e0` and the thrust-term helper
+`0x141238c20` (170 lines: bindings `0x1b9`/`0x1c9`, compressor and bleed paths) are replayed from recordings, not
+ported. 120 emulator cases: fields compared are identical to 2 ulp (libm `pow`).
+`throttle_gain` (`0x1411dd610`) takes the lever as 1.0 when `B+0xa98` is set and `F+0x24c` is clear.

@@ -62,6 +62,12 @@ def main():
                 e.uc.reg_write(UC_X86_REG_RAX, value)
                 rid, index = regs[2] & 0xffffffff, regs[3] & 0xffffffff
                 calls.append((name, [rid, index], value))
+            elif ret_kind == 'a':
+                value = rng.uniform(-0.5, 0.5)
+                e.set_xmm_f32(0, value)
+                calls.append((name, [regs[1] & 0xffffffff], bits_f(value)))
+            elif ret_kind == 'v':
+                calls.append((name, [regs[1] & 0xffffffff], 0))
             elif ret_kind == 'b':
                 value = rng.randrange(2)
                 e.uc.reg_write(UC_X86_REG_RAX, value)
@@ -77,6 +83,8 @@ def main():
     emu.stubs[0x1417f12c0] = record('flag', 'b')
     emu.stubs[0x140c448c0] = record('dt', 'd')
     emu.stubs[0x1407ace10] = record('bind', 'i')
+    emu.stubs[0x141238c20] = record('thrust', 'a')
+    emu.stubs[0x1411924e0] = record('timer', 'v')
     print('# engine update vectors from the original 0x141197b00 (see tools/gen_engine_update_vectors.py)')
 
     def randomise(addr, size):
