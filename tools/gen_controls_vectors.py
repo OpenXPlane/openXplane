@@ -23,6 +23,10 @@ def void_stub(call, rng):
     pass
 
 
+def rng_double(case, lo, hi):
+    return struct.unpack('<Q', struct.pack('<d', case.rng.uniform(lo, hi)))[0]
+
+
 def resize_stub(case):
     def stub(call, rng):
         vec, count = call.ints[0], call.ints[1] & 0xffffffff
@@ -34,12 +38,23 @@ def resize_stub(case):
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x141190000, 0x1412a0000), (0x140800000, 0x140900000)])
-    for addr in (0x1407ace10, 0x140822620, 0x1411854a0, 0x1411c5a90):
+    case = VmCase(EXE, SEED, [(0x141190000, 0x1412a0000), (0x140800000, 0x140900000), (0x141176000, 0x141177100),
+                              (0x1406e0000, 0x1406f0000), (0x141230000, 0x141240000), (0x141a60000, 0x141a70000)])
+    for addr in (0x1407ace10, 0x1417f12c0):
         case.stub(addr, bool_stub)
     case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0.005, 0.06)))
-    for addr in (0x1411da6c0, 0x14119ac90, 0x141197b00, 0x14119a570, 0x1411bd470, 0x1411975a0, 0x141190ed0, 0x1406307a0):
+    for addr in (0x141197b00, 0x1411bd470, 0x141190ed0, 0x1406307a0, 0x14117c380):
         case.stub(addr, void_stub)
+    # the leaf callees of the engine kinds (replayed by the port)
+    case.stub(0x141ba6750, lambda call, rng: call.ret_f32(rng.uniform(-40.0, 45.0)))
+    case.stub(0x141ba64e0, lambda call, rng: call.ret_f32(rng.uniform(0.3, 1.4)))
+    case.stub(0x1411dd610, lambda call, rng: call.ret_f32(rng.uniform(0.0, 1.0)))
+    case.stub(0x1408be0f0, lambda call, rng: call.ret_f32(rng.uniform(-500.0, 12000.0)))
+    case.stub(0x1411b0a30, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
+    case.stub(0x1410c9c60, lambda call, rng: call.ret_int(0x6f0000100000))
+    case.stub(0x14067b2f0, lambda call, rng: call.ret_f32(rng.uniform(0.0, 1.0)))
+    case.stub(0x1408bd9d0, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
+    case.stub(0x140984e50, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
     case.stub(0x1406fd4d0, resize_stub(case))
     print('# controls vectors (tools/gen_controls_vectors.py), stage', STAGE)
     done = attempts = 0
@@ -69,18 +84,41 @@ def main():
         for off in (0x91c, 0x920):
             fz.preset('B', off, case.rng.randrange(1, 4))
         for e in range(4):
-            fz.preset('E', 0x68 * e, case.rng.choice([0, 1, 2, 4, 5, 6, 7]))
+            fz.preset('E', 0x68 * e, case.rng.choice([0, 1, 2, 3, 4, 5, 6, 7]))
             fz.preset('P', 0x3770 * e, case.rng.choice([0, 3, 5, 6, 6]))
+        for e in range(4):
+            fz.preset('B', 0xb7c + 4 * e, case.rng.randrange(0, 3))
+            fz.preset('B', 0xd38 + 4 * e, case.rng.randrange(0, 3))
+        for j in range(4):
+            fz.preset('B', 0xbbc + 4 * j, case.rng.randrange(0, 3))
+        fz.preset('B', 0x990, case.rng.choice([0, 0, 1, 1, 2]))
+        fz.preset('B', 0xa9c, case.rng.choice([0, 2, 3, 3, 2]))
+        fz.preset('B', 0xc24, case.rng.choice([0, 1]))
+        fz.preset('B', 0xab0, case.rng.choice([0, 1]))
+        for e in range(4):
+            fz.preset('M', 0x2cc * e + 0x298, case.rng.choice([0, 1, 2, 3]))
+            fz.preset('M', 0x2cc * e + 0x228, case.rng.choice([0, 1]))
+            fz.preset('M', 0x2cc * e + 0x70, case.rng.choice([0, 1, 1]))
+            fz.preset('M', 0x2cc * e + 0x74, case.rng.randrange(0, 3))
+            fz.preset('M', 0x2cc * e + 0x48, case.rng.randrange(0, 5))
         fz.preset('B', 0xb78, case.rng.randrange(0, 3))
         fz.preset('B', 0xc90, case.rng.randrange(0, 3))
         fz.preset('B', 0xc9c, case.rng.randrange(0, 3))
         fz.preset('B', 0xca0, case.rng.randrange(0, 3))
+        extra = {}
+        for address, value in ((0x142f01918, rng_double(case, -100.0, 100.0)), (0x142f01910, rng_double(case, 0.0, 1000.0))):
+            case.emu.write_u32(address, value & 0xffffffff)
+            case.emu.write_u32(address + 4, value >> 32)
+            extra[address] = value & 0xffffffff
+            extra[address + 4] = value >> 32
+        for i in range(0x803 * 2):
+            case.emu.write_u32(0x14612bd90 + 4 * i, struct.unpack('<I', struct.pack('<f', 0.3 + ((i * 37) % 101) / 100.0))[0])
         try:
             case.run(FUNC, ints=[F], until=UNTIL[STAGE], max_instructions=600000)
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        print(case.dump(f'{F:x} {entry_rsp(0):x}'))
+        print(case.dump(f'{F:x} {entry_rsp(0):x}', extra_words=extra))
         done += 1
 
 

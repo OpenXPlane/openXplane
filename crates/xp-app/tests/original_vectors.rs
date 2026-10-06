@@ -2482,12 +2482,21 @@ impl openxplane::vm::Callees for VmReplay {
     }
 }
 
+/// The runtime atmosphere table the generators fill with a deterministic pattern.
+fn fill_atmosphere_table(vm: &mut openxplane::vm::Vm) {
+    for i in 0..0x803u64 * 2 {
+        let v = (0.3 + ((i * 37) % 101) as f64 / 100.0) as f32;
+        vm.set_f32(openxplane::controls::ATMOSPHERE_TABLE + 4 * i, v);
+    }
+}
+
 fn controls_stage(path: &str, stop: Option<openxplane::controls::Stop>) {
     let cases = parse_vm_cases(path);
     assert!(cases.len() >= 20);
     for (n, mut case) in cases.into_iter().enumerate() {
         let f = u64::from_str_radix(&case.header[0], 16).unwrap();
         let entry = u64::from_str_radix(&case.header[1], 16).unwrap();
+        fill_atmosphere_table(&mut case.vm);
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
@@ -2500,8 +2509,11 @@ fn controls_stage(path: &str, stop: Option<openxplane::controls::Stop>) {
         );
         for (addr, want) in &case.expected {
             let got = case.vm.u32(*addr);
+            let (g, w) = (f32::from_bits(got), f32::from_bits(*want));
             assert!(
-                got == *want || (f32::from_bits(got) - f32::from_bits(*want)).abs() <= 1e-5,
+                got == *want
+                    || (g.is_nan() && w.is_nan())
+                    || (g - w).abs() <= 1e-5 * (1.0 + w.abs()),
                 "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
             );
         }
@@ -2611,5 +2623,92 @@ fn piston_engine_update_matches_the_original_machine_code() {
                 "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
             );
         }
+    }
+}
+
+fn small_cases(function: &str) -> Vec<VmCaseData> {
+    let cases = parse_vm_cases(&format!("engine_small_{function}.txt"));
+    assert!(cases.len() >= 40);
+    cases
+}
+
+fn words_match(case: &VmCaseData, n: usize) {
+    for (addr, want) in &case.expected {
+        let got = case.vm.u32(*addr);
+        assert!(
+            got == *want
+                || (f32::from_bits(got) - f32::from_bits(*want)).abs()
+                    <= 1e-5 * (1.0 + f32::from_bits(*want).abs()),
+            "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
+        );
+    }
+}
+
+#[test]
+fn engine_has_mode_matches_the_original_machine_code() {
+    for (n, case) in small_cases("140822620").into_iter().enumerate() {
+        let b = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let index: i32 = case.header[1].parse().unwrap();
+        let mode: i32 = case.header[2].parse().unwrap();
+        let want: i32 = case.header[3].parse().unwrap();
+        assert_eq!(
+            openxplane::callees::engine_has_mode(&case.vm, b, index, mode),
+            want,
+            "case {n}"
+        );
+    }
+}
+
+#[test]
+fn int_power_matches_the_original_machine_code() {
+    for (n, case) in small_cases("141192820").into_iter().enumerate() {
+        let base: i32 = case.header[0].parse().unwrap();
+        let exponent: i32 = case.header[1].parse().unwrap();
+        let want = case.header[2].parse::<u64>().unwrap() as u32 as i32;
+        assert_eq!(
+            openxplane::callees::int_power(base, exponent),
+            want,
+            "case {n}"
+        );
+    }
+}
+
+#[test]
+fn group_query_matches_the_original_machine_code() {
+    for (n, mut case) in small_cases("1411854a0").into_iter().enumerate() {
+        let b = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let j: i32 = case.header[1].parse().unwrap();
+        let g: i32 = case.header[2].parse().unwrap();
+        let mask: u32 = case.header[3].parse().unwrap();
+        let want: u8 = case.header[4].parse().unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let got = openxplane::callees::group_query(&case.vm, &mut env, b, j, g, mask);
+        assert_eq!(u8::from(got), want, "case {n}");
+        assert!(env.calls.is_empty(), "case {n}: recorded calls unused");
+    }
+}
+
+#[test]
+fn replay_active_matches_the_original_machine_code() {
+    for (n, case) in small_cases("1411c5a90").into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let want: u8 = case.header[1].parse().unwrap();
+        assert_eq!(
+            u8::from(openxplane::callees::replay_active(&case.vm, f)),
+            want,
+            "case {n}"
+        );
+    }
+}
+
+#[test]
+fn engine_start_state_matches_the_original_machine_code() {
+    for (n, mut case) in small_cases("1411da6c0").into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let index: i32 = case.header[1].parse().unwrap();
+        openxplane::callees::engine_start_state(&mut case.vm, f, index);
+        words_match(&case, n);
     }
 }

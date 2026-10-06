@@ -603,10 +603,6 @@ pub fn update_engine_kind3(
     vm.set_f32(m + 0xb8, (f64::from(g2.sqrt()) * (e10 * d7)) as f32);
 }
 
-/// The runtime values the propeller curve of `B+0x990 == 1` interpolates between (two floats at `0x14612c1c8`
-/// and `0x14612c1d0`; zero in the reference build until the weather system fills them).
-pub const PROPELLER_REFERENCE: u64 = 0x1_4612_c1c8;
-
 /// `0x141a6a650(B, a, r, d)`: the propeller power coefficient from the speed `a` (percent), the speed ratio `r`
 /// and the density factor `d`, by the model selected with `B+0x990` (0: the power laws of the speed, 1: the
 /// density-scaled model with the exponents `B+0x998..0x9a4`, anything else 0).
@@ -632,13 +628,7 @@ pub fn propeller_curve(vm: &Vm, b: u64, a: f32, r: f32, d: f32) -> f32 {
             sse_max(0.0, t) * d + e1
         }
         1 => {
-            let rho = interpolate_clamped(
-                135.0,
-                vm.f32(PROPELLER_REFERENCE),
-                136.0,
-                vm.f32(PROPELLER_REFERENCE + 8),
-                f32::from_bits(0x43075811),
-            ) / 1.225;
+            let rho = table_lookup(vm, f32::from_bits(0x43075811)) / 1.225;
             let line = |v0: f32, v1: f32| {
                 if rho == 1.0 {
                     (v0 + v1) * 0.5

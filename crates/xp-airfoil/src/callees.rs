@@ -372,3 +372,153 @@ pub fn direction_angles(a: f32, b: f32, c: f32) -> [f32; 4] {
         sqrt(aa + bb + cc),
     ]
 }
+
+/// `0x140822620(B, n, mode)`: whether the object `n` exists in the sense of `mode`: 0 an index below either count,
+/// 1 a part that is not of kind 9, 2 an engine index, 3 an engine of kind 0 to 4, 4 kinds 1 and 2, 5 kinds 5 and 6,
+/// 6 kind 7 (all 1 or 0). An unknown mode gives 0.
+pub fn engine_has_mode(vm: &Vm, b: u64, n: i32, mode: i32) -> i32 {
+    let parts = vm.i32(b + 0x920);
+    let engines = vm.i32(b + 0x91c);
+    let engine_kind = |vm: &Vm| {
+        vm.i32(
+            vm.u64(b + 0x5ff8)
+                .wrapping_add((i64::from(n) * 0x68) as u64),
+        )
+    };
+    match mode {
+        0 => i32::from(n < parts || n < engines),
+        1 => {
+            if n >= parts {
+                return 0;
+            }
+            let part = vm
+                .u64(b + 0x6010)
+                .wrapping_add((i64::from(n) * 0x3770) as u64);
+            i32::from(vm.i32(part) != 9)
+        }
+        2 => i32::from(n < engines),
+        3 => i32::from(n < engines && (engine_kind(vm) as u32) <= 4),
+        4 => i32::from(n < engines && (engine_kind(vm).wrapping_sub(1) as u32) <= 1),
+        5 => i32::from(n < engines && (engine_kind(vm).wrapping_sub(5) as u32) <= 1),
+        6 => i32::from(n < engines && engine_kind(vm) == 7),
+        _ => 0,
+    }
+}
+
+/// `0x141192820(base, exponent)`: the integer power by squaring (wrapping).
+pub fn int_power(base: i32, exponent: i32) -> i32 {
+    if exponent == 0 {
+        return 1;
+    }
+    if exponent == 1 {
+        return base;
+    }
+    let squared = base.wrapping_mul(base);
+    let half = ((exponent as u32) >> 1) as i32;
+    if exponent & 1 == 0 {
+        int_power(squared, half)
+    } else {
+        int_power(squared, half).wrapping_mul(base)
+    }
+}
+
+/// `0x1411854a0(B, j, g, mask)`: whether input `j` counts for the throttle group `g`: when `B+0xcf8+4j` equals `g`,
+/// or the group's bit (`1 << group`) is in `mask` (limited to six bits), the binding query `(2, 0x2c, j)` on the
+/// aircraft's input object `[B+0x61f8]` must be clear.
+pub fn group_query(
+    vm: &Vm,
+    env: &mut dyn crate::vm::Callees,
+    b: u64,
+    j: i32,
+    g: i32,
+    mask: u32,
+) -> bool {
+    let group = vm.i32(b + 0xcf8 + 4 * j as i64 as u64);
+    if group != g {
+        let bit = match group {
+            0 => 1,
+            1 => 2,
+            _ => {
+                let p = int_power(4, ((group as u32) >> 1) as i32);
+                if group & 1 != 0 { p.wrapping_add(p) } else { p }
+            }
+        };
+        if (mask & bit as u32) & 0x3f == 0 {
+            return false;
+        }
+    }
+    let table = vm.u64(b + 0x61f8);
+    let mut args = crate::vm::CallArgs::ints(&[table, 2, 0x2c, j as u32 as u64]);
+    args.int[1] = Some(2);
+    env.call(&mut Vm::default(), 0x1407ace10, args).rax as u32 == 0
+}
+
+/// `0x1411c5a90(F)`: the replay flag: `F+0x28` clear and `F+0x6880` set.
+pub fn replay_active(vm: &Vm, f: u64) -> bool {
+    vm.i32(f + 0x28) == 0 && vm.i32(f + 0x6880) != 0
+}
+
+/// The global double at `0x142f01918` (the simulation time the starter logic compares against).
+pub const SIM_TIME: u64 = 0x1_42f0_1918;
+
+/// `0x1411da6c0(F, n)`: the start-up state of engine `n`: with `B+0xc34` set (a start-up sequence: the engine state
+/// `+0x38` is marked and the lever `+0x40` and flags `+0x1f4` follow the engine speed `+0x98` against the
+/// thresholds `B+0x9c0`, `B+0x9bc` and 16, depending on the start switch `F+0x58c` 1 or -1); otherwise the
+/// `B+0xc24..0xc30` options set the lever, the ignition state `+0x48`, `+0x1f8` and `+0x1f4`, and the deadline
+/// `+0x218` is the simulation time plus 0.1 second (0 for the start switch 2).
+pub fn engine_start_state(vm: &mut Vm, f: u64, n: i32) {
+    let b = vm.u64(f + 0x20);
+    let m = vm.u64(f + 0x68b0) + (i64::from(n) * 0x2cc) as u64;
+    let time = vm.f64(SIM_TIME);
+    let deadline = |vm: &mut Vm| vm.set_f32(m + 0x218, (time + 0.1) as f32);
+    if vm.i32(b + 0xc34) != 0 {
+        vm.set_i32(m + 0x38, 1);
+        let (limit, speed) = (vm.f32(b + 0x9c0), vm.f32(m + 0x98));
+        // the original's `jb`: below or unordered
+        if limit < speed || limit.is_nan() || speed.is_nan() {
+            return start_state_cold(vm, f, m, time);
+        }
+        let switch = vm.u8(f + 0x58c);
+        if switch == 1 {
+            deadline(vm);
+            let held = vm.i32(f + 0x24c) != 0;
+            let speed = vm.f32(m + 0x98);
+            if speed > 16.0 || !held {
+                vm.set_i32(m + 0x1f4, 1);
+            }
+            let speed = vm.f32(m + 0x98);
+            if speed > vm.f32(b + 0x9bc) || (!held && speed > 16.0) {
+                vm.set_f32(m + 0x40, 1.0);
+            }
+        } else if switch == 0xff {
+            deadline(vm);
+            vm.set_f32(m + 0x40, 0.0);
+            vm.set_i32(m + 0x1f4, 0);
+        }
+    } else {
+        if vm.i32(b + 0xc24) != 0 {
+            vm.set_f32(m + 0x40, 1.0);
+        }
+        if vm.i32(b + 0xc28) != 0 {
+            vm.set_i32(m + 0x48, 3);
+        }
+        if vm.i32(b + 0xc2c) != 0 {
+            vm.set_i32(m + 0x1f8, 1);
+        }
+        if vm.i32(b + 0xc30) != 0 {
+            vm.set_i32(m + 0x1f4, 1);
+        }
+        deadline(vm);
+        if vm.u8(f + 0x58c) == 2 {
+            vm.set_i32(m + 0x218, 0);
+        }
+    }
+}
+
+/// The start-up state when the engine speed has passed `B+0x9c0`: the deadline already passed and the engine
+/// held (`F+0x24c`) clears the `+0x1f4` flag.
+fn start_state_cold(vm: &mut Vm, f: u64, m: u64, time: f64) {
+    if f64::from(vm.f32(m + 0x218)) > time && vm.i32(f + 0x24c) != 0 {
+        vm.set_i32(m + 0x1f4, 0);
+    }
+}

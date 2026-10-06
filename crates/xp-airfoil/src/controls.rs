@@ -41,13 +41,7 @@ fn held_back(vm: &Vm, env: &mut dyn Callees, f: u64, index: i32, mode: i32) -> b
     engine_held_back(
         h,
         |id, i| bind(&mut **shared.borrow_mut(), f, id, i),
-        |i, m| {
-            let args = CallArgs::ints(&[b, i as u32 as u64, m as u32 as u64]);
-            shared
-                .borrow_mut()
-                .call(&mut Vm::default(), 0x140822620, args)
-                .rax as i32
-        },
+        |i, m| crate::callees::engine_has_mode(vm, b, i, m),
     ) != 0
 }
 
@@ -109,8 +103,7 @@ pub fn engine_controls(
                 } else {
                     0
                 };
-                let args = CallArgs::ints(&[b, j as u64, g as u64, u64::from(masked)]);
-                let ok = env.call(vm, 0x1411854a0, args).rax as u8 != 0;
+                let ok = crate::callees::group_query(vm, env, b, j, g, masked);
                 if ok && vm.i32(f + 0x764 + 4 * j as u64) == 1 {
                     let x6 = vm.f32(b + 0x1bb0) * vm.f32(b + 0x1b94);
                     let d0 = vm.f32(b + 0xd84);
@@ -163,7 +156,7 @@ pub fn engine_controls(
                 continue;
             }
             let state = vm.u64(f + 0x68b0) + 0x2cc * e as u64;
-            let ready = env.call(vm, 0x1411c5a90, CallArgs::ints(&[f])).rax as u32 != 0;
+            let ready = crate::callees::replay_active(vm, f);
             if !ready {
                 vm.set_i32(state + 0xcc, 0);
             }
@@ -171,15 +164,15 @@ pub fn engine_controls(
                 vm.set_i32(state + off, 0);
             }
             if vm.i32(b + 0xc34) != 0 && vm.i32(state + 0x38) == 1 && 51.0 > vm.f32(state + 0x98) {
-                env.call(vm, 0x1411da6c0, CallArgs::ints(&[f, e as u64]));
+                crate::callees::engine_start_state(vm, f, e);
             }
             let kind = vm.i32(vm.u64(b + 0x5ff8) + 0x68 * e as u64) as u32;
             if kind <= 4 && vm.i32(f + 0x6764) == 0 {
-                env.call(vm, 0x14119ac90, CallArgs::ints(&[state, f, e as u64, temp]));
+                crate::piston::update_engine_piston(vm, env, state, f, e, temp);
             } else if kind.wrapping_sub(5) <= 1 {
                 env.call(vm, 0x141197b00, CallArgs::ints(&[state, f, e as u64]));
             } else if kind == 7 {
-                env.call(vm, 0x14119a570, CallArgs::ints(&[state, f, e as u64]));
+                update_engine_kind7(vm, state, f, e);
             }
         }
     }
@@ -250,7 +243,7 @@ pub fn engine_controls(
             let x1 = crate::scalar::clamp(t, 0.0, 1.0);
             let blended = (1.0 - x1) * vm.f32(m + 0x25c) + x1 * x2;
             vm.set_f32(m + 0x25c, blended);
-            env.call(vm, 0x1411975a0, CallArgs::ints(&[m, f, e as u64]));
+            apply_engine_thrust(vm, m, f, e);
         }
     }
     if stop == Some(Stop::Blend) {
@@ -459,11 +452,8 @@ pub fn engine_controls(
     let part_count = vm.i32(b + 0x920);
     for i in 0..part_count.max(engines).max(0) {
         let proceed = i < engines && vm.i32(e_table + 0x68 * i as u64) as u32 <= 4;
-        if !proceed {
-            let args = CallArgs::ints(&[b, i as u64, 1]);
-            if env.call(&mut Vm::default(), 0x140822620, args).rax as i32 == 0 {
-                continue;
-            }
+        if !proceed && crate::callees::engine_has_mode(vm, b, i, 1) == 0 {
+            continue;
         }
         if i < vm.i32(b + 0x91c) {
             let inv = (1.0 / time(vm, env)) as f32;

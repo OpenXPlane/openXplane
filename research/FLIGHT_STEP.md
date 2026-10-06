@@ -209,8 +209,8 @@ speed ratio in percent, and `M+0xb8` is the power from the propeller curve `0x14
 (percent), the speed ratio `r` and the density factor `d`. `B+0x990 == 0`: the 3rd and 1.4th powers of `a/100`
 blended between 25 and 50 percent (a clamped line), the 4th power times 1.202 and the square of `r` times -0.2 (each
 scaled by the blend and `d`), less 0.002 of `r` in percent, plus the difference of the squares of `a/100` and `r`
-over `(1 + 0.05 a) (1 + 5 r)`. `B+0x990 == 1`: the density ratio from the two runtime values at `0x14612c1c8` and
-`0x14612c1d0` (clamped line between 135 and 136 at 135.344, over 1.225), the exponents `B+0x998..0x9a4` extrapolated
+over `(1 + 0.05 a) (1 + 5 r)`. `B+0x990 == 1`: the density ratio from the runtime atmosphere table at the position
+135.344 (entries 135 and 136 of `0x14612bd90`, i.e. altitude 8534 m, over 1.225), the exponents `B+0x998..0x9a4` extrapolated
 along the line to `d`, and the power laws of `a` and `r` over `0.95 sqrt|r| + 0.05`. Any other value gives 0.
 
 The kind 0 handler `update_engine_kind0` (`0x14119bc00(M, B, F, n, level)`, 548 instructions) is ported with its heat
@@ -236,3 +236,16 @@ them running) are identical, NaN-free.
 
 Not ported: the callees already listed as environment (frame time, bindings, atmosphere queries, noise,
 the global clock).
+
+### Engine control with the engine updates native
+
+`engine_controls` now calls the ported engine functions itself instead of replaying them: `update_engine_piston`
+(kinds 0-4), `update_engine_kind7`, `apply_engine_thrust`, and the small helpers `engine_has_mode` (`0x140822620`: a
+switch over the modes 0 to 6, 1 or 0), `group_query` (`0x1411854a0`, with the integer power `0x141192820`),
+`replay_active` (`0x1411c5a90`) and `engine_start_state` (`0x1411da6c0`: the start-up switch and the options
+`B+0xc24..0xc34`; the simulation time is the global double at `0x142f01918`). Each helper has its own vectors
+(`tools/gen_engine_small_vectors.py`, `engine_small_*.txt`); the four controls stages (`controls_1..4.txt`) are
+regenerated so that the real engine code runs in the emulator under the orchestrator and only the leaf environment is
+replayed: the input bindings, the frame time, the atmosphere queries, the noise, the random generator, the fuel
+draw, and the unported callees (`0x141197b00` the kinds 5 and 6 update, `0x1411bd470` the propeller force on the
+`Objects` layout, `0x141190ed0` the init).
