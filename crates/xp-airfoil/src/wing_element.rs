@@ -757,3 +757,33 @@ mod tests {
         assert_eq!(delta_wing_weight(&b, 0, 1.0, 1.0), 0.0);
     }
 }
+
+/// `0x1408be280`: `sqrt(x^2 + y^2)` in float32.
+pub fn hypot2(x: f32, y: f32) -> f32 {
+    let sum = x * x + y * y;
+    if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+}
+
+/// `0x14090e310`: `sqrt(x^2 + y^2 + z^2)` in float32.
+pub fn hypot3(x: f32, y: f32, z: f32) -> f32 {
+    let sum = x * x + y * y + z * z;
+    if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+}
+
+/// `0x141291580`: rotates `(a, b, c)` with three angles in degrees, the object floats at `+0x9c`, `+0xa0`
+/// and `+0xa4` (`angles[0]`, `angles[1]`, `angles[2]`), and returns the three results in the order the
+/// original stores them.
+pub fn rotate_euler(angles: [f32; 3], a: f32, b: f32, c: f32) -> [f32; 3] {
+    let (r0, r1, r2) = (
+        angles[2] * RADIANS_PER_DEGREE,
+        angles[1] * RADIANS_PER_DEGREE,
+        angles[0] * RADIANS_PER_DEGREE,
+    );
+    let (cp, sp) = (r0.cos(), r0.sin());
+    let (cq, sq) = (r1.cos(), r1.sin());
+    let (cr, sr) = (r2.cos(), r2.sin());
+    let u = cr * c - sr * a;
+    let v = cr * a + sr * c;
+    let w = sq * u + cq * b;
+    [cp * v - sp * w, cp * w + sp * v, cq * u - sq * b]
+}

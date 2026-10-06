@@ -558,6 +558,48 @@ fn element_force_matches_the_original_machine_code() {
 }
 
 #[test]
+fn geometry_helpers_match_the_original_machine_code() {
+    use openxplane::wing_element::{hypot2, hypot3, rotate_euler};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/geometry.txt"
+    ))
+    .unwrap();
+    let (mut counts, mut worst) = ([0usize; 3], 0u32);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        match t[0] {
+            "H2" => {
+                assert_eq!(hypot2(f(t[1]), f(t[2])).to_bits(), f(t[3]).to_bits());
+                counts[0] += 1;
+            }
+            "H3" => {
+                assert_eq!(
+                    hypot3(f(t[1]), f(t[2]), f(t[3])).to_bits(),
+                    f(t[4]).to_bits()
+                );
+                counts[1] += 1;
+            }
+            "R" => {
+                let got = rotate_euler([f(t[1]), f(t[2]), f(t[3])], f(t[4]), f(t[5]), f(t[6]));
+                for k in 0..3 {
+                    worst = worst.max(ulps(got[k], f(t[7 + k])));
+                }
+                counts[2] += 1;
+            }
+            other => panic!("unknown record {other}"),
+        }
+    }
+    println!("{counts:?} cases, rotation worst {worst} ulp");
+    assert!(counts.iter().all(|c| *c >= 300));
+    // sin and cos come from the platform's libm here and from the C runtime in the original
+    assert!(worst <= 64, "rotation differs by {worst} ulp");
+}
+
+#[test]
 fn wing_element_straight_path_matches_the_original_machine_code() {
     use openxplane::wing_element::{
         Aircraft, Boundary, ElementInputs, ElementState, Flow, FoilCall, FoilResult, WingFields,

@@ -198,3 +198,12 @@ for the taper `t`; (8) a structural-load section (skipped when `F+0x28` is nonze
 
 Step 6 is ported too (`0x1411b8e00`: a supersonic flat-panel model with the Mach number `F+0x420` clamped to 1.15..3, four panel terms at the angle plus or minus the half thickness angle `atan(t cos sweep)`, `t` from `0x14121bfd0`, blended into Cl, Cd, Cm and induced Cd by the weight with `0x1406ea0b0`); 450 cases are compared, 436 identical and the rest within 8 ulp. Not ported: step 8. The meaning of the object
 fields (`F+0x74`, `F+0x420`, `F+0x64c0`, `X+0x288`) is not established.
+
+## The wing force function `0x1411bd470` (first reading, not ported)
+
+The caller of `get_el_force` is a 24 KB function (about 2600 instructions once the diagnostic code is removed
+with `tools/clean_asm.py`) that handles one wing: it builds the airflow at the wing from the aircraft state,
+loops over the elements calling `get_el_force`, and sums forces and moments. Small leaf helpers it uses are
+ported and verified (`hypot2` `0x1408be280`, `hypot3` `0x14090e310`, `rotate_euler` `0x141291580`, a rotation of
+three values by the angles at `+0x9c`, `+0xa0`, `+0xa4` of an object). Larger callees still to read:
+`0x14121b580` (2.5 KB), `0x14090e310`-based speed terms, and the many calls to `0x1406ea0b0`.
