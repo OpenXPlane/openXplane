@@ -41,3 +41,14 @@ Verified by emulator vectors (`tools/gen_frame_vectors.py`, `tools/gen_wing_misc
   over `max(record - f664, 0.01)`, held to 0..1; negative `v` reaches the CRT's sqrt error handler `0x142300430`,
   whose result is not established) and `record_flag_6028` (`0x1411da150`, binding `0x251`): 900 vectors
   (`tools/gen_flight_helper_vectors.py`). Meaning of the quantities is not established.
+- `airflow` (`0x14121b580`, `crates/xp-airfoil/src/airflow.rs`): the airflow at a point of the aircraft. The point is
+  rotated into the world frame in double precision (matrices `F+0x430..0x454`, origin `F+0x378..0x388` unless the
+  engine flag is set), the wind sampler `0x141ba80a0` (passed in; not ported) is asked for the wind there, the
+  wind is held to +-200 per component (otherwise the original aborts), the reference `F+0x368..0x370` is
+  subtracted, the result is moved back with `to_aircraft_frame` and the rotation term of the rates
+  `F+0x3cc/0x3d0/0x3d4` is added. Each stored result goes through `0x141176330` (non-finite becomes zero). 500
+  vectors with a stubbed sampler, identical bits (`tools/gen_airflow_vectors.py`). Not ported: the call of
+  `0x14117d970` selected by the last argument (callers seen so far pass zero).
+  **Correction**: the eighth argument of the frame transform is *not* the caller's `r12` (as first assumed): the
+  function's inline finite check executes `xorl %r12d, %r12d` at `0x14121b735` on every path, so the argument is 0
+  and the origin is never subtracted from the wind.

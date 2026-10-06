@@ -1535,3 +1535,61 @@ fn flight_helpers_match_the_original_machine_code() {
     }
     assert_eq!(counts, [300, 400, 200]);
 }
+
+#[test]
+fn airflow_matches_the_original_machine_code() {
+    use openxplane::airflow::airflow;
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/airflow.txt"
+    ))
+    .unwrap();
+    let d = |h: &str| f64::from_bits(u64::from_str_radix(h, 16).unwrap());
+    let mut cases = 0;
+    for line in text.lines().filter(|l| l.starts_with("A ")) {
+        let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
+        let mut fo = std::collections::HashMap::new();
+        for (o, h) in [0x430usize, 0x434, 0x440, 0x444, 0x450, 0x454]
+            .into_iter()
+            .zip(&t[6..12])
+        {
+            fo.insert(o, u32::from_str_radix(h, 16).unwrap());
+        }
+        for (k, o) in [0x378usize, 0x380, 0x388].into_iter().enumerate() {
+            let bits = u64::from_str_radix(t[12 + k], 16).unwrap();
+            fo.insert(o, bits as u32);
+            fo.insert(o + 4, (bits >> 32) as u32);
+        }
+        for (o, h) in [0x368usize, 0x36c, 0x370, 0x3cc, 0x3d0, 0x3d4]
+            .into_iter()
+            .zip(&t[15..21])
+        {
+            fo.insert(o, u32::from_str_radix(h, 16).unwrap());
+        }
+        let wind = [f(t[21]), f(t[22]), f(t[23])];
+        let seen = [d(t[24]), d(t[25]), d(t[26])];
+        let got = airflow(
+            &Sparse(fo),
+            [f(t[1]), f(t[2]), f(t[3])],
+            t[5] == "1",
+            |x, y, z| {
+                assert_eq!(
+                    [x.to_bits(), y.to_bits(), z.to_bits()],
+                    seen.map(f64::to_bits),
+                    "{line}"
+                );
+                wind
+            },
+        )
+        .unwrap();
+        for k in 0..3 {
+            assert_eq!(
+                got[k].to_bits(),
+                f(t[27 + k]).to_bits(),
+                "{line}: component {k}"
+            );
+        }
+        cases += 1;
+    }
+    assert_eq!(cases, 500);
+}

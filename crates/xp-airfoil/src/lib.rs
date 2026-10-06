@@ -3,6 +3,7 @@
 //! profile function, the runtime clock and the wing element function. Verified against the original machine
 //! code in `crates/xp-app/tests/original_vectors.rs` (research/VERIFICATION.md).
 pub mod aero;
+pub mod airflow;
 pub mod airfoil;
 pub mod atmosphere;
 pub mod buffet;

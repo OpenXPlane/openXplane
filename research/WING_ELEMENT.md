@@ -215,7 +215,7 @@ three values by the angles at `+0x9c`, `+0xa0`, `+0xa4` of an object). Larger ca
   eighth argument is not 1), then rotates by three sine/cosine pairs at `F+0x430..0x454`.
 - `0x14121b580` (2.5 KB): the airflow velocity at a point of the aircraft. It rotates the point with the same
   matrices in double precision, adds the origin, asks the wind sampler `0x141ba80a0` (object `F+0xc200`) for the
-  wind there, subtracts the reference point `F+0x368..0x370`, converts with `to_aircraft_frame`, adds the rotation
+  wind there, subtracts the reference point `F+0x368..0x370`, converts with `to_aircraft_frame` (without the origin shift: the eighth argument is zero, see FLIGHT_STEP.md), adds the rotation
   term from the angular rates at `F+0x3cc/0x3d0/0x3d4`, and finally calls `0x14117d970` (18 KB, not read).
 - `0x141ba80a0` (2.7 KB): the wind sampler. With the disturbance disabled (`+0x2c` zero, or a global time check
   failing) it copies the base wind from `+0x14/+0x18/+0x1c`; otherwise it computes a localized disturbance
