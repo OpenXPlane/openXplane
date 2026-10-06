@@ -2,7 +2,34 @@
 
 All notable changes. The newest is first. Versions are `MAJOR.MINOR.COMMITS` (see `scripts/version.sh`).
 
+Every entry that changes what you can see carries a screenshot or an animation (pictures live in
+`site/assets/`; the website strips the `site/` prefix).
+
 ## 0.1
+
+### Flight model
+
+- Every engine kind of the reference build is ported and runs inside the engine controls: electric, carburetted and
+  injected piston (the Cessna 172 SP), free and fixed turboprop, with the starter, the thrust term and the propeller
+  power curve. Blocks of the flight step (wing aspect factors, rocket and blown-flap effects, the wing element loop,
+  the body loop, the atmosphere step), the body aerodynamic functions and two sections of the wash are ported too.
+  Each is compared with the original machine code in an emulator.
+
+![Takeoff from Seattle-Tacoma with the approximate flight model](site/assets/anim/takeoff.gif)
+
+### Viewer and scenes
+
+- The Cessna 172 SP exterior (OBJ8 with textures, lighting and glass) and airports from apt.dat.
+
+![The Cessna 172 SP exterior, orbiting camera](site/assets/anim/orbit.gif)
+
+![Seattle-Tacoma from apt.dat](site/assets/gallery/airport-KSEA.jpg)
+
+- The data-output lines of the reference build, drawn in its layout.
+
+![Data-output lines](site/assets/gallery/ui-frame-rate.jpg)
+
+### Everything else in 0.1
 
 - The data-output lines of the reference build (`OPENXPLANE_DATA_OUTPUT`, frame rate, speeds, attitude, position and others) and the label table of all 173 data-output lines extracted from the executable. The earlier invented instrument panel, key help and menu bar are removed.
 - Ports with emulator vectors: the element planform area, the control surface deflection getter, the control surface terms function and two small helpers.

@@ -6,6 +6,7 @@ const DISCORD = "";
 
 const DOCS = [
   ["README", "Overview and commands"],
+  ["CHANGELOG", "Changelog"],
   ["USER_GUIDE", "User guide"],
   ["BUILDING", "Building"],
   ["FAQ", "FAQ"],
@@ -233,6 +234,7 @@ function route() {
 
 const links = $("#doc-links");
 for (const [name, title] of DOCS) {
+  if (name === "CHANGELOG") continue; // has its own entry in the main section
   const a = document.createElement("a");
   a.href = `#/doc/${name}`; a.dataset.route = `/doc/${name}`; a.textContent = title;
   links.append(a);

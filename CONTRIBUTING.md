@@ -25,3 +25,8 @@ Thanks for helping! A few rules keep the project healthy:
 ## Layout
 
 See the repository layout in the README and `docs/ARCHITECTURE.md`.
+
+## Changelog
+
+Every user-visible change gets a `CHANGELOG.md` entry with a screenshot or an animation (put the picture in `site/assets/`).
+The website shows the changelog on its own page.

@@ -2,7 +2,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: [site/**, docs/**, research/*.md, README.md, .github/workflows/pages.yml]
+    paths: [site/**, docs/**, research/*.md, README.md, CHANGELOG.md, .github/workflows/pages.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
       - name: Collect documents next to the site
         run: |
           mkdir -p site/docs/research
-          cp README.md docs/*.md docs/*.json site/docs/
+          cp README.md CHANGELOG.md docs/*.md docs/*.json site/docs/
           cp research/*.md site/docs/research/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
