@@ -33,6 +33,8 @@ cargo test --offline --test original_vectors
 |---|---|---:|---|
 | `0x1406ea0b0` | clamped linear interpolation helper ([AFL_REGIMES.md](AFL_REGIMES.md)) | 2000 | identical bits |
 | `0x141a412c0` | angle correction, fixed-grid lookup, normalised angle, stall flag, active-stall noise | 1200 | identical bits |
+| `0x1411a0230` | sweep angle of an element's quarter-chord line ([WING_ELEMENT.md](WING_ELEMENT.md)) | 1500 | identical bits (on macOS libm) |
+| `0x1411a00f0` | delta-wing weight of an element | 1500 (482 nonzero) | identical bits (on macOS libm) |
 
 For `0x141a412c0` the signature recovered from the disassembly is: `RCX` the table object (parameters at
 `+0x04..+0x10`, Cl at `+0x14`, Cd at `+0xb58`, Cm at `+0x169c`, 721 floats each), `XMM1..XMM3` the noise x, y and
@@ -47,6 +49,11 @@ This confirms, bit for bit, `src/aero.rs` (angle correction and lookup), `src/st
 the hysteresis), `src/buffet.rs` (the noise perturbation and the six-scale sum) and the Cl scaling by the
 divisor, as composed by `profile::evaluate_polar`. The earlier notes' statement that no comparison with the
 running original had been done now holds only for the parts not listed here.
+
+The two element geometry functions use `atan2` and `tan`. The original calls its C runtime; the port calls the
+platform's libm. On the development machine (macOS) all 3000 results match exactly; on other platforms the last
+bit may differ, so `tests/original_vectors.rs` allows 4 ulps for the sweep and 64 ulps for the weight (which
+divides by a small difference) and prints the exact and worst counts.
 
 ## Limits
 

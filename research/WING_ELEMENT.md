@@ -29,9 +29,15 @@ the induced-drag term). It returns a float in `XMM0`: the weighted normalised an
 
 ## Steps
 
-1. **Element geometry.** Two small helpers, `0x1411a0230` and `0x1411a00f0`, turn the element's corner points
-   (the three coordinate arrays) into a vector length and a sweep-related angle term; their outputs feed the
-   steps below.
+1. **Element geometry (ported, verified).** `0x1411a0230` gives the sweep in degrees of an element's
+   quarter-chord line: `atan2(zq[i+1] - zq[i], sqrt(dx^2 + dy^2)) * 57.29578` with `zq = z - chord / 4` and `dx`,
+   `dy` the differences of the first two coordinate arrays (`+0x5bc`, `+0x5e8`) between the element's two
+   boundary points, the third array (`+0x614`) being `z` and the chord array `+0x70`. `0x1411a00f0` turns it
+   into the delta-wing weight `ramp * ratio * tail`: `ramp = clamp((sweep - 40) * 0.1, 0, 1)`; `ratio` from
+   `c = 4 / tan(clamp(|sweep|, 15, 75) deg)`, `clamp((field18 - 2c) / (c - 2c), 0, 1)` or 0.5 when `c = 0`;
+   `tail = clamp(2 (1 - field1c), 0, 1)`. Both are in `src/wing_element.rs` and match the original bit for bit
+   in 1500 cases each ([VERIFICATION.md](VERIFICATION.md)); `field18` and `field1c` are the object fields at
+   `+0x18` and `+0x1c` whose meaning is not established.
 2. **Flow factor and Reynolds number.** A lift-slope style factor `1 / (1 + 5.7296 / (pi * x))`
    (5.7296 = 0.1 per degree in radians) followed by `k = (sqrt(8 * y + 1) + 1) / 4` is computed and later
    multiplies the accumulated Cl. The dynamic viscosity of air is interpolated linearly through
@@ -77,7 +83,7 @@ The meaning of the objects' fields beyond what the diagnostics name; the sources
 the caller's per-element flow computation); the behaviour of helpers `0x14082b800`, `0x14121bfd0`, `0x1411e1940`,
 `0x1408bd9d0`, `0x1411a0230`, `0x1411a00f0` and of the C runtime functions `0x14230b380`, `0x14230be80`,
 `0x14230c1d0`; the exact formulas of steps 2, 4 and 9; and whether the temperature field is in degrees Celsius.
-Steps 5, 6 and 7 are read in full; the rest is read at the level of the constants and data flow above.
+Steps 1, 5, 6 and 7 are read in full; the rest is read at the level of the constants and data flow above.
 
 ## Plan
 

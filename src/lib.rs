@@ -17,6 +17,7 @@ pub mod regimes;
 pub mod runtime;
 pub mod stall;
 pub mod wing;
+pub mod wing_element;
 pub mod world;
 use std::path::{Path, PathBuf};
 

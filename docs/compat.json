@@ -27,8 +27,8 @@
       "name": "Flight model",
       "weight": 28,
       "implemented": 0.25,
-      "verified": 0.02,
-      "note": "An approximate rigid-body model that takes off and flies. The original's wing element function is mapped but not ported."
+      "verified": 0.03,
+      "note": "An approximate rigid-body model that takes off and flies. The original's wing element function is mapped; its element geometry and delta-wing weight are ported and verified, the rest is not."
     },
     {
       "name": "Datarefs and commands",

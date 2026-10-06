@@ -112,3 +112,58 @@ fn profile_stage_matches_the_original_machine_code() {
             .join("\n")
     );
 }
+
+/// Distance in units in the last place between two floats of the same sign convention.
+fn ulps(a: f32, b: f32) -> u32 {
+    if a.to_bits() == b.to_bits() {
+        return 0;
+    }
+    let key = |x: f32| {
+        let b = x.to_bits() as i32;
+        if b < 0 { i32::MIN.wrapping_sub(b) } else { b }
+    };
+    key(a).abs_diff(key(b))
+}
+
+#[test]
+fn wing_element_geometry_matches_the_original_machine_code() {
+    use openxplane::wing_element::{Boundary, delta_wing_weight, sweep_degrees};
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/wing_geometry.txt"
+    ))
+    .unwrap();
+    let (mut cases, mut exact_sweep, mut exact_weight, mut nonzero) = (0, 0, 0, 0);
+    let (mut worst_sweep, mut worst_weight) = (0u32, 0u32);
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let t: Vec<&str> = line.split_whitespace().collect();
+        assert_eq!(t[10], "|", "{line}");
+        let v: Vec<f32> = t[..10].iter().map(|h| f(h)).collect();
+        let (x, y, z, c) = ([v[0], v[1]], [v[2], v[3]], [v[4], v[5]], [v[6], v[7]]);
+        let b = Boundary {
+            x: &x,
+            y: &y,
+            z: &z,
+            chord: &c,
+        };
+        let (want_sweep, want_weight) = (f(t[11]), f(t[12]));
+        let sweep = sweep_degrees(&b, 0);
+        let weight = delta_wing_weight(&b, 0, v[8], v[9]);
+        cases += 1;
+        nonzero += usize::from(want_weight != 0.0);
+        exact_sweep += usize::from(sweep.to_bits() == want_sweep.to_bits());
+        exact_weight += usize::from(weight.to_bits() == want_weight.to_bits());
+        worst_sweep = worst_sweep.max(ulps(sweep, want_sweep));
+        worst_weight = worst_weight.max(ulps(weight, want_weight));
+    }
+    println!(
+        "{cases} cases: sweep exact {exact_sweep} (worst {worst_sweep} ulp), weight exact {exact_weight} (worst {worst_weight} ulp), {nonzero} nonzero weights"
+    );
+    assert!(cases >= 1000 && nonzero > 100);
+    // atan2 and tan come from the platform's libm here and from the C runtime in the original
+    assert!(worst_sweep <= 4, "sweep differs by {worst_sweep} ulp");
+    assert!(worst_weight <= 64, "weight differs by {worst_weight} ulp");
+}
