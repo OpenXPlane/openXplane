@@ -50,6 +50,69 @@ function totals(c) {
   return { implemented: sum("implemented"), verified: sum("verified") };
 }
 
+const GALLERY = {
+  anims: [
+    ["assets/anim/takeoff.gif", "Takeoff from Seattle-Tacoma", "The Cessna 172 accelerates down runway 16L and climbs out; chase camera, approximate flight model."],
+    ["assets/anim/orbit.gif", "Orbiting the Cessna 172 SP", "The OBJ8 exterior with textures, lighting and glass, drawn by wgpu."],
+  ],
+  airports: [
+    ["assets/gallery/airport-KSEA.jpg", "Seattle-Tacoma (KSEA)", "Runways, taxiways and aprons with holes, from apt.dat."],
+    ["assets/gallery/airport-KSFO.jpg", "San Francisco (KSFO)", "Four runways in apt.dat."],
+    ["assets/gallery/airport-KJFK.jpg", "New York JFK (KJFK)", "Runways with concrete surface codes."],
+    ["assets/gallery/airport-EGLL.jpg", "London Heathrow (EGLL)", "Two parallel runways."],
+    ["assets/gallery/airport-RJTT.jpg", "Tokyo Haneda (RJTT)", "Four runways, two of them crossing."],
+    ["assets/gallery/airport-LSZH.jpg", "Zurich (LSZH)", "Three runways in apt.dat."],
+    ["assets/gallery/airport-YSSY.jpg", "Sydney (YSSY)", "Three runways in apt.dat."],
+  ],
+  aircraft: [
+    ["assets/gallery/exterior-standard.jpg", "Cessna 172 SP", "The standard variant: fuselage, gear, propeller, wings, seats and glass."],
+    ["assets/gallery/exterior-seaplane.jpg", "Cessna 172 SP seaplane", "The floats variant loads and flies in the model as well."],
+  ],
+  flight: [
+    ["assets/gallery/flight-000.00s.jpg", "On the runway", "Standing on the gear at the start of runway 16L."],
+    ["assets/gallery/flight-017.00s.jpg", "Takeoff roll", "About 17 seconds in, the nose rotating."],
+    ["assets/gallery/flight-024.00s.jpg", "Liftoff", "The wheels leave the runway."],
+    ["assets/gallery/flight-040.00s.jpg", "Climb-out", "Climbing over the airport at about 90 knots."],
+  ],
+};
+const lightboxItems = [];
+
+function openLightbox(index) {
+  const lb = $("#lightbox");
+  const [src, title, text] = lightboxItems[index];
+  lb.dataset.index = index;
+  $("#lb-img").src = src;
+  $("#lb-img").alt = title;
+  $("#lb-caption").textContent = `${title}: ${text}`;
+  lb.hidden = false;
+}
+function stepLightbox(delta) {
+  const n = lightboxItems.length;
+  openLightbox((Number($("#lightbox").dataset.index) + delta + n) % n);
+}
+
+function renderGallery() {
+  view.replaceChildren(clone("gallery"));
+  lightboxItems.length = 0;
+  for (const [id, key] of [["gallery-anims", "anims"], ["gallery-airports", "airports"], ["gallery-aircraft", "aircraft"], ["gallery-flight", "flight"]]) {
+    const box = view.querySelector("#" + id);
+    for (const item of GALLERY[key]) {
+      const [src, title, text] = item;
+      const index = key === "anims" ? -1 : lightboxItems.push(item) - 1;
+      const fig = document.createElement("figure");
+      const img = document.createElement("img");
+      img.src = src; img.alt = title; img.loading = "lazy";
+      if (index >= 0) img.addEventListener("click", () => openLightbox(index));
+      const cap = document.createElement("figcaption");
+      cap.innerHTML = "<b></b><br>";
+      cap.querySelector("b").textContent = title;
+      cap.append(text);
+      fig.append(img, cap);
+      box.append(fig);
+    }
+  }
+}
+
 const $ = (s) => document.querySelector(s);
 const view = $("#view");
 
@@ -148,6 +211,7 @@ function route() {
     a.classList.toggle("active", a.dataset.route === path));
   window.scrollTo(0, 0);
   if (path === "/") renderHome();
+  else if (path === "/gallery") renderGallery();
   else if (path === "/status") renderStatus();
   else if (path === "/download") {
     view.replaceChildren(clone("download"));
@@ -191,6 +255,16 @@ if (REPO) {
   }
 }
 
+$("#lb-close").addEventListener("click", () => { $("#lightbox").hidden = true; });
+$("#lb-prev").addEventListener("click", () => stepLightbox(-1));
+$("#lb-next").addEventListener("click", () => stepLightbox(1));
+$("#lightbox").addEventListener("click", (e) => { if (e.target.id === "lightbox") $("#lightbox").hidden = true; });
+addEventListener("keydown", (e) => {
+  if ($("#lightbox").hidden) return;
+  if (e.key === "Escape") $("#lightbox").hidden = true;
+  else if (e.key === "ArrowLeft") stepLightbox(-1);
+  else if (e.key === "ArrowRight") stepLightbox(1);
+});
 $("#menu-btn").addEventListener("click", () => document.body.classList.toggle("drawer-open"));
 $("#scrim").addEventListener("click", () => document.body.classList.remove("drawer-open"));
 $("#theme-btn").addEventListener("click", () => {

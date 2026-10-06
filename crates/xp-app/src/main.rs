@@ -4,6 +4,17 @@ mod scene;
 mod viewer;
 use std::{collections::BTreeSet, env, fs, path::Path, process::ExitCode};
 
+/// Size of offscreen frames: `OPENXPLANE_FRAME_SIZE=WxH`, else 1280x800.
+fn frame_size() -> (u32, u32) {
+    std::env::var("OPENXPLANE_FRAME_SIZE")
+        .ok()
+        .and_then(|v| {
+            let (w, h) = v.split_once('x')?;
+            Some((w.parse().ok()?, h.parse().ok()?))
+        })
+        .unwrap_or((1280, 800))
+}
+
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     if args.len() == 5 && args[0] == "airfoil-replay" {
@@ -341,7 +352,8 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         return Ok(true);
     }
     if args.len() >= 5 && args[0] == "fly-render" {
-        // Renders chase-camera frames of the scripted takeoff at the given times (seconds).
+        // Renders chase-camera frames of the scripted takeoff at the given times (seconds). With
+        // OPENXPLANE_FRAME_SIZE=WxH the frames are smaller (for animations).
         let mut session = scene::airport_flight(
             Path::new(&args[1]),
             &args[2].to_string_lossy(),
@@ -356,6 +368,8 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             times = vec![0.0, 18.0, 30.0, 50.0];
         }
         times.sort_by(f32::total_cmp);
+        let (w, h) = frame_size();
+        let mut offscreen = pollster::block_on(gpu::Offscreen::new(&session.scene, w, h))?;
         let mut c = openxplane::flight::Controls::default();
         for t in times {
             while session.model.state.time < f64::from(t) {
@@ -368,18 +382,42 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
             camera.pitch = 0.18;
             camera.distance = 24.0;
-            let out = format!("{prefix}-{t:03.0}s.png");
-            pollster::block_on(gpu::render_png_camera(
+            let out = format!("{prefix}-{t:06.2}s.png");
+            offscreen.render(
                 &session.scene,
+                session.body.first_mesh,
                 &camera,
                 Path::new(&out),
-            ))?;
+            )?;
             let tel = session.model.telemetry(&c);
             println!(
-                "t {t:5.1}s  IAS {:5.1} kt  alt {:6.1} ft  pitch {:5.1}  -> {out}",
+                "t {t:6.2}s  IAS {:5.1} kt  alt {:6.1} ft  pitch {:5.1}  -> {out}",
                 tel.airspeed_kt, tel.altitude_ft, tel.pitch_deg
             );
         }
+        return Ok(true);
+    }
+    if args.len() == 4 && args[0] == "turntable" {
+        // N frames of the aircraft preview with the camera going once around it.
+        let scene = scene::load(Path::new(&args[1]))?;
+        let prefix = args[2].to_string_lossy().into_owned();
+        let frames: usize = args[3]
+            .to_str()
+            .and_then(|s| s.parse().ok())
+            .ok_or("frame count")?;
+        let (w, h) = frame_size();
+        let mut offscreen = pollster::block_on(gpu::Offscreen::new(&scene, w, h))?;
+        for i in 0..frames {
+            let mut camera = gpu::Camera::new(&scene);
+            camera.yaw = -0.7 + std::f32::consts::TAU * i as f32 / frames as f32;
+            offscreen.render(
+                &scene,
+                0,
+                &camera,
+                Path::new(&format!("{prefix}-{i:03}.png")),
+            )?;
+        }
+        println!("{frames} frames");
         return Ok(true);
     }
     if args.len() == 2 && args[0] == "datarefs" {

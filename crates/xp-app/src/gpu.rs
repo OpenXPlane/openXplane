@@ -397,75 +397,116 @@ pub async fn render_png_camera(
     camera: &Camera,
     output: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let instance = instance();
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions::default())
-        .await?;
-    let renderer = Renderer::new(&adapter, wgpu::TextureFormat::Rgba8UnormSrgb, scene).await?;
-    let (width, height) = (1280, 800);
-    let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("preview export"),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    });
-    let view = texture.create_view(&Default::default());
-    let targets = renderer.targets(width, height);
-    let mut encoder = renderer.device.create_command_encoder(&Default::default());
-    renderer.draw(&mut encoder, &view, &targets, camera);
-    let row_bytes = (width * 4).div_ceil(256) * 256;
-    let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("readback"),
-        size: (row_bytes * height) as u64,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            texture: &texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(row_bytes),
-                rows_per_image: Some(height),
+    let mut offscreen = Offscreen::new(scene, 1280, 800).await?;
+    offscreen.render(scene, 0, camera, output)
+}
+
+/// A renderer that draws to an image instead of a window, reusable for a series of frames: create it once
+/// from a scene, then pose the aircraft meshes, move the camera and call `render` for each frame.
+pub struct Offscreen {
+    renderer: Renderer,
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    targets: Targets,
+    width: u32,
+    height: u32,
+}
+
+impl Offscreen {
+    pub async fn new(
+        scene: &Scene,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let instance = instance();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions::default())
+            .await?;
+        let renderer = Renderer::new(&adapter, wgpu::TextureFormat::Rgba8UnormSrgb, scene).await?;
+        let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("offscreen frame"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
             },
-        },
-        wgpu::Extent3d {
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&Default::default());
+        let targets = renderer.targets(width, height);
+        Ok(Self {
+            renderer,
+            texture,
+            view,
+            targets,
             width,
             height,
-            depth_or_array_layers: 1,
-        },
-    );
-    renderer.queue.submit([encoder.finish()]);
-    let (send, recv) = std::sync::mpsc::channel();
-    buffer
-        .slice(..)
-        .map_async(wgpu::MapMode::Read, move |result| {
-            let _ = send.send(result);
+        })
+    }
+
+    /// Re-uploads the vertices of the meshes from `first_mesh` on, draws the scene and saves a PNG.
+    pub fn render(
+        &mut self,
+        scene: &Scene,
+        first_mesh: usize,
+        camera: &Camera,
+        output: &std::path::Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (width, height) = (self.width, self.height);
+        self.renderer.update_meshes(first_mesh, scene);
+        let renderer = &self.renderer;
+        let mut encoder = renderer.device.create_command_encoder(&Default::default());
+        renderer.draw(&mut encoder, &self.view, &self.targets, camera);
+        let row_bytes = (width * 4).div_ceil(256) * 256;
+        let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("readback"),
+            size: (row_bytes * height) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
         });
-    renderer.device.poll(wgpu::PollType::wait_indefinitely())?;
-    recv.recv()??;
-    let mapped = buffer.slice(..).get_mapped_range();
-    let pixels: Vec<u8> = mapped
-        .chunks(row_bytes as usize)
-        .flat_map(|row| row[..width as usize * 4].iter().copied())
-        .collect();
-    image::save_buffer(output, &pixels, width, height, image::ColorType::Rgba8)?;
-    println!("Rendered {}", output.display());
-    drop(mapped);
-    buffer.unmap();
-    Ok(())
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(row_bytes),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        renderer.queue.submit([encoder.finish()]);
+        let (send, recv) = std::sync::mpsc::channel();
+        buffer
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, move |result| {
+                let _ = send.send(result);
+            });
+        renderer.device.poll(wgpu::PollType::wait_indefinitely())?;
+        recv.recv()??;
+        let mapped = buffer.slice(..).get_mapped_range();
+        let pixels: Vec<u8> = mapped
+            .chunks(row_bytes as usize)
+            .flat_map(|row| row[..width as usize * 4].iter().copied())
+            .collect();
+        image::save_buffer(output, &pixels, width, height, image::ColorType::Rgba8)?;
+        drop(mapped);
+        buffer.unmap();
+        Ok(())
+    }
 }

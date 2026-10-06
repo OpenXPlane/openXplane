@@ -129,7 +129,7 @@ blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--prim
 .badge { display: inline-block; padding: 1px 10px; border-radius: 12px; font-size: .78rem; font-weight: 500;
   border: 1px solid currentColor; white-space: nowrap; }
 .badge.done { color: var(--ok); } .badge.part { color: var(--part); } .badge.todo { color: var(--secondary-text); }
-.status td:first-child { white-space: nowrap; font-weight: 500; }
+.status td:first-child { white-space: normal; min-width: 220px; max-width: 460px; font-weight: 500; }
 .milestones li { margin: .5em 0; }
 .footer { margin: 48px 32px 0; padding: 20px 0 32px; border-top: 1px solid var(--divider);
   color: var(--secondary-text); font-size: .85rem; }
@@ -152,3 +152,24 @@ blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--prim
 .note { color: var(--secondary-text); font-size: .85rem; font-weight: 400; margin-top: 2px; }
 .status small { color: var(--secondary-text); }
 .milestones li { margin: .8em 0; }
+
+/* gallery */
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin: 16px 0 8px; }
+.thumbs figure, .anims figure { margin: 0; background: var(--surface); border-radius: 4px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.thumbs img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; cursor: zoom-in;
+  transition: transform .15s; }
+.thumbs img:hover { transform: scale(1.03); }
+.thumbs figcaption, .anims figcaption { padding: 8px 12px; font-size: .85rem; color: var(--secondary-text); }
+.anims { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin: 16px 0; }
+.anims img { display: block; width: 100%; }
+.lightbox { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.88); display: flex;
+  align-items: center; justify-content: center; }
+.lightbox figure { margin: 0; max-width: 92vw; max-height: 92vh; text-align: center; color: #fff; }
+.lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 4px; }
+.lightbox figcaption { margin-top: 10px; font-size: .95rem; }
+.lightbox .icon-btn { position: absolute; color: #fff; background: rgba(255,255,255,.12); }
+.lb-close { top: 16px; right: 16px; } .lb-prev { left: 16px; top: 50%; } .lb-next { right: 16px; top: 50%; }
+
+/* the hidden attribute must win over display rules such as .icon-btn and .lightbox */
+[hidden] { display: none !important; }

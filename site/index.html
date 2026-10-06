@@ -40,6 +40,7 @@
   <div class="drawer-section">
     <a href="#/" data-route="/"><span class="material-icons">home</span>Overview</a>
     <a href="#/download" data-route="/download"><span class="material-icons">download</span>Install</a>
+    <a href="#/gallery" data-route="/gallery"><span class="material-icons">photo_library</span>Gallery</a>
     <a href="#/status" data-route="/status"><span class="material-icons">fact_check</span>Status</a>
   </div>
   <div class="drawer-subheader">Documentation</div>
@@ -101,6 +102,11 @@
     </figure>
 
     <figure class="shot elevation-2">
+      <img src="assets/anim/takeoff.gif" alt="Animation: the Cessna 172 takes off from Seattle-Tacoma (chase camera)" loading="lazy">
+      <figcaption>Takeoff from KSEA with the approximate flight model (chase camera). More in the <a href="#/gallery">gallery</a>.</figcaption>
+    </figure>
+
+    <figure class="shot elevation-2">
       <img src="assets/flight.png" alt="The Cessna 172 climbing out of Seattle-Tacoma with the approximate flight model" loading="lazy">
       <figcaption>Flying the Cessna out of KSEA with the approximate flight model: wing elements use the airfoil code verified against the original. Not the original's flight model.</figcaption>
     </figure>
@@ -150,6 +156,22 @@ cargo test</code></pre>
   </div>
 </template>
 
+<template id="gallery">
+  <div class="content">
+    <h1>Gallery</h1>
+    <p class="lead">Screenshots and animations rendered by openXplane itself from the original content (wgpu, Metal).
+      Click a picture to enlarge it; the arrow keys move between pictures.</p>
+    <h2>Animations</h2>
+    <div class="anims" id="gallery-anims"></div>
+    <h2>Airports</h2>
+    <div class="thumbs" id="gallery-airports"></div>
+    <h2>Aircraft</h2>
+    <div class="thumbs" id="gallery-aircraft"></div>
+    <h2>Flight</h2>
+    <div class="thumbs" id="gallery-flight"></div>
+  </div>
+</template>
+
 <template id="status">
   <div class="content">
     <h1>Status</h1>
@@ -167,6 +189,13 @@ cargo test</code></pre>
       <a href="#/doc/COMPATIBILITY">compatibility estimate</a>.</p>
   </div>
 </template>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="icon-btn lb-close" id="lb-close" aria-label="Close"><span class="material-icons">close</span></button>
+  <button class="icon-btn lb-prev" id="lb-prev" aria-label="Previous"><span class="material-icons">chevron_left</span></button>
+  <figure><img id="lb-img" alt=""><figcaption id="lb-caption"></figcaption></figure>
+  <button class="icon-btn lb-next" id="lb-next" aria-label="Next"><span class="material-icons">chevron_right</span></button>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="app.js"></script>
