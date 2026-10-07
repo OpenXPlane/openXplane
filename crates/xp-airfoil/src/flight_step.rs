@@ -876,6 +876,89 @@ pub fn set_position(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, positi
     }
 }
 
+/// `0x1411d9e50(F, i)`: whether the `i`-th entry of the record list at `F+0x69b8` (16-byte entries) is live: it
+/// must differ from the empty key held in the globals `0x142f03778/0x142f03780` and be accepted by the lookup
+/// `0x140f5c540` on the singleton at `0x14578b780` (replayed).
+fn record_live(vm: &mut Vm, env: &mut dyn Callees, f: u64, index: i32) -> bool {
+    let begin = vm.u64(f + 0x69b8);
+    let count = vm.u64(f + 0x69c0).wrapping_sub(begin) as i64 >> 4;
+    if (i64::from(index) as u64) >= count as u64 {
+        return false;
+    }
+    let entry = begin + (i64::from(index) as u64) * 16;
+    let empty =
+        vm.u32(entry) == vm.u32(0x1_42f0_3778) && vm.u64(entry + 8) == vm.u64(0x1_42f0_3780);
+    if empty {
+        return false;
+    }
+    env.call(vm, 0x140f5c540, CallArgs::ints(&[0x1_4578_b780]))
+        .rax as u8
+        != 0
+}
+
+/// `update_flight` `0x141271fa2..0x14127223b`: advances the state. The position is advanced by
+/// `dt * velocity * scale` (the double at `0x142f01898`; three separate frame-time queries) through
+/// [`set_position`]; the rates `F+0x3cc/0x3d0/0x3d4` times the frame time rotate the quaternion at `F+0x3e4`
+/// ([`integrate_attitude`](crate::attitude::integrate_attitude)), giving the Euler angles `F+0x3e0/0x3dc/0x3d8` whose
+/// sines and cosines fill the frame pairs `F+0x430/0x434`, `0x440/0x444`, `0x450/0x454`; every live entry of the
+/// record list `F+0x69b8` is advanced by the frame time through the singleton (`0x140f42620`, `0x140f3c2d0`,
+/// replayed). `rbp` is the frame of `update_flight` (the entry copy lives at `rbp`), `callee_frame` the frame of
+/// [`set_position`] when called from here.
+pub fn integrate_motion(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, callee_frame: u64) {
+    use crate::attitude::integrate_attitude;
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let frame_time = |vm: &mut Vm, env: &mut dyn Callees| {
+        f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0)
+    };
+    let scale = vm.f64(0x1_42f0_1898);
+    let z0 = position_component(vm, env, f, 0x388);
+    let dt = frame_time(vm, env);
+    let z = dt * f64::from(vm.f32(f + 0x370)) * scale + z0;
+    let y0 = position_component(vm, env, f, 0x380);
+    let dt = frame_time(vm, env);
+    let y = dt * f64::from(vm.f32(f + 0x36c)) * scale + y0;
+    let x0 = position_component(vm, env, f, 0x378);
+    let dt = frame_time(vm, env);
+    let x = dt * f64::from(vm.f32(f + 0x368)) * scale + x0;
+    set_position(vm, env, f, callee_frame, [x, y, z]);
+    let dt = frame_time(vm, env);
+    let w3 = (dt * f64::from(vm.f32(f + 0x3d4))) as f32;
+    let dt = frame_time(vm, env);
+    let w2 = (dt * f64::from(vm.f32(f + 0x3d0))) as f32;
+    let dt = frame_time(vm, env);
+    let w1 = (dt * f64::from(vm.f32(f + 0x3cc))) as f32;
+    integrate_attitude(vm, [w1, w2, w3], f + 0x3e4, f + 0x3e0, f + 0x3dc, f + 0x3d8);
+    for (angle, pair) in [(0x3dc, 0x430), (0x3e0, 0x440), (0x3d8, 0x450)] {
+        let a = vm.f32(f + angle) * RAD;
+        vm.set_f32(f + pair, a.sin());
+        vm.set_f32(f + pair + 4, a.cos());
+    }
+    let mut i = 0i32;
+    let count = |vm: &Vm| vm.u64(f + 0x69c0).wrapping_sub(vm.u64(f + 0x69b8)) as i64 >> 4;
+    if count(vm) != 0 {
+        loop {
+            if record_live(vm, env, f, i) {
+                let entry = vm.u64(f + 0x69b8) + (i as u64) * 16;
+                for k in 0..4 {
+                    let word = vm.u32(entry + 4 * k);
+                    vm.set_u32(rbp + 4 * k, word);
+                }
+                let mut args = CallArgs::ints(&[0x1_4578_b780]);
+                args.int[1] = None;
+                let object = env.call(vm, 0x140f42620, args).rax;
+                let dt = frame_time(vm, env) as f32;
+                let mut args = CallArgs::ints(&[object]);
+                args.xmm[1] = Some(dt.to_bits());
+                env.call(vm, 0x140f3c2d0, args);
+            }
+            i += 1;
+            if (i64::from(i) as u64) >= count(vm) as u64 {
+                break;
+            }
+        }
+    }
+}
+
 /// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
 /// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
 /// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density

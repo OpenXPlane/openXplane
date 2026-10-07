@@ -2917,6 +2917,83 @@ fn set_position_matches_the_original_machine_code() {
 }
 
 #[test]
+fn euler_to_quaternion_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("attitude_e2q.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let q = openxplane::attitude::euler_to_quaternion(float(&h[0]), float(&h[1]), float(&h[2]));
+        for (k, v) in q.iter().enumerate() {
+            case.vm.set_f32(hex(&h[3]) + 4 * k as u64, *v);
+        }
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn quaternion_to_euler_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("attitude_q2e.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let q = hex(&h[0]);
+        let mut quaternion = [0, 4, 8, 12].map(|k| case.vm.f32(q + k));
+        let angles = openxplane::attitude::quaternion_to_euler(&mut quaternion);
+        for (k, v) in quaternion.iter().enumerate() {
+            case.vm.set_f32(q + 4 * k as u64, *v);
+        }
+        for (k, v) in angles.iter().enumerate() {
+            case.vm.set_f32(hex(&h[1 + k]), *v);
+        }
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn attitude_integration_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("attitude_integrate.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let w = [float(&h[0]), float(&h[1]), float(&h[2])];
+        openxplane::attitude::integrate_attitude(
+            &mut case.vm,
+            w,
+            hex(&h[3]),
+            hex(&h[4]),
+            hex(&h[5]),
+            hex(&h[6]),
+        );
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn integrate_motion_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_integrate.txt");
+    assert!(cases.len() >= 80);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (f, rbp, callee) = (
+            hex(&case.header[0]),
+            hex(&case.header[1]),
+            hex(&case.header[2]),
+        );
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::integrate_motion(&mut case.vm, &mut env, f, rbp, callee);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

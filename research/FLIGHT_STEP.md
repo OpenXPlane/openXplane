@@ -304,6 +304,25 @@ taken from the probe, or, when the probe reports a hit, extrapolated from the ca
 (`F+0x42f60..0x42f74`, divided by the slope term snapped away from zero by 0.01); otherwise the state is initialised
 (`-500.0`, the cell `F+0x42f84 = -1`, a unit normal) and the height comes from `0x141962750`.
 
+The attitude (`crates/xp-airfoil/src/attitude.rs`, 200 cases each): `euler_to_quaternion` (`0x1408816e0`, three half
+angles from degrees through `sin` and `cos`), `quaternion_to_euler` (`0x140889cb0`: normalises the quaternion in place
+by `1 / sqrt(max(|q|^2, 0.1))` and returns `a = atan2(2 (q2 q1 + q3 q0), q1^2 + q0^2 - q2^2 - q3^2)` wrapped to
+`0..360`, `b = -asin(clamp(2 (q3 q1 - q2 q0)))` and `c = atan2(2 (q3 q2 + q1 q0), q0^2 - q1^2 - q2^2 + q3^2)`
+wrapped to `-180..180`, all in degrees) and `integrate_attitude` (`0x140f5fb10`: the three rate increments, radians
+times 57.29578, become a quaternion (arguments in the order of the third, second and first increment) that multiplies
+the stored quaternion on the right, after which the Euler angles are stored). The trigonometry is the platform's
+libm, so values agree within about a unit in the last place.
+
+`integrate_motion` (`0x141271fa2..0x14127223b`, 100 cases; the engine flag, frame time, the terrain functions and the
+record list singleton are replayed): the position is advanced by `dt * velocity * scale` (the double at
+`0x142f01898`, three frame-time queries, each preceded by the position accessor) through `set_position`; the rates
+times the frame time (three more queries) rotate the quaternion at `F+0x3e4` giving the Euler angles
+`F+0x3e0/0x3dc/0x3d8`, whose sines and cosines are stored as the frame pairs `F+0x430/0x434`, `0x440/0x444` and
+`0x450/0x454`; then every live record of the list at `F+0x69b8` (16 bytes each; live when it differs from the empty
+key in `0x142f03778/0x142f03780` and `0x140f5c540` accepts it) is advanced by the frame time through the singleton at
+`0x14578b780`. The register state at the block start is `xmm12 = 0.0174533` (the constant is loaded early in the
+function).
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded
