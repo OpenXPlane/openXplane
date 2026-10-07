@@ -693,3 +693,279 @@ pub fn wheel_groups(vm: &mut Vm, f: u64, rbp: u64) {
     }
     vm.set_f32(rbp.wrapping_add(0x1758), count);
 }
+
+fn world_frame(vm: &Vm, f: u64) -> crate::transform::Frame {
+    crate::transform::Frame {
+        origin: [vm.f64(f + 0x378), vm.f64(f + 0x380), vm.f64(f + 0x388)],
+        rotation: [
+            [vm.f32(f + 0x430), vm.f32(f + 0x434)],
+            [vm.f32(f + 0x440), vm.f32(f + 0x444)],
+            [vm.f32(f + 0x450), vm.f32(f + 0x454)],
+        ],
+    }
+}
+
+/// `0x1407ac020(F, point, ..., shift = 1)`: the point rotated out of the aircraft frame, then each component moved by
+/// the position double (three engine-flag queries, x, y, z).
+fn to_world(vm: &mut Vm, env: &mut dyn Callees, f: u64, point: [f32; 3]) -> [f32; 3] {
+    let frame = world_frame(vm, f);
+    let mut out = crate::transform::from_aircraft_frame(&frame, point, false, false);
+    for (k, offset) in [0x378u64, 0x380, 0x388].into_iter().enumerate() {
+        let shift = position_component(vm, env, f, offset);
+        out[k] = (f64::from(out[k]) + shift) as f32;
+    }
+    out
+}
+
+/// `0x14126aad6..0x14126b3ee`: the hook. A static object (`0x1411b63a0` of the table at `0x14578b040`, replayed)
+/// holds the hook geometry (rotated through `0x140f33900`); the globals at `0x14589a000..0x14589a020` are the
+/// engaged hook's state: the wire index `H` (negative while free), a second index, a progress double and an
+/// engagement point of three doubles. With `F+0x28 == 0`, the object and `B+0x4454 > 0`, an engaged hook pulls the
+/// arm angle `F+0x6548` toward the wire and applies the pull (`0x1408e3230`, replayed); the tip positions
+/// `F+0x654c..0x655c` and `F+0x6550..0x6560` are placed in the world; and, when `esi` (the arm found the surface)
+/// and the demand `F+0x6528 > 0.9` allow, each of the three wires is tested for engagement with the probe
+/// `0x1411e14d0` (replayed), recording the first engaged wire; a hold timer then eases the engagement point.
+/// The register state at the block start is `xmm8 = 0.5` (double), `xmm10 = 0.5`, `xmm12 = 1.0` (double),
+/// `r13 = -1`.
+#[allow(clippy::field_reassign_with_default)]
+pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
+    use crate::transform::{rotate_euler_f64, to_aircraft_frame};
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    const TABLE: u64 = 0x1_4578_b040;
+    const H: u64 = 0x1_4589_a000;
+    const H4: u64 = 0x1_4589_a004;
+    const H8: u64 = 0x1_4589_a008;
+    const WEIGHT: u64 = 0x1_4589_9ffc;
+    let object = env.call(vm, 0x1411b63a0, CallArgs::ints(&[TABLE])).rax;
+    let b0 = vm.u64(f + 0x20);
+    let usable = vm.i32(f + 0x28) == 0 && object != 0 && vm.f32(b0 + 0x4454) > 0.0;
+    if !usable {
+        return;
+    }
+    let height = |vm: &mut Vm, env: &mut dyn Callees| -> f32 {
+        let value = f32::from_bits(env.call(vm, 0x1407cd810, CallArgs::ints(&[f])).xmm0 as u32);
+        value - vm.f32(TABLE + 0xc8)
+    };
+    let entry = |vm: &Vm, offset: u64, index: i32| {
+        f64::from(vm.f32((TABLE + offset).wrapping_add((i64::from(index) * 8) as u64)))
+    };
+    let g070 = f64::from(vm.f32(TABLE + 0x30));
+    let rotate = |vm: &Vm, a: f64, bb: f64, c: f64, add: bool| {
+        let angles = [
+            vm.f32(object + 0x80),
+            vm.f32(object + 0x84),
+            vm.f32(object + 0x88),
+        ];
+        let offsets = [
+            vm.f32(object + 0x64),
+            vm.f32(object + 0x68),
+            vm.f32(object + 0x6c),
+        ];
+        rotate_euler_f64(angles, offsets, add, [a, bb, c])
+    };
+    let frame_time = |vm: &mut Vm, env: &mut dyn Callees| frame_time(vm, env);
+    let hook_index = vm.i32(H);
+    if hook_index >= 0 {
+        let r1 = rotate(
+            vm,
+            entry(vm, 0x8c, hook_index),
+            g070,
+            entry(vm, 0xa4, hook_index),
+            true,
+        );
+        let again = vm.i32(H);
+        let r2 = rotate(
+            vm,
+            entry(vm, 0x90, again),
+            g070,
+            entry(vm, 0xa8, again),
+            true,
+        );
+        let x9 = f64::from(vm.f32(f + 0x654c)) - (r2[0] + r1[0]) * 0.5;
+        let x8 = f64::from(vm.f32(f + 0x6554)) - (r2[1] + r1[1]) * 0.5;
+        let x6 = f64::from(vm.f32(f + 0x655c)) - (r2[2] + r1[2]) * 0.5;
+        let h = height(vm, env);
+        let weight = interpolate_clamped(0.0, 0.01, 15.0, 1.0, h);
+        let mut args = CallArgs::default();
+        args.xmm = [
+            Some((x9 as f32).to_bits()),
+            Some((x6 as f32).to_bits()),
+            None,
+            None,
+        ];
+        let planar = f32::from_bits(env.call(vm, 0x1408be280, args).xmm0 as u32);
+        let mut args = CallArgs::default();
+        args.xmm = [
+            Some(x8.to_bits() as u32),
+            Some(planar.to_bits()),
+            None,
+            None,
+        ];
+        let angle = f64::from_bits(env.call(vm, 0x1408ce690, args).xmm0);
+        let target = (angle * 57.2957763671875) as f32;
+        let arm = interpolate_clamped(0.01, vm.f32(f + 0x6548), 1.0, target, weight);
+        vm.set_f32(f + 0x6548, arm);
+        let x8w = vm.f32(WEIGHT) * vm.f32(f + 0x288) * weight;
+        let idx = vm.i32(H);
+        let dy = entry(vm, 0xa4, idx) as f32 - entry(vm, 0xa8, idx) as f32;
+        let dx = entry(vm, 0x90, idx) as f32 - entry(vm, 0x8c, idx) as f32;
+        let heading = dx.atan2(dy) * DEG;
+        let a6 = ((f64::from(heading) + 90.0) as f32) * RAD;
+        let first = a6.sin() * x8w;
+        let neg = -x8w;
+        let third = neg * a6.cos();
+        let o = rotate(vm, f64::from(first), 0.0, f64::from(third), false);
+        let frame = world_frame(vm, f);
+        let [t1, _t2, t3] = to_aircraft_frame(
+            &frame,
+            [o[0] as f32, o[1] as f32, o[2] as f32],
+            false,
+            false,
+        );
+        let b = vm.u64(f + 0x20);
+        let a = vm.f32(f + 0x6548) * RAD;
+        let x7 = a.cos() * t1;
+        let x8n = neg * a.sin();
+        let x2 = t3 * a.cos();
+        let mut args = CallArgs::ints(&[f]);
+        args.xmm = [
+            None,
+            Some(vm.f32(b + 0x4440).to_bits()),
+            Some(x7.to_bits()),
+            Some(vm.f32(b + 0x4444).to_bits()),
+        ];
+        args.stack = [
+            Some(u64::from(x8n.to_bits())),
+            Some(u64::from(vm.f32(b + 0x4448).to_bits())),
+            Some(u64::from(x2.to_bits())),
+            None,
+        ];
+        env.call(vm, 0x1408e3230, args);
+    }
+    // the tips of the arm
+    let b = vm.u64(f + 0x20);
+    let base = [vm.f32(b + 0x4440), vm.f32(b + 0x4444), vm.f32(b + 0x4448)];
+    let out = to_world(vm, env, f, base);
+    vm.set_f32(f + 0x654c, out[0]);
+    vm.set_f32(f + 0x6554, out[1]);
+    vm.set_f32(f + 0x655c, out[2]);
+    let a7 = vm.f32(f + 0x6548) * RAD;
+    let length = vm.f32(b + 0x4454);
+    let tip = [
+        vm.f32(b + 0x4440),
+        vm.f32(b + 0x4444) - length * a7.sin(),
+        length * a7.cos() + vm.f32(b + 0x4448),
+    ];
+    let out = to_world(vm, env, f, tip);
+    vm.set_f32(f + 0x6550, out[0]);
+    vm.set_f32(f + 0x6558, out[1]);
+    vm.set_f32(f + 0x6560, out[2]);
+    if vm.i32(H) >= 0 {
+        let dt = frame_time(vm, env);
+        let v = f64::from(vm.f32(f + 0x6550)) + dt * f64::from(vm.f32(f + 0x368));
+        vm.set_f64(H + 0x10, v);
+        let dt = frame_time(vm, env);
+        let v = f64::from(vm.f32(f + 0x6558)) + dt * f64::from(vm.f32(f + 0x36c));
+        vm.set_f64(H + 0x18, v);
+        let dt = frame_time(vm, env);
+        let v = f64::from(vm.f32(f + 0x6560)) + dt * f64::from(vm.f32(f + 0x370));
+        vm.set_f64(H + 0x20, v);
+    }
+    let probe = |vm: &mut Vm,
+                 env: &mut dyn Callees,
+                 a: u64,
+                 bb: u64,
+                 c: u64,
+                 d: u64,
+                 x: f32,
+                 z: f32|
+     -> bool {
+        let mut args = CallArgs::ints(&[a, bb, c, d]);
+        args.stack = [
+            Some(u64::from(x.to_bits())),
+            Some(u64::from(z.to_bits())),
+            None,
+            None,
+        ];
+        env.call(vm, 0x1411e14d0, args).rax as u32 != 0
+    };
+    // 0 = fall to the release check, 1 = the engaged check (`0x14126b1c5`)
+    let mut to_release_check = false;
+    if esi_in != 0 && f64::from(vm.f32(f + 0x6528)) > 0.9 {
+        if vm.i32(H) >= 0 {
+            to_release_check = true;
+        } else {
+            let h = height(vm, env);
+            if h > 10.0 {
+                let (x, z) = (vm.f32(f + 0x6550), vm.f32(f + 0x6560));
+                if probe(vm, env, 0, 0, 2, 0, x, z) {
+                    let (x, z) = (vm.f32(f + 0x6550), vm.f32(f + 0x6560));
+                    if !probe(vm, env, 0, 1, 2, 1, x, z) {
+                        for wire in 0..=2u64 {
+                            let (x, z) = (vm.f32(f + 0x6550), vm.f32(f + 0x6560));
+                            if !probe(vm, env, wire, 0, wire, 1, x, z) {
+                                continue;
+                            }
+                            let dt = frame_time(vm, env);
+                            let z2 = (f64::from(vm.f32(f + 0x6560))
+                                + dt * f64::from(vm.f32(f + 0x370)))
+                                as f32;
+                            let dt = frame_time(vm, env);
+                            let x2 = (f64::from(vm.f32(f + 0x6550))
+                                + dt * f64::from(vm.f32(f + 0x368)))
+                                as f32;
+                            if probe(vm, env, wire, 0, wire, 1, x2, z2) {
+                                continue;
+                            }
+                            let reach = height(vm, env);
+                            vm.set_f32(WEIGHT, ((f64::from(reach * reach)) / 200.0) as f32);
+                            vm.set_i32(H, wire as i32);
+                            vm.set_i32(H4, wire as i32);
+                            vm.set_f64(H8, 0.0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if to_release_check || vm.i32(H) >= 0 {
+        // the engaged check
+        let h = height(vm, env);
+        if 1.0 > h && 0.5 > vm.f32(f + 0x6528) {
+            vm.set_i32(H, -1);
+        } else if vm.i32(H) >= 0 {
+            return;
+        }
+    }
+    if vm.i32(H4) < 0 {
+        return;
+    }
+    let dt = frame_time(vm, env);
+    let progress = vm.f64(H8) + dt * 0.1;
+    vm.set_f64(H8, progress);
+    if progress > 1.0 {
+        vm.set_i32(H4, -1);
+    }
+    let idx = vm.i32(H4);
+    let r1 = rotate(vm, entry(vm, 0x8c, idx), g070, entry(vm, 0xa4, idx), true);
+    let idx = vm.i32(H4);
+    let r2 = rotate(vm, entry(vm, 0x90, idx), g070, entry(vm, 0xa8, idx), true);
+    let targets = [
+        (H + 0x10, (r2[0] + r1[0]) * 0.5),
+        (H + 0x18, (r2[1] + r1[1]) * 0.5),
+        (H + 0x20, (r2[2] + r1[2]) * 0.5),
+    ];
+    let mut args = CallArgs::default();
+    args.xmm = [
+        Some((vm.f64(H8) as f32).to_bits()),
+        Some(5.0f32.to_bits()),
+        None,
+        None,
+    ];
+    let ease = f32::from_bits(env.call(vm, 0x1408625a0, args).xmm0 as u32);
+    for (address, target) in targets {
+        let value = interpolate_clamped(0.0, vm.f64(address) as f32, 1.0, target as f32, ease);
+        vm.set_f64(address, f64::from(value));
+    }
+}

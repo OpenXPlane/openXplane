@@ -417,6 +417,20 @@ force and the debug flag is a log. Inputs: the frame slot `rbp+0x1758` (computed
 `wheel_groups` (`0x1412686a9..0x14126883f`, 80 cases): the count of gear records with both leading words nonzero, stored as a
 float at `rbp+0x1758` for `gear_aero`.
 
+`hook_state` (`crates/xp-airfoil/src/flight_state.rs`, `0x14126aad6..0x14126b3ee`, 100 cases; the hook object `0x1411b63a0`, the height `0x1407cd810`, `0x1408be280`, `0x1408ce690`, `0x1408625a0`, the wire probe `0x1411e14d0`, the pull `0x1408e3230` and the engine flag are replayed):
+the arresting hook. The geometry table at `0x14578b040` and the state globals `0x14589a000..0x14589a020` (wire index,
+second index, progress, engagement point) are read and written as memory. With `F+0x28 == 0`, the object and
+`B+0x4454 > 0`, an engaged hook (`[0x14589a000] >= 0`) eases the arm angle `F+0x6548` toward the wire direction (a clamped
+interpolation weighted by the height) and applies the pull; the tips are placed in the world
+(`F+0x654c/0x6554/0x655c` from the arm base, `F+0x6550/0x6558/0x6560` from the tip, each through the aircraft-frame
+rotation plus the position with three engine-flag queries); when `esi` (from `arm_probe`) is set, `F+0x6528 > 0.9`
+and the height exceeds 10, the three wires are probed and the last engaged one is recorded (`[0x145899ffc] = h^2 / 200`);
+a release test (height below 1 with the demand below 0.5) and the hold timer (`+0.1 dt` per step, ending the
+engagement at 1) ease the engagement point. The register state at the block start is `xmm8 = 0.5` (double), `xmm10 = 0.5`,
+`xmm12 = 1.0` (double), `r13 = -1`, `r14 = F+0x6548`.
+
+The replay test helper now also compares the float and stack arguments of replayed calls (floats within a relative 1e-5).
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

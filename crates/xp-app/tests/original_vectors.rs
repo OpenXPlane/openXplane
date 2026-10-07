@@ -2389,6 +2389,8 @@ struct VmCaseData {
 struct RecordedCall {
     address: u64,
     ints: [u64; 4],
+    xmm: [u32; 4],
+    stack: [u64; 4],
     rax: u64,
     xmm0: u64,
     effects: Vec<(u64, u32)>,
@@ -2440,6 +2442,8 @@ fn parse_vm_cases(path: &str) -> Vec<VmCaseData> {
                         hex(tokens[4]),
                         hex(tokens[5]),
                     ],
+                    xmm: [6, 7, 8, 9].map(|k| hex(tokens[k]) as u32),
+                    stack: [10, 11, 12, 13].map(|k| hex(tokens[k])),
                     rax: hex(tokens[bar[0] + 1]),
                     xmm0: hex(tokens[bar[0] + 2]),
                     effects: tokens[bar[1] + 1..].iter().map(|t| word(t)).collect(),
@@ -2449,6 +2453,16 @@ fn parse_vm_cases(path: &str) -> Vec<VmCaseData> {
         }
     }
     cases
+}
+
+/// Equal words, or two normal floats within a relative tolerance (libm differences).
+fn close_bits(a: u32, b: u32) -> bool {
+    let normal = |w: u32| (w >> 23) & 0xff != 0 && (w >> 23) & 0xff != 0xff;
+    a == b
+        || (normal(a)
+            && normal(b)
+            && (f32::from_bits(a) - f32::from_bits(b)).abs()
+                <= 1e-5 * (1.0 + f32::from_bits(b).abs()))
 }
 
 struct VmReplay {
@@ -2470,6 +2484,29 @@ impl openxplane::vm::Callees for VmReplay {
         for (i, want) in args.int.iter().enumerate() {
             if let Some(v) = want {
                 assert_eq!(*v, c.ints[i], "argument {i} of {address:#x}");
+            }
+        }
+        for (i, want) in args.xmm.iter().enumerate() {
+            if let Some(v) = want {
+                assert!(
+                    close_bits(*v, c.xmm[i]),
+                    "float argument {i} of {address:#x}: {v:#x} vs {:#x}",
+                    c.xmm[i]
+                );
+            }
+        }
+        for (i, want) in args.stack.iter().enumerate() {
+            if let Some(v) = want {
+                // a float stored by `movss` leaves the upper half of the slot as it was
+                if *v >> 32 == 0 {
+                    let got = (c.stack[i] & 0xffff_ffff) as u32;
+                    assert!(
+                        close_bits(*v as u32, got),
+                        "stack argument {i} of {address:#x}: {v:#x} vs {got:#x}"
+                    );
+                } else {
+                    assert_eq!(*v, c.stack[i], "stack argument {i} of {address:#x}");
+                }
             }
         }
         for (a, w) in &c.effects {
@@ -3139,6 +3176,27 @@ fn wheel_groups_match_the_original_machine_code() {
         let f = u64::from_str_radix(&case.header[0], 16).unwrap();
         let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
         openxplane::flight_state::wheel_groups(&mut case.vm, f, rbp);
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn hook_state_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_hook.txt");
+    assert!(cases.len() >= 80);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = hex(&case.header[0]);
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::hook_state(
+            &mut case.vm,
+            &mut env,
+            f,
+            hex(&case.header[2]) as u32,
+        );
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }
 }
