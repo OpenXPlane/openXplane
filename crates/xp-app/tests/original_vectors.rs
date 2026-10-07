@@ -3442,6 +3442,18 @@ fn gear_drag_and_brake_matches_the_original_machine_code() {
 }
 
 #[test]
+fn force_tables_match_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_ftab.txt");
+    assert!(cases.len() >= 40);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = hex(&case.header[0]);
+        openxplane::flight_state::force_tables(&mut case.vm, f).unwrap();
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

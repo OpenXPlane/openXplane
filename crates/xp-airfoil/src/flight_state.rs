@@ -2386,3 +2386,75 @@ pub fn gear_drag_and_brake(
     env.call(vm, 0x1411ddfd0, args);
     Ok(())
 }
+
+/// `0x14126f37f..0x1412709ff`: the force tables. Unless `F+0x675c` is set, each of the three sources whose flag
+/// (`F+0x676c`, `F+0x6768`, `F+0x6770`) is set copies its six values from `F+0x6780..` into the matching entries of
+/// the tables at `F+0x2bc..0x338` (the finite-value checks the original runs in between are not ported), then the
+/// six totals `F+0x2e0`, `F+0x2cc`, `F+0x2f4`, `F+0x30c`, `F+0x324` and `F+0x33c` are summed from their rows in
+/// the original's order. The debug dump (`F+0xbcd0`/`F+0xbcc8`) is not ported.
+pub fn force_tables(vm: &mut Vm, f: u64) -> Result<(), String> {
+    if vm.i32(f + 0x675c) == 0 {
+        let copies: [(u64, [(u64, u64); 6]); 3] = [
+            (
+                0x676c,
+                [
+                    (0x2d0, 0x6780),
+                    (0x2bc, 0x6784),
+                    (0x2e4, 0x677c),
+                    (0x2f8, 0x6788),
+                    (0x310, 0x678c),
+                    (0x328, 0x6790),
+                ],
+            ),
+            (
+                0x6768,
+                [
+                    (0x2d4, 0x6798),
+                    (0x2c0, 0x679c),
+                    (0x2e8, 0x6794),
+                    (0x2fc, 0x67a0),
+                    (0x314, 0x67a4),
+                    (0x32c, 0x67a8),
+                ],
+            ),
+            (
+                0x6770,
+                [
+                    (0x2d8, 0x67b0),
+                    (0x2c4, 0x67b4),
+                    (0x2ec, 0x67ac),
+                    (0x300, 0x67b8),
+                    (0x318, 0x67bc),
+                    (0x330, 0x67c0),
+                ],
+            ),
+        ];
+        for (flag, pairs) in copies {
+            if vm.i32(f + flag) != 0 {
+                for (to, from) in pairs {
+                    let word = vm.u32(f + from);
+                    vm.set_u32(f + to, word);
+                }
+            }
+        }
+        let rows: [(u64, &[u64]); 6] = [
+            (0x2e0, &[0x2d4, 0x2d0, 0x2d8, 0x2dc]),
+            (0x2cc, &[0x2c0, 0x2bc, 0x2c4, 0x2c8]),
+            (0x2f4, &[0x2e8, 0x2e4, 0x2ec, 0x2f0]),
+            (0x30c, &[0x2fc, 0x2f8, 0x300, 0x304, 0x308]),
+            (0x324, &[0x314, 0x310, 0x318, 0x31c, 0x320]),
+            (0x33c, &[0x32c, 0x328, 0x330, 0x334, 0x338]),
+        ];
+        for (total, row) in rows {
+            let mut sum = vm.f32(f + row[0]);
+            for offset in &row[1..] {
+                sum += vm.f32(f + offset);
+            }
+            vm.set_f32(f + total, sum);
+        }
+    }
+    if vm.i32(f + 0xbcd0) != 0 || vm.i32(f + 0xbcc8) != 0 {
+        return Err("debug dump not ported".into());
+    }
+    Ok(())
+}
