@@ -722,7 +722,7 @@ pub fn rigid_body_step(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
 
 /// `0x1407ce820/0x1407ce850/0x1407ce880(F)`: the position doubles `F+0x378/0x380/0x388`, zero when the engine
 /// flag is set.
-fn position_component(vm: &mut Vm, env: &mut dyn Callees, f: u64, offset: u64) -> f64 {
+pub(crate) fn position_component(vm: &mut Vm, env: &mut dyn Callees, f: u64, offset: u64) -> f64 {
     let flag = env
         .call(vm, 0x1417f12c0, CallArgs::ints(&[0x1424_f5648]))
         .rax as u8

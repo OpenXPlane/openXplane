@@ -15,12 +15,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
-from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RSI, UC_X86_REG_XMM8, UC_X86_REG_XMM11,  # noqa: E402
+from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RSI, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
-          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7), 'angles': (0x1412728f7, 0x141272a96)}
+          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7), 'angles': (0x1412728f7, 0x141272a96), 'path': (0x141272a96, 0x14127307c)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
@@ -278,6 +278,29 @@ def main():
                 fz.preset_f64('F', off, rng.uniform(-5000, 5000))
             case.emu.uc.reg_write(UC_X86_REG_XMM12, 0x3c8efa36)
             case.emu.uc.reg_write(UC_X86_REG_XMM8, 0)
+        if BLOCK == 'path':
+            CX = case.region('CX', 0x300)
+            case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
+            case.stub(0x1407d76f0, lambda call, rng: call.ret_f32(rng.choice([rng.uniform(-5, 30), rng.uniform(0, 8), 20.0])))
+            case.stub(0x1406e2be0, lambda call, rng: call.ret_f64(rng.uniform(0, 5000)))
+            g = struct.unpack('<Q', struct.pack('<d', rng.choice([0.5, 1.0, 2.0, 4.0, 2.0])))[0]
+            case.emu.write_u32(0x142f01920, g & 0xffffffff)
+            case.emu.write_u32(0x142f01924, g >> 32)
+            extra[0x142f01920] = g & 0xffffffff
+            extra[0x142f01924] = g >> 32
+            speeds = [rng.uniform(0, 0.2) for _ in range(3)] if rng.random() < 0.45 else [rng.choice([0.0, 0.3, 0.9, 5.0, 40.0]) for _ in range(3)]
+            for off, v in zip((0x368, 0x36c, 0x370), speeds):
+                fz.preset_f32('F', off, v)
+            case.emu.uc.reg_write(UC_X86_REG_XMM7, struct.unpack('<I', struct.pack('<f', speeds[0]))[0])
+            case.emu.uc.reg_write(UC_X86_REG_XMM9, struct.unpack('<I', struct.pack('<f', speeds[2]))[0])
+            case.emu.uc.reg_write(UC_X86_REG_XMM11, 0)
+            fz.preset('F', 0x65b0, rng.choice([0, 0, 0, 1]))
+            fz.preset('F', 0x65b4, rng.choice([0, 0, 0, 1]))
+            fz.preset('F', 0x24c, rng.choice([0, 1]))
+            for off in (0x390, 0x398):
+                fz.preset_f64('F', off, rng.choice([rng.uniform(-90, 90), 0.0]))
+            for off in (0x65b8, 0x65c0, 0x65c8, 0x65d0, 0x65d8, 0x65e0, 0x65e8, 0x65f0, 0x65f8, 0x6600, 0x6608, 0x6610):
+                fz.preset_f64('F', off, rng.choice([rng.uniform(-90, 90)] * 12 + [0.0]))
         if BLOCK == 'angles':
             for off in (0x3f4, 0x3f8, 0x3fc, 0x368, 0x370):
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.01, 0.01), 0.0]))
@@ -289,7 +312,7 @@ def main():
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.5, 0.5), 0.0]))
             for off in (0x430, 0x434, 0x440, 0x444, 0x450, 0x454):
                 fz.preset_f32('F', off, rng.uniform(-1.0, 1.0))
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
             if BLOCK != 'motion':
@@ -310,12 +333,12 @@ def main():
                     fz.preset_f32('S', 0x400 + off, rng.uniform(lo, hi))
             case.emu.uc.reg_write(UC_X86_REG_RBP, rbp)
             case.emu.uc.reg_write(UC_X86_REG_XMM15, 0x80000000)
-            case.emu.uc.reg_write(UC_X86_REG_XMM11, 0x3c8efa36)
+            case.emu.uc.reg_write(UC_X86_REG_XMM11, 0 if BLOCK == 'path' else 0x3c8efa36)
             case.emu.uc.reg_write(UC_X86_REG_R13, 0xffffffffffffffff)
         case.emu.uc.reg_write(UC_X86_REG_R15, F)
         case.emu.uc.reg_write(UC_X86_REG_R14, 1 if BLOCK == 'motion' else 0)
         case.emu.uc.reg_write(UC_X86_REG_R12, 0)
-        if BLOCK not in ('integrate', 'geodetic', 'angles'):
+        if BLOCK not in ('integrate', 'geodetic', 'angles', 'path'):
             case.emu.uc.reg_write(UC_X86_REG_XMM12, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
         case.emu.uc.reg_write(UC_X86_REG_XMM13, 0)
         case.emu.uc.reg_write(UC_X86_REG_XMM14, struct.unpack('<I', struct.pack('<f', 1.0))[0])
@@ -324,9 +347,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)

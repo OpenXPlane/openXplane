@@ -343,8 +343,17 @@ queries); finally the position goes through the planet object's 4 x 4 double mat
 angle `F+0x414 = atan(F+0x3f8 / max(sqrt(F+0x3f4^2 + F+0x3fc^2), 0.01))` and the track
 `F+0x410 = atan2(F+0x3f4, -F+0x3fc)` (degrees, wrapped to `0..360`), the track of the world velocity
 `F+0x418 = atan2(F+0x368, -F+0x370)` likewise, and the sine and cosine pairs of the angles `F+0x404` and `F+0x408`
-at `F+0x460/0x464` and `F+0x468/0x46c`. Next in the function is a bookkeeping block that runs only while the global
-`0x142f01920` exceeds 1 (the sim speed), storing path samples at `F+0x65b0..0x6624`; it is not ported yet.
+at `F+0x460/0x464` and `F+0x468/0x46c`. 
+
+`path_samples` (`crates/xp-airfoil/src/flight_state.rs`, `0x141272a96..0x14127307c`, 120 cases; the engine flag,
+the height above the ground `0x1407d76f0`, the planet object and the geographic distance `0x1406e2be0` are replayed):
+the takeoff and landing record, kept while the global `0x142f01920` (the sim speed) exceeds 1. While the speed is below
+one knot (`m/s * 1.9438445`) the longitude/latitude pairs of the start points (`F+0x65b8/0x65c8`, `0x65d8/0x65e8`,
+`0x65f8/0x6608`) follow the position; below 50 feet (`m * 3.28084`) the end point is refreshed and, when all six
+doubles are set, `F+0x65b0` is raised; the second set (`F+0x65c0..0x6610`) works the same way with the flag
+`F+0x65b4` and the speed above one knot. The four distances between pairs of these points (always computed) go to
+`F+0x6618/0x661c/0x6620/0x6624` in feet. The register state at the block start is `xmm7 = F+0x368`,
+`xmm9 = F+0x370` (floats) and `xmm11 = 0.0`.
 
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle

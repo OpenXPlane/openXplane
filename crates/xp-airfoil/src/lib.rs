@@ -14,6 +14,7 @@ pub mod controls;
 pub mod element_force;
 pub mod engine;
 pub mod engine_env;
+pub mod flight_state;
 pub mod flight_step;
 pub mod forces;
 pub mod fuel;
