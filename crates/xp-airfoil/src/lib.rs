@@ -19,6 +19,7 @@ pub mod flight_step;
 pub mod forces;
 pub mod fuel;
 pub mod input;
+pub mod mass;
 pub mod matrix;
 pub mod piston;
 pub mod profile;

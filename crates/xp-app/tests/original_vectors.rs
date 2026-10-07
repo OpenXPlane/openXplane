@@ -3555,6 +3555,46 @@ fn segment_probe_matches_the_original_machine_code() {
 }
 
 #[test]
+fn mass_point_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("mass_point.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = &case.header;
+        let sums = openxplane::mass::Sums {
+            total: hex(&h[8]),
+            inertia: [hex(&h[9]), hex(&h[10]), hex(&h[11])],
+            moments: [hex(&h[12]), hex(&h[13]), hex(&h[14])],
+            weights: [float(&h[5]), float(&h[7]), float(&h[6])],
+        };
+        let point = (float(&h[1]), float(&h[2]), float(&h[3]));
+        let (v, mode) = (float(&h[0]), hex(&h[4]) as i32);
+        openxplane::mass::mass_point(&mut case.vm, &sums, v, point, mode, false).unwrap();
+        words_match_exact(&case, n);
+    }
+}
+
+#[test]
+fn tank_position_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("tank_position.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (b, tank, out) = (
+            hex(&case.header[0]),
+            hex(&case.header[1]) as i32,
+            hex(&case.header[2]),
+        );
+        let p = openxplane::mass::tank_position(&mut case.vm, b, tank);
+        for (k, v) in p.iter().enumerate() {
+            case.vm.set_f32(out + 4 * k as u64, *v);
+        }
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);
