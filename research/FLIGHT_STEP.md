@@ -339,6 +339,13 @@ are smoothed into the accelerations `F+0x43c/0x44c/0x45c` by `lerp` with the fac
 queries); finally the position goes through the planet object's 4 x 4 double matrix (`+0x200..0x270`) into
 `F+0x3a8/0x3b0/0x3b8`.
 
+`flight_angles` (`0x1412728f7..0x141272a96`, 120 cases): from the local velocity `F+0x3f4/0x3f8/0x3fc` the flight path
+angle `F+0x414 = atan(F+0x3f8 / max(sqrt(F+0x3f4^2 + F+0x3fc^2), 0.01))` and the track
+`F+0x410 = atan2(F+0x3f4, -F+0x3fc)` (degrees, wrapped to `0..360`), the track of the world velocity
+`F+0x418 = atan2(F+0x368, -F+0x370)` likewise, and the sine and cosine pairs of the angles `F+0x404` and `F+0x408`
+at `F+0x460/0x464` and `F+0x468/0x46c`. Next in the function is a bookkeeping block that runs only while the global
+`0x142f01920` exceeds 1 (the sim speed), storing path samples at `F+0x65b0..0x6624`; it is not ported yet.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

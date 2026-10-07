@@ -3025,6 +3025,17 @@ fn geodetic_state_matches_the_original_machine_code() {
 }
 
 #[test]
+fn flight_angles_match_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_angles.txt");
+    assert!(cases.len() >= 100);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        openxplane::flight_step::flight_angles(&mut case.vm, f);
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

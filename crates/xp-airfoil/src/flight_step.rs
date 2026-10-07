@@ -1094,6 +1094,39 @@ pub fn geodetic_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     );
 }
 
+/// `update_flight` `0x1412728f7..0x141272a96`: the flight angles from the local velocity `F+0x3f4/0x3f8/0x3fc`:
+/// the flight path angle `F+0x414 = atan(F+0x3f8 / max(sqrt(F+0x3f4^2 + F+0x3fc^2), 0.01))` and the track
+/// `F+0x410 = atan2(F+0x3f4, -F+0x3fc)` in degrees (`0..=360`), the track of the world velocity
+/// `F+0x418 = atan2(F+0x368, -F+0x370)` in degrees (`0..=360`), and the sine and cosine of the angles
+/// `F+0x404` and `F+0x408` (taken as degrees) at `F+0x460/0x464` and `F+0x468/0x46c`.
+pub fn flight_angles(vm: &mut Vm, f: u64) {
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    let wrap = |mut a: f32| {
+        while 0.0 > a {
+            a += 360.0;
+        }
+        while a > 360.0 {
+            a += -360.0;
+        }
+        a
+    };
+    let neg_z = -vm.f32(f + 0x3fc);
+    let east = vm.f32(f + 0x3f4);
+    let sum = east * east + neg_z * neg_z;
+    let horizontal = if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+    let held = if horizontal > 0.01 { horizontal } else { 0.01 };
+    vm.set_f32(f + 0x414, (vm.f32(f + 0x3f8) / held).atan() * DEG);
+    vm.set_f32(f + 0x410, wrap(east.atan2(neg_z) * DEG));
+    let (v0, v2) = (vm.f32(f + 0x368), vm.f32(f + 0x370));
+    vm.set_f32(f + 0x418, wrap(v0.atan2(-v2) * DEG));
+    for (angle, pair) in [(0x404, 0x460), (0x408, 0x468)] {
+        let a = vm.f32(f + angle) * RAD;
+        vm.set_f32(f + pair, a.sin());
+        vm.set_f32(f + pair + 4, a.cos());
+    }
+}
+
 /// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
 /// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
 /// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density
