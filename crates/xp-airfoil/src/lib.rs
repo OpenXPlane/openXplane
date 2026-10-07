@@ -22,6 +22,7 @@ pub mod prop;
 pub mod regimes;
 pub mod runtime;
 pub mod scalar;
+pub mod shadow;
 pub mod stall;
 pub mod transform;
 pub mod vm;

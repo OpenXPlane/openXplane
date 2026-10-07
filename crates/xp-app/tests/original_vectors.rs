@@ -2914,9 +2914,76 @@ fn wash_wings_match_the_original_machine_code() {
     wash_stage("wash_3.txt", Some(openxplane::wash::Stop::Wings));
 }
 
+/// The tail of the wash: the vectors were recorded with the shadow function `0x141186930` stubbed, so its recorded
+/// flag and value are replayed and `shadow_scale` applies them (the function itself is tested on its own).
 #[test]
-fn wash_matches_the_original_machine_code() {
-    wash_stage("wash_4.txt", None);
+fn wash_tail_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("wash_4.txt");
+    assert!(cases.len() >= 40);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (f, rbp) = (hex(&case.header[0]), hex(&case.header[1]));
+        let x = f32::from_bits(hex(&case.header[2]) as u32);
+        let z = f32::from_bits(hex(&case.header[3]) as u32);
+        let out1 = hex(&case.header[4]);
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let stop = Some(openxplane::wash::Stop::Wings);
+        openxplane::wash::wash(&mut case.vm, &mut env, f, rbp, x, z, out1, stop)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        let args = openxplane::vm::CallArgs::ints(&[f, rbp + 0x670]);
+        openxplane::vm::Callees::call(&mut env, &mut case.vm, 0x141186930, args);
+        openxplane::wash::shadow_scale(&mut case.vm, rbp, out1, out1 + 4, out1 + 8);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn ray_box_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("shadow_box.txt");
+    assert!(cases.len() >= 200);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let mut hits = 0;
+    for (n, case) in cases.iter().enumerate() {
+        let a: Vec<u64> = case.header[..4].iter().map(|s| hex(s)).collect();
+        let got = openxplane::shadow::ray_box(&case.vm, a[0], a[1], a[2], a[3]);
+        let want = hex(&case.header[4]) != 0;
+        assert_eq!(got, want, "case {n}");
+        hits += usize::from(want);
+    }
+    assert!(hits >= 10);
+}
+
+#[test]
+fn body_shadow_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("shadow_body.txt");
+    assert!(cases.len() >= 25);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::shadow::body_shadow(
+            &mut case.vm,
+            &mut env,
+            hex(&h[0]),
+            hex(&h[1]),
+            float(&h[2]),
+            hex(&h[5]),
+            float(&h[3]),
+            hex(&h[6]),
+            float(&h[4]),
+            hex(&h[7]),
+            hex(&h[8]) as u32 as i32,
+        )
+        .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
 }
 
 #[test]

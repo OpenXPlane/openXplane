@@ -148,21 +148,36 @@ pub fn wash(
     if stop == Some(Stop::Wings) {
         return Ok(());
     }
-    shadow(vm, env, f, rbp, out1, out2, out3);
+    shadow(vm, env, f, rbp, out1, out2, out3)
+}
+
+/// `0x1411819c2..0x141181f0d`: the shadow of the bodies (`0x141186930`, `shadow::body_shadow`: it stores a flag at
+/// `rbp+0x670` and a value at `rbp+0x674`) scales the three outputs: by `sqrt(1/2)` when the point is inside a body,
+/// otherwise by `sqrt(1 - min(1, value))` when the value is positive; a factor of 1 or more changes nothing.
+fn shadow(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+    out1: u64,
+    out2: u64,
+    out3: u64,
+) -> Result<(), String> {
+    let slot = |off: u64| rbp.wrapping_add(off);
+    let (x, z, y) = (
+        vm.f32(slot(0x648)),
+        vm.f32(slot(0x658)),
+        vm.f32(slot(0x668)),
+    );
+    let body = vm.i32(slot(0x688));
+    crate::shadow::body_shadow(vm, env, f, slot(0x670), x, out1, z, out2, y, out3, body)?;
+    shadow_scale(vm, rbp, out1, out2, out3);
     Ok(())
 }
 
-/// `0x1411819c2..0x141181f0d`: the shadow of the bodies (`0x141186930`, replayed: it stores a flag at `rbp+0x670`
-/// and a value at `rbp+0x674`) scales the three outputs: by `sqrt(1/2)` when the point is inside a body, otherwise by
-/// `sqrt(1 - min(1, value))` when the value is positive; a factor of 1 or more changes nothing.
-fn shadow(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, out1: u64, out2: u64, out3: u64) {
-    use crate::vm::CallArgs;
+/// The part of the tail after the shadow function: the scale factor from the flag and value it stored.
+pub fn shadow_scale(vm: &mut Vm, rbp: u64, out1: u64, out2: u64, out3: u64) {
     let slot = |off: u64| rbp.wrapping_add(off);
-    let mut args = CallArgs::ints(&[f, slot(0x670), 0, out1]);
-    args.int[2] = None;
-    args.stack[1] = Some(out2);
-    args.stack[3] = Some(out3);
-    env.call(vm, 0x141186930, args);
     let inside = vm.i32(slot(0x670)) != 0;
     let value = vm.f32(slot(0x674));
     let factor = if inside {

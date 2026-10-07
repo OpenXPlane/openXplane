@@ -293,16 +293,30 @@ T - 273.15` with the Mach number `F+0x420`. The three weather-object accessors a
 
 `wing_chain_factor` (`0x14121a9b0(W, X, &list_a, &list_b, log)`, called from the first loop of the step with the lists of
 chained wings, which it releases): see the function's doc comment; 120 cases identical (the vector release call
-`0x1422e7c2c` is stubbed). The wash `0x14117d970` is ported in two of its sections (`crates/xp-airfoil/src/wash.rs`:
-the jet exhaust of the engines of kinds 5 and 6, and the propeller slipstream of the parts, each compared from the
-function entry to a checkpoint, 80 cases): for an engine part the point is rotated into the propeller axes
+`0x1422e7c2c` is stubbed). The wash `0x14117d970` is ported in sections (`crates/xp-airfoil/src/wash.rs`: the jet
+exhaust of the engines of kinds 5 and 6, and the propeller slipstream of the parts, each compared from the function
+entry to a checkpoint, 80 cases): for an engine part the point is rotated into the propeller axes
 (`0x141296900`, whose six stack floats are `sin, cos` of the angles `+0x79c`, `+0x7a0`, `+0x7a4`), the normalized
 radius and axial position give the swirl and thrust velocity profiles, and the result is rotated back and added to the
 three outputs after finite-value guards. The wing wake (`0x14117f79f..0x1411819c2`: per wing and element, a downwash
 from two tangents blended by the body blend factor, a decay factor from the swirl term, with the excluded wing and
 body area ratios) and the tail (the body shadow scales the outputs by `sqrt(1/2)` inside a body or by
-`sqrt(1 - min(1, value))`) are ported too; 80 more cases, with the shadow function `0x141186930` replayed (it writes a
-flag at `rbp+0x670` and a value at `rbp+0x674`). So the whole wash is ported except that function (526 instructions,
-a ray-box test and a mesh crossing). Not ported: the radiator/gear loop of the step (it uses the terrain probe and
+`sqrt(1 - min(1, value))`) are ported too; 80 more cases, with the shadow function replayed (it writes a flag at
+`rbp+0x670` and a value at `rbp+0x674`).
+
+The body shadow `0x141186930(F, result, x, &out1, z, &out2, y, &out3, excluded)` and its ray-box test `0x141296c40`
+are ported in `crates/xp-airfoil/src/shadow.rs` (300 and 28 cases, the latter with the input-binding query
+`0x1407ace10` replayed). The ray starts at the point and runs along `-out`; for each of the 39 body records
+(`B+0x6040`, stride `0x34c8`) that is not bound away (`0x1407ace10(F, 1, 0x179, body+0x5f0)` for indices up to `0x26`),
+has `+0x54 == 0` and the enabled byte `+0x588`, is not the excluded body and has `+0x10` above the excluded body's, the
+point is moved into the body frame (`+0x618..0x620`) and tested against the body box (`+0x58..0x6c`): inside, or a
+slab hit of the ray. The 32 mesh boxes (`+0xa0`, stride `0x28`, a triangle count at `+0xc` and a first triangle at
+`+8`, nine floats per triangle at `+0x70`) are slab-tested, and a point inside the body box also tries the reversed
+ray; the triangles are Moeller-Trumbore tests in float32, giving bit 0 for a hit with `t >= 0` and bit 1 for `t < 0`.
+Both bits (3) mean the point is inside the mesh (`result[0] = 1`); only bit 0 adds the body's `+4` to the value.
+The slab test follows the original's `cmov` selection (the fourth vector component never contributes). The two debug
+logging branches (`F+0xbcc8`, `F+0xbcd0`) are not ported. So the whole wash is ported.
+
+Not ported: the radiator/gear loop of the step (it uses the terrain probe and
 standard containers) and the gear contact function `0x1411c8690` (2300 instructions, terrain-driven; no DSF scenery
 is available to verify it).
