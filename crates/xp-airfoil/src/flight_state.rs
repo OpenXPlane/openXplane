@@ -2407,3 +2407,74 @@ pub fn step_reset(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     env.call(vm, 0x1409830b0, CallArgs::ints(&[f + 0x430d8]));
     env.call(vm, 0x1412763c0, CallArgs::ints(&[f]));
 }
+
+/// `0x141265810..0x1412659b9`: with `F+0x28 == 0`, the ids that `0x1411bbfb0(F+0xb8a0, 0, 0, 1, 0, 0, 0, 0, 0, &ids)`
+/// collects (a vector of 32-bit ids at `rbp+0x60`) are scanned in order: for each, the object `0x1407d6e70(F, id)`
+/// is resolved through `0x1411b9460` (a temporary at `rbp+0x80`, released with `0x1407bfac0`), and when its record
+/// has `+0x36e8 == 2` the same is done again to test `+0x36ec == 2`. The first id that passes is handed to
+/// `0x140f39780` and, unless `F+0xb9a8` is already set, recorded in `F+0xb9a8` (1), `F+0xb9ac` (the result of
+/// `0x140f44180`) and `F+0xb9b0` (`+0xfc` of its object); `F+0xb9a8` (8 bytes) is cleared and `F+0xb9b0` set to 180.0
+/// beforehand. The vector is released with `0x140601360`. At the end `0x1411b10a0(F+0xb8a0)` is called.
+pub fn find_marked_source(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    if vm.i32(f + 0x28) == 0 {
+        for k in 0..3 {
+            vm.set_u64(slot(0x60 + 8 * k), 0);
+        }
+        let mut args = CallArgs::ints(&[f + 0xb8a0, 0, 0, 1]);
+        args.stack = [Some(0); 4];
+        env.call(vm, 0x1411bbfb0, args);
+        vm.set_u64(f + 0xb9a8, 0);
+        vm.set_u32(f + 0xb9b0, 0x4334_0000);
+        let object = |vm: &mut Vm, env: &mut dyn Callees, id: u32| {
+            env.call(vm, 0x1407d6e70, CallArgs::ints(&[f, u64::from(id)]))
+                .rax
+        };
+        let mut index = 0u32;
+        let count = |vm: &Vm| (vm.u64(slot(0x68)).wrapping_sub(vm.u64(slot(0x60)))) as i64 >> 2;
+        if count(vm) != 0 {
+            loop {
+                let id = vm.u32(vm.u64(slot(0x60)) + 4 * u64::from(index));
+                let x = object(vm, env, id);
+                let first = env
+                    .call(vm, 0x1411b9460, CallArgs::ints(&[x, slot(0x80)]))
+                    .rax;
+                let record = vm.u64(first);
+                let mut found = false;
+                let mut second = false;
+                if vm.i32(record + 0x36e8) == 2 {
+                    let x = object(vm, env, id);
+                    let again = env
+                        .call(vm, 0x1411b9460, CallArgs::ints(&[x, slot(0x78)]))
+                        .rax;
+                    second = true;
+                    found = vm.i32(vm.u64(again) + 0x36ec) == 2;
+                }
+                if second {
+                    env.call(vm, 0x1407bfac0, CallArgs::ints(&[slot(0x78)]));
+                }
+                env.call(vm, 0x1407bfac0, CallArgs::ints(&[slot(0x80)]));
+                if found {
+                    let x = object(vm, env, id);
+                    env.call(vm, 0x140f39780, CallArgs::ints(&[x]));
+                    if vm.i32(f + 0xb9a8) == 0 {
+                        vm.set_u32(f + 0xb9a8, 1);
+                        let x = object(vm, env, id);
+                        let flag = env.call(vm, 0x140f44180, CallArgs::ints(&[x])).rax as u8;
+                        vm.set_u32(f + 0xb9ac, u32::from(flag));
+                        let x = object(vm, env, id);
+                        let value = vm.u32(x + 0xfc);
+                        vm.set_u32(f + 0xb9b0, value);
+                    }
+                    break;
+                }
+                index = index.wrapping_add(1);
+                if i64::from(index as i32) as u64 >= count(vm) as u64 {
+                    break;
+                }
+            }
+        }
+        env.call(vm, 0x140601360, CallArgs::ints(&[slot(0x60)]));
+    }
+    env.call(vm, 0x1411b10a0, CallArgs::ints(&[f + 0xb8a0]));
+}
