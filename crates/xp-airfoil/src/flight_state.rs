@@ -1578,18 +1578,8 @@ pub fn gear_state_update(
     let sim_speed = vm.f64(0x1_42f0_1920);
     if 1.0 > sim_speed || vm.i32(f + 0x24c) == 0 || vm.i32(f + 0x64e4) == 0 {
         let b = vm.u64(f + 0x20);
-        let mut args = CallArgs::default();
-        args.int[0] = Some(f);
-        args.int[2] = Some(slot(-0x38));
-        args.xmm[1] = Some(f64::from(vm.f32(b + 0x280c)).to_bits() as u32);
-        args.xmm[3] = Some(f64::from(vm.f32(b + 0x2810)).to_bits() as u32);
-        args.stack = [
-            Some(slot(-0x68)),
-            Some(f64::from(vm.f32(b + 0x2814)).to_bits()),
-            Some(slot(0x1758)),
-            Some(1),
-        ];
-        env.call(vm, 0x140816eb0, args);
+        let point = [0x280c, 0x2810, 0x2814].map(|o| f64::from(vm.f32(b + o)));
+        world_point_f64(vm, env, f, point, [slot(-0x38), slot(-0x68), slot(0x1758)]);
         let ctx = env.call(vm, 0x14193ae40, CallArgs::default()).rax;
         let mut args = CallArgs::default();
         args.int = [
@@ -2141,21 +2131,8 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
             ];
             env.call(vm, 0x140913e60, args);
             let b = vm.u64(f + 0x20);
-            let mut args = CallArgs::default();
-            args.int = [Some(f), None, Some(slot(-0x50)), None];
-            args.xmm = [
-                None,
-                Some(f64::from(vm.f32(b + 0x280c)).to_bits() as u32),
-                None,
-                Some(f64::from(vm.f32(b + 0x2810)).to_bits() as u32),
-            ];
-            args.stack = [
-                Some(slot(-0x68)),
-                Some(f64::from(vm.f32(b + 0x2814)).to_bits()),
-                Some(slot(0x1758)),
-                Some(1),
-            ];
-            env.call(vm, 0x140816eb0, args);
+            let point = [0x280c, 0x2810, 0x2814].map(|o| f64::from(vm.f32(b + o)));
+            world_point_f64(vm, env, f, point, [slot(-0x50), slot(-0x68), slot(0x1758)]);
             let d1 = (vm.f64(slot(0x1750)) - vm.f64(slot(0x1758))) as f32;
             let d2 = (vm.f64(rbp) - vm.f64(slot(-0x68))) as f32;
             let d3 = (vm.f64(slot(-0x38)) - vm.f64(slot(-0x50))) as f32;
@@ -2635,4 +2612,28 @@ pub fn add_plugin_force(
         return Err("debug dump not ported".into());
     }
     Ok(())
+}
+
+/// `0x140816eb0(F, _, out1, _, a, b, c, out2, out3, 1)`: the point `(a, b, c)` (doubles) moved out of the aircraft
+/// frame into the world: the rotation of `F+0x430..0x454` (double precision) and then the position doubles
+/// `F+0x378/0x380/0x388` added (one engine-flag query each). The three results are stored through the pointers.
+pub fn world_point_f64(vm: &mut Vm, env: &mut dyn Callees, f: u64, point: [f64; 3], out: [u64; 3]) {
+    let word = |vm: &Vm, o: u64| f64::from(vm.f32(f + o));
+    let pairs = [
+        word(vm, 0x440),
+        word(vm, 0x444),
+        word(vm, 0x430),
+        word(vm, 0x434),
+        word(vm, 0x450),
+        word(vm, 0x454),
+    ];
+    let rotated = crate::transform::rotate_pairs_f64(point[0], point[1], point[2], pairs);
+    for k in 0..3 {
+        vm.set_f64(out[k], rotated[k]);
+    }
+    for (k, offset) in [0x378u64, 0x380, 0x388].into_iter().enumerate() {
+        let shift = position_component(vm, env, f, offset);
+        let sum = shift + vm.f64(out[k]);
+        vm.set_f64(out[k], sum);
+    }
 }

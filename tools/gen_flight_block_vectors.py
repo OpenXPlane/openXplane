@@ -638,7 +638,6 @@ def main():
                     bits64 = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
                     call.put(pointer, bits64 & 0xffffffff)
                     call.put(pointer + 4, bits64 >> 32)
-            case.stub(0x140816eb0, world3)
             CX = case.region('CX', 0x300)
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
             def geo3(call, rng):
@@ -881,7 +880,6 @@ def main():
                 for pointer in (call.ints[2], call.stack[0], call.stack[2]):
                     call.put_f32(pointer, rng.choice([0.0, rng.uniform(-10, 10), rng.uniform(-0.005, 0.005)]))
             case.stub(0x140913e60, geo)
-            case.stub(0x140816eb0, world3)
             case.stub(0x141296750, to_frame)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0, 0.4)))
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
