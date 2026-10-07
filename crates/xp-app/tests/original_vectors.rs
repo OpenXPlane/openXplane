@@ -3526,6 +3526,22 @@ fn wing_strips_match_the_original_machine_code() {
 }
 
 #[test]
+fn late_tail_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_tail.txt");
+    assert!(cases.len() >= 40);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = hex(&case.header[0]);
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::late_tail(&mut case.vm, &mut env, f).unwrap();
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

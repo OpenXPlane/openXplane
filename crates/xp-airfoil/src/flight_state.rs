@@ -2609,3 +2609,35 @@ pub fn wing_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0xd0)]));
     }
 }
+
+/// `0x14127402d..0x141274060`: the end of the step. With `rdi = 0` and `rsi = 1` at this point, the first key
+/// index `0..=0x12` that `0x1417b2e70(0x1460ad818, index)` reports (low byte) decides what is asked of `0x1407debf0`
+/// with the aircraft's name field `F+0x2c`: none reported, it gets the mode `F+0x28`; reported while the global
+/// `0x1460b83b0` is the integer kind (2), it gets the low byte the import behind `0x1424e5fc8` returns for the
+/// global's value (`0x1460b83b4`). With the other kind (a string) the original copies the last four characters into
+/// `F+0x2c` and does not call `0x1407debf0`; that path is not ported.
+pub fn late_tail(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<(), String> {
+    const KIND: u64 = 0x1_460b_83b0;
+    let call_end = |vm: &mut Vm, env: &mut dyn Callees, first: u64| {
+        let mut args = CallArgs::ints(&[first, f + 0x2c, 1, 0]);
+        args.stack[0] = Some(0);
+        env.call(vm, 0x1407debf0, args);
+    };
+    let reported = (0..=0x12u64).any(|index| {
+        env.call(vm, 0x1417b2e70, CallArgs::ints(&[0x1_460a_d818, index]))
+            .rax as u8
+            != 0
+    });
+    if !reported {
+        let mode = u64::from(vm.u32(f + 0x28));
+        call_end(vm, env, mode);
+        return Ok(());
+    }
+    if vm.i32(KIND) != 2 {
+        return Err("string path not ported".into());
+    }
+    let value = u64::from(vm.u32(KIND + 4));
+    let byte = env.call(vm, 0x1_424e_5fc8, CallArgs::ints(&[value])).rax as u8;
+    call_end(vm, env, u64::from(byte));
+    Ok(())
+}
