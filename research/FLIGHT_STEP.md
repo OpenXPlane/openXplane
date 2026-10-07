@@ -554,3 +554,7 @@ logging branches (`F+0xbcc8`, `F+0xbcd0`) are not ported. So the whole wash is p
 Not ported: the radiator/gear loop of the step (it uses the terrain probe and
 standard containers) and the gear contact function `0x1411c8690` (2300 instructions, terrain-driven; no DSF scenery
 is available to verify it).
+
+## Wing strip contact probe (`0x14126d5d3..0x14126dd98`)
+
+Ported as `flight_state::wing_ground_probe`. Early out (to `0x14126ef6b`) unless `F+0x42ec8 > altitude - |wind|`; otherwise loops the 48 wings, skipping those bound by `0x1407ace10(F,1,0x251,i)` or with byte `+0x678 == 0`, and issues three `0x1411c7a50` calls per wing from the normalised strip direction. Verified against the emulator (30 cases, 26 entering the loop). Not established: the stack slots beyond the fourth (`0x40`, `0x48` and the two pointer arguments) of the `0x1411c7a50` calls are not compared.

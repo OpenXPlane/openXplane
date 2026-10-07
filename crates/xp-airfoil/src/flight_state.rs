@@ -1757,3 +1757,90 @@ pub fn wheel_contact(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Re
     vm.set_i32(slot(-0x78), 0);
     Ok(())
 }
+
+/// `0x14126d5d3..0x14126dd98`: the wing-strip contact near the ground. Returns `false` when the aircraft is too high
+/// (`F+0x42ec8 <= altitude - |B+0x64f4..0x64fc|`; the original then skips to `0x14126ef6b`). Otherwise, for each of the
+/// 48 wings whose binding `0x251` (queried with the wing index, replayed) is clear and whose enabled byte is set, the
+/// unit span direction from the boundary arrays `+0x5bc/0x5e8/0x614` between the root and the tip, and the probe
+/// distance `F+0x42f50` give three points that are handed to the strip contact function `0x1411c7a50` (replayed) with
+/// the wing's accumulators `X+0x2d0/0x2d4`. The settings of the original are `B+0x2898 * 9.798 / (0.15 * B+0x64ac)`
+/// (`rbp-0x10`) and a tenth of it (`rbp-0x8`).
+#[allow(clippy::field_reassign_with_default)]
+pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> bool {
+    use crate::wing_element::boundary_at;
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let sqrt = |v: f32| if 0.0 > v { f32::NAN } else { v.sqrt() };
+    vm.set_i32(slot(-0x78), 0);
+    let altitude = position_component(vm, env, f, 0x380);
+    let b = vm.u64(f + 0x20);
+    let (w0, w1, w2) = (vm.f32(b + 0x64f4), vm.f32(b + 0x64f8), vm.f32(b + 0x64fc));
+    let wind = sqrt(w0 * w0 + w1 * w1 + w2 * w2);
+    let limit = f64::from(vm.f32(f + 0x42ec8));
+    let height = altitude - f64::from(wind);
+    if limit.partial_cmp(&height) != Some(std::cmp::Ordering::Greater) {
+        return false;
+    }
+    let x1 = (f64::from(vm.f32(b + 0x64ac)) * 0.15) as f32;
+    let drag = vm.f32(b + 0x2898) * f32::from_bits(0x411c_c5c1) / x1;
+    vm.set_f32(slot(-0x10), drag);
+    let tenth = (f64::from(drag) * 0.1) as f32;
+    vm.set_f32(slot(-0x8), tenth);
+    vm.set_i32(slot(0x1750), 0);
+    for i in 0..48u64 {
+        let mut args = CallArgs::ints(&[f, 1, 0x251, i]);
+        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
+        if env.call(vm, 0x1407ace10, args).rax as u32 != 0 {
+            continue;
+        }
+        let b = vm.u64(f + 0x20);
+        let wing = vm.u64(b + 0x6028) + i * 0x36c8;
+        if vm.u8(wing + 0x678) == 0 {
+            continue;
+        }
+        let xrec = vm.u64(f + 0x6940) + i * 0x2d8;
+        let n = vm.i32(wing + 4);
+        let read = |vm: &Vm, base: u64| -> Vec<f32> {
+            (0..=n.max(0) as u64)
+                .map(|k| vm.f32(wing + base + 4 * k))
+                .collect()
+        };
+        let (ax, ay, az) = (read(vm, 0x5bc), read(vm, 0x5e8), read(vm, 0x614));
+        let nf = n as f32;
+        let d9 = boundary_at(&ax, n, nf) - boundary_at(&ax, n, 0.0);
+        let d8 = boundary_at(&ay, n, nf) - boundary_at(&ay, n, 0.0);
+        let d11 = boundary_at(&az, n, nf) - boundary_at(&az, n, 0.0);
+        let len = sqrt(d9 * d9 + d8 * d8 + d11 * d11);
+        let (d9, d8, d11) = (d9 / len, d8 / len, d11 / len);
+        let reach = vm.f32(f + 0x42f50);
+        let (drag, tenth) = (vm.f32(slot(-0x10)), vm.f32(slot(-0x8)));
+        let ptrs = [Some(xrec + 0x2d0), Some(xrec + 0x2d4)];
+        let call = |vm: &mut Vm, env: &mut dyn Callees, a: f32, b3: f32, s: [f32; 4]| {
+            let mut args = CallArgs::default();
+            args.int = [Some(f), Some(0xffff_ffff), None, None];
+            args.xmm = [None, None, Some(a.to_bits()), Some(b3.to_bits())];
+            args.stack = s.map(|v| Some(u64::from(v.to_bits())));
+            let _ = ptrs;
+            let _ = tenth;
+            env.call(vm, 0x1411c7a50, args);
+        };
+        // first point
+        let tz = boundary_at(&az, n, nf);
+        let ty = boundary_at(&ay, n, nf);
+        let tx = boundary_at(&ax, n, nf);
+        let m_reach = -reach;
+        call(vm, env, tx, m_reach * d9, [ty, m_reach * d8, drag, tz]);
+        // second point
+        let tz = boundary_at(&az, n, nf);
+        let ty = boundary_at(&ay, n, nf);
+        let tx = boundary_at(&ax, n, nf);
+        call(vm, env, tx, m_reach * d8, [ty, reach * d9, drag, tz]);
+        // third point
+        let tz = boundary_at(&az, n, nf);
+        let ty = boundary_at(&ay, n, nf);
+        let tx = boundary_at(&ax, n, nf);
+        call(vm, env, tx, d8 * reach, [ty, m_reach * d9, drag, tz]);
+        let _ = (tenth, d11);
+    }
+    vm.set_i32(slot(0x1750), 48);
+    true
+}
