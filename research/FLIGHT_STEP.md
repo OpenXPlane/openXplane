@@ -666,3 +666,4 @@ The late-state block (`0x141273dfb..0x14127402d`) runs `0x141245750` natively no
 ## Strip blocks run `0x14121a9b0` natively
 
 `0x14121a9b0` is the wing-chain factor (`flight_step::wing_chain_factor`), also for the wing records embedded in the parts (`part + 0x88`). The part-strip and wing-strip blocks call it natively now with the vector copies `0x1405f3f30` returns (list addresses). The generator implements the three vector helpers (`0x140985d90` push back, `0x1405f3f30` copy construct, `0x1405ddb90` destroy) as recorded effects in a bump region and stubs the heap release, so the real function runs on the real lists; mutations of its sums and weights are caught by both blocks.
+- `0x141296750` runs natively in the ground response block (`transform::to_aircraft_frame`).

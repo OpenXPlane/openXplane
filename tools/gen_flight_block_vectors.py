@@ -1038,7 +1038,6 @@ def main():
                 fz.preset_f64('CX', off, rng.uniform(-1, 1))
             for off in (0x2e0, 0x2e8, 0x2f0):
                 fz.preset_f64('CX', off, rng.uniform(-1e7, 1e7))
-            case.stub(0x141296750, to_frame)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0, 0.4)))
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
             fz.preset('F', 0x24, B >> 32, record=True)

@@ -2099,21 +2099,12 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
             let d1 = (vm.f64(slot(0x1750)) - vm.f64(slot(0x1758))) as f32;
             let d2 = (vm.f64(rbp) - vm.f64(slot(-0x68))) as f32;
             let d3 = (vm.f64(slot(-0x38)) - vm.f64(slot(-0x50))) as f32;
-            let mut args = CallArgs::default();
-            args.int = [Some(f), None, Some(slot(0x1750)), None];
-            args.xmm = [
-                None,
-                Some(d3.to_bits()),
-                Some(d1.to_bits()),
-                Some(d2.to_bits()),
-            ];
-            args.stack = [
-                Some(slot(0x1758)),
-                Some(bits(d1)),
-                Some(slot(-0x58)),
-                Some(0),
-            ];
-            env.call(vm, 0x141296750, args);
+            let frame = world_frame(vm, f);
+            let [o1, o2, o3] =
+                crate::transform::to_aircraft_frame(&frame, [d3, d2, d1], false, false);
+            vm.set_f32(slot(0x1750), o1);
+            vm.set_f32(slot(0x1758), o2);
+            vm.set_f32(slot(-0x58), o3);
             let (x7, x8, x9) = (
                 vm.f32(slot(0x1750)),
                 vm.f32(slot(0x1758)),
