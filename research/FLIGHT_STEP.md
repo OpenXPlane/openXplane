@@ -458,6 +458,17 @@ two interface updates run; with `F+0x28 == 1` and one of the globals `0x145899fd
 `F+0xf0` and `F+0xfc` plus `F+0x108` becomes the float at `rbp+0x1750` (`F+0x108 + F+0xec` when `F+0x3c == 1` and
 `0x1411d9d80(F)` is zero).
 
+`gear_targets` (`0x14126c034..0x14126c4e4`, 60 cases; `0x1411daa80` is replayed; the key table at `0x1460e9708` is read as memory): unless
+`F+0x28 == 0` and `F+0x689c` is set, every gear record (`B+0x6080`, stride `0x88`, ten) with a kind other than 0 and 1 and a
+live target (`+0x50` or `+0x54` above 0.01, or `+0xc` set) writes the target `+0x24` of its animation entry
+(`F+0x6958`, `0x90` bytes each): `F+0x218` when `F+0x214` is set; when a key of the table (code `0x25` or `0x49`, enabled
+by the parallel table at `+0xba44`, 500 slots) is held, `(F+0x20c + F+0x208) * +0x50 + pedal * +0x54` held to
+`+-(+0x50)`; otherwise `pedal * clamp(+0x50 - (+0x54 - +0x50) * (sqrt(clamp(1 - (1 / B+0x1e94) * (max(first.+0x58, 0.01) * entry0.+0x40 * 1.9438445))) - 1))`
+between the two (0.5 under the root when `B+0x1e94` is zero). With `B+0xe78` the value is multiplied by `0x1411daa80(F+0xbdd8)`;
+it is then multiplied by the entry's extension `+0x10` and by -1 when the point `p0.+0x7c - sin(entry.+0x18) *
+(p0.+0x18 - (1 - ext) * p0.+0x20)` is above zero. `pedal` is the float at `rbp+0x1750` (also in `xmm6` at the block start; it
+is reloaded from the slot after every gear). The register state at the block start is `xmm7 = 0.01` (double), `xmm10 = 0.5`, `rsi = rdi = 0`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

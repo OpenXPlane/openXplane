@@ -1258,3 +1258,130 @@ pub fn world_pull(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         vm.set_f32(rbp.wrapping_add(0x1750), f108 + vm.f32(f + 0xec));
     }
 }
+
+/// `0x14126c034..0x14126c4d7`: the gear animation targets. Unless `F+0x28 == 0` and `F+0x689c` is set, each gear
+/// record (`B+0x6080`, stride `0x88`, ten of them) with a kind other than 0 and 1 and a live target (`+0x50` or `+0x54`
+/// above 0.01 or `+0xc` set) writes the target of its animation state (`F+0x6958`, `+0x24` of the `0x90`-byte entry):
+/// with `F+0x214` set the value `F+0x218`; with a held-down key among the slots of the table at `0x1460e9708` (kind `0x25`
+/// or `0x49`, enabled by the parallel table `+0xba44`) the lever `F+0x20c + F+0x208` times `+0x50` plus the pedal sum
+/// `rbp+0x1750` times `+0x54`, held to `+-(+0x50)`; otherwise `+0x50` moved toward `+0x54` by `sqrt(clamp(1 -
+/// (1 / B+0x1e94) * (max(+0x58, 0.01) * entry0+0x40 * 1.9438445), 0, 1)) - 1` (`0.5` when `B+0x1e94` is zero), held
+/// between them and multiplied by the pedal sum. Then, with `B+0xe78`, the value is multiplied by `0x1411daa80`
+/// (replayed), by the extension `+0x10` of the entry, and by `-1` when the entry's own height term is positive.
+/// The register state at the block start is `xmm7 = 0.01` (double), `xmm10 = 0.5`, `xmm12 = 1.0` (double),
+/// `xmm8 = 0`, and the slot `rbp+0x1750`.
+pub fn gear_targets(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    const KNOTS: f32 = f32::from_bits(0x3ff8_cfe5);
+    const TABLE: u64 = 0x1_460e_9708;
+    let slot = |off: u64| rbp.wrapping_add(off);
+    if vm.i32(f + 0x28) == 0 && vm.i32(f + 0x689c) != 0 {
+        return Ok(());
+    }
+    let sqrt = |v: f32| if 0.0 > v { f32::NAN } else { v.sqrt() };
+    for i in 0..10u64 {
+        let b = vm.u64(f + 0x20);
+        let g = vm.u64(b + 0x6080) + i * 0x88;
+        let kind = vm.i32(g);
+        if kind == 0 || kind == 1 {
+            continue;
+        }
+        let live = f64::from(vm.f32(g + 0x50)) > 0.01
+            || f64::from(vm.f32(g + 0x54)) > 0.01
+            || vm.i32(g + 0xc) != 0;
+        if !live {
+            continue;
+        }
+        let begin = vm.u64(f + 0x6958);
+        let count = (vm.u64(f + 0x6960).wrapping_sub(begin) as i64) / 0x90;
+        let elem = begin + i * 0x90;
+        let in_range = (i as i64) < count && count > 0;
+        if vm.i32(f + 0x214) != 0 {
+            if !in_range {
+                return Err("gear state index out of range".into());
+            }
+            vm.set_f32(elem + 0x24, vm.f32(f + 0x218));
+            continue;
+        }
+        let pressed = |code: i32| {
+            (0..500u64)
+                .any(|k| vm.i32(TABLE + 4 * k + 0xba44) != 0 && vm.i32(TABLE + 4 * k) == code)
+        };
+        let pedal = vm.f32(slot(0x1750));
+        let mut value;
+        if pressed(0x25) || pressed(0x49) {
+            let (g50, g54) = (vm.f32(g + 0x50), vm.f32(g + 0x54));
+            if !in_range {
+                return Err("gear state index out of range".into());
+            }
+            vm.set_f32(
+                elem + 0x24,
+                (vm.f32(f + 0x20c) + vm.f32(f + 0x208)) * g50 + pedal * g54,
+            );
+            let v = vm.f32(elem + 0x24);
+            let neg = -g50;
+            value = if neg > v {
+                neg
+            } else if g50 < v {
+                g50
+            } else {
+                v
+            };
+        } else {
+            if count == 0 {
+                return Err("gear state vector empty".into());
+            }
+            let first = vm.u64(b + 0x6080);
+            let reach = {
+                let w = vm.f32(first + 0x58);
+                (if w > 0.01 { w } else { 0.01 }) * vm.f32(begin + 0x40)
+            };
+            let lever = vm.f32(b + 0x1e94);
+            let held = if lever == 0.0 {
+                0.5
+            } else {
+                let t = (1.0 / (lever - 0.0)) * (reach * KNOTS - 0.0);
+                let v = 1.0 - t;
+                clamp(v, 0.0, 1.0)
+            };
+            let s = sqrt(held);
+            let (g50, g54) = (vm.f32(g + 0x50), vm.f32(g + 0x54));
+            let hi = if g50 > g54 { g50 } else { g54 };
+            let lo = if g50 < g54 { g50 } else { g54 };
+            let v = g50 - (g54 - g50) * (s - 1.0);
+            let moved = if lo > v {
+                lo
+            } else if hi < v {
+                hi
+            } else {
+                v
+            };
+            value = pedal * moved;
+            if !in_range {
+                return Err("gear state index out of range".into());
+            }
+        }
+        vm.set_f32(elem + 0x24, value);
+        let b = vm.u64(f + 0x20);
+        if vm.i32(b + 0xe78) != 0 {
+            let scale = f32::from_bits(
+                env.call(vm, 0x1411daa80, CallArgs::ints(&[f + 0xbdd8]))
+                    .xmm0 as u32,
+            );
+            value = scale * vm.f32(elem + 0x24);
+            vm.set_f32(elem + 0x24, value);
+        }
+        let ext = vm.f32(elem + 0x10);
+        vm.set_f32(slot(0x1758), ext);
+        let scaled = vm.f32(elem + 0x24) * ext;
+        vm.set_f32(elem + 0x24, scaled);
+        let p0 = vm.u64(elem);
+        let a = vm.f32(elem + 0x18) * RAD;
+        let lever =
+            f64::from(vm.f32(p0 + 0x18)) - (1.0 - f64::from(ext)) * f64::from(vm.f32(p0 + 0x20));
+        let along = f64::from(vm.f32(p0 + 0x7c)) - f64::from(a.sin()) * lever;
+        let factor = if along > 0.0 { -1.0 } else { 1.0 };
+        vm.set_f32(elem + 0x24, (f64::from(scaled) * factor) as f32);
+    }
+    Ok(())
+}
