@@ -442,6 +442,16 @@ record of the list at `F+0x69b8` is handed to `0x140f39ae0` through the singleto
 (`+0xc/0x10/0x14`) along the air velocity there by `0x140f26ef0`. Register state: `xmm12 = 1.0` (double), `r13 = -1`,
 `r14 = 1`, `esi = 0`.
 
+`float_waves` (`0x14126b757..0x14126bf30`, 80 cases; the airflow, the wave function `0x1408bd9d0` and the frame time are replayed): three float
+sections (point `B+0x3f40/0x3f4c/0x3f58`, area `B+0x3f64`, strength `B+0x3f70`) keep a smoothed air velocity at
+`F+0x6564/0x6570/0x657c`. With the water switch `F+0x650c` clear the stored values follow the points of the sections whose
+area is positive and `F+0x652c` is cleared. With it set, `F+0x652c` rises by `0.5 dt` to 1; every section with a positive
+area (the loop head tests the area, not the strength) takes the air velocity at its point (wash off), is pushed by the other
+sections (`wave` noise `w * 0.5 + 1` times the stored offsets, a separation measure from the radii `sqrt(area / pi)`,
+`0.1 * speed * (offset / distance) * clamp(1 - distance / (2 * radii))`), blends the stored velocity toward the result
+(`F+0x652c * strength * v / max(|v|, 1)`) with factor `dt` and applies the drag `1.2 * area * F+0x652c * |v|^2 * F+0x6c / 2`
+by `0x140f26ef0`. The frame slot `rbp+0x1750` holds `F` in the original.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

@@ -1088,3 +1088,136 @@ pub fn float_drag(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         add_aero_force(vm, f, &force);
     }
 }
+
+/// `0x14126b757..0x14126bf30`: the float sections' wave interaction. Three sections (`B+0x3f40/0x3f4c/0x3f58`: the
+/// point; `B+0x3f64`: the area; `B+0x3f70`: the strength) keep a smoothed air velocity at `F+0x6564/0x6570/0x657c`
+/// (three floats each). With the water switch `F+0x650c` clear the stored values follow the points; with it set
+/// `F+0x652c` rises at 0.5 per second to 1 and, for every section with strength, the air velocity at its point
+/// (`0x14121b580` replayed, wash off) is pushed by the neighbouring sections (the wave function `0x1408bd9d0`
+/// replayed, a spacing from the radii `sqrt(area / pi)`), the result is blended into the stored velocity (factor
+/// `dt`) and applied as a drag `1.2 * area * F+0x652c * |v|^2 * F+0x6c / 2` by `0x140f26ef0`. Register state:
+/// `xmm12 = 1.0` (double), `r13 = -1`, `esi = 0`.
+#[allow(clippy::field_reassign_with_default)]
+pub fn float_waves(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::callees::{AeroForce, add_aero_force};
+    const PI: f32 = f32::from_bits(0x4049_0fdb);
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let sqrt = |v: f32| if 0.0 > v { f32::NAN } else { v.sqrt() };
+    if vm.i32(f + 0x650c) == 0 {
+        vm.set_i32(f + 0x652c, 0);
+        let b = vm.u64(f + 0x20);
+        for k in 0..3u64 {
+            if vm.f32(b + 0x3f64 + 4 * k) > 0.0 {
+                for (to, from) in [(0x6564, 0x3f40), (0x6570, 0x3f4c), (0x657c, 0x3f58)] {
+                    let word = vm.u32(b + from + 4 * k);
+                    vm.set_u32(f + to + 4 * k, word);
+                }
+            }
+        }
+        return;
+    }
+    let dt = frame_time(vm, env);
+    let level = (f64::from(vm.f32(f + 0x652c)) + dt * 0.5) as f32;
+    vm.set_f32(f + 0x652c, clamp(level, 0.0, 1.0));
+    for k in 0..3u64 {
+        let b = vm.u64(f + 0x20);
+        let strength = vm.f32(b + 0x3f70 + 4 * k);
+        // the loop head tests the area, not the strength
+        let gate = vm.f32(b + 0x3f64 + 4 * k);
+        if gate <= 0.0 || gate.is_nan() {
+            continue;
+        }
+        vm.set_i32(slot(-0x80), 0);
+        let mut args = CallArgs::default();
+        args.int = [Some(f), None, Some(slot(0x1758)), None];
+        args.xmm = [
+            None,
+            Some(vm.f32(b + 0x3f40 + 4 * k).to_bits()),
+            None,
+            Some(vm.f32(b + 0x3f4c + 4 * k).to_bits()),
+        ];
+        args.stack = [
+            Some(slot(-0x74)),
+            Some(u64::from(vm.f32(b + 0x3f58 + 4 * k).to_bits())),
+            Some(slot(-0x80)),
+            None,
+        ];
+        env.call(vm, 0x14121b580, args);
+        let mut a = vm.f32(slot(0x1758));
+        let mut bb = vm.f32(slot(-0x74));
+        let mut c = vm.f32(slot(-0x80));
+        let speed = sqrt(a * a + bb * bb + c * c);
+        let b = vm.u64(f + 0x20);
+        for m in 0..3u64 {
+            let area_m = vm.f32(b + 0x3f64 + 4 * m);
+            if area_m <= 0.0 || area_m.is_nan() || m == k {
+                continue;
+            }
+            let rsum = sqrt(vm.f32(b + 0x3f64 + 4 * k) / PI) + sqrt(area_m / PI);
+            let time = vm.f64(0x1_42f0_1918) as f32;
+            let wave = |vm: &mut Vm, env: &mut dyn Callees, index: u64| -> f64 {
+                let mut args = CallArgs::default();
+                args.xmm[0] = Some(time.to_bits());
+                args.int[1] = Some(index);
+                let w = f32::from_bits(env.call(vm, 0x1408bd9d0, args).xmm0 as u32);
+                f64::from(w) * 0.5 + 1.0
+            };
+            let pk = |vm: &Vm, base: u64, i: u64| vm.f32(f + base + 4 * i);
+            let w = wave(vm, env, 3 * k);
+            let dx = (w * f64::from(pk(vm, 0x6564, k) - pk(vm, 0x6564, m))) as f32;
+            let w = wave(vm, env, 3 * k + 1);
+            let dy = (w * f64::from(pk(vm, 0x6570, k) - pk(vm, 0x6570, m))) as f32;
+            let w = wave(vm, env, 3 * k + 2);
+            let dz = (w * f64::from(pk(vm, 0x657c, k) - pk(vm, 0x657c, m))) as f32;
+            let dist = sqrt(dy * dy + dx * dx + dz * dz);
+            let d5 = if dist > 0.01 { dist } else { 0.01 };
+            let x4 = (f64::from(rsum) + f64::from(rsum)) as f32;
+            let fac = if x4 == 0.0 {
+                0.5
+            } else {
+                clamp(1.0 - (1.0 / (x4 - 0.0)) * (d5 - 0.0), 0.0, 1.0)
+            };
+            let sc = f64::from(speed) * 0.1;
+            a = (f64::from(a) + f64::from(dx / d5) * sc * f64::from(fac)) as f32;
+            bb = (f64::from(bb) + f64::from(dy / d5) * sc * f64::from(fac)) as f32;
+            c = (f64::from(c) + f64::from(dz / d5) * sc * f64::from(fac)) as f32;
+        }
+        let speed2 = sqrt(a * a + bb * bb + c * c);
+        let level = vm.f32(f + 0x652c);
+        let s8 = level * strength;
+        let b = vm.u64(f + 0x20);
+        let area_k = vm.f32(b + 0x3f64 + 4 * k);
+        let q = speed2 * speed2 * vm.f32(f + 0x6c);
+        let magnitude = (f64::from(area_k) * 1.2 * f64::from(level) * f64::from(q) * 0.5) as f32;
+        vm.set_f32(slot(-0x78), magnitude);
+        let dt = frame_time(vm, env);
+        let t = clamp(dt as f32, 0.0, 1.0);
+        let held = if speed2 > 1.0 { speed2 } else { 1.0 };
+        let x5 = s8 * a / held;
+        let x2 = ((f64::from(bb) - 1.0) * f64::from(s8) / f64::from(held)) as f32;
+        let x8 = s8 * c / held;
+        for (base, value) in [(0x6564u64, x5), (0x6570, x2), (0x657c, x8)] {
+            let old = vm.f32(f + base + 4 * k);
+            vm.set_f32(f + base + 4 * k, (1.0 - t) * old + t * value);
+        }
+        let b = vm.u64(f + 0x20);
+        let force = AeroForce {
+            a2: a,
+            a3: 0.0,
+            a5: bb,
+            a6: magnitude,
+            a7: c,
+            a8: 0.0,
+            a9: vm.f32(b + 0x3f40 + 4 * k),
+            a10: vm.f32(b + 0x3f4c + 4 * k),
+            a11: vm.f32(b + 0x3f58 + 4 * k),
+            a12: 0.0,
+            a13: 0.0,
+            a14: 0,
+            a15: 0.0,
+            a16: 0.0,
+            a17: 0.0,
+        };
+        add_aero_force(vm, f, &force);
+    }
+}
