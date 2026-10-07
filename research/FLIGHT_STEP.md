@@ -394,6 +394,13 @@ and `F+0x3dc` (to +-20) are limited by replacing an out-of-range value with the 
 After this block the function only looks up a name for the aircraft (a loop over 19 entries and the string copy
 `0x1407debf0` into `F+0x2c`), which is not ported.
 
+`arm_probe` (`crates/xp-airfoil/src/flight_state.rs`, `0x14126a791..0x14126aad6`, 120 cases; the terrain probe `0x14195ffc0`
+and the engine flag are replayed): the angle `F+0x6548` of the arm described by `B+0x4440..0x4454` takes the demand
+`F+0x6528` through `interpolate_clamped` between `B+0x444c` and `B+0x4450`; with `F+0x28 == 0` and `B+0x4454 > 0`
+five iterations place the arm tip in the world, ask the terrain probe and, on a hit, lower the angle by
+`(probe height + 0.1 - tip height) / B+0x4454` in degrees, held to the limits. It returns `esi` (1 once any tip was
+below the surface), which the next block reads. The block starts with `rbx = B`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

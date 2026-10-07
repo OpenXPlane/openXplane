@@ -443,3 +443,90 @@ pub fn late_state(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
         }
     }
 }
+
+/// `0x14126a791..0x14126aad6`: the swing of the arm at `B+0x4440..0x4454` (a retractable or trailing member whose
+/// angle `F+0x6548` follows the demand `F+0x6528` between the limits `B+0x444c` and `B+0x4450`). The angle becomes
+/// the interpolation of the demand; with `F+0x28 == 0` and a positive arm length `B+0x4454`, five iterations place
+/// the arm tip in the world (`rotate_pairs`, the position doubles, the probe offset `F+0x42f50` through
+/// `rotate_pairs_f64`), ask the terrain probe `0x14195ffc0` (replayed) and, when it hits, lower the angle by the
+/// penetration (`+0.1` of the probe height minus the tip height, over the arm length, in degrees) held to the limits.
+/// Returns the original's `esi`: 1 once any iteration found the tip below the surface, else 0.
+#[allow(clippy::field_reassign_with_default)]
+pub fn arm_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> u32 {
+    use crate::transform::{rotate_pairs, rotate_pairs_f64};
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let b = vm.u64(f + 0x20);
+    let mut esi = 0u32;
+    let angle = interpolate_clamped(
+        0.0,
+        vm.f32(b + 0x444c),
+        1.0,
+        vm.f32(b + 0x4450),
+        vm.f32(f + 0x6528),
+    );
+    vm.set_f32(f + 0x6548, angle);
+    let active = vm.i32(f + 0x28) == 0 && vm.f32(b + 0x4454) > 0.0;
+    if !active {
+        return esi;
+    }
+    let pairs = [
+        vm.f32(f + 0x440),
+        vm.f32(f + 0x444),
+        vm.f32(f + 0x430),
+        vm.f32(f + 0x434),
+        vm.f32(f + 0x450),
+        vm.f32(f + 0x454),
+    ];
+    for _ in 0..5 {
+        vm.set_i32(slot(0x1758), 0);
+        vm.set_i32(slot(-0x80), 0);
+        vm.set_i32(slot(-0x7c), 0);
+        let a7 = vm.f32(f + 0x6548) * RAD;
+        let b = vm.u64(f + 0x20);
+        let length = vm.f32(b + 0x4454);
+        let x8 = length * a7.cos() + vm.f32(b + 0x4448);
+        let x4 = vm.f32(b + 0x4444) - length * a7.sin();
+        let [o1, o2, o3] = rotate_pairs(vm.f32(b + 0x4440), x4, x8, pairs);
+        vm.set_f32(slot(0x1758), o1);
+        vm.set_f32(slot(-0x80), o2);
+        vm.set_f32(slot(-0x7c), o3);
+        let x9 = (position_component(vm, env, f, 0x378) + f64::from(vm.f32(slot(0x1758)))) as f32;
+        let y8 = (position_component(vm, env, f, 0x380) + f64::from(vm.f32(slot(-0x80)))) as f32;
+        let z7 = (position_component(vm, env, f, 0x388) + f64::from(vm.f32(slot(-0x7c)))) as f32;
+        let p = pairs.map(f64::from);
+        let r = rotate_pairs_f64(0.0, f64::from(vm.f32(f + 0x42f50)), 0.0, p);
+        vm.set_f64(slot(-0x68), r[0]);
+        vm.set_f64(slot(-0x38), r[1]);
+        vm.set_f64(slot(-0x50), r[2]);
+        vm.set_f32(slot(0x40), (f64::from(x9) + r[0]) as f32);
+        vm.set_f32(slot(0x44), (f64::from(y8) + r[1]) as f32);
+        vm.set_f32(slot(0x48), (f64::from(z7) + r[2]) as f32);
+        vm.set_f32(slot(0x30), x9);
+        vm.set_f32(slot(0x34), y8);
+        vm.set_f32(slot(0x38), z7);
+        let mut args = CallArgs::default();
+        args.int = [
+            Some(f + 0x42e40),
+            Some(slot(0x40)),
+            Some(slot(0x30)),
+            Some(slot(0x3a8)),
+        ];
+        args.stack = [Some(0), Some(0), Some(0), None];
+        let hit = env.call(vm, 0x14195ffc0, args).rax as u8 != 0;
+        if hit {
+            let depth = (f64::from(vm.f32(slot(0x3ac))) + 0.1 - f64::from(y8)) as f32;
+            if depth > 0.0 {
+                esi = 1;
+            }
+            let b = vm.u64(f + 0x20);
+            let lowered = vm.f32(f + 0x6548) - depth / vm.f32(b + 0x4454) * DEG;
+            vm.set_f32(
+                f + 0x6548,
+                clamp(lowered, vm.f32(b + 0x444c), vm.f32(b + 0x4450)),
+            );
+        }
+    }
+    esi
+}
