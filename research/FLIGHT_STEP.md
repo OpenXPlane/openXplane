@@ -401,6 +401,19 @@ five iterations place the arm tip in the world, ask the terrain probe and, on a 
 `(probe height + 0.1 - tip height) / B+0x4454` in degrees, held to the limits. It returns `esi` (1 once any tip was
 below the surface), which the next block reads. The block starts with `rbx = B`.
 
+`gear_aero` (`crates/xp-airfoil/src/flight_state.rs`, `0x14126883f..0x141269920`, 50 cases): the aerodynamic drag of the ten
+gear records (`B+0x6080`, stride `0x88`). A record with a kind word is skipped when its animation state
+(`0x1407d6c50`: entry `i` of the vector at `F+0x6958`, `0x90` bytes each) is retracted (`+0x10 < 0.01`) and
+`B+0x2830` is not positive. `found` (the original's `esi`) becomes set when a live body record names the gear
+(`body+0x5f4 == i`); it stays set across skipped gears and is cleared after a force is applied. The drag areas come from
+the record (`+0x58 * 0.2` (1 for kind 1), capped by `+0x5c`, times `+0x18`, doubled; and `4 * +0x58 * +0x5c` scaled by the
+kind: 3 x2, 4 x1.2, 5 x2.4, 6 x2.8, 7 x4, 1 x0, and x0.25 when no flag and `found`), are multiplied by the dynamic
+pressure `F+0x424` and `|e|^0.1` of the extension (the first two terms use at least `B+0x2830`, the third does not) and
+summed with a term `B+0x2834 * q * e / rbp[0x1758]` for records with the second flag. The sum is applied by `0x140f26ef0`
+along the air velocity at a point blended from the record and the state's own offsets. The block between the gears'
+force and the debug flag is a log. Inputs: the frame slot `rbp+0x1758` (computed before the loop from the wheel groups),
+`xmm7 = 0`, `esi = 0`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

@@ -3115,6 +3115,23 @@ fn arm_probe_matches_the_original_machine_code() {
 }
 
 #[test]
+fn gear_aero_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_gear.txt");
+    assert!(cases.len() >= 40);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::gear_aero(&mut case.vm, &mut env, f, rbp)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

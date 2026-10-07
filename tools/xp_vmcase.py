@@ -86,13 +86,14 @@ class VmCase:
         self.regions[name] = addr
         return addr
 
-    def stub(self, address, handler):
+    def stub(self, address, handler, record=True):
         def run(e):
             call = Call(self, address)
             handler(call, self.rng)
             e.uc.reg_write(UC_X86_REG_RAX, call.rax)
             e.uc.reg_write(UC_X86_REG_XMM0, call.xmm0)
-            self.calls.append(call)
+            if record:
+                self.calls.append(call)
         self.emu.stubs[address] = run
 
     def run(self, entry, **kwargs):

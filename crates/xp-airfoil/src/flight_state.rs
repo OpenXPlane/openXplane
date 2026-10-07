@@ -530,3 +530,152 @@ pub fn arm_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> u32 {
     }
     esi
 }
+
+/// `0x14126883f..0x141269920`: the aerodynamic drag of the landing gear. For each of the ten gear records
+/// (`B+0x6080`, stride `0x88`) that has a kind word and is either extended (`state+0x10 >= 0.01`) or allowed by
+/// `B+0x2830 > 0`, the matching animation state (`F+0x6958`, entries of `0x90` bytes; `0x1407d6c50`) and the
+/// drag area from the record (`+0x58`, `+0x5c`, `+0x18`, scaled by the kind: wheel, door, strut, ...) are
+/// multiplied by the dynamic pressure `F+0x424` and a power law of the extension (`|e|^0.1`, at least `B+0x2830`),
+/// and the sum is applied by `0x140f26ef0` along the air velocity at a point blended from the record and the
+/// state's own offsets. `found` tracks whether a live body record names the gear (`body+0x5f4 == index`);
+/// it is cleared after a force is applied. The frame slot `rbp+0x1758` (computed before the loop from the wheel
+/// groups) and the register state `xmm7 = 0`, `esi = 0` are inputs. Not ported: the debug log.
+pub fn gear_aero(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+    use crate::callees::{AeroForce, add_aero_force};
+    use crate::engine::cosine_blend;
+    use crate::flight_step::body_enabled;
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let mut found = false;
+    let power = |x: f32| -> f32 {
+        if x > 0.0 {
+            x.powf(0.1)
+        } else if 0.0 > x {
+            -(-x).powf(0.1)
+        } else {
+            0.0
+        }
+    };
+    for i in 0..10u64 {
+        let b = vm.u64(f + 0x20);
+        let g = vm.u64(b + 0x6080) + i * 0x88;
+        if vm.i32(g) == 0 {
+            continue;
+        }
+        let begin = vm.u64(f + 0x6958);
+        let count = (vm.u64(f + 0x6960).wrapping_sub(begin) as i64) / 0x90;
+        if i >= count as u64 {
+            return Err("gear state index out of range".into());
+        }
+        let elem = begin + i * 0x90;
+        let ext = vm.f32(elem + 0x10);
+        let allowed = vm.f32(b + 0x2830) > 0.0;
+        if 0.01 > f64::from(ext) && !allowed {
+            continue;
+        }
+        for j in 0..39 {
+            if body_enabled(vm, env, f, j) != 0 {
+                let body = vm.u64(b + 0x6040) + (j as u64) * 0x34c8;
+                if vm.i32(body + 0x5f4) as u64 == i {
+                    found = true;
+                }
+            }
+        }
+        let b = vm.u64(f + 0x20);
+        let (kind, flag2) = (vm.i32(g), vm.i32(g + 4));
+        let k74: f32 = if flag2 != 0 {
+            f32::from_bits(0x3f95_c28f)
+        } else {
+            0.125
+        };
+        let d2 = if kind == 1 { 1.0 } else { 0.2 };
+        let g58 = f64::from(vm.f32(g + 0x58));
+        let g5c = vm.f32(g + 0x5c);
+        let mut x2 = (g58 * d2) as f32;
+        if x2 > g5c && kind != 1 {
+            x2 = g5c;
+        }
+        x2 *= vm.f32(g + 0x18);
+        let mut x10 = (f64::from(x2) + f64::from(x2)) as f32;
+        let mut x6 = (((g58 + g58) * f64::from(g5c)) * 2.0) as f32;
+        let (k70, mut x9): (f32, f32);
+        if flag2 != 0 {
+            k70 = 0.5;
+            x9 = x10;
+            x10 = (f64::from(x10) * 1.5) as f32;
+        } else {
+            k70 = 0.0;
+            x9 = 0.0;
+            if found {
+                x6 = (f64::from(x6) * 0.25) as f32;
+            }
+        }
+        x6 = match kind {
+            3 => (f64::from(x6) + f64::from(x6)) as f32,
+            4 => (f64::from(x6) * 1.2) as f32,
+            5 => (f64::from(x6) * 2.4) as f32,
+            6 => (f64::from(x6) * 2.8) as f32,
+            7 => (f64::from(x6) * 4.0) as f32,
+            1 => (f64::from(x6) * 0.0) as f32,
+            _ => x6,
+        };
+        let b2830 = vm.f32(b + 0x2830);
+        let pw = power(ext);
+        let pmax = if pw > b2830 { pw } else { b2830 };
+        let q = vm.f32(f + 0x424);
+        x10 = x10 * k74 * q * pmax;
+        let x7 = x6 * f32::from_bits(0x3ef0_a3d7) * q * pmax;
+        x9 = x9 * k70 * q * pw;
+        let x8 = if flag2 != 0 {
+            (f64::from(vm.f32(b + 0x2834)) * f64::from(q) * f64::from(ext)
+                / f64::from(vm.f32(rbp + 0x1758))) as f32
+        } else {
+            0.0
+        };
+        let sum = x7 + x10 + x9 + x8;
+        vm.set_f32(rbp.wrapping_sub(0x78), sum);
+        let p0 = vm.u64(elem);
+        let a = vm.f32(elem + 0x18) * RAD;
+        let lever =
+            f64::from(vm.f32(p0 + 0x18)) - (1.0 - f64::from(ext)) * f64::from(vm.f32(p0 + 0x20));
+        let along = f64::from(vm.f32(p0 + 0x7c)) - f64::from(a.sin()) * lever;
+        let gt = vm.u64(b + 0x6080) + i * 0x88;
+        let z = ((f64::from(vm.f32(gt + 0x7c)) + along) * 0.5) as f32;
+        let cb = {
+            // 0x14121b4d0(elem): the blend of the state and its target object
+            let t = vm.u64(elem);
+            cosine_blend(
+                vm.f32(elem + 0x10),
+                vm.f32(elem + 0x14),
+                vm.f32(elem + 0x18),
+                vm.f32(t + 0x18),
+                vm.f32(t + 0x20),
+                vm.f32(t + 0x70),
+            )
+        };
+        let y =
+            ((f64::from(vm.f32(gt + 0x70)) + (cb + f64::from(vm.f32(elem + 0x2c)))) * 0.5) as f32;
+        let side = f64::from((vm.f32(elem + 0x14) * RAD).sin()) * lever * f64::from(a.cos())
+            + f64::from(vm.f32(p0 + 0x64));
+        let x = ((f64::from(vm.f32(gt + 0x64)) + side) * 0.5) as f32;
+        let force = AeroForce {
+            a2: vm.f32(f + 0x29c),
+            a3: 0.0,
+            a5: vm.f32(f + 0x2a8),
+            a6: sum,
+            a7: vm.f32(f + 0x2b4),
+            a8: 0.0,
+            a9: x,
+            a10: y,
+            a11: z,
+            a12: 0.0,
+            a13: 0.0,
+            a14: 0,
+            a15: 0.0,
+            a16: 0.0,
+            a17: 0.0,
+        };
+        add_aero_force(vm, f, &force);
+        found = false;
+    }
+    Ok(())
+}
