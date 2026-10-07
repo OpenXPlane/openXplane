@@ -3583,6 +3583,63 @@ fn plugin_force_matches_the_original_machine_code() {
     }
 }
 
+fn matrix_cases(kind: &str) {
+    use openxplane::matrix::{axis_rotation, mul, read, rigid_inverse, rotate_by, write};
+    let cases = parse_vm_cases(&format!("matrix_{kind}.txt"));
+    assert!(cases.len() >= 60);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let double = |s: &str| f64::from_bits(hex(s));
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h: Vec<String> = case.header.clone();
+        match kind {
+            "mul" => {
+                let (a, b) = (read(&case.vm, hex(&h[2])), read(&case.vm, hex(&h[3])));
+                write(&mut case.vm, hex(&h[1]), &mul(&a, &b));
+            }
+            "rigid" => {
+                let m = read(&case.vm, hex(&h[2]));
+                write(&mut case.vm, hex(&h[1]), &rigid_inverse(&m));
+            }
+            "axis" => {
+                let r = axis_rotation(double(&h[2]), double(&h[3]), double(&h[4]), double(&h[5]));
+                write(&mut case.vm, hex(&h[1]), &r);
+            }
+            _ => {
+                let m = read(&case.vm, hex(&h[1]));
+                let r = rotate_by(
+                    &m,
+                    double(&h[2]),
+                    double(&h[3]),
+                    double(&h[4]),
+                    double(&h[5]),
+                );
+                write(&mut case.vm, hex(&h[1]), &r);
+            }
+        }
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn matrix_multiply_matches_the_original_machine_code() {
+    matrix_cases("mul");
+}
+
+#[test]
+fn matrix_rigid_inverse_matches_the_original_machine_code() {
+    matrix_cases("rigid");
+}
+
+#[test]
+fn matrix_axis_rotation_matches_the_original_machine_code() {
+    matrix_cases("axis");
+}
+
+#[test]
+fn matrix_rotate_by_matches_the_original_machine_code() {
+    matrix_cases("rotate");
+}
+
 #[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
