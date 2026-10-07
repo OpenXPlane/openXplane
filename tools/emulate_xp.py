@@ -82,7 +82,8 @@ class Emulator:
     def _on_code(self, uc, address, size, user):
         stub = self.stubs.get(address)
         if stub is not None:
-            stub(self)
+            if stub(self) is True:
+                return  # the stub declined this call: the function runs natively
             rsp = uc.reg_read(UC_X86_REG_RSP)
             ret = struct.unpack('<Q', uc.mem_read(rsp, 8))[0]
             uc.reg_write(UC_X86_REG_RSP, rsp + 8)

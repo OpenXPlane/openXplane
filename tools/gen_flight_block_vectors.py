@@ -32,6 +32,26 @@ RECORD_VECTOR = 0x146125768
 RECORDING_ID = 0x142f2e3dc
 
 
+
+def stub_point_drag(case):
+    """The callees of 0x14119e5b0 (the drag of a gear point): the point transform and the terrain probe."""
+    def transform(call, rng):
+        for address in (call.ints[2], call.stack[0], call.stack[2]):
+            call.put_f32(address, rng.choice([0.0, rng.uniform(-10, 10)]))
+
+    def probe(call, rng):
+        a = call.ints[2]
+        y = struct.unpack('<f', struct.pack('<I', case.emu.read_u32(call.ints[1] + 4)))[0]
+        call.put_f32(a, rng.uniform(-3, 3))
+        call.put_f32(a + 4, y + rng.choice([-1.0, 1.0, 0.0, rng.uniform(-2, 2)]))
+        call.ret_int(rng.choice([0, 1, 1, 1]))
+
+    inside = (0x14119e5b0, 0x14119e960)
+    case.stub(0x1407ac020, transform, caller=inside)
+    case.stub(0x141960dc0, probe, caller=inside)
+    case.stub(0x1408e25a0, lambda call, rng: None, record=False)
+
+
 def vector_stubs(case, rng):
     """Stubs implementing the std::vector helpers of the strip blocks in a bump region, as recorded effects."""
     HP = case.region('HP', 0x20000)
@@ -1041,7 +1061,7 @@ def main():
             CX = case.region('CX', 0x300)
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
             case.stub(0x1408e25a0, lambda call, rng: None, record=False)
-            case.stub(0x14119e5b0, lambda call, rng: None)
+            stub_point_drag(case)
             def put64f(call, pointer, v):
                 bits64 = struct.unpack('<Q', struct.pack('<d', v))[0]
                 call.put(pointer, bits64 & 0xffffffff)
@@ -1091,7 +1111,7 @@ def main():
                 for pointer in (call.ints[3], call.stack[2], call.stack[5]):
                     call.put_f32(pointer, rng.uniform(-1, 1))
             case.stub(0x1411ddfd0, wheel_state)
-            case.stub(0x14119e5b0, lambda call, rng: None)
+            stub_point_drag(case)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.01, 0.2, 2.0, rng.uniform(0, 1)])))
             G = case.region('G', 0x88 * 10)
             X = case.region('X', 0x90 * 10)

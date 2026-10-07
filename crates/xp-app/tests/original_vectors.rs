@@ -2484,9 +2484,16 @@ impl openxplane::vm::Callees for VmReplay {
             .pop_front()
             .unwrap_or_else(|| panic!("call {address:#x} not recorded"));
         assert_eq!(c.address, address, "call order");
+        // pointers into the original's stack frame: the port keeps its own frame, so effects are rebased onto it
+        let in_stack = |v: u64| (0x7fe0_0000_0000..0x7ff0_0000_0000).contains(&v);
+        let mut rebase = None;
         for (i, want) in args.int.iter().enumerate() {
             if let Some(v) = want {
-                assert_eq!(*v, c.ints[i], "argument {i} of {address:#x}");
+                if in_stack(c.ints[i]) && !in_stack(*v) {
+                    rebase.get_or_insert(v.wrapping_sub(c.ints[i]));
+                } else {
+                    assert_eq!(*v, c.ints[i], "argument {i} of {address:#x}");
+                }
             }
         }
         for (i, want) in args.xmm.iter().enumerate() {
@@ -2513,7 +2520,11 @@ impl openxplane::vm::Callees for VmReplay {
             }
         }
         for (a, w) in &c.effects {
-            vm.set_u32(*a, *w);
+            let a = match rebase {
+                Some(delta) if in_stack(*a) => a.wrapping_add(delta),
+                _ => *a,
+            };
+            vm.set_u32(a, *w);
         }
         openxplane::vm::Reply {
             rax: c.rax,
@@ -3480,6 +3491,28 @@ fn gear_drag_and_brake_matches_the_original_machine_code() {
             calls: std::mem::take(&mut case.calls),
         };
         openxplane::flight_state::gear_drag_and_brake(&mut case.vm, &mut env, f, rbp).unwrap();
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn point_drag_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("gear_drag.txt");
+    assert!(cases.len() >= 60);
+    let hex = |s: &str| u32::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let p = (
+            f32::from_bits(hex(&case.header[1])),
+            f32::from_bits(hex(&case.header[2])),
+            f32::from_bits(hex(&case.header[3])),
+        );
+        let drag = f32::from_bits(hex(&case.header[4]));
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::point_drag(&mut case.vm, &mut env, f, p, drag).unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }

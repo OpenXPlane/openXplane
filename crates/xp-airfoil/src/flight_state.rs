@@ -2031,7 +2031,6 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
     const RAD: f32 = f32::from_bits(0x3c8e_fa36);
     const DEG: f32 = f32::from_bits(0x4265_2ee0);
     let slot = |o: i64| (rbp as i64 + o) as u64;
-    let bits = |v: f32| u64::from(v.to_bits());
     if vm.i32(slot(-0x78)) == 0 {
         return Ok(());
     }
@@ -2116,15 +2115,8 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
             add_plugin_force(vm, env, f, pa, p7, pc, p8, pp, p9)?;
             let b = vm.u64(f + 0x20);
             let reach = (f64::from(vm.f32(b + 0x64ac)) * 0.1) as f32;
-            let mut args = CallArgs::ints(&[f]);
-            args.xmm = [
-                None,
-                Some(vm.f32(b + 0x280c).to_bits()),
-                Some(vm.f32(b + 0x2810).to_bits()),
-                Some(vm.f32(b + 0x2814).to_bits()),
-            ];
-            args.stack = [Some(bits(reach * reach)), None, None, None];
-            env.call(vm, 0x14119e5b0, args);
+            let point = (vm.f32(b + 0x280c), vm.f32(b + 0x2810), vm.f32(b + 0x2814));
+            point_drag(vm, env, f, point, reach * reach)?;
         }
     }
     let b = vm.u64(f + 0x20);
@@ -2205,15 +2197,7 @@ pub fn gear_drag_and_brake(
         }
         let t2 = t2 * vm.f32(g + 0x18);
         let t2 = ((f64::from(t2) + f64::from(t2)) * ed) as f32;
-        let mut args = CallArgs::ints(&[f]);
-        args.xmm = [
-            None,
-            Some(x.to_bits()),
-            Some(y.to_bits()),
-            Some(z.to_bits()),
-        ];
-        args.stack = [Some(u64::from((t2 + t1).to_bits())), None, None, None];
-        env.call(vm, 0x14119e5b0, args);
+        point_drag(vm, env, f, (x, y, z), t2 + t1)?;
     }
     let b = vm.u64(f + 0x20);
     let capacity = vm.f32(b + 0x2890);
@@ -2508,6 +2492,77 @@ pub fn late_tail(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<(), Strin
     let byte = env.call(vm, 0x1_424e_5fc8, CallArgs::ints(&[value])).rax as u8;
     call_end(vm, env, u64::from(byte));
     Ok(())
+}
+
+/// The address of the scratch frame standing in for the original's stack locals of [`point_drag`].
+const DRAG_FRAME: u64 = 0x7e00_0000_0000;
+
+/// `0x14119e5b0(F, x, y, z, drag)`: the drag `drag` applied as a plug-in force at the body point `(x, y, z)`. The
+/// point is transformed by `0x1407ac020` and probed against the terrain with `0x141960dc0` (both replayed; their
+/// results are floats in a local frame, `DRAG_FRAME + 0x40..0x4c` for the point and `+0x50`, `+0x60` for the probe's
+/// results). When the probe answers true and its value `+0x54` is above the point's `+0x44`, the point's wind-axis
+/// offset is formed with the matrices at `F+0x3cc` and `F+0x430/0x440/0x450`, turned into the force
+/// `-0.5 drag |v|^2 (1000 * 0.5)` along the unit velocity `v = M (R p) + F+0x368` (the length floored at 0.01) and handed
+/// to [`add_plugin_force`].
+pub fn point_drag(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    (x, y, z): (f32, f32, f32),
+    drag: f32,
+) -> Result<(), String> {
+    let frame = DRAG_FRAME;
+    for offset in [0x40, 0x44, 0x48, 0x50, 0x54, 0x58, 0x60, 0x64, 0x68] {
+        vm.set_u32(frame + offset, 0);
+    }
+    let mut args = CallArgs::ints(&[f]);
+    args.int[2] = Some(frame + 0x40);
+    args.xmm = [
+        None,
+        Some(x.to_bits()),
+        Some(y.to_bits()),
+        Some(y.to_bits()),
+    ];
+    args.stack = [None, Some(u64::from(z.to_bits())), None, Some(1)];
+    env.call(vm, 0x1407ac020, args);
+    let mut args = CallArgs::ints(&[f + 0x42e40, frame + 0x40, frame + 0x50, frame + 0x60]);
+    args.stack = [Some(0), None, None, None];
+    let hit = env.call(vm, 0x141960dc0, args).rax as u8 != 0;
+    let above = vm.f32(frame + 0x54) > vm.f32(frame + 0x44);
+    if !hit || !above {
+        return Ok(());
+    }
+    let (m0, m1, m2) = (vm.f32(f + 0x3cc), vm.f32(f + 0x3d0), vm.f32(f + 0x3d4));
+    let (a0, a1, a2) = (vm.f32(f + 0x430), vm.f32(f + 0x434), vm.f32(f + 0x440));
+    let (a3, a4, a5) = (vm.f32(f + 0x444), vm.f32(f + 0x450), vm.f32(f + 0x454));
+    let t3 = (-x) * m0 - m1 * z;
+    let t4 = m0 * y - m2 * z;
+    let t5 = m1 * y + m2 * x;
+    let u1 = a5 * t4 + a4 * t3;
+    let u9 = a5 * t3 - a4 * t4;
+    let u10 = u9 * a0 + a1 * t5;
+    let v11 = u1 * a3 - u10 * a2 + vm.f32(f + 0x368);
+    let v10 = u10 * a3 + u1 * a2 + vm.f32(f + 0x370);
+    let v9 = u9 * a1 - a0 * t5 + vm.f32(f + 0x36c);
+    let sum = (v11 * v11 + v9 * v9) + v10 * v10;
+    let len = if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+    let len = if len > f32::from_bits(0x3c23_d70a) {
+        len
+    } else {
+        f32::from_bits(0x3c23_d70a)
+    };
+    let half = f64::from(drag) * 0.5;
+    let k = -((f64::from(len * len) * half * 1000.0 * 0.5) as f32);
+    let w1 = k * v11 / len;
+    let w5 = k * v10 / len;
+    let w2 = k * v9 / len;
+    let r4 = w5 * a2 + w1 * a3;
+    let r5 = w5 * a3 - w1 * a2;
+    let s5 = r5 * a1 - w2 * a0;
+    let r3 = w2 * a1 + r5 * a0;
+    let d = r3 * a5 + r4 * a4;
+    let b = r4 * a5 - r3 * a4;
+    add_plugin_force(vm, env, f, x, b, y, d, z, s5)
 }
 
 /// `0x1408e3230(F, a, b, c, d, p, e, name)`: the plug-in force `(b, d, e)` at the point `(a, c, p)` (arguments in the

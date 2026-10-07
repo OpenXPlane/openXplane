@@ -86,8 +86,14 @@ class VmCase:
         self.regions[name] = addr
         return addr
 
-    def stub(self, address, handler, record=True):
+    def stub(self, address, handler, record=True, caller=None):
+        """Replaces a function; with `caller=(lo, hi)` only calls whose return address lies in the range."""
         def run(e):
+            if caller is not None:
+                rsp = e.uc.reg_read(UC_X86_REG_RSP)
+                ret = struct.unpack('<Q', e.uc.mem_read(rsp, 8))[0]
+                if not caller[0] <= ret < caller[1]:
+                    return True
             call = Call(self, address)
             handler(call, self.rng)
             e.uc.reg_write(UC_X86_REG_RAX, call.rax)
