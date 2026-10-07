@@ -879,7 +879,7 @@ pub fn set_position(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, positi
 /// `0x1411d9e50(F, i)`: whether the `i`-th entry of the record list at `F+0x69b8` (16-byte entries) is live: it
 /// must differ from the empty key held in the globals `0x142f03778/0x142f03780` and be accepted by the lookup
 /// `0x140f5c540` on the singleton at `0x14578b780` (replayed).
-fn record_live(vm: &mut Vm, env: &mut dyn Callees, f: u64, index: i32) -> bool {
+pub(crate) fn record_live(vm: &mut Vm, env: &mut dyn Callees, f: u64, index: i32) -> bool {
     let begin = vm.u64(f + 0x69b8);
     let count = vm.u64(f + 0x69c0).wrapping_sub(begin) as i64 >> 4;
     if (i64::from(index) as u64) >= count as u64 {

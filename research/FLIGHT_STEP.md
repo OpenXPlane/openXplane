@@ -431,6 +431,11 @@ engagement at 1) ease the engagement point. The register state at the block star
 
 The replay test helper now also compares the float and stack arguments of replayed calls (floats within a relative 1e-5).
 
+`tow_and_records` (`0x14126b3e8..0x14126b548`, 120 cases; the singleton calls `0x140f42620`, `0x140f39ae0` and the record lookup `0x140f5c540` are replayed): with `B+0x2894 > 0` and `F+0xdac == 0` a pull
+`B+0x2894 * 9.798 * F+0x6590 * ramp(F+0x70)` (the ramp is 1 at `0.01` and 0 at 0) along the second axis is moved into
+the aircraft frame and added as an axial force with arm `B+0x289c`, a side force and a normal force; then every live
+record of the list at `F+0x69b8` is handed to `0x140f39ae0` through the singleton.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

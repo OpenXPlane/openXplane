@@ -969,3 +969,50 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
         vm.set_f64(address, f64::from(value));
     }
 }
+
+/// `0x14126b3e8..0x14126b548`: the towing drag and the record update. With a positive drag coefficient `B+0x2894`
+/// and `F+0xdac == 0` a force `B+0x2894 * 9.798 * F+0x6590 * ramp(F+0x70)` (the ramp falls from 1 at `0.01` to 0 at
+/// 0) acts along the aircraft's second axis; it is moved into the aircraft frame and added as axial (with arm
+/// `B+0x289c`), side and normal forces. Then every live record of the list `F+0x69b8` is passed to the singleton's
+/// `0x140f39ae0` (replayed, after `0x140f42620`). `rbp` is the frame of `update_flight`; the register state at the
+/// block start is `xmm13 = 0.0`, `xmm14 = 1.0`.
+#[allow(clippy::field_reassign_with_default)]
+pub fn tow_and_records(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::callees::{add_axial_force, add_normal_force, add_side_force};
+    use crate::transform::to_aircraft_frame;
+    let b = vm.u64(f + 0x20);
+    let coefficient = vm.f32(b + 0x2894);
+    if coefficient > 0.0 && vm.i32(f + 0xdac) == 0 {
+        let ramp =
+            interpolate_clamped(f32::from_bits(0x3c23_d70a), 1.0, 0.0, 0.0, vm.f32(f + 0x70));
+        let pull = coefficient * f32::from_bits(0x411c_c5c1) * vm.f32(f + 0x6590) * ramp;
+        let frame = world_frame(vm, f);
+        let [out1, out2, out3] = to_aircraft_frame(&frame, [0.0, pull, 0.0], false, false);
+        let b = vm.u64(f + 0x20);
+        let arm = vm.f32(b + 0x289c);
+        add_axial_force(vm, f, out3, 0.0, arm);
+        add_side_force(vm, f, out1, arm, 0.0);
+        add_normal_force(vm, f, out2, 0.0, 0.0);
+    }
+    let count = |vm: &Vm| vm.u64(f + 0x69c0).wrapping_sub(vm.u64(f + 0x69b8)) as i64 >> 4;
+    if count(vm) != 0 {
+        let mut i = 0i32;
+        loop {
+            if crate::flight_step::record_live(vm, env, f, i) {
+                let entry = vm.u64(f + 0x69b8) + (i as u64) * 16;
+                for k in 0..4 {
+                    let word = vm.u32(entry + 4 * k);
+                    vm.set_u32(rbp + 4 * k, word);
+                }
+                let mut args = CallArgs::ints(&[0x1_4578_b780]);
+                args.int[1] = None;
+                let object = env.call(vm, 0x140f42620, args).rax;
+                env.call(vm, 0x140f39ae0, CallArgs::ints(&[object]));
+            }
+            i += 1;
+            if (i64::from(i) as u64) >= count(vm) as u64 {
+                break;
+            }
+        }
+    }
+}

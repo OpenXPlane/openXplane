@@ -3202,6 +3202,22 @@ fn hook_state_matches_the_original_machine_code() {
 }
 
 #[test]
+fn tow_and_records_match_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_tow.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (f, rbp) = (hex(&case.header[0]), hex(&case.header[1]));
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::tow_and_records(&mut case.vm, &mut env, f, rbp);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);
