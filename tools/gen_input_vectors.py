@@ -17,7 +17,7 @@ EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.ar
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000)])
+    case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000), (0x141245000, 0x141247000), (0x140819000, 0x14081a000)])
     case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
     rng = case.rng
     print(f'# input vectors {KIND} (tools/gen_input_vectors.py)')
@@ -38,6 +38,33 @@ def main():
                 fz.preset('OBJ', 0x8cf8 + 4 * k, rng.randrange(0, 8))
                 fz.preset('OBJ', 0x8cf8 + 0xba44 + 4 * k, rng.choice([0, 1, 1]))
             run = (0x1417da870, [OBJ, arg])
+        elif KIND == 'start':
+            FF = case.region('FF', 0xc000)
+            BB = case.region('BB', 0x1000)
+            case.region('SK', 0x10)
+            case.stub(0x1407cdce0, lambda call, rng: None)
+            case.stub(0x1407d6a00, lambda call, rng: None)
+            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.01, 0.02, 0.3, 1.0, 5.0, 40.0, rng.uniform(0, 3)])))
+            fz.preset('FF', 0x20, BB & 0xffffffff, record=True)
+            fz.preset('FF', 0x24, BB >> 32, record=True)
+            fz.preset('FF', 0x6484, rng.choice([0, 1, 2]))
+            fz.preset('FF', 0x6488, rng.choice([0, 1]))
+            fz.preset('FF', 0x648c, rng.choice([0, 0, 1]))
+            fz.preset('FF', 0x64a8, rng.choice([0, 1, 2, 3, 4, 5, 5, 6]))
+            fz.preset_f32('FF', 0x6490, rng.choice([0.0, 0.5, 11.5, 13.0, rng.uniform(0, 100), 99.5, 100.0]))
+            fz.preset_f32('FF', 0x6494, rng.choice([rng.uniform(0, 520), 316.5, 300.0, 15.0]))
+            fz.preset_f32('FF', 0x6498, rng.choice([0.0, 0.3, 0.995, 1.0, rng.uniform(0, 1)]))
+            fz.preset_f32('FF', 0x649c, rng.choice([0.0, rng.uniform(0, 30), rng.uniform(0, 80)]))
+            fz.preset_f32('FF', 0x64a0, rng.uniform(0, 2))
+            fz.preset_f32('FF', 0x64a4, rng.choice([0.0, 450.0, rng.uniform(0, 500)]))
+            fz.preset_f32('FF', 0x5c, rng.uniform(-20, 40))
+            fz.preset_f32('FF', 0x754, rng.uniform(0, 100))
+            for off in (0xc58, 0xc5c, 0xc60, 0xc64):
+                fz.preset_f32('BB', off, rng.uniform(1.0, 60.0))
+            for off in (0xc7c, 0xc80, 0xc84, 0xc88):
+                fz.preset_f32('BB', off, rng.uniform(0, 3))
+            run = (0x141245750, [FF])
+            OBJ = FF
         elif KIND == 'variation':
             a = rng.choice([rng.uniform(-95, 95), rng.uniform(-90, 90), 0.0, 90.0, -90.0, 12.5, 5.0])
             b = rng.choice([rng.uniform(-185, 185), rng.uniform(-180, 180), 0.0, 175.0, 180.0, -180.0, 17.0])
@@ -75,6 +102,8 @@ def main():
             sys.stderr.write(f'trial failed: {err}\n')
             continue
         result = case.emu.reg(UC_X86_REG_RAX) & 0xffffffff
+        if KIND == 'start':
+            OBJ = run[1][0]
         if KIND == 'variation':
             import struct
             bits = lambda v: struct.unpack('<I', struct.pack('<f', v))[0]

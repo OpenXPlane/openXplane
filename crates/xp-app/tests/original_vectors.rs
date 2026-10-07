@@ -2673,6 +2673,13 @@ fn small_cases(function: &str) -> Vec<VmCaseData> {
 }
 
 fn words_match(case: &VmCaseData, n: usize) {
+    words_match_with(case, n, false);
+}
+
+/// Like [`words_match`]; with `doubles` an aligned pair of words that is a double agreeing to 1e-7 also matches
+/// (libm differences, amplified by the cancellation in the earth-centred coordinates). Only for blocks whose
+/// results are doubles: elsewhere a pair of floats would pass as a double.
+fn words_match_with(case: &VmCaseData, n: usize, doubles: bool) {
     // a word of the flight object the original left alone must not be written by the port either
     if let Some(f) = u64::from_str_radix(&case.header[0], 16)
         .ok()
@@ -2697,6 +2704,9 @@ fn words_match(case: &VmCaseData, n: usize) {
     // a double (two words of an aligned pair) that agrees to 1e-7 also matches (libm differences, amplified by
     // the cancellation in the earth-centred coordinates)
     let doubles_agree = |addr: u64| {
+        if !doubles {
+            return false;
+        }
         let base = addr & !7;
         let (Some(lo), Some(hi)) = (expected.get(&base), expected.get(&(base + 4))) else {
             return false;
@@ -3657,7 +3667,7 @@ fn matrix_cases(kind: &str) {
                 write(&mut case.vm, hex(&h[1]), &r);
             }
         }
-        words_match(&case, n);
+        words_match_with(&case, n, true);
     }
 }
 
@@ -3742,6 +3752,21 @@ fn magnetic_variation_matches_the_original_machine_code() {
             (got - want).abs() <= 1e-5 * (1.0 + want.abs()),
             "case {n}: {got} vs {want}"
         );
+    }
+}
+
+#[test]
+fn start_sequence_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("input_start.txt");
+    assert!(cases.len() >= 200);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::start_sequence(&mut case.vm, &mut env, f);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
     }
 }
 

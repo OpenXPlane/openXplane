@@ -2897,3 +2897,269 @@ pub fn heading_blend(vm: &Vm, f: u64, x: f32) -> f32 {
     }
     r
 }
+
+/// The four curves of the start sequence (24 floats each, `0x142660790`, `0x1426607f0`, `0x142660850`,
+/// `0x1426608b0`): the gas generator speed (%) and the temperature (degrees) while starting, and the same while
+/// running down.
+const START_CURVES: [[f32; 24]; 4] = [
+    [
+        0.0, 8.0, 12.0, 18.0, 24.0, 29.0, 33.0, 38.0, 42.0, 47.0, 51.0, 56.0, 62.0, 66.0, 70.0,
+        74.0, 77.0, 82.0, 85.0, 90.0, 94.0, 98.0, 100.0, 100.0,
+    ],
+    [
+        40.0, 74.0, 159.0, 261.0, 361.0, 429.0, 461.0, 488.0, 507.0, 513.0, 510.0, 507.0, 490.0,
+        479.0, 468.0, 455.0, 445.0, 432.0, 427.0, 419.0, 414.0, 411.0, 404.0, 397.0,
+    ],
+    [
+        100.0, 99.0, 90.0, 75.0, 57.0, 48.0, 40.0, 33.0, 29.0, 25.0, 23.0, 20.0, 19.0, 17.0, 16.0,
+        14.0, 13.0, 12.0, 11.0, 11.0, 10.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        316.0, 314.0, 310.0, 279.0, 244.0, 231.0, 218.0, 208.0, 203.0, 197.0, 194.0, 191.0, 189.0,
+        186.0, 185.0, 183.0, 182.0, 181.0, 180.0, 180.0, 179.0, 0.0, 0.0, 0.0,
+    ],
+];
+
+/// `0x141245750`: the start sequence state machine (`F+0x64a8` selects one of six states; the jet engine start:
+/// 0 off, 1 winding up the starter, 2 and 3 light-off and acceleration along the curves of the gas generator speed
+/// `F+0x6490` and temperature `F+0x6494`, 4 running, 5 running down). `F+0x6484` is the mode (0, 1 or 2), `F+0x6488`
+/// follows it, `F+0x648c` a stop request, `F+0x6498` a blend, `F+0x649c` the time in the state and `F+0x64a4` the
+/// temperature offset. The commands `0xd9`/`0xda` are input bindings (`0x1407ace10(F, 2, id, 0)`); entering
+/// state 1 or 5 on the stop request ends them with `0x1407cdce0` and `0x1407d6a00` (replayed).
+pub fn start_sequence(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    let (s90, s94, s98, s9c, sa4, sa8) = (0x6490, 0x6494, 0x6498, 0x649c, 0x64a4, 0x64a8);
+    let bind = |vm: &mut Vm, env: &mut dyn Callees, id: u64| -> bool {
+        let mut args = CallArgs::ints(&[f, 2, id, 0]);
+        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
+        env.call(vm, 0x1407ace10, args).rax as u32 != 0
+    };
+    let tenth = |vm: &mut Vm, env: &mut dyn Callees| (frame_time(vm, env) / 10.0) as f32;
+    // the position `x` on a curve: the interpolation between the neighbouring entries; `None` below zero
+    let on_curve = |curve: usize, x: f32| -> Option<(f32, usize)> {
+        if 0.0 > x {
+            return None;
+        }
+        let (low, high) = (x.floor() as i32, x.ceil() as i32);
+        if high > 23 {
+            return Some((0.0, 24));
+        }
+        let t = &START_CURVES[curve];
+        let (a, c) = (t[low as usize], t[high as usize]);
+        Some(((x - low as f32) * (c - a) + a, 0))
+    };
+    let kind = vm.i32(f + 0x6484);
+    if kind == 0 {
+        vm.set_i32(f + 0x6488, 0);
+    } else if kind == 2 {
+        vm.set_i32(f + 0x6488, 1);
+    }
+    let state = vm.u32(f + sa8);
+    let b = vm.u64(f + 0x20);
+    match state {
+        0 => {
+            if 1.0 > vm.f32(f + s90) {
+                let rate = (frame_time(vm, env) / f64::from(vm.f32(b + 0xc58))) as f32;
+                let c = vm.f32(f + s98);
+                let delta = if -rate > -c {
+                    -rate
+                } else if rate < -c {
+                    rate
+                } else {
+                    -c
+                };
+                vm.set_f32(f + s98, delta + c);
+            }
+            let rate = tenth(vm, env);
+            let v = lerp(vm.f32(f + s90), 0.0, rate);
+            vm.set_f32(f + s90, v);
+            let rate = tenth(vm, env);
+            let v = lerp(vm.f32(f + s94), vm.f32(f + 0x5c), rate);
+            vm.set_f32(f + s94, v);
+            vm.set_u32(f + sa4, 0);
+            if (vm.i32(f + 0x6488) != 0 || vm.i32(f + 0x6484) == 1) && !bind(vm, env, 0xd9) {
+                vm.set_u32(f + sa8, 1);
+            }
+            vm.set_u32(f + s9c, 0);
+            vm.set_u32(f + 0x648c, 0);
+        }
+        1 => {
+            let rate = (frame_time(vm, env) / f64::from(vm.f32(b + 0xc58))) as f32;
+            let c = vm.f32(f + s98);
+            let room = 1.0 - c;
+            let delta = if -rate > room {
+                -rate
+            } else if rate < room {
+                rate
+            } else {
+                room
+            };
+            vm.set_f32(f + s98, c + delta);
+            let r = clamp((frame_time(vm, env) / 10.0) as f32, 0.0, 1.0);
+            let v = (1.0 - r) * vm.f32(f + s90) + r * 0.0;
+            vm.set_f32(f + s90, v);
+            let r = clamp((frame_time(vm, env) / 10.0) as f32, 0.0, 1.0);
+            let v = (1.0 - r) * vm.f32(f + s94) + vm.f32(f + 0x5c) * r;
+            vm.set_f32(f + s94, v);
+            vm.set_u32(f + sa4, 0);
+            if (vm.i32(f + 0x6488) != 0 || vm.i32(f + 0x6484) == 2)
+                && f64::from(vm.f32(f + s98)) > 0.99
+                && !bind(vm, env, 0xd9)
+            {
+                vm.set_u32(f + sa8, 2);
+            }
+            if vm.i32(f + 0x6484) == 0 {
+                vm.set_u32(f + sa8, 0);
+            }
+            vm.set_u32(f + s9c, 0);
+        }
+        2 | 3 => {
+            vm.set_f32(f + s98, 1.0);
+            let timer = (f64::from(vm.f32(f + s9c)) + frame_time(vm, env)) as f32;
+            vm.set_f32(f + s9c, timer);
+            let mut held_b = 0.0;
+            if state == 3 {
+                let rate = tenth(vm, env);
+                let big = |o: u64| vm.f32(b + o);
+                let (m0, m1) = (big(0xc7c), big(0xc80));
+                let first = if m0 > m1 { m0 } else { m1 };
+                let (m2, m3) = (big(0xc84), big(0xc88));
+                let second = if m2 > m3 { m2 } else { m3 };
+                let top = if first > second { first } else { second };
+                let pressed = bind(vm, env, 0xda);
+                let boost = if pressed { 450.0 } else { 0.0 };
+                let target = (f64::from(vm.f32(f + 0x64a0) * 4.0 * top)
+                    + f64::from(vm.f32(f + 0x754)) * 0.5
+                    + boost) as f32;
+                held_b = lerp(vm.f32(f + sa4), target, rate);
+                vm.set_f32(f + sa4, held_b);
+            }
+            let scale = 24.0 / vm.f32(b + 0xc60);
+            let x = scale * timer;
+            let n1 = match on_curve(0, x) {
+                None => 0.0,
+                Some((_, 24)) => 100.0,
+                Some((v, _)) => v,
+            };
+            vm.set_f32(f + s90, n1);
+            let base = if state == 2 {
+                vm.f32(f + 0x5c) + vm.f32(f + sa4)
+            } else {
+                held_b + vm.f32(f + 0x5c)
+            };
+            let x = scale * timer;
+            let temp = match on_curve(1, x) {
+                None => base,
+                Some((_, 24)) => {
+                    let ramp = 397.0 - (x - 23.0) * 5.0;
+                    let raised = base + 350.0;
+                    if raised > ramp { raised } else { ramp }
+                }
+                Some((v, _)) => v,
+            };
+            vm.set_f32(f + s94, temp);
+            let mut stop_calls = false;
+            if state == 2 {
+                let pressed = bind(vm, env, 0xda);
+                vm.set_f32(f + sa4, if pressed { 450.0 } else { 0.0 });
+                if vm.i32(f + 0x6484) == 0 && 12.0 > vm.f32(f + s90) {
+                    vm.set_u32(f + sa8, 0);
+                }
+                if vm.f32(f + s90) > 99.0 {
+                    vm.set_u32(f + sa8, 3);
+                }
+                if vm.i32(f + 0x648c) != 0 {
+                    vm.set_u32(f + sa8, 1);
+                    stop_calls = true;
+                }
+            } else {
+                if vm.i32(f + 0x6484) == 0 {
+                    vm.set_u32(f + sa8, 4);
+                    vm.set_u32(f + s9c, 0);
+                }
+                if bind(vm, env, 0xd9) {
+                    vm.set_u32(f + sa8, 5);
+                    vm.set_u32(f + s9c, 0);
+                }
+                if vm.i32(f + 0x648c) != 0 {
+                    vm.set_u32(f + 0x6f0, 0);
+                    vm.set_u32(f + 0xbd20, 0);
+                    vm.set_u32(f + sa8, 5);
+                    vm.set_u32(f + s9c, 0);
+                    env.call(vm, 0x1407d6a00, CallArgs::ints(&[f, 0xda, 0]));
+                    stop_calls = true;
+                }
+            }
+            if state == 2 && stop_calls {
+                vm.set_u32(f + 0xbd20, 0);
+                vm.set_u32(f + 0x6f0, 0);
+                vm.set_u32(f + s9c, 0);
+                vm.set_u32(f + 0x1128, 0);
+                env.call(vm, 0x1407cdce0, CallArgs::ints(&[f, 0xd9, 0]));
+            } else if state == 3 && stop_calls {
+                env.call(vm, 0x1407cdce0, CallArgs::ints(&[f, 0xd9, 0]));
+            }
+        }
+        4 => {
+            vm.set_f32(f + s98, 1.0);
+            let timer = (f64::from(vm.f32(f + s9c)) + frame_time(vm, env)) as f32;
+            vm.set_f32(f + s9c, timer);
+            vm.set_f32(f + s90, 100.0);
+            vm.set_u32(f + 0xbd20, 0);
+            let rate = tenth(vm, env);
+            let v = lerp(vm.f32(f + sa4), 0.0, rate);
+            vm.set_f32(f + sa4, v);
+            let rate = (frame_time(vm, env) / f64::from(vm.f32(b + 0xc5c))) as f32;
+            let v = lerp(vm.f32(f + s94), 316.0, rate);
+            vm.set_f32(f + s94, v);
+            let kind = vm.i32(f + 0x6484);
+            if kind == 0 {
+                if 317.0 > v {
+                    vm.set_u32(f + sa8, 5);
+                    vm.set_u32(f + s9c, 0);
+                }
+            } else if kind == 1 {
+                vm.set_u32(f + sa8, 3);
+            }
+            if vm.i32(f + 0x648c) != 0 {
+                vm.set_u32(f + sa8, 5);
+                vm.set_u32(f + 0xbd20, 0);
+                vm.set_u32(f + 0x6f0, 0);
+                vm.set_u32(f + s9c, 0);
+                vm.set_u32(f + 0x1128, 0);
+                env.call(vm, 0x1407cdce0, CallArgs::ints(&[f, 0xd9, 0]));
+            }
+        }
+        5 => {
+            vm.set_f32(f + s98, 1.0);
+            let timer = (f64::from(vm.f32(f + s9c)) + frame_time(vm, env)) as f32;
+            vm.set_f32(f + s9c, timer);
+            let scale = 24.0 / vm.f32(b + 0xc64);
+            let x = scale * timer;
+            let n1 = match on_curve(2, x) {
+                None => 0.0,
+                Some((_, 24)) => {
+                    let ramp = 0.0 - (x - 20.0);
+                    if 0.0 > ramp { 0.0 } else { ramp }
+                }
+                Some((v, _)) => v,
+            };
+            vm.set_f32(f + s90, n1);
+            let base = vm.f32(f + 0x5c);
+            let x = scale * timer;
+            let temp = match on_curve(3, x) {
+                None => base,
+                Some((_, 24)) => {
+                    let ramp = 0.0 - (x - 20.0) * 1.6;
+                    if base > ramp { base } else { ramp }
+                }
+                Some((v, _)) => v,
+            };
+            vm.set_f32(f + s94, temp);
+            vm.set_u32(f + sa4, 0);
+            if vm.i32(f + 0x6484) == 0 && 11.0 >= n1 {
+                vm.set_u32(f + sa8, 0);
+            }
+        }
+        _ => {}
+    }
+}
