@@ -173,3 +173,59 @@ def stub_terrain_helpers(case, caller=(0x141960dc0, 0x141961200)):
         for k in range(3):
             call.put_f32(call.ints[3] + 4 * k, rng.uniform(-1, 1))
     case.stub(0x1406ed6a0, normal, caller=caller)
+
+
+SURFACES = 0x14611ac88
+
+
+def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26)):
+    """Presets a mesh object for 0x14195ffc0 in region `mesh_name`: triangles, flag words, the five range bounds,
+    moving cells with their spheres, the surface records and the noise table."""
+    fz = case.fz
+    M = mesh_name
+    O = mesh_off
+    fz.region('NZ', 0x14578f1f0, 0x100000)
+    count = rng.randrange(*triangles)
+    tri = case.region('TR', 36 * count)
+    for k in range(count):
+        for i in range(9):
+            lo, hi = (-8.0, 25.0) if i % 3 == 1 else (-12.0, 12.0)
+            fz.preset_f32('TR', 36 * k + 4 * i, rng.uniform(lo, hi))
+    flags = case.region('FL', 4 * count)
+    for k in range(count):
+        fz.preset('FL', 4 * k, rng.randrange(0, 4) | rng.choice([0, 0, 0x8000]) | rng.randrange(0, 4) << 16)
+    bounds = sorted(rng.randrange(0, count + 1) for _ in range(5))
+    if rng.random() < 0.5:
+        bounds[0] = 0
+    for off, v in zip((0x70, 0x74, 0x78, 0x7c, 0x80), bounds):
+        fz.preset(M, O + off, v)
+    fz.preset(M, O + 0x28, tri & 0xffffffff)
+    fz.preset(M, O + 0x2c, tri >> 32)
+    fz.preset(M, O + 0x40, flags & 0xffffffff)
+    fz.preset(M, O + 0x44, flags >> 32)
+    fz.preset_f32(M, O + 0x88, rng.choice([100.0, 100.0, rng.uniform(-5, 30)]))
+    cells = rng.randrange(0, 4)
+    spheres = case.region('SPH', 16 * max(cells, 1))
+    records = case.region('CEL', 0x50 * max(cells, 1))
+    for c in range(cells):
+        for i, (lo, hi) in enumerate(((-8, 8), (-8, 8), (-8, 8), (2, 15))):
+            fz.preset_f32('SPH', 16 * c + 4 * i, rng.uniform(lo, hi))
+        for off in range(0, 0x48, 4):
+            fz.preset_f32('CEL', 0x50 * c + off, rng.uniform(-1.5, 1.5))
+        a = rng.randrange(0, count)
+        fz.preset('CEL', 0x50 * c + 0x48, a)
+        fz.preset('CEL', 0x50 * c + 0x4c, rng.randrange(a, count + 1))
+    fz.preset(M, O + 0x90, spheres & 0xffffffff)
+    fz.preset(M, O + 0x94, spheres >> 32)
+    fz.preset(M, O + 0xa8, records & 0xffffffff)
+    fz.preset(M, O + 0xac, records >> 32)
+    end = records + 0x50 * cells
+    fz.preset(M, O + 0xb0, end & 0xffffffff)
+    fz.preset(M, O + 0xb4, end >> 32)
+    table = case.region('SR', 36 * 4)
+    for r in range(4):
+        fz.preset_f32('SR', 36 * r, rng.uniform(0.01, 0.3))
+        fz.preset_f32('SR', 36 * r + 4, rng.choice([0.0, rng.uniform(0.1, 3)]))
+    fz.region('GS', SURFACES, 8)
+    fz.preset('GS', 0, table & 0xffffffff)
+    fz.preset('GS', 4, table >> 32)

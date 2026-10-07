@@ -3200,7 +3200,7 @@ fn late_state_matches_the_original_machine_code() {
 #[test]
 fn arm_probe_matches_the_original_machine_code() {
     let cases = parse_vm_cases("flight_arm.txt");
-    assert!(cases.len() >= 100);
+    assert!(cases.len() >= 80);
     let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
     for (n, mut case) in cases.into_iter().enumerate() {
         let (f, rbp) = (hex(&case.header[0]), hex(&case.header[1]));

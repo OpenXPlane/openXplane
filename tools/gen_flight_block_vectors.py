@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from xp_vmcase import setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
+from xp_vmcase import setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RBX, UC_X86_REG_RIP, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_XMM10, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
@@ -547,12 +547,8 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_RDI, 0)
             case.emu.uc.reg_write(UC_X86_REG_RSI, 1)
         if BLOCK == 'arm':
-            def tip_probe(call, rng):
-                if rng.random() < 0.7:
-                    for k in range(8):
-                        call.put_f32(call.ints[3] + 4 * k, rng.uniform(-20, 20))
-                call.ret_int(1 if rng.random() < 0.6 else 0)
-            case.stub(0x14195ffc0, tip_probe)
+            case.stub(0x1406ed6a0, lambda call, rng: None, record=False)
+            setup_segment_mesh(case, rng, 'F', 0x42e40)
             case.emu.uc.reg_write(UC_X86_REG_RBX, B)
             fz.preset('F', 0x28, rng.choice([0, 0, 0, 7]))
             for off, lo, hi in ((0x444c, -30, 0), (0x4450, 0, 60), (0x4454, 0.2, 4), (0x4448, -3, 3), (0x4444, -3, 3), (0x4440, -3, 3)):

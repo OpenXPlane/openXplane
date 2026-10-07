@@ -446,7 +446,7 @@ pub fn late_state(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
 /// angle `F+0x6548` follows the demand `F+0x6528` between the limits `B+0x444c` and `B+0x4450`). The angle becomes
 /// the interpolation of the demand; with `F+0x28 == 0` and a positive arm length `B+0x4454`, five iterations place
 /// the arm tip in the world (`rotate_pairs`, the position doubles, the probe offset `F+0x42f50` through
-/// `rotate_pairs_f64`), ask the terrain probe `0x14195ffc0` (replayed) and, when it hits, lower the angle by the
+/// `rotate_pairs_f64`), ask the terrain probe `0x14195ffc0` (`terrain::segment_probe`) and, when it hits, lower the angle by the
 /// penetration (`+0.1` of the probe height minus the tip height, over the arm length, in degrees) held to the limits.
 /// Returns the original's `esi`: 1 once any iteration found the tip below the surface, else 0.
 #[allow(clippy::field_reassign_with_default)]
@@ -504,15 +504,17 @@ pub fn arm_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> u32 {
         vm.set_f32(slot(0x30), x9);
         vm.set_f32(slot(0x34), y8);
         vm.set_f32(slot(0x38), z7);
-        let mut args = CallArgs::default();
-        args.int = [
-            Some(f + 0x42e40),
-            Some(slot(0x40)),
-            Some(slot(0x30)),
-            Some(slot(0x3a8)),
-        ];
-        args.stack = [Some(0), Some(0), Some(0), None];
-        let hit = env.call(vm, 0x14195ffc0, args).rax as u8 != 0;
+        let hit = crate::terrain::segment_probe(
+            vm,
+            env,
+            f + 0x42e40,
+            slot(0x40),
+            slot(0x30),
+            crate::terrain::SegmentOut {
+                point: slot(0x3a8),
+                ..Default::default()
+            },
+        );
         if hit {
             let depth = (f64::from(vm.f32(slot(0x3ac))) + 0.1 - f64::from(y8)) as f32;
             if depth > 0.0 {
