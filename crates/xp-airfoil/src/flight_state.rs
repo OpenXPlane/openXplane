@@ -2386,3 +2386,24 @@ pub fn gear_drag_and_brake(
     env.call(vm, 0x1411ddfd0, args);
     Ok(())
 }
+
+/// `0x141265731..0x14126580a`: the start of the flight step. The log switch `0x14120c960(F+0xbcc8)` is queried (a
+/// nonzero answer only writes a log line), and unless `F+0x675c` is set the six force totals are cleared; the
+/// per-source force tables (`F+0x2bc..0x338` apart from the totals) and `F+0x294` are cleared; `0x1409830b0` is
+/// called on `F+0x430d8` and `0x1412763c0` on the object (both replayed).
+pub fn step_reset(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8]));
+    if vm.i32(f + 0x675c) == 0 {
+        for offset in [0x30c, 0x2cc, 0x324, 0x2e0, 0x33c, 0x2f4] {
+            vm.set_u32(f + offset, 0);
+        }
+    }
+    for offset in [
+        0x2c0, 0x2c4, 0x2bc, 0x2d4, 0x2d8, 0x2d0, 0x2e8, 0x2ec, 0x2e4, 0x300, 0x304, 0x2f8, 0x2fc,
+        0x318, 0x31c, 0x310, 0x314, 0x330, 0x334, 0x328, 0x32c, 0x294,
+    ] {
+        vm.set_u32(f + offset, 0);
+    }
+    env.call(vm, 0x1409830b0, CallArgs::ints(&[f + 0x430d8]));
+    env.call(vm, 0x1412763c0, CallArgs::ints(&[f]));
+}

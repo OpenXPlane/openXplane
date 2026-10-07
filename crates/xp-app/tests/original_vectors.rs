@@ -2384,6 +2384,7 @@ struct VmCaseData {
     vm: openxplane::vm::Vm,
     calls: std::collections::VecDeque<RecordedCall>,
     expected: Vec<(u64, u32)>,
+    initial: Vec<(u64, u32)>,
 }
 
 struct RecordedCall {
@@ -2416,12 +2417,14 @@ fn parse_vm_cases(path: &str) -> Vec<VmCaseData> {
                 vm: openxplane::vm::Vm::default(),
                 calls: Default::default(),
                 expected: Vec::new(),
+                initial: Vec::new(),
             }),
             "W" => {
                 let case = cases.last_mut().unwrap();
                 for tok in &tokens[1..] {
                     let (a, w) = word(tok);
                     case.vm.set_u32(a, w);
+                    case.initial.push((a, w));
                 }
             }
             "O" => {
@@ -2670,6 +2673,23 @@ fn small_cases(function: &str) -> Vec<VmCaseData> {
 }
 
 fn words_match(case: &VmCaseData, n: usize) {
+    // a word of the flight object the original left alone must not be written by the port either
+    if let Some(f) = u64::from_str_radix(&case.header[0], 16)
+        .ok()
+        .filter(|v| (0x6f00_0000_0000..0x7000_0000_0000).contains(v))
+    {
+        let written: std::collections::HashSet<u64> =
+            case.expected.iter().map(|(a, _)| *a).collect();
+        for (addr, was) in &case.initial {
+            if (f..f + 0x10000).contains(addr) && !written.contains(addr) {
+                assert_eq!(
+                    case.vm.u32(*addr),
+                    *was,
+                    "case {n}: {addr:#x} written by the port only"
+                );
+            }
+        }
+    }
     // a differing word passes only as two normal floats within a relative tolerance (libm differences): integers
     // and flags that differ in their bits must not hide as denormals
     let normal = |w: u32| (w >> 23) & 0xff != 0 && (w >> 23) & 0xff != 0xff;
@@ -3436,6 +3456,22 @@ fn gear_drag_and_brake_matches_the_original_machine_code() {
             calls: std::mem::take(&mut case.calls),
         };
         openxplane::flight_state::gear_drag_and_brake(&mut case.vm, &mut env, f, rbp).unwrap();
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn step_reset_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_reset.txt");
+    assert!(cases.len() >= 20);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = hex(&case.header[0]);
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::step_reset(&mut case.vm, &mut env, f);
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }
