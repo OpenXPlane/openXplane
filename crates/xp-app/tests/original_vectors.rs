@@ -3529,6 +3529,32 @@ fn terrain_probe_matches_the_original_machine_code() {
 }
 
 #[test]
+fn segment_probe_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("segment_probe.txt");
+    assert!(cases.len() >= 200);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let mut hits = 0;
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h: Vec<u64> = case.header.iter().map(|s| hex(s)).collect();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let out = openxplane::terrain::SegmentOut {
+            point: h[3],
+            normal: h[4],
+            moved: h[5],
+            id: h[6],
+        };
+        let got = openxplane::terrain::segment_probe(&mut case.vm, &mut env, h[0], h[1], h[2], out);
+        assert_eq!(u64::from(got), h[7], "case {n}: result");
+        hits += u64::from(got);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_exact(&case, n);
+    }
+    assert!(hits >= 60);
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);
