@@ -1253,7 +1253,7 @@ pub fn world_pull(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
 /// (replayed), by the extension `+0x10` of the entry, and by `-1` when the entry's own height term is positive.
 /// The register state at the block start is `xmm7 = 0.01` (double), `xmm10 = 0.5`, `xmm12 = 1.0` (double),
 /// `xmm8 = 0`, and the slot `rbp+0x1750`.
-pub fn gear_targets(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+pub fn gear_targets(vm: &mut Vm, _env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
     const RAD: f32 = f32::from_bits(0x3c8e_fa36);
     const KNOTS: f32 = f32::from_bits(0x3ff8_cfe5);
     const TABLE: u64 = 0x1_460e_9708;
@@ -1347,10 +1347,7 @@ pub fn gear_targets(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Res
         vm.set_f32(elem + 0x24, value);
         let b = vm.u64(f + 0x20);
         if vm.i32(b + 0xe78) != 0 {
-            let scale = f32::from_bits(
-                env.call(vm, 0x1411daa80, CallArgs::ints(&[f + 0xbdd8]))
-                    .xmm0 as u32,
-            );
+            let scale = crate::callees::blend(vm, f + 0xbdd8, vm.i32(b + 0xe78));
             value = scale * vm.f32(elem + 0x24);
             vm.set_f32(elem + 0x24, value);
         }
@@ -1538,9 +1535,7 @@ pub fn gear_state_update(
             let memory = f + 0xbdd8;
             let held = vm.f32(elem + 0x50);
             let owner = vm.u64(memory + 8);
-            let mut args = CallArgs::ints(&[memory, u64::from(vm.u32(owner + 0xe7c))]);
-            args.int[1] = Some(u64::from(vm.u32(owner + 0xe7c)));
-            let floor = f32::from_bits(env.call(vm, 0x1411daa80, args).xmm0 as u32);
+            let floor = crate::callees::blend(vm, memory, vm.i32(owner + 0xe7c));
             let decay = if vm.i32(0x1_42f0_1968) != 0 {
                 f32::from_bits(0x3681_742e)
             } else {

@@ -644,3 +644,5 @@ The part strip block now also runs `0x1411d9f60` natively (`controls::held_back`
 ## Math helpers now native in the hook and steering blocks
 
 The helpers these blocks used to replay are already ported elsewhere and run natively now (vectors regenerated with the real code): `0x1407cd810` (the speed `sqrt(F+0x368^2 + F+0x36c^2 + F+0x370^2)`, `wing_element::hypot3`), `0x1408be280` (`hypot2`), `0x1408ce690` (`atan2` of a double and a float) and `0x1408625a0` (`engine::signed_pow`; it returns +0 for a zero argument, which the original does with `xorps`). The low half of a double argument is not compared in the replays.
+
+The gear target and ground state blocks now run `0x1411daa80` natively too (`callees::blend`, the mask is `B+0xe78` and `[owner]+0xe7c`); their vectors were regenerated with the real function.

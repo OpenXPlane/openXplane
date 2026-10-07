@@ -586,7 +586,12 @@ def main():
             for address in (0x145899fc4, 0x145899fc8, 0x145899fcc):
                 putw(address, struct.unpack('<I', struct.pack('<f', rng.uniform(-50, 50)))[0])
         if BLOCK == 'gtarget':
-            case.stub(0x1411daa80, lambda call, rng: call.ret_f32(rng.uniform(-2, 2)))
+            OWG = case.region('OWG', 0x1000)
+            fz.preset('F', 0xbde0, OWG & 0xffffffff, record=True)
+            fz.preset('F', 0xbde4, OWG >> 32, record=True)
+            fz.preset_f32('OWG', 0xdb4, rng.uniform(0.5, 5.0))
+            for off in (0x60, 0x64, 0x68):
+                fz.preset_f32('F', 0xbdd8 + off, rng.uniform(-1, 6))
             G = case.region('G', 0x88 * 10)
             EL = case.region('EL', 0x90 * 10)
             PP = case.region('PP', 0x100 * 10)
@@ -600,7 +605,7 @@ def main():
             for off in (0x218, 0x20c, 0x208):
                 fz.preset_f32('F', off, rng.uniform(-1, 1))
             fz.preset_f32('B', 0x1e94, rng.choice([0.0, rng.uniform(1, 40), rng.uniform(1, 40)]))
-            fz.preset('B', 0xe78, rng.choice([0, 1]))
+            fz.preset('B', 0xe78, rng.choice([0, 1, 2, 3, 4, 5, 7]))
             for address in dirty:
                 case.emu.write_u32(address, 0)
             dirty.clear()
@@ -668,7 +673,6 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM7, struct.unpack('<Q', struct.pack('<d', 0.01))[0])
             case.emu.uc.reg_write(UC_X86_REG_XMM10, struct.unpack('<I', struct.pack('<f', 0.5))[0])
         if BLOCK == 'gstate':
-            case.stub(0x1411daa80, lambda call, rng: call.ret_f32(rng.uniform(-1, 1)))
             def world3(call, rng):
                 for pointer in (call.ints[2], call.stack[0], call.stack[2]):
                     bits64 = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
@@ -698,7 +702,8 @@ def main():
                 name = {F: 'F', B: 'B'}[base]
                 fz.preset(name, off, ptr & 0xffffffff, record=True)
                 fz.preset(name, off + 4, ptr >> 32, record=True)
-            fz.preset('OW', 0xe7c, rng.randrange(0, 4))
+            fz.preset('OW', 0xe7c, rng.randrange(0, 8))
+            fz.preset_f32('OW', 0xdb4, rng.uniform(0.5, 5.0))
             fz.preset('B', 0xe7c, rng.choice([0, 1, 1]))
             fz.preset('F', 0x24c, rng.choice([0, 1]))
             fz.preset('F', 0x64e4, rng.choice([0, 1]))
