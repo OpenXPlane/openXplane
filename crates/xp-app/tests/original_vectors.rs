@@ -3725,6 +3725,27 @@ fn input_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn magnetic_variation_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("input_variation.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, case) in cases.into_iter().enumerate() {
+        let got = openxplane::flight_state::magnetic_variation(
+            &case.vm,
+            hex(&case.header[1]),
+            float(&case.header[2]),
+            float(&case.header[3]),
+        );
+        let want = float(&case.header[4]);
+        assert!(
+            (got - want).abs() <= 1e-5 * (1.0 + want.abs()),
+            "case {n}: {got} vs {want}"
+        );
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

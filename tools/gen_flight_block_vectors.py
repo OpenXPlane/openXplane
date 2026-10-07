@@ -340,18 +340,43 @@ def main():
             for off in (0x65b8, 0x65c0, 0x65c8, 0x65d0, 0x65d8, 0x65e0, 0x65e8, 0x65f0, 0x65f8, 0x6600, 0x6608, 0x6610):
                 fz.preset_f64('F', off, rng.choice([rng.uniform(-90, 90)] * 12 + [0.0]))
         if BLOCK == 'instruments':
-            for address in (0x14076b5d0, 0x141244b60, 0x1407d7bc0, 0x1407cc570):
+            fz.preset_f32('F', 0x410, rng.uniform(-400, 400))
+            for address in (0x141244b60, 0x1407cc570):
                 case.stub(address, lambda call, rng: call.ret_f32(rng.uniform(-30, 30)))
+            case.stub(0x1417f12c0, lambda call, rng: call.ret_int(0))
             for off in (0x368, 0x36c, 0x370, 0x400, 0x404, 0x408, 0x414, 0x3d0, 0x344, 0x34c, 0x350, 0x358):
-                fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-3, 3), rng.uniform(-200, 200)]) if off in (0x358,) else rng.uniform(-60, 60))
+                fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-3, 3), rng.uniform(-200, 200)]) if off in (0x358,) else (rng.uniform(-1.2, 1.2) if off in (0x368, 0x36c, 0x370) and rng.random() < 0.5 else rng.uniform(-60, 60)))
             for off in (0x70, 0x6c, 0x74):
                 fz.preset_f32('F', off, rng.uniform(0.2, 1.5))
             for off in (0x24a4, 0x2498):
                 fz.preset_f32('B', off, rng.uniform(0.05, 5.0))
             for off in (0x500, 0x504, 0x508, 0x50c, 0x510, 0x514, 0x518, 0x51c, 0x520, 0x524, 0x528, 0x52c, 0x530, 0x534, 0x538, 0x53c, 0x6638, 0x663c):
                 fz.preset_f32('F', off, rng.uniform(-20, 20))
-            for off in (0x390, 0x398):
-                fz.preset_f64('F', off, rng.uniform(-90, 90))
+            pos = [rng.uniform(-90, 90), rng.uniform(-90, 90)]
+            for off, v in zip((0x390, 0x398), pos):
+                fz.preset_f64('F', off, v)
+            for address in dirty:
+                case.emu.write_u32(address, 0)
+            dirty.clear()
+
+            def floor5(x):
+                t = x / 5.0 - 0.5
+                t = t - 0.5 if t < 0 else t + 0.5
+                return int(t) * 5
+
+            fa, fb = (struct.unpack('<f', struct.pack('<f', v))[0] for v in pos)
+            tlat = max(-90, min(90, floor5(fa)))
+            tlon = floor5(fb)
+            tlon = -180 if tlon < -180 else min(tlon, 175)
+            trow = max(1, min(36, int((90 - tlat) / 5)))
+            tcol = max(0, min(71, int((tlon + 180) / 5)))
+            for r in (trow, trow - 1):
+                for c in (tcol, (tcol + 1) % 72):
+                    address = 0x145890720 + 4 + 4 * (r * 72 + c)
+                    word = struct.unpack('<I', struct.pack('<f', rng.uniform(-30, 30)))[0]
+                    dirty.append(address)
+                    case.emu.write_u32(address, word)
+                    extra[address] = word
             case.emu.uc.reg_write(UC_X86_REG_XMM8, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
             case.emu.uc.reg_write(UC_X86_REG_XMM11, 0)
         if BLOCK == 'coeff':

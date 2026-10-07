@@ -177,10 +177,7 @@ pub fn instruments(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     );
     let lat = position_component(vm, env, f, 0x398) as f32;
     let lon = position_component(vm, env, f, 0x390) as f32;
-    let mut args = CallArgs::ints(&[0x1_4589_0720]);
-    args.xmm[1] = Some(lon.to_bits());
-    args.xmm[2] = Some(lat.to_bits());
-    let variation = replayed_float(vm, env, 0x14076b5d0, args);
+    let variation = magnetic_variation(vm, 0x1_4589_0720, lon, lat);
     vm.set_f32(f + 0x428, variation);
     let mut args = CallArgs::ints(&[f]);
     args.xmm[1] = Some(vm.f32(f + 0x358).to_bits());
@@ -199,9 +196,7 @@ pub fn instruments(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     vm.set_f32(f + 0x504, lerp(vm.f32(f + 0x504), target, factor));
     let dt = frame_time(vm, env);
     let factor = (dt / f64::from(vm.f32(b + 0x2498))) as f32;
-    let mut args = CallArgs::ints(&[f]);
-    args.xmm[1] = Some(2.0f32.to_bits());
-    let reference = replayed_float(vm, env, 0x1407d7bc0, args);
+    let reference = heading_blend(vm, f, 2.0);
     let mut x = vm.f32(f + 0x358) - reference;
     while -180.0 > x {
         x += 360.0;
@@ -2829,4 +2824,71 @@ pub fn great_circle(
         vm.set_f32(distance_out, distance as f32);
     }
     distance
+}
+
+/// `0x14076b5d0(table, a, b)`: the magnetic variation at latitude `a` and longitude `b` (degrees) from the grid of
+/// floats at `table + 4` (37 rows of 72 columns, 5 degrees apart: row `r` holds the latitude `90 - 5 r`, column `c`
+/// the longitude `-180 + 5 c`, the stored values have the opposite sign). The cell corners come from the latitude
+/// rounded down to a multiple of 5 (limited to -90..90) and the longitude likewise (-180..175, the column after 71
+/// wrapping to 0); the result is the bilinear interpolation (the latitude first, in float32).
+pub fn magnetic_variation(vm: &Vm, table: u64, a: f32, b: f32) -> f32 {
+    let floor5 = |x: f32| -> i32 {
+        let t = (f64::from(x) / 5.0 - 0.5) as f32;
+        let t = if 0.0 > t { t - 0.5 } else { t + 0.5 };
+        (t as i32).wrapping_mul(5)
+    };
+    let lat = floor5(a).clamp(-90, 90);
+    let lon = {
+        let v = floor5(b);
+        if v < -180 { -180 } else { v.min(175) }
+    };
+    let row = ((90 - lat) / 5).clamp(1, 36) as u64;
+    let col = ((lon + 180) / 5).clamp(0, 71) as u64;
+    let at = |r: u64, c: u64| -vm.f32(table + 4 + 4 * (r * 72 + c % 72));
+    let (v00, v10) = (at(row, col), at(row - 1, col));
+    let (v01, v11) = (at(row, col + 1), at(row - 1, col + 1));
+    let (lo, hi) = (lat as f32, (f64::from(lat) + 5.0) as f32);
+    let along = |near: f32, far: f32| {
+        if lo == hi {
+            (far + near) * 0.5
+        } else {
+            (far - near) / (hi - lo) * (a - lo) + near
+        }
+    };
+    let (l0, l1) = (along(v00, v10), along(v01, v11));
+    let (lon_lo, lon_hi) = (lon as f32, (f64::from(lon) + 5.0) as f32);
+    if lon_lo == lon_hi {
+        (l1 + l0) * 0.5
+    } else {
+        (l1 - l0) / (lon_hi - lon_lo) * (b - lon_lo) + l0
+    }
+}
+
+/// `0x1407d7bc0(F, x)`: the heading `F+0x358` moved toward `F+0x410` by the fraction `r` of the way, with `r` the
+/// speed `|(F+0x368, F+0x36c, F+0x370)|` between `x / 2` (0) and `x` (1) held to `0..1` (0.5 for `x == 0`). The
+/// difference of the headings is wrapped to -180..180 first and the result to 0..360.
+pub fn heading_blend(vm: &Vm, f: u64, x: f32) -> f32 {
+    let half = (f64::from(x) * 0.5) as f32;
+    let ratio = if half == x {
+        0.5
+    } else {
+        let speed = hypot3(vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+        clamp((speed - half) * (1.0 / (x - half)) + 0.0, 0.0, 1.0)
+    };
+    let base = vm.f32(f + 0x358);
+    let mut d = vm.f32(f + 0x410) - base;
+    while -180.0 > d {
+        d += 360.0;
+    }
+    while d > 180.0 {
+        d += -360.0;
+    }
+    let mut r = d * ratio + base;
+    while 0.0 > r {
+        r += 360.0;
+    }
+    while r > 360.0 {
+        r += -360.0;
+    }
+    r
 }
