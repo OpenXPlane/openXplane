@@ -436,6 +436,12 @@ The replay test helper now also compares the float and stack arguments of replay
 the aircraft frame and added as an axial force with arm `B+0x289c`, a side force and a normal force; then every live
 record of the list at `F+0x69b8` is handed to `0x140f39ae0` through the singleton.
 
+`float_drag` (`0x14126b548..0x14126b757`, 100 cases; the airflow `0x14121b580`, called with the wash switched on, is replayed): while
+`F+0x148 > 0.01` each of the four float-section records at `B+0x6098` (stride `0x1c8`) with a nonzero first word gets a drag
+`|v|^2 * 1.23 * sin(clamp(|+0x1bc - +0x1b0| - 1, 0, 180) deg) * (+8) * F+0x6c / 2` applied at its point
+(`+0xc/0x10/0x14`) along the air velocity there by `0x140f26ef0`. Register state: `xmm12 = 1.0` (double), `r13 = -1`,
+`r14 = 1`, `esi = 0`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

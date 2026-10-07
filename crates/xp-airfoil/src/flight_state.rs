@@ -1016,3 +1016,75 @@ pub fn tow_and_records(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         }
     }
 }
+
+/// `0x14126b548..0x14126b757`: the drag of the float sections. While `F+0x148 > 0.01`, each of the four records at
+/// `B+0x6098` (stride `0x1c8`) with a nonzero first word gets the air velocity at its point (`+0xc/+0x10/+0x14`,
+/// `0x14121b580` replayed, with the wash switched on) and a drag along it of `|v|^2 * 1.23 * sin(clamp(|+0x1bc - +0x1b0| - 1,
+/// 0, 180) deg) * (+8) * F+0x6c / 2` applied by `0x140f26ef0` at the point. The register state at the block start is
+/// `xmm11 = rad`, `xmm12 = 1.0` (double), `xmm13 = 0`, `r13 = -1`, `r14 = 1`, `esi = 0`.
+#[allow(clippy::field_reassign_with_default)]
+pub fn float_drag(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::callees::{AeroForce, add_aero_force};
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    if f64::from(vm.f32(f + 0x148)) <= 0.01 || vm.f32(f + 0x148).is_nan() {
+        return;
+    }
+    for k in 0..4u64 {
+        let b = vm.u64(f + 0x20);
+        let rec = vm.u64(b + 0x6098) + k * 0x1c8;
+        if vm.i32(rec) == 0 {
+            continue;
+        }
+        vm.set_i32(slot(0x1758), 0);
+        let mut args = CallArgs::default();
+        args.int = [Some(f), None, Some(slot(-0x78)), None];
+        args.xmm = [
+            None,
+            Some(vm.f32(rec + 0xc).to_bits()),
+            None,
+            Some(vm.f32(rec + 0x10).to_bits()),
+        ];
+        args.stack = [
+            Some(slot(-0x80)),
+            Some(u64::from(vm.f32(rec + 0x14).to_bits())),
+            Some(slot(0x1758)),
+            None,
+        ];
+        env.call(vm, 0x14121b580, args);
+        let (a, bb, c) = (
+            vm.f32(slot(-0x78)),
+            vm.f32(slot(-0x80)),
+            vm.f32(slot(0x1758)),
+        );
+        let sum = a * a + bb * bb + c * c;
+        let speed = if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+        let b = vm.u64(f + 0x20);
+        let rec = vm.u64(b + 0x6098) + k * 0x1c8;
+        let spread = (vm.f32(rec + 0x1bc) - vm.f32(rec + 0x1b0)).abs();
+        let angle = clamp((f64::from(spread) - 1.0) as f32, 0.0, 180.0);
+        let area = (angle * RAD).sin() * vm.f32(rec + 8);
+        let drag = (f64::from(speed * speed)
+            * (f64::from(area) * 1.23)
+            * f64::from(vm.f32(f + 0x6c))
+            * 0.5) as f32;
+        let force = AeroForce {
+            a2: a,
+            a3: 0.0,
+            a5: bb,
+            a6: drag,
+            a7: c,
+            a8: 0.0,
+            a9: vm.f32(rec + 0xc),
+            a10: vm.f32(rec + 0x10),
+            a11: vm.f32(rec + 0x14),
+            a12: 0.0,
+            a13: 0.0,
+            a14: 0,
+            a15: 0.0,
+            a16: 0.0,
+            a17: 0.0,
+        };
+        add_aero_force(vm, f, &force);
+    }
+}
