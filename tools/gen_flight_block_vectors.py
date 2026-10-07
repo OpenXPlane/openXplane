@@ -321,7 +321,6 @@ def main():
             fz.preset_f32('F', 0x3f8, rng.uniform(-3, 3))
             height_m = rng.choice([rng.uniform(-5, 30), rng.uniform(0, 8), 20.0, rng.uniform(10, 20)])
             fz.preset_f32('B', 0x65a4, -(height_m + hh))
-            case.stub(0x1406e2be0, lambda call, rng: call.ret_f64(rng.uniform(0, 5000)))
             g = struct.unpack('<Q', struct.pack('<d', rng.choice([0.5, 1.0, 2.0, 4.0, 2.0])))[0]
             case.emu.write_u32(0x142f01920, g & 0xffffffff)
             case.emu.write_u32(0x142f01924, g >> 32)

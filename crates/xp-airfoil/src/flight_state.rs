@@ -136,17 +136,9 @@ pub fn path_samples(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
         (0x6620, [0x65b8, 0x65c8, 0x65f8, 0x6608]),
         (0x6624, [0x65c0, 0x65d0, 0x6600, 0x6610]),
     ] {
-        let ctx = planet(vm, env);
-        let bits = |vm: &Vm, k: usize| vm.f64(f + points[k]).to_bits();
-        let mut args = CallArgs::ints(&[ctx]);
-        args.xmm = [
-            None,
-            Some(bits(vm, 0) as u32),
-            Some(bits(vm, 1) as u32),
-            Some(bits(vm, 2) as u32),
-        ];
-        args.stack = [Some(bits(vm, 3)), Some(0), Some(0), None];
-        let distance = f64::from_bits(env.call(vm, 0x1406e2be0, args).xmm0);
+        planet(vm, env);
+        let p = |vm: &Vm, k: usize| vm.f64(f + points[k]);
+        let distance = great_circle(vm, p(vm, 0), p(vm, 1), p(vm, 2), p(vm, 3), 0, 0);
         vm.set_f32(f + target, (distance * 3.2808399200439453) as f32);
     }
 }
@@ -2768,4 +2760,73 @@ pub fn local_axes(vm: &mut Vm, env: &mut dyn Callees, planet: u64, out: u64, lat
     for (k, v) in product.iter().enumerate() {
         vm.set_f32(out + 4 * k as u64, *v as f32);
     }
+}
+
+/// `0x1406e2be0(planet, a1, b1, a2, b2, bearing_out, distance_out)`: the great-circle distance in metres between
+/// two points given as (`a`, `b`) pairs of degrees, with `a` the latitude and `b` the longitude counted positive to
+/// the west: the haversine `h = cos a1 cos a2 sin^2(db / 2) + sin^2(da / 2)` (the two squared sines in float32),
+/// the angle `c = 2 asin(sqrt(h))`, the distance `c * 6378145`. Optionally the initial bearing in degrees (0..360,
+/// float32) through the first pointer and the distance as a float32 through the second. For `c == 0` both stores
+/// are zero and the result is 0; within `cos a1 < 0.01` of a pole the bearing is 180 (north) or 360 (south).
+pub fn great_circle(
+    vm: &mut Vm,
+    a1: f64,
+    b1: f64,
+    a2: f64,
+    b2: f64,
+    bearing_out: u64,
+    distance_out: u64,
+) -> f64 {
+    const RAD: f64 = f64::from_bits(0x3f91_df46_a252_9d39);
+    const DEG: f64 = f64::from_bits(0x404c_a5dc_1a63_c1f8);
+    const RADIUS: f64 = 6378145.0;
+    // the 15-digit constants of the original, not the exact values
+    const HALF_TURN: f64 = f64::from_bits(0x400921fb54442d11);
+    const TURN: f64 = f64::from_bits(0x401921fb54442d11);
+    let (lat1, lat2) = (a1 * RAD, a2 * RAD);
+    let lon2 = b2 * -RAD;
+    let lon1 = b1 * -RAD;
+    let cos1 = lat1.cos();
+    let s_lat = ((lat1 - lat2) * 0.5).sin() as f32;
+    let s_lon = ((lon1 - lon2) * 0.5).sin() as f32;
+    let h = (lat2.cos() * cos1) * f64::from(s_lon * s_lon) + f64::from(s_lat * s_lat);
+    let c = 2.0 * h.sqrt().asin();
+    if c == 0.0 {
+        if bearing_out != 0 {
+            vm.set_u32(bearing_out, 0);
+        }
+        if distance_out != 0 {
+            vm.set_u32(distance_out, 0);
+        }
+        return 0.0;
+    }
+    let bearing = if 0.01 > cos1 {
+        if lat1 > 0.0 { HALF_TURN } else { TURN }
+    } else {
+        let cos_c = c.cos();
+        let sin_c = c.sin();
+        let along = (lat2.sin() - lat1.sin() * cos_c) / (sin_c * cos1);
+        let sin_dlon = (lon2 - lon1).sin();
+        let clamped = along.clamp(-1.0, 1.0);
+        if 0.0 > sin_dlon {
+            clamped.acos()
+        } else {
+            TURN - clamped.acos()
+        }
+    };
+    if bearing_out != 0 {
+        let mut v = (bearing * DEG) as f32;
+        while 0.0 > v {
+            v += 360.0;
+        }
+        while v > 360.0 {
+            v += -360.0;
+        }
+        vm.set_f32(bearing_out, v);
+    }
+    let distance = c * RADIUS;
+    if distance_out != 0 {
+        vm.set_f32(distance_out, distance as f32);
+    }
+    distance
 }

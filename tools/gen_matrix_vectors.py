@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from emulate_xp import RET_ADDR  # noqa: E402
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
-from unicorn.x86_const import UC_X86_REG_XMM1, UC_X86_REG_XMM2, UC_X86_REG_XMM3  # noqa: E402
+from unicorn.x86_const import UC_X86_REG_XMM0, UC_X86_REG_XMM1, UC_X86_REG_XMM2, UC_X86_REG_XMM3  # noqa: E402
 
 EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 
@@ -25,7 +25,7 @@ def dbits(v):
 
 def main():
     case = VmCase(EXE, SEED, [(0x1407b3000, 0x1407b4000), (0x14093c000, 0x14093d000), (0x140cba000, 0x140cbb000),
-                              (0x140cb9000, 0x140cba000), (0x1419f7000, 0x1419f9000), (0x14062c000, 0x14062d000), (0x1419f6000, 0x1419f7000), (0x14089c000, 0x14089d000)])
+                              (0x140cb9000, 0x140cba000), (0x1419f7000, 0x1419f9000), (0x14062c000, 0x14062d000), (0x1419f6000, 0x1419f7000), (0x14089c000, 0x14089d000), (0x1406e2000, 0x1406e3000)])
     rng = case.rng
     print(f'# matrix vectors {KIND} (tools/gen_matrix_vectors.py)')
     done = 0
@@ -91,6 +91,20 @@ def main():
                 fz.preset_f32('M', 4 * k, mtx[k // 4][k % 4])
             run = (0x1419f6fd0, [M, P, P + 4, P + 8], [])
             header_args = f'{M:x} {P:x}'
+        elif KIND == 'circle':
+            P = case.region('P', 0x10)
+            pts = [rng.uniform(-90, 90) for _ in range(4)]
+            if rng.random() < 0.15:
+                pts[2], pts[3] = pts[0], pts[1]
+            if rng.random() < 0.15:
+                pts[0] = rng.choice([89.9999, -89.9999, 89.5, 0.0])
+            if rng.random() < 0.3:
+                pts[1] = rng.uniform(-179, 179); pts[3] = rng.uniform(-179, 179)
+            bear = P if rng.random() < 0.8 else 0
+            dist = P + 4 if rng.random() < 0.8 else 0
+            run = (0x1406e2be0, [CX], [dbits(pts[3]), bear, dist])
+            angle, axis = pts[0], [pts[1], pts[2], 0.0]
+            header_args = f'{P:x} {bear:x} {dist:x} {dbits(pts[0]):016x} {dbits(pts[1]):016x} {dbits(pts[2]):016x} {dbits(pts[3]):016x}'
         elif KIND == 'axes':
             run = (0x1419f7ee0, [CX, R], [])
             header_args = f'{CX:x} {R:x} {dbits(lat):016x} {dbits(lon):016x}'
@@ -112,6 +126,8 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
+        if KIND == 'circle':
+            header_args += ' %016x' % (case.emu.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffffffffffff)
         text = case.dump(f'{KIND} {header_args}')
         lines = text.split('\n')
         lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not sp - 0x800 <= int(t.split('=')[0], 16) < sp + 0x100)

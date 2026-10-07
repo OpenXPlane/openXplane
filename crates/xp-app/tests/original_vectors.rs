@@ -3605,6 +3605,23 @@ fn matrix_cases(kind: &str) {
                 let r = axis_rotation(double(&h[2]), double(&h[3]), double(&h[4]), double(&h[5]));
                 write(&mut case.vm, hex(&h[1]), &r);
             }
+            "circle" => {
+                let d = |k: usize| double(&h[k]);
+                let r = openxplane::flight_state::great_circle(
+                    &mut case.vm,
+                    d(4),
+                    d(5),
+                    d(6),
+                    d(7),
+                    hex(&h[2]),
+                    hex(&h[3]),
+                );
+                let want = f64::from_bits(hex(&h[8]));
+                assert!(
+                    (r - want).abs() <= 1e-7 * (1.0 + want.abs()),
+                    "case {n}: {r} vs {want}"
+                );
+            }
             "euler" => {
                 let m: [f32; 16] = std::array::from_fn(|k| case.vm.f32(hex(&h[1]) + 4 * k as u64));
                 let p = hex(&h[2]);
@@ -3662,6 +3679,11 @@ fn matrix_axis_rotation_matches_the_original_machine_code() {
 #[test]
 fn local_axes_match_the_original_machine_code() {
     matrix_cases("axes");
+}
+
+#[test]
+fn great_circle_matches_the_original_machine_code() {
+    matrix_cases("circle");
 }
 
 #[test]
