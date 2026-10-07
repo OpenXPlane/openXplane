@@ -15,12 +15,27 @@ fn planet(vm: &mut Vm, env: &mut dyn Callees) -> u64 {
     env.call(vm, 0x14193ae40, CallArgs::default()).rax
 }
 
-/// `0x1407d76f0(F, offset)`: the height of the aircraft (plus `offset` times the local vertical velocity
-/// `F+0x3f8`) above the ground cell, replayed.
-fn height_above_ground(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> f32 {
-    let mut args = CallArgs::ints(&[f]);
-    args.xmm[1] = Some(0);
-    f32::from_bits(env.call(vm, 0x1407d76f0, args).xmm0 as u32)
+/// `0x1407d76f0(F, dt)`: the height of the aircraft above the ground: its altitude `F+0x3a0` plus `dt` times the
+/// vertical velocity `F+0x3f8`, minus the altitude of the ground point `(F+0x378, F+0x42f5c, F+0x388)` (floats;
+/// `local_to_geodetic`) and `B+0x65a4`.
+fn height_above_ground(vm: &mut Vm, env: &mut dyn Callees, f: u64, dt: f32) -> f32 {
+    let planet = planet(vm, env);
+    let alt = position_component(vm, env, f, 0x3a0);
+    let top = (f64::from(dt * vm.f32(f + 0x3f8)) + alt) as f32;
+    let z = position_component(vm, env, f, 0x388) as f32;
+    let ground = vm.f32(f + 0x42f5c);
+    let x = position_component(vm, env, f, 0x378) as f32;
+    let scratch = [0x7f00_0000u64, 0x7f00_0008, 0x7f00_0010];
+    local_to_geodetic(
+        vm,
+        env,
+        planet,
+        scratch,
+        [f64::from(x), f64::from(ground), f64::from(z)],
+    );
+    let out = vm.f64(scratch[2]) as f32;
+    let b = vm.u64(f + 0x20);
+    (top - out) - vm.f32(b + 0x65a4)
 }
 
 /// `0x141272a96..0x14127307c`: the path samples of the takeoff and landing record, kept while the simulation
@@ -60,7 +75,7 @@ pub fn path_samples(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
                 let v = lat(vm, env);
                 vm.set_f64(f + 0x65e8, v);
             }
-            let height = height_above_ground(vm, env, f) * FEET;
+            let height = height_above_ground(vm, env, f, 0.0) * FEET;
             if 50.0 > height {
                 let v = lon(vm, env);
                 vm.set_f64(f + 0x65f8, v);
@@ -74,7 +89,7 @@ pub fn path_samples(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
             }
         }
         if g > 1.0 && vm.i32(f + 0x65b4) == 0 {
-            let height = height_above_ground(vm, env, f) * FEET;
+            let height = height_above_ground(vm, env, f, 0.0) * FEET;
             let (mut a, mut b);
             if height > 50.0 {
                 let v = lon(vm, env);

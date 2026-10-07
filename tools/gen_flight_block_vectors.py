@@ -296,7 +296,31 @@ def main():
         if BLOCK == 'path':
             CX = case.region('CX', 0x300)
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
-            case.stub(0x1407d76f0, lambda call, rng: call.ret_f32(rng.choice([rng.uniform(-5, 30), rng.uniform(0, 8), 20.0])))
+            import math
+            N = rng.uniform(-60, 60)
+            case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(N))
+            fz.preset_f64('CX', 0xb0, 6378137.0)
+            fz.preset_f64('CX', 0xb8, 6356752.314245)
+            fz.preset_f64('CX', 0xc8, 0.00669437999014)
+            fz.preset_f64('CX', 0xd0, 0.00673949674228)
+            for off in (0x208, 0x210, 0x220, 0x230, 0x240, 0x248):
+                fz.preset_f64('CX', off, 0.0)
+            for off in (0x200, 0x228, 0x250):
+                fz.preset_f64('CX', off, 1.0)
+            lat, lon, hh = rng.uniform(-80, 80), rng.uniform(-170, 170), rng.uniform(-20, 100)
+            la, lo = math.radians(lat), math.radians(lon)
+            a_, b_, e2_ = 6378137.0, 6356752.314245, 0.00669437999014
+            nn = a_ / math.sqrt(1 - e2_ * math.sin(la) ** 2)
+            ecef = ((nn + hh + N) * math.cos(la) * math.cos(lo), (nn + hh + N) * math.cos(la) * math.sin(lo), (b_ * b_ / (a_ * a_) * nn + hh + N) * math.sin(la))
+            ly = struct.unpack('<f', struct.pack('<f', rng.uniform(-50, 50)))[0]
+            fz.preset_f32('F', 0x42f5c, ly)
+            for off, v in ((0x260, ecef[0]), (0x268, ecef[1] - ly), (0x270, ecef[2])):
+                fz.preset_f64('CX', off, v)
+            for off in (0x378, 0x380, 0x388, 0x3a0):
+                fz.preset_f64('F', off, 0.0)
+            fz.preset_f32('F', 0x3f8, rng.uniform(-3, 3))
+            height_m = rng.choice([rng.uniform(-5, 30), rng.uniform(0, 8), 20.0, rng.uniform(10, 20)])
+            fz.preset_f32('B', 0x65a4, -(height_m + hh))
             case.stub(0x1406e2be0, lambda call, rng: call.ret_f64(rng.uniform(0, 5000)))
             g = struct.unpack('<Q', struct.pack('<d', rng.choice([0.5, 1.0, 2.0, 4.0, 2.0])))[0]
             case.emu.write_u32(0x142f01920, g & 0xffffffff)

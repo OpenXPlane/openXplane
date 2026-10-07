@@ -632,3 +632,7 @@ The planet and local-axes matrices are 4 x 4 of doubles in the row-vector conven
 The step's trivial helpers run in the port instead of being replayed (their vectors regenerated with the real code): `0x14120c960(p)` (`1` when either of `p`, `p+8` is nonzero: the log switch, `flight_step::debug_dump_active`), `0x1411da150(F, i)` (the wing enabled byte or zero when the binding `0x251` is set: `flight_step::wing_enabled`), `0x1411b4730(F, i, j)` (`[F + 0x68e0 + 24 j] + 0x2d8 i`), `0x1417b2e70(table, i)` (the key state byte `table[i + 0xaf2f]`) and `0x1409830b0(v)` (a vector's `clear`: the end returns to the begin). `0x1407d6e70` and `0x1411b9460` take and release shared pointers (reference counts) and stay replayed.
 
 The part strip block now also runs `0x1411d9f60` natively (`controls::held_back`, the rule ported with the engine controls) and its vectors were regenerated with the real function (part kind, lever and limits preset).
+
+## Height above the ground `0x1407d76f0` (`flight_state::height_above_ground`)
+
+`0x1407d76f0(F, dt)`: `(alt + dt * F+0x3f8) - altitude(ground point) - B+0x65a4`, with `alt = F+0x3a0` (engine-flag guarded) and the ground point `(F+0x378, F+0x42f5c, F+0x388)` (floats, the two guarded ones read in the order 0x3a0, 0x388, 0x378) converted by `local_to_geodetic`. Native now in the path-sample block; its vectors were regenerated with a consistent planet (identity map plus translation, a chosen geographic point and a constant geoid height).
