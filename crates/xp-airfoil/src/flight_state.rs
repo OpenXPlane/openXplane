@@ -2415,10 +2415,8 @@ pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Resu
     let mut i = 0u32;
     if vm.i32(vm.u64(f + 0x20) + 0x920) > 0 {
         loop {
-            let selected = env
-                .call(vm, 0x1411d9f60, CallArgs::ints(&[f, u64::from(i), 1]))
-                .rax as u32;
-            if selected != 0 {
+            let selected = crate::controls::held_back(vm, env, f, i as i32, 1);
+            if selected {
                 let offset = i64::from(i as i32) as u64 * 0x3770;
                 for j in 0..4u64 {
                     let base = vm.u64(vm.u64(f + 0x20) + 0x6010);

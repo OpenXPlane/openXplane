@@ -1023,18 +1023,22 @@ def main():
                 for i in range(3):
                     for k in range(8):
                         fz.preset_f32('VEC', 0x2d8 * (3 * j + i) + 4 * k, rng.uniform(-5, 5))
-            case.stub(0x1411d9f60, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
             case.stub(0x1405f3f30, lambda call, rng: call.ret_int(call.ints[1] + 0x10))
             for addr in (0x140985d90, 0x14121a9b0, 0x1405ddb90):
                 case.stub(addr, lambda call, rng: None)
             fz.preset('F', 0xbcc8, 0)
             fz.preset('F', 0xbcd0, 0)
             fz.preset('B', 0x920, rng.choice([0, 1, 2, 3, 3]))
+            fz.preset('B', 0x91c, rng.choice([0, 1, 2]))
+            fz.preset_f32('F', 0x64b4, rng.choice([0.0, 1.0]))
             fz.preset('B', 0x6010, PR & 0xffffffff, record=True)
             fz.preset('B', 0x6014, PR >> 32, record=True)
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
             fz.preset('F', 0x24, B >> 32, record=True)
             for p in range(3):
+                fz.preset('PR', 0x3770 * p, rng.choice([0, 3, 6, 6, 9]))
+                fz.preset_f32('PR', 0x3770 * p + 0x790, rng.choice([-1.0, 0.0, 1.0]))
+                fz.preset_f32('PR', 0x3770 * p + 0x798, rng.choice([-1.0, 0.0, 1.0]))
                 fz.preset('PR', 0x3770 * p + 4, rng.choice([0, 1, 1]))
                 fz.preset('PR', 0x3770 * p + 0x8c, rng.choice([0, 1, 2, 3, 5]))
                 fz.preset_f32('PR', 0x3770 * p + 0xa0, rng.uniform(-3, 3))
