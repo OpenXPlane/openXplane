@@ -3374,6 +3374,26 @@ fn body_surface_probe_matches_the_original_machine_code() {
 }
 
 #[test]
+fn body_contact_blend_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_bblend.txt");
+    assert!(cases.len() >= 40);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (f, rbp, body) = (
+            hex(&case.header[0]),
+            hex(&case.header[1]),
+            hex(&case.header[2]),
+        );
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::body_contact_blend(&mut case.vm, &mut env, f, rbp, body);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

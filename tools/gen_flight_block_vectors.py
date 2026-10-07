@@ -20,7 +20,7 @@ from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, U
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
-          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7), 'angles': (0x1412728f7, 0x141272a96), 'path': (0x141272a96, 0x14127307c), 'instruments': (0x14127307c, 0x141273779), 'coeff': (0x141273779, 0x141273dfb), 'late': (0x141273dfb, 0x14127402d), 'arm': (0x14126a791, 0x14126aad6), 'gear': (0x14126883f, 0x141269920), 'wheels': (0x1412686a9, 0x14126883f), 'hook': (0x14126aad6, 0x14126b3ee), 'tow': (0x14126b3e8, 0x14126b548), 'floats': (0x14126b548, 0x14126b757), 'waves': (0x14126b757, 0x14126bf30), 'pull': (0x14126bf30, 0x14126c034), 'gtarget': (0x14126c034, 0x14126c4e4), 'steer': (0x14126c4e4, 0x14126c7dc), 'gstate': (0x14126c7dc, 0x14126d1f2), 'wcontact': (0x14126d1f2, 0x14126d5d3), 'wprobe': (0x14126d5d3, 0x14126dd98), 'bsurf': (0x14126de36, 0x14126e4c8)}
+          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7), 'angles': (0x1412728f7, 0x141272a96), 'path': (0x141272a96, 0x14127307c), 'instruments': (0x14127307c, 0x141273779), 'coeff': (0x141273779, 0x141273dfb), 'late': (0x141273dfb, 0x14127402d), 'arm': (0x14126a791, 0x14126aad6), 'gear': (0x14126883f, 0x141269920), 'wheels': (0x1412686a9, 0x14126883f), 'hook': (0x14126aad6, 0x14126b3ee), 'tow': (0x14126b3e8, 0x14126b548), 'floats': (0x14126b548, 0x14126b757), 'waves': (0x14126b757, 0x14126bf30), 'pull': (0x14126bf30, 0x14126c034), 'gtarget': (0x14126c034, 0x14126c4e4), 'steer': (0x14126c4e4, 0x14126c7dc), 'gstate': (0x14126c7dc, 0x14126d1f2), 'wcontact': (0x14126d1f2, 0x14126d5d3), 'wprobe': (0x14126d5d3, 0x14126dd98), 'bsurf': (0x14126de36, 0x14126e4c8), 'bblend': (0x14126e4c8, 0x14126e974)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
@@ -793,6 +793,29 @@ def main():
             for reg, val in ((UC_X86_REG_RSI, D), (UC_X86_REG_RBX, D + 0x588), (UC_X86_REG_R14, D + 0x630),
                              (UC_X86_REG_RDI, 0), (UC_X86_REG_R11, 0)):
                 case.emu.uc.reg_write(reg, val)
+        if BLOCK == 'bblend':
+            def contact(call, rng):
+                call.ret_int(rng.choice([0, 1, 1]))
+                for k in (3, 4, 5):
+                    call.put_f32(call.stack[k], rng.uniform(-2, 2))
+                call.put_f32(call.stack[6], rng.choice([-1.0, 0.0, rng.uniform(0, 5)]))
+                call.put_f32(call.stack[7], rng.choice([0.0, 0.005, rng.uniform(0, 3)]))
+            case.stub(0x1411cb1e0, contact)
+            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([-0.1, 0.1, 0.3, 0.4, 0.6, rng.uniform(0, 0.6)])))
+            D = case.region('D', 0x34c8)
+            case.body = D
+            fz.preset('F', 0x20, B & 0xffffffff, record=True)
+            fz.preset('F', 0x24, B >> 32, record=True)
+            fz.preset('D', 0x654, rng.choice([0, 1, 2, 3, 3, 4]))
+            fz.preset('D', 0x658, rng.choice([-1, 0, 1, 3, 4, 7, 8, 12]))
+            fz.preset('D', 0x2c, rng.choice([0, 0, 1]))
+            for off in range(0x30, 0x54, 4):
+                fz.preset_f32('D', off, rng.uniform(0, 1))
+            for off in (0x368, 0x370):
+                fz.preset_f32('F', off, rng.choice([0.0, rng.uniform(-10, 10), rng.uniform(-3, 3)]))
+            for reg, val in ((UC_X86_REG_RSI, D), (UC_X86_REG_RBX, D + 0x588), (UC_X86_REG_RDI, 0),
+                             (UC_X86_REG_R11, 0)):
+                case.emu.uc.reg_write(reg, val)
         if BLOCK == 'angles':
             for off in (0x3f4, 0x3f8, 0x3fc, 0x368, 0x370):
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.01, 0.01), 0.0]))
@@ -804,10 +827,10 @@ def main():
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.5, 0.5), 0.0]))
             for off in (0x430, 0x434, 0x440, 0x444, 0x450, 0x454):
                 fz.preset_f32('F', off, rng.uniform(-1.0, 1.0))
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
-            if BLOCK not in ('motion', 'late', 'arm', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf'):
+            if BLOCK not in ('motion', 'late', 'arm', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend'):
                 fz.preset('F', 0x28, rng.choice([7, 12345]))
             for w in range(48) if BLOCK == 'element' else []:
                 fz.preset('W', 0x36c8 * w + 0x58, rng.choice([0, 1]))
@@ -820,6 +843,8 @@ def main():
                 extra[address] = value & 0xffffffff
                 extra[address + 4] = value >> 32
             rbp = S + 0x400
+            if BLOCK == 'bblend':
+                fz.preset('S', 0x400 + 0x1750, rng.randrange(0, 39))
             if BLOCK == 'bsurf':
                 fz.preset_f32('S', 0x400 - 0x10, rng.uniform(0.1, 3))
                 fz.preset_f32('S', 0x400 - 0x8, rng.uniform(0.1, 3))
@@ -838,7 +863,7 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM11, 0 if BLOCK in ('path', 'instruments') else 0x3c8efa36)
             case.emu.uc.reg_write(UC_X86_REG_R13, 0xffffffffffffffff)
         case.emu.uc.reg_write(UC_X86_REG_R15, F)
-        case.emu.uc.reg_write(UC_X86_REG_R14, case.body + 0x630 if BLOCK == 'bsurf' else 1 if BLOCK == 'motion' else (F + 0x6548 if BLOCK == 'hook' else (1 if BLOCK == 'floats' else 0)))
+        case.emu.uc.reg_write(UC_X86_REG_R14, case.body + 0x630 if BLOCK in ('bsurf', 'bblend') else 1 if BLOCK == 'motion' else (F + 0x6548 if BLOCK == 'hook' else (1 if BLOCK == 'floats' else 0)))
         case.emu.uc.reg_write(UC_X86_REG_R12, 0x1460e9708 if BLOCK == 'steer' else 0)
         if BLOCK not in ('integrate', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'hook'):
             case.emu.uc.reg_write(UC_X86_REG_XMM12, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
@@ -849,9 +874,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '') + (f' {case.emu.reg(UC_X86_REG_RSI) & 0xffffffff:x}' if BLOCK == 'arm' else '') + (f' {esi_v:x}' if BLOCK == 'hook' else '') + (f' {int(case.emu.uc.reg_read(UC_X86_REG_RIP) == 0x14126dd98):x}' if BLOCK == 'wprobe' else '') + (f' {case.body:x}' if BLOCK == 'bsurf' else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '') + (f' {case.emu.reg(UC_X86_REG_RSI) & 0xffffffff:x}' if BLOCK == 'arm' else '') + (f' {esi_v:x}' if BLOCK == 'hook' else '') + (f' {int(case.emu.uc.reg_read(UC_X86_REG_RIP) == 0x14126dd98):x}' if BLOCK == 'wprobe' else '') + (f' {case.body:x}' if BLOCK in ('bsurf', 'bblend') else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)

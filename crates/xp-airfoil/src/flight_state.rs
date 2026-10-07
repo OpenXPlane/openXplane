@@ -1933,3 +1933,120 @@ pub fn body_surface_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
         }
     }
 }
+
+fn unit_clamp(v: f32) -> f32 {
+    clamp(v, 0.0, 1.0)
+}
+
+/// `(1 - c) * old + c * new` with the blend factor `c = clamp(2 * frame time)` taken from a fresh time query.
+fn blend_to(vm: &mut Vm, env: &mut dyn Callees, at: u64, new: f32) {
+    let t = frame_time(vm, env);
+    let c = unit_clamp((t + t) as f32);
+    let kept = (1.0 - c) * vm.f32(at);
+    vm.set_f32(at, kept + c * new);
+}
+
+/// `0x14126e4c8..0x14126e974`: the contact response of body `s` (index `j`, from the frame slot `rbp+0x1750`). The
+/// callee `0x1411cb1e0` is asked for every pair `(edi, r12)` of the rows (`edi < +0x654 - 1`, `r12` from a quarter
+/// to three quarters of the point count `+0x658`) and reports a contact through its return value and five float
+/// outputs; a contact raises `F+0x24c`, `F+0x250`, `rbp-0x78` and the body's `+0x2c`, and tracks the contact with the
+/// lowest and with the highest third output. When the body has a contact (`+0x2c`) its smoothed values `+0x30..+0x50`
+/// are blended toward the new ones with `clamp(2 * frame time)`, otherwise `+0x30..+0x38` are cleared.
+pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, s: u64) {
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    let g = s + 0x588;
+    let r14 = s + 0x630;
+    let j = vm.u32(slot(0x1750));
+    let count = vm.i32(r14 + 0x28);
+    let mut acc_a = 0.0f32; // xmm12, from rbp-0x1c
+    let mut acc_b = 0.0f32; // xmm15, from rbp-0x7c
+    let mut low = [0.0f32; 3]; // xmm8, xmm9, xmm6
+    let mut high = [0.0f32; 3]; // xmm10, xmm11, xmm7
+    vm.set_f32(slot(-0x1c), 0.0);
+    vm.set_f32(slot(-0x6c), 0.0);
+    vm.set_f32(slot(-0x7c), 0.0);
+    let mut r12 = (f64::from(count) * 0.25) as i32;
+    let reach = f64::from(count) * 0.75;
+    if reach >= f64::from(r12) {
+        loop {
+            let mut edi = 0i32;
+            while edi < vm.i32(r14 + 0x24) - 1 {
+                vm.set_f32(slot(-0x6c), 0.0);
+                vm.set_f32(slot(-0x30), 0.0);
+                vm.set_f32(slot(-0x18), 0.0);
+                let args = CallArgs {
+                    int: [Some(f), Some(s), Some(g), Some(r14)],
+                    xmm: [None; 4],
+                    stack: [
+                        u64::from(j),
+                        edi as u32 as u64,
+                        r12 as u32 as u64,
+                        slot(-0x6c),
+                    ]
+                    .map(Some),
+                };
+                if env.call(vm, 0x1411cb1e0, args).rax as u32 != 0 {
+                    vm.set_i32(f + 0x24c, 1);
+                    vm.set_i32(f + 0x250, 1);
+                    vm.set_i32(slot(-0x78), 1);
+                    if vm.i32(s + 0x2c) == 0 {
+                        vm.set_i32(s + 0x2c, 1);
+                    }
+                    let (o1, o2, o3) = (
+                        vm.f32(slot(-0x6c)),
+                        vm.f32(slot(-0x30)),
+                        vm.f32(slot(-0x18)),
+                    );
+                    if low[2] > o3 {
+                        low = [o1, o2, o3];
+                    }
+                    if o3 > high[2] {
+                        high = [o1, o2, o3];
+                    }
+                }
+                edi += 1;
+            }
+            r12 += 1;
+            if reach < f64::from(r12) {
+                break;
+            }
+        }
+        acc_a = vm.f32(slot(-0x1c));
+        acc_b = vm.f32(slot(-0x7c));
+        vm.set_f32(slot(-0x6c), acc_b);
+    }
+    if vm.i32(s + 0x2c) == 0 {
+        vm.set_u32(s + 0x30, 0);
+        vm.set_u32(s + 0x34, 0);
+        vm.set_u32(s + 0x38, 0);
+        return;
+    }
+    blend_to(vm, env, s + 0x30, acc_a);
+    blend_to(vm, env, s + 0x34, acc_b);
+    let t = frame_time(vm, env);
+    let t3 = (t + t) as f32;
+    let (vx, vy) = (vm.f32(f + 0x368), vm.f32(f + 0x370));
+    let speed = (vx * vx + vy * vy).sqrt();
+    let w = unit_clamp((speed - 1.0) * f32::from_bits(0x3de3_8e39) + 0.0);
+    let m = if acc_a > 0.0 { acc_a } else { 0.0 };
+    let v = vm.f32(slot(-0x6c));
+    let den = if v > f32::from_bits(0x3c23_d70a) {
+        v
+    } else {
+        f32::from_bits(0x3c23_d70a)
+    };
+    let scaled = m / den * (w * w);
+    let c3 = unit_clamp(t3);
+    let kept = (1.0 - c3) * vm.f32(s + 0x38);
+    vm.set_f32(s + 0x38, kept + c3 * scaled);
+    for (offset, value) in [
+        (0x3c, low[0]),
+        (0x40, low[1]),
+        (0x44, low[2]),
+        (0x48, high[0]),
+        (0x4c, high[1]),
+        (0x50, high[2]),
+    ] {
+        blend_to(vm, env, s + offset, value);
+    }
+}
