@@ -1221,3 +1221,40 @@ pub fn float_waves(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         add_aero_force(vm, f, &force);
     }
 }
+
+/// `0x14126bf30..0x14126c034`: the external pull and the pedal sum. With `F+0x28 == 0` the two interface updates
+/// `0x1411e4bd0(0x145899fa0)` and `0x1409057f0(0x142edf4b0)` run (replayed); with `F+0x28 == 1` and one of the globals
+/// `0x145899fd0/fd4` set, the force `-(0x145899fc4, fc8, fcc)` (world axes) is added at `(0, B+0x2638, B+0x263c)`.
+/// The larger in magnitude of `F+0xf0` and `F+0xfc` (the second wins a tie) plus `F+0x108` is stored as a float at
+/// `rbp+0x1750`; when `F+0x3c == 1` and `0x1411d9d80(F)` (replayed) is zero it is `F+0x108 + F+0xec` instead.
+pub fn world_pull(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::callees::add_world_force;
+    match vm.i32(f + 0x28) {
+        0 => {
+            env.call(vm, 0x1411e4bd0, CallArgs::ints(&[0x1_4589_9fa0]));
+            env.call(vm, 0x1409057f0, CallArgs::ints(&[0x1_42ed_f4b0]));
+        }
+        1 if vm.i32(0x1_4589_9fd0) != 0 || vm.i32(0x1_4589_9fd4) != 0 => {
+            let b = vm.u64(f + 0x20);
+            let force = [
+                -vm.f32(0x1_4589_9fc4),
+                -vm.f32(0x1_4589_9fc8),
+                -vm.f32(0x1_4589_9fcc),
+            ];
+            add_world_force(vm, f, [0.0, vm.f32(b + 0x2638), vm.f32(b + 0x263c)], force);
+        }
+        _ => {}
+    }
+    let (second, first) = (vm.f32(f + 0xfc), vm.f32(f + 0xf0));
+    let mut pick = if first.abs() > second.abs() {
+        first
+    } else {
+        second
+    };
+    let f108 = vm.f32(f + 0x108);
+    pick += f108;
+    vm.set_f32(rbp.wrapping_add(0x1750), pick);
+    if vm.i32(f + 0x3c) == 1 && env.call(vm, 0x1411d9d80, CallArgs::ints(&[f])).rax as u32 == 0 {
+        vm.set_f32(rbp.wrapping_add(0x1750), f108 + vm.f32(f + 0xec));
+    }
+}

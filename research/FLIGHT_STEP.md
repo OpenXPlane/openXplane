@@ -452,6 +452,12 @@ sections (`wave` noise `w * 0.5 + 1` times the stored offsets, a separation meas
 (`F+0x652c * strength * v / max(|v|, 1)`) with factor `dt` and applies the drag `1.2 * area * F+0x652c * |v|^2 * F+0x6c / 2`
 by `0x140f26ef0`. The frame slot `rbp+0x1750` holds `F` in the original.
 
+`world_pull` (`0x14126bf30..0x14126c034`, 100 cases; `0x1411e4bd0`, `0x1409057f0` and `0x1411d9d80` are replayed): with `F+0x28 == 0`
+two interface updates run; with `F+0x28 == 1` and one of the globals `0x145899fd0/fd4` set the force
+`-(0x145899fc4, fc8, fcc)` is added as a world-axes force at `(0, B+0x2638, B+0x263c)`. The larger in magnitude of
+`F+0xf0` and `F+0xfc` plus `F+0x108` becomes the float at `rbp+0x1750` (`F+0x108 + F+0xec` when `F+0x3c == 1` and
+`0x1411d9d80(F)` is zero).
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded
