@@ -2080,3 +2080,199 @@ pub fn body_contact_loop(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     }
     vm.set_u32(slot(0x1750), 39);
 }
+
+/// `0x14126e9a0..0x14126ef74`: the ground forces after a body contact (`rbp-0x78` set). With the weights `B+0x2804`
+/// and `B+0x2808` positive, the heading of the ground velocity relative to the aircraft (the point
+/// `(-B+0x2800 * F+0x3d4, -B+0x2800 * F+0x3d0, 0)` moved out of the aircraft frame, added to `F+0x368/0x370`, through
+/// `atan2`) gives a side force `clamp(f(speed) * speed * sin(angle) * |sin(angle)| ...)` applied at the contact point
+/// with `0x1408e3230`; with the position `F+0x64e4` set, the drag toward the stored geographic point (converted to
+/// the world through `0x140913e60`, `0x140816eb0` and `0x141296750`) is applied as a second force and a moment
+/// (`0x14119e5b0`). Then, with `B+0x28dc` set and `F+0x64dc > 0.01`, a brake force is applied and the brake energy
+/// `F+0x28c` grows by `frame time * ...` up to `B+0x2890`.
+#[allow(clippy::field_reassign_with_default)]
+pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::transform::{Frame, from_aircraft_frame};
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    let bits = |v: f32| u64::from(v.to_bits());
+    if vm.i32(slot(-0x78)) == 0 {
+        return;
+    }
+    let b = vm.u64(f + 0x20);
+    if vm.f32(b + 0x2804) > 0.0 && vm.f32(b + 0x2808) > 0.0 {
+        let m = -vm.f32(b + 0x2800);
+        let (a, c3) = (m * vm.f32(f + 0x3d4), m * vm.f32(f + 0x3d0));
+        let frame = Frame {
+            origin: [0.0; 3],
+            rotation: [
+                [vm.f32(f + 0x430), vm.f32(f + 0x434)],
+                [vm.f32(f + 0x440), vm.f32(f + 0x444)],
+                [vm.f32(f + 0x450), vm.f32(f + 0x454)],
+            ],
+        };
+        let w = from_aircraft_frame(&frame, [a, c3, 0.0], false, false);
+        vm.set_f32(slot(0x1758), w[0]);
+        vm.set_f32(slot(-0x58), w[1]);
+        vm.set_f32(slot(0x1750), w[2]);
+        let y = -(w[2] + vm.f32(f + 0x370));
+        let x = w[0] + vm.f32(f + 0x368);
+        let bearing = x.atan2(y) * DEG;
+        let mut h = vm.f32(f + 0x3e0) - bearing;
+        while -180.0 > h {
+            h += 360.0;
+        }
+        while h > 180.0 {
+            h += -360.0;
+        }
+        let angle = (vm.f32(f + 0x64cc) - h) * RAD;
+        let sine = angle.sin();
+        let (vx, vy, vz) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+        let speed = ((vx * vx + vy * vy) + vz * vz).sqrt();
+        let b = vm.u64(f + 0x20);
+        let side = sine.abs() * speed * vm.f32(b + 0x2804) * 1000.0;
+        let knots = speed * f32::from_bits(0x3ff8_cfe5);
+        let factor = interpolate_clamped(0.0, 1.0, vm.f32(b + 0x7b0), 0.0, knots);
+        let moment = factor * (speed * sine) * side * vm.f32(f + 0x64c8);
+        let limit = vm.f32(b + 0x288c);
+        let moment = clamp(moment, -limit, limit);
+        let mut args = CallArgs::ints(&[f]);
+        args.xmm = [None, Some(0), Some((-moment).to_bits()), Some(0)];
+        args.stack = [
+            Some(0),
+            Some(bits(vm.f32(b + 0x2800))),
+            Some(0),
+            Some(0x1_4266_1b68),
+        ];
+        env.call(vm, 0x1408e3230, args);
+        if vm.i32(f + 0x64e4) != 0 {
+            let planet = env.call(vm, 0x14193ae40, CallArgs::default()).rax;
+            let mut args = CallArgs::default();
+            args.int = [
+                Some(planet),
+                Some(slot(-0x38)),
+                Some(rbp),
+                Some(slot(0x1750)),
+            ];
+            args.stack = [
+                Some(vm.f64(f + 0x64e8).to_bits()),
+                Some(vm.u64(f + 0x64f0)),
+                Some(vm.u64(f + 0x64f8)),
+                None,
+            ];
+            env.call(vm, 0x140913e60, args);
+            let b = vm.u64(f + 0x20);
+            let mut args = CallArgs::default();
+            args.int = [Some(f), None, Some(slot(-0x50)), None];
+            args.xmm = [
+                None,
+                Some(f64::from(vm.f32(b + 0x280c)).to_bits() as u32),
+                None,
+                Some(f64::from(vm.f32(b + 0x2810)).to_bits() as u32),
+            ];
+            args.stack = [
+                Some(slot(-0x68)),
+                Some(f64::from(vm.f32(b + 0x2814)).to_bits()),
+                Some(slot(0x1758)),
+                Some(1),
+            ];
+            env.call(vm, 0x140816eb0, args);
+            let d1 = (vm.f64(slot(0x1750)) - vm.f64(slot(0x1758))) as f32;
+            let d2 = (vm.f64(rbp) - vm.f64(slot(-0x68))) as f32;
+            let d3 = (vm.f64(slot(-0x38)) - vm.f64(slot(-0x50))) as f32;
+            let mut args = CallArgs::default();
+            args.int = [Some(f), None, Some(slot(0x1750)), None];
+            args.xmm = [
+                None,
+                Some(d3.to_bits()),
+                Some(d1.to_bits()),
+                Some(d2.to_bits()),
+            ];
+            args.stack = [
+                Some(slot(0x1758)),
+                Some(bits(d1)),
+                Some(slot(-0x58)),
+                Some(0),
+            ];
+            env.call(vm, 0x141296750, args);
+            let (x7, x8, x9) = (
+                vm.f32(slot(0x1750)),
+                vm.f32(slot(0x1758)),
+                vm.f32(slot(-0x58)),
+            );
+            let len = ((x7 * x7 + x8 * x8) + x9 * x9).sqrt();
+            let len = if len > f32::from_bits(0x3c23_d70a) {
+                len
+            } else {
+                f32::from_bits(0x3c23_d70a)
+            };
+            let b = vm.u64(f + 0x20);
+            let weight = vm.f32(b + 0x2898) * f32::from_bits(0x411c_c5c1);
+            let half = (f64::from(weight) * 0.1) as f32;
+            let k = interpolate_clamped(0.0, 0.0, 25.0, half, len);
+            let (p9, p8, p7) = (k * x9 / len, k * x8 / len, k * x7 / len);
+            let mut args = CallArgs::ints(&[f]);
+            args.xmm = [
+                None,
+                Some(vm.f32(b + 0x280c).to_bits()),
+                Some(p7.to_bits()),
+                Some(vm.f32(b + 0x2810).to_bits()),
+            ];
+            args.stack = [
+                Some(bits(p8)),
+                Some(bits(vm.f32(b + 0x2814))),
+                Some(bits(p9)),
+                Some(0x1_4266_1b78),
+            ];
+            env.call(vm, 0x1408e3230, args);
+            let b = vm.u64(f + 0x20);
+            let reach = (f64::from(vm.f32(b + 0x64ac)) * 0.1) as f32;
+            let mut args = CallArgs::ints(&[f]);
+            args.xmm = [
+                None,
+                Some(vm.f32(b + 0x280c).to_bits()),
+                Some(vm.f32(b + 0x2810).to_bits()),
+                Some(vm.f32(b + 0x2814).to_bits()),
+            ];
+            args.stack = [Some(bits(reach * reach)), None, None, None];
+            env.call(vm, 0x14119e5b0, args);
+        }
+    }
+    let b = vm.u64(f + 0x20);
+    let slip = vm.f32(f + 0x64dc);
+    if vm.i32(b + 0x28dc) != 0 && f64::from(slip) > 0.01 {
+        let scale = vm.f32(b + 0x2890) / 10.0 * slip;
+        let (vx, vy, vz) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+        let speed = ((vx * vx + vy * vy) + vz * vz).sqrt();
+        let force = (f64::from(speed * scale) * 1.25) as f32;
+        let mut args = CallArgs::ints(&[f]);
+        args.xmm = [
+            None,
+            Some(vm.f32(b + 0x28bc).to_bits()),
+            Some(0),
+            Some(vm.f32(b + 0x28c0).to_bits()),
+        ];
+        args.stack = [
+            Some(0),
+            Some(bits(vm.f32(b + 0x28c4))),
+            Some(bits(force)),
+            Some(0x1_4266_1b80),
+        ];
+        env.call(vm, 0x1408e3230, args);
+        let b = vm.u64(f + 0x20);
+        let capacity = vm.f32(b + 0x2890);
+        if capacity.partial_cmp(&vm.f32(f + 0x28c)) == Some(std::cmp::Ordering::Greater) {
+            let t = frame_time(vm, env);
+            let grown = (f64::from(vm.f32(f + 0x28c)) + t * f64::from(scale)) as f32;
+            let capacity = vm.f32(vm.u64(f + 0x20) + 0x2890);
+            let value = if 0.0 > grown {
+                0.0
+            } else if capacity < grown {
+                capacity
+            } else {
+                grown
+            };
+            vm.set_f32(f + 0x28c, value);
+        }
+    }
+}
