@@ -469,7 +469,31 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM8, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
             case.emu.uc.reg_write(UC_X86_REG_XMM10, struct.unpack('<Q', struct.pack('<d', 0.5))[0])
         if BLOCK == 'late':
-            case.stub(0x14125e4f0, lambda call, rng: None)
+            EN = case.region('EN', 0x68 * 4)
+            RT = case.region('RT', 0x2cc * 4)
+            SM = case.region('SM', 0x388 * 4)
+            PT = case.region('PT', 0x3770 * 2)
+            fz.region('NZ', 0x14578f1f0, 0x100000)
+            for name, off, ptr in (('F', 0x68b0, RT), ('F', 0x68c8, SM), ('B', 0x5ff8, EN), ('B', 0x6010, PT)):
+                fz.preset(name, off, ptr & 0xffffffff, record=True)
+                fz.preset(name, off + 4, ptr >> 32, record=True)
+            fz.preset('B', 0x91c, rng.choice([1, 2, 3]))
+            fz.preset('B', 0xa70, rng.choice([0, 1]))
+            fz.preset('F', 0x6760, rng.choice([0, 0, 1]))
+            for off in (0x6880, 0x6884, 0x6888):
+                fz.preset('F', off, rng.choice([0, 0, 1]))
+            for off in (0x1a84, 0x1aa4, 0x1b38, 0x1ac4):
+                fz.preset('B', off, rng.choice([0, 1]))
+            fz.preset('B', 0xaf8, rng.choice([0, 1, 2, 3]))
+            for k in range(4):
+                fz.preset('EN', 0x68 * k, rng.choice([0, 1, 2, 3, 5, 6, 7]))
+                fz.preset_f32('EN', 0x68 * k + 0x64, rng.uniform(0.05, 3))
+                fz.preset_f32('EN', 0x68 * k + 0x20, rng.uniform(0, 2))
+                fz.preset('RT', 0x2cc * k + 0x74, rng.choice([0, 1]))
+                fz.preset_f32('RT', 0x2cc * k + 0x44, rng.uniform(0, 1))
+            for off in (0x1a80, 0x1aa0, 0x1b34, 0x1ac0, 0x1b20, 0x1b24, 0x7b0, 0x7b4, 0x7d4, 0x7ac, 0x7d8, 0x1aac, 0x1ab0, 0xb64, 0xb68):
+                fz.preset_f32('B', off, rng.uniform(0.2, 150))
+            fz.preset_f32('PT', 0x7a0, rng.choice([0.0, 10.0, 60.0]))
             case.stub(0x1407cdce0, lambda call, rng: None)
             case.stub(0x1407d6a00, lambda call, rng: None)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.01, 0.02, 0.3, 1.0, 5.0, 40.0, rng.uniform(0, 3)])))

@@ -5,6 +5,7 @@
 
 Header: `KIND obj arg result`. Stack words are not compared.
 """
+import struct
 import sys
 from pathlib import Path
 
@@ -17,8 +18,26 @@ EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.ar
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000), (0x141245000, 0x141247000), (0x1407cc000, 0x1407cd000), (0x1407e7000, 0x1407e8000), (0x140819000, 0x14081a000)])
+    case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000), (0x141245000, 0x141247000), (0x14125e000, 0x141261000), (0x1407cc000, 0x1407cd000), (0x1407e7000, 0x1407e8000), (0x140819000, 0x14081a000)])
     case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
+    import os
+    trace = os.environ.get('XPTRACE')
+    if trace:
+        from unicorn import UC_HOOK_CODE
+        from unicorn.x86_const import UC_X86_REG_XMM0
+        specs = {}
+        for part in trace.split(';'):
+            addr, regs = part.split(':')
+            specs[int(addr, 16)] = [int(r) for r in regs.split(',')]
+
+        def on_code(uc, address, size, user):
+            if address in specs:
+                vals = []
+                for r in specs[address]:
+                    raw = uc.reg_read(UC_X86_REG_XMM0 + r) & 0xffffffffffffffff
+                    vals.append('x%d=%g/%g' % (r, struct.unpack('<f', struct.pack('<I', raw & 0xffffffff))[0], struct.unpack('<d', struct.pack('<Q', raw))[0]))
+                sys.stderr.write('%x %s\n' % (address, ' '.join(vals)))
+        case.emu.uc.hook_add(UC_HOOK_CODE, on_code)
     rng = case.rng
     print(f'# input vectors {KIND} (tools/gen_input_vectors.py)')
     done = 0
@@ -64,6 +83,49 @@ def main():
             for off in (0xc7c, 0xc80, 0xc84, 0xc88):
                 fz.preset_f32('BB', off, rng.uniform(0, 3))
             run = (0x141245750, [FF])
+            OBJ = FF
+        elif KIND == 'engines':
+            FF = case.region('FF', 0xc000)
+            BB = case.region('BB', 0x7000)
+            EN = case.region('EN', 0x68 * 4)
+            RT = case.region('RT', 0x2cc * 4)
+            SM = case.region('SM', 0x388 * 4)
+            PT = case.region('PT', 0x3770 * 2)
+            fz.region('NZ', 0x14578f1f0, 0x100000)
+            case.region('SK', 0x10)
+            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.01, 0.05, 0.3, 1.0, 5.0, 40.0, rng.uniform(0, 3)])))
+            def put(name, off, ptr, base=0):
+                fz.preset(name, off, ptr & 0xffffffff, record=True)
+                fz.preset(name, off + 4, ptr >> 32, record=True)
+            put('FF', 0x20, BB)
+            put('FF', 0x68b0, RT)
+            put('FF', 0x68c8, SM)
+            put('BB', 0x5ff8, EN)
+            put('BB', 0x6010, PT)
+            n = rng.choice([1, 2, 3, 4])
+            fz.preset('BB', 0x91c, n)
+            fz.preset('BB', 0xa70, rng.choice([0, 1]))
+            fz.preset('FF', 0x6760, rng.choice([0, 0, 0, 1]))
+            fz.preset('FF', 0x28, rng.choice([0, 0, 1]))
+            for off in (0x6880, 0x6884, 0x6888):
+                fz.preset('FF', off, rng.choice([0, 0, 1]))
+            for off in (0x1a84, 0x1aa4, 0x1b38, 0x1ac4):
+                fz.preset('BB', off, rng.choice([0, 1]))
+            fz.preset('BB', 0xaf8, rng.choice([0, 1, 2, 3]))
+            for k in range(4):
+                fz.preset('EN', 0x68 * k, rng.choice([0, 1, 2, 3, 5, 6, 7]))
+                fz.preset_f32('EN', 0x68 * k + 0x64, rng.choice([rng.uniform(0.02, 3), 0.5, 1.0]))
+                fz.preset_f32('EN', 0x68 * k + 0x20, rng.choice([0.0, rng.uniform(0, 2)]))
+                fz.preset('RT', 0x2cc * k + 0x74, rng.choice([0, 1]))
+                fz.preset_f32('RT', 0x2cc * k + 0x44, rng.choice([0.05, 0.3, 0.5, 0.95, rng.uniform(0, 1)]))
+            for off in (0xd4, 0xe0):
+                pass
+            for off, lo, hi in ((0x64, -20, 60), (0x70, 0.2, 1.3), (0x400, 0, 80), (0x41c, 0, 100)):
+                fz.preset_f32('FF', off, rng.uniform(lo, hi))
+            for off in (0x1a80, 0x1aa0, 0x1b34, 0x1ac0, 0x1b20, 0x1b24, 0x7b0, 0x7b4, 0x7d4, 0x7ac, 0x7d8, 0x1aac, 0x1ab0, 0xb64, 0xb68):
+                fz.preset_f32('BB', off, rng.uniform(0.2, 150))
+            fz.preset_f32('PT', 0x7a0, rng.choice([0.0, 10.0, 60.0]))
+            run = (0x14125e4f0, [FF])
             OBJ = FF
         elif KIND == 'airspeed':
             speed = rng.choice([rng.uniform(-400, 400), rng.uniform(-100, 100), rng.uniform(250, 900), 0.0])
@@ -112,14 +174,12 @@ def main():
             sys.stderr.write(f'trial failed: {err}\n')
             continue
         result = case.emu.reg(UC_X86_REG_RAX) & 0xffffffff
-        if KIND == 'start':
+        if KIND in ('start', 'engines'):
             OBJ = run[1][0]
         if KIND == 'airspeed':
-            import struct
             result = case.emu.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff
             arg = '%08x %d' % (struct.unpack('<I', struct.pack('<f', run[2][0]))[0], run[1][2])
         if KIND == 'variation':
-            import struct
             bits = lambda v: struct.unpack('<I', struct.pack('<f', v))[0]
             result = case.emu.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff
             arg = f'{bits(run[2][0]):08x} {bits(run[2][1]):08x}'

@@ -3795,6 +3795,33 @@ fn equivalent_airspeed_matches_the_original_machine_code() {
 }
 
 #[test]
+fn engine_runtime_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("input_engines.txt");
+    assert!(cases.len() >= 50);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::engine_runtime(&mut case.vm, &mut env, f);
+        if std::env::var("XPDEBUG").is_ok() {
+            for (a, w) in &case.expected {
+                let g = case.vm.u32(*a);
+                if g != *w {
+                    println!(
+                        "case {n}: {a:#x}: got {} want {}",
+                        f32::from_bits(g),
+                        f32::from_bits(*w)
+                    );
+                }
+            }
+        }
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

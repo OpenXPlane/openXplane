@@ -417,7 +417,7 @@ pub fn late_state(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
         }
     }
     if vm.i32(f + 0x28) == 0 {
-        env.call(vm, 0x14125e4f0, CallArgs::ints(&[f]));
+        engine_runtime(vm, env, f);
     }
     if vm.i32(f + 0xdbc) != 0 {
         let limit = |value: f32, lo: f32, hi: f32, bound: i32| -> f32 {
@@ -3245,4 +3245,431 @@ pub fn equivalent_airspeed(vm: &Vm, obj: u64, speed: f32, mode: i32) -> f32 {
         }
     }
     guess
+}
+
+/// The random noise table (`0x14578f1f0`, 0x40000 floats) the engine runtime reads for the jitter of its readings.
+const NOISE: u64 = 0x1_4578_f1f0;
+
+/// `0x14125e4f0`: the runtime of the engines (`B+0x91c` records of `0x2cc` bytes at `F+0x68b0`, the engine
+/// parameters at `[B+0x5ff8] + 0x68 i`): for each engine the response factors (`+0x240..0x248`, `+0xcc`, `+0xc4`) are
+/// scaled by the inverse of the engine's time constant `+0x64` (0.1..2), two temperatures (`+0xdc`, `+0x140`) relax
+/// toward the outside value or the engine's own (`+0x90`/`+0x98`), the displayed temperatures `+0xd4`/`+0xe0` are
+/// set from the targets (with the input bindings 7, `0x1e1`, `0x1d9` and `0x1b1` adding to them) in the display unit
+/// (`B+0x1a84` / `B+0x1aa4` select Celsius), eleven jittered copies of them (`+0xe4..0x10c`) come from the noise
+/// table for the kinds 1 and 2, the engine's fuel flow `+0x1cc` and heat `+0x144` integrate toward the response
+/// (`+0x248`) and the readings `+0x148..0x170` are jittered likewise, and the throttle position `+0x44` follows the
+/// lever bounds `B+0x7ac`/`B+0x7d8` (`B+0xaf8` 2) or `B+0x1aac`/`B+0x1ab0` (3). The debug log writes are not ported.
+pub fn engine_runtime(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    let (zero, tenth) = (0.0f32, f32::from_bits(0x3dcc_cccd));
+    let to_c = |x: f32| ((f64::from(x) - 32.0) / 1.8f64) as f32;
+    let to_f = |x: f32| (f64::from(x) * 1.8f64 + 32.0) as f32;
+    let bind = |vm: &mut Vm, env: &mut dyn Callees, id: u64, i: u64| -> bool {
+        let mut args = CallArgs::ints(&[f, 1, id, i]);
+        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
+        env.call(vm, 0x1407ace10, args).rax as u32 != 0
+    };
+    if vm.i32(f + 0x6760) != 0 {
+        return;
+    }
+    let noise = |vm: &Vm, index: u32| vm.f32(NOISE + 4 * u64::from(index & 0x3ffff));
+    let mut i = 0u64;
+    while (i as i32) < vm.i32(vm.u64(f + 0x20) + 0x91c) {
+        let b = vm.u64(f + 0x20);
+        let eng = vm.u64(b + 0x5ff8) + i * 0x68;
+        let kind = vm.i32(eng);
+        let r = vm.u64(f + 0x68b0) + i * 0x2cc;
+        // the clamped time constant, read again for every product like the original
+        let m = |vm: &Vm| {
+            let e = vm.f32(vm.u64(vm.u64(f + 0x20) + 0x5ff8) + i * 0x68 + 0x64);
+            if tenth > e {
+                tenth
+            } else if 2.0f32 < e {
+                2.0
+            } else {
+                e
+            }
+        };
+        let inverse = |vm: &Vm| (1.0f64 / f64::from(m(vm))) as f32;
+        let first = inverse(vm) * vm.f32(r + 0x240);
+        vm.set_f32(r + 0x240, first);
+        let v = inverse(vm) * vm.f32(r + 0x244);
+        vm.set_f32(r + 0x244, v);
+        let v = inverse(vm) * vm.f32(r + 0x248);
+        vm.set_f32(r + 0x248, v);
+        let guard_a = vm.i32(f + 0x28) == 0 && vm.i32(f + 0x6880) != 0;
+        let guard_b = vm.i32(f + 0x28) == 0 && vm.i32(f + 0x6884) != 0;
+        let guard_c = vm.i32(f + 0x28) == 0 && vm.i32(f + 0x6888) != 0;
+        if !guard_a {
+            let v = inverse(vm) * vm.f32(r + 0xcc);
+            vm.set_f32(r + 0xcc, v);
+            let v = inverse(vm) * vm.f32(r + 0xc4);
+            vm.set_f32(r + 0xc4, v);
+        }
+        if !guard_b {
+            let dt = frame_time(vm, env);
+            let relax = |vm: &mut Vm, offset: u64, target: f32, rate: f32| {
+                let c = clamp(rate, 0.0, 1.0);
+                let v = (1.0 - c) * vm.f32(r + offset) + c * target;
+                vm.set_f32(r + offset, v);
+            };
+            if first > zero {
+                let rate = (dt / 10.0) as f32;
+                let mut x = vm.f32(r + 0xd4);
+                if vm.i32(b + 0x1a84) == 0 {
+                    x = to_c(x);
+                }
+                let target = (f64::from(x) * 0.75) as f32;
+                relax(vm, 0xdc, target, rate);
+            } else {
+                let s = ((f64::from(vm.f32(r + 0x90)) + 1.0) * dt / 1800.0) as f32;
+                let c = clamp(s, 0.0, 1.0);
+                let v = (1.0 - c) * vm.f32(r + 0xdc) + vm.f32(f + 0x64) * c;
+                vm.set_f32(r + 0xdc, v);
+            }
+            if vm.f32(r + 0x244) > zero {
+                let dt = frame_time(vm, env);
+                let rate = (dt / 10.0) as f32;
+                let mut x = vm.f32(r + 0xe0);
+                if vm.i32(b + 0x1aa4) == 0 {
+                    x = to_c(x);
+                }
+                let target = (f64::from(x) * 0.75) as f32;
+                relax(vm, 0x140, target, rate);
+            } else {
+                let dt = frame_time(vm, env);
+                let s = ((f64::from(vm.f32(r + 0x90)) + 1.0) * dt / 1800.0) as f32;
+                let c = clamp(s, 0.0, 1.0);
+                let v = (1.0 - c) * vm.f32(r + 0x140) + vm.f32(f + 0x64) * c;
+                vm.set_f32(r + 0x140, v);
+            }
+            let source = if matches!(kind, 1 | 2) {
+                f64::from(vm.f32(r + 0x90)) * 100.0
+            } else if kind == 6 {
+                f64::from(vm.f32(r + 0x98))
+            } else {
+                f64::from(vm.f32(r + 0x90))
+            };
+            let k = (source as f32) - zero;
+            let total = vm.f32(f + 0x64);
+            let step = |vm: &Vm, offset: u64| -> f32 {
+                let held = vm.f32(r + offset);
+                let cand = (total - held) / 100.0 * k + held;
+                let low = |a: f32, b: f32| if a < b { a } else { b };
+                if total > held {
+                    if held > cand { held } else { low(total, cand) }
+                } else if total.partial_cmp(&cand) != Some(std::cmp::Ordering::Greater) {
+                    low(held, cand)
+                } else {
+                    total
+                }
+            };
+            let ta = step(vm, 0xdc);
+            let tb = step(vm, 0x140);
+            let mut t1 = vm.f32(b + 0x1a80);
+            if vm.i32(b + 0x1a84) == 0 {
+                t1 = to_c(t1);
+            }
+            let mut t2 = vm.f32(b + 0x1aa0);
+            if vm.i32(b + 0x1aa4) == 0 {
+                t2 = to_c(t2);
+            }
+            let a240 = vm.f32(r + 0x240) - zero;
+            let mut x10 = (t1 - ta) * a240 + ta;
+            let a244 = vm.f32(r + 0x244) - zero;
+            let mut x6 = (t2 - tb) * a244 + tb;
+            if vm.i32(r + 0x74) != 0 {
+                if bind(vm, env, 7, i) {
+                    x10 = (f64::from(x10) * 1.5) as f32;
+                    x6 = (f64::from(x6) * 1.5) as f32;
+                }
+                if bind(vm, env, 0x1e1, i) {
+                    x10 = (f64::from(x10) * 1.5) as f32;
+                }
+                if bind(vm, env, 0x1d9, i) {
+                    let half = (f64::from(vm.f32(b + 0x1a80)) * 0.5) as f32;
+                    let rise = vm.f32(r + 0x90) - zero;
+                    let lowest = if half < zero { half } else { zero };
+                    let blend = (zero - half) / 100.0;
+                    let c = rise * blend + half;
+                    let held = if lowest > c {
+                        lowest
+                    } else {
+                        let up = if half > zero { half } else { zero };
+                        if up < c { up } else { c }
+                    };
+                    x10 += held;
+                }
+                if bind(vm, env, 0x1b1, i) {
+                    let rest = vm.f32(r + 0x98) - vm.f32(r + 0x90);
+                    let rest = if rest > zero { rest } else { zero };
+                    let v = ((f64::from(rest) + f64::from(rest)) as f32 - zero) * 250.0 + zero;
+                    let add = if zero > v {
+                        zero
+                    } else if 250.0f32 < v {
+                        250.0
+                    } else {
+                        v
+                    };
+                    x10 += add;
+                    let add2 = add;
+                    x6 += add2;
+                }
+            }
+            if vm.i32(b + 0x1a84) == 0 {
+                x10 = to_f(x10);
+            }
+            vm.set_f32(r + 0xd4, x10);
+            let shown = if vm.i32(b + 0x1aa4) != 0 {
+                x6
+            } else {
+                to_f(x6)
+            };
+            vm.set_f32(r + 0xe0, shown);
+            let base = (i as u32).wrapping_mul(100);
+            if matches!(kind, 1 | 2) {
+                let display = if vm.i32(b + 0x1aa4) != 0 {
+                    x6
+                } else {
+                    to_f(x6)
+                };
+                let write = |vm: &mut Vm, k: u32, offset: u64| {
+                    let at = base.wrapping_add(k);
+                    let n = (1.0 - 0.0) * noise(vm, at) + noise(vm, at.wrapping_add(1)) * 0.0;
+                    let v = ((f64::from(n) + f64::from(n)) - 1.0) as f32;
+                    let value = (f64::from(v) * 0.02 + 1.0) * f64::from(display);
+                    vm.set_f32(r + offset, value as f32);
+                };
+                for (k, offset) in [
+                    (1, 0xe4u64),
+                    (2, 0xe8),
+                    (3, 0xec),
+                    (4, 0xf0),
+                    (5, 0xf4),
+                    (6, 0xf8),
+                    (7, 0xfc),
+                    (8, 0x100),
+                ] {
+                    write(vm, k, offset);
+                }
+                for (n, k) in (9u32..12).enumerate() {
+                    write(vm, k, 0x104 + 4 * n as u64);
+                }
+            }
+        }
+        if !guard_c {
+            engine_runtime_tail(vm, env, f, i, kind);
+        }
+        engine_runtime_throttle(vm, f, i);
+        i += 1;
+    }
+}
+
+/// `0x14125f3b0..0x14125fe8f` of [`engine_runtime`]: the heat and fuel flow integration of engine `i`.
+fn engine_runtime_tail(vm: &mut Vm, env: &mut dyn Callees, f: u64, i: u64, kind: i32) {
+    let to_c = |x: f32| ((f64::from(x) - 32.0) / 1.8f64) as f32;
+    let b = vm.u64(f + 0x20);
+    let r = vm.u64(f + 0x68b0) + i * 0x2cc;
+    let eng = vm.u64(b + 0x5ff8) + i * 0x68;
+    let (zero, half) = (0.0f32, 0.5f32);
+    let a1 = (f64::from(vm.f32(b + 0x7b0)) * 1.5) as f32;
+    let a2 = (f64::from(vm.f32(b + 0x7d4)) / 1.5) as f32;
+    let m1 = if a1 > vm.f32(b + 0x7b4) {
+        a1
+    } else {
+        vm.f32(b + 0x7b4)
+    };
+    let m2 = if a1 > a2 { a1 } else { a2 };
+    let avg = (f64::from(m2 + (m1 + a1)) / 3.0) as f32;
+    let v = vm.f32(r + 0x44) - zero + half;
+    let q = if half > v {
+        half
+    } else if 1.5f32 < v {
+        1.5
+    } else {
+        v
+    };
+    let part = vm
+        .u64(b + 0x6010)
+        .wrapping_add((i64::from(vm.i32(b + 0xa70)) * 0x3770) as u64);
+    let s1 = if vm.f32(part + 0x7a0).abs() > 45.0 {
+        f64::from(vm.f32(r + 0x90)) / 100.0
+    } else {
+        let sample = vm.u64(f + 0x68c8) + i * 0x388;
+        let t = (vm.f32(sample + 0x84) * f32::from_bits(0x3d99_999a) + vm.f32(f + 0x400)).abs();
+        let t = t * q * f32::from_bits(0x3ff8_cfe5) / avg;
+        f64::from(if 0.0 > t { f32::NAN } else { t.sqrt() })
+    };
+    let x = (f64::from(vm.f32(f + 0x70)) * s1) as f32;
+    let mut j = (f64::from(x) * 0.925 + 0.075f64) as f32;
+    let (b20, b24) = (f64::from(vm.f32(b + 0x1b20)), f64::from(vm.f32(b + 0x1b24)));
+    let lo = (b20 * 0.75 + b24 * 0.25) as f32;
+    let hi = (b20 * 0.25 + b24 * 0.75) as f32;
+    let r1cc = vm.f32(r + 0x1cc);
+    let mut x6: f32;
+    if matches!(kind, 5 | 6) {
+        if lo == hi {
+            x6 = if lo > r1cc {
+                zero
+            } else if r1cc > hi {
+                2.0
+            } else {
+                1.0
+            };
+        } else {
+            let cand = 2.0 / (hi - lo) * (r1cc - lo) + zero;
+            x6 = if zero > cand {
+                zero
+            } else if 2.0f32 < cand {
+                2.0
+            } else {
+                cand
+            };
+        }
+        let prod = vm.f32(b + 0xb68) * vm.f32(b + 0xb64) * vm.f32(eng + 0x20);
+        if prod == 0.0 {
+            x6 = (x6 + j) * half;
+        } else {
+            let low_j = if j < x6 { j } else { x6 };
+            let cand = (x6 - j) / (prod - zero) * (vm.f32(r + 0xcc) - zero) + j;
+            if low_j > cand {
+                x6 = low_j;
+            } else {
+                let high_j = if j > x6 { j } else { x6 };
+                x6 = if high_j < cand { high_j } else { cand };
+            }
+        }
+    } else {
+        let jm = (f64::from(j) * 0.1) as f32;
+        let pick = |cand: f32| if j < cand { j } else { cand };
+        if lo == hi {
+            if lo > r1cc {
+                x6 = jm;
+            } else if r1cc <= hi {
+                x6 = (jm + j) * half;
+            } else {
+                x6 = j;
+            }
+        } else {
+            let cand = (j - jm) / (hi - lo) * (r1cc - lo) + jm;
+            if j > jm {
+                x6 = if jm > cand { jm } else { pick(cand) };
+            } else {
+                x6 = if j <= cand { pick(cand) } else { j };
+            }
+        }
+    }
+    if matches!(kind, 1 | 2) {
+        let (c1, c2) = (vm.f32(b + 0x1b34), vm.f32(b + 0x1ac0));
+        if c1 > 100.0 && c2 > 100.0 {
+            let a = vm.f32(r + 0x1cc) / c1;
+            let c = vm.f32(r + 0x144) / c2;
+            j += c - a;
+            x6 += a - c;
+        }
+    }
+    let t = (vm.f32(r + 0x2bc) - 1.0) * f32::from_bits(0x3f66_6666) + 1.0;
+    let g = clamp(t, 0.1, 1.0);
+    x6 *= g;
+    j *= g;
+    let mode1 = vm.i32(b + 0x1b38);
+    let mut s130 = vm.f32(b + 0x1b34);
+    if mode1 == 0 {
+        s130 = to_c(s130);
+    }
+    s130 -= 15.0;
+    let mode2 = vm.i32(b + 0x1ac4);
+    let mut s30 = vm.f32(b + 0x1ac0);
+    if mode2 == 0 {
+        s30 = to_c(s30);
+    }
+    s30 -= 15.0;
+    let mut cc = vm.f32(r + 0x1cc);
+    if mode1 == 0 {
+        cc = to_c(cc);
+    }
+    let s138 = vm.f32(f + 0x64);
+    let s128 = cc - s138;
+    let mut s120 = vm.f32(r + 0x144);
+    if mode2 == 0 {
+        s120 = to_c(s120);
+    }
+    let dt = frame_time(vm, env);
+    let w = (vm.f32(r + 0x248) - s128 / s130 * x6) * vm.f32(b + 0x1b34);
+    let v = (f64::from(vm.f32(r + 0x1cc)) + dt * f64::from(w) / 180.0) as f32;
+    vm.set_f32(r + 0x1cc, v);
+    let dt2 = frame_time(vm, env);
+    let w2 = (vm.f32(r + 0x248) - (s120 - s138) / s30 * j) * vm.f32(b + 0x1ac0);
+    let heat = (f64::from(vm.f32(r + 0x144)) + dt2 * f64::from(w2) / 60.0) as f32;
+    vm.set_f32(r + 0x144, heat);
+    let base = (i as u32).wrapping_mul(100);
+    let put = |vm: &mut Vm, k: u32, offset: u64| {
+        let at = base.wrapping_add(k);
+        let lead = vm.f32(NOISE + 4 * u64::from(at & 0x3ffff));
+        let next = vm.f32(NOISE + 4 * u64::from(at.wrapping_add(1) & 0x3ffff));
+        let n = (1.0 - 0.0) * lead + next * 0.0;
+        let value = ((f64::from(n) + f64::from(n)) - 1.0) as f32;
+        let out = (f64::from(value) * 0.02 + 1.0) * f64::from(vm.f32(r + 0x144));
+        vm.set_f32(r + offset, out as f32);
+    };
+    for (k, offset) in [
+        (1, 0x148u64),
+        (2, 0x14c),
+        (3, 0x150),
+        (4, 0x154),
+        (5, 0x158),
+        (6, 0x15c),
+        (7, 0x160),
+        (8, 0x164),
+    ] {
+        put(vm, k, offset);
+    }
+    for (n, k) in (9u32..12).enumerate() {
+        put(vm, k, 0x168 + 4 * n as u64);
+    }
+}
+
+/// `0x14125fe8f..0x14125ff05` of [`engine_runtime`]: the throttle position `+0x44` of engine `i` follows the lever
+/// bounds `B+0x7ac`/`B+0x7d8` (when `B+0xaf8` is 2 and the position lies in 0.1..0.9) or `B+0x1aac`/`B+0x1ab0` (3).
+#[allow(clippy::manual_range_contains)] // a NaN position is not skipped
+fn engine_runtime_throttle(vm: &mut Vm, f: u64, i: u64) {
+    let b = vm.u64(f + 0x20);
+    let r = vm.u64(f + 0x68b0) + i * 0x2cc;
+    let (zero, half) = (0.0f32, 0.5f32);
+    let min1 = |x: f32| if 1.0f32 < x { 1.0 } else { x };
+    match vm.i32(b + 0xaf8) {
+        2 => {
+            let x = f64::from(vm.f32(r + 0x44));
+            if x < 0.1 || 0.9 < x {
+                return;
+            }
+            let (hi, lo) = (vm.f32(b + 0x7d8), vm.f32(b + 0x7ac));
+            if lo == hi {
+                vm.set_f32(r + 0x44, min1(half));
+            } else {
+                let c = 0.8f32 / (hi - lo) * (vm.f32(f + 0x41c) - lo);
+                let t = f32::from_bits(0x3f66_6666) - c;
+                let held = clamp(t, 0.1, 0.9);
+                vm.set_f32(r + 0x44, if zero > held { zero } else { min1(held) });
+            }
+        }
+        3 => {
+            let (hi, lo) = (vm.f32(b + 0x1ab0), vm.f32(b + 0x1aac));
+            let heat = vm.f32(r + 0x144);
+            let value = if lo == hi {
+                if lo > heat {
+                    min1(zero)
+                } else if heat <= hi {
+                    min1(half)
+                } else {
+                    min1(1.0)
+                }
+            } else {
+                let c = 1.0 / (hi - lo) * (heat - lo) + zero;
+                let held = if zero > c { zero } else { min1(c) };
+                if zero > held { zero } else { min1(held) }
+            };
+            vm.set_f32(r + 0x44, value);
+        }
+        _ => {}
+    }
 }
