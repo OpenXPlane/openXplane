@@ -2276,3 +2276,113 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         }
     }
 }
+
+/// `0x14126ef74..0x14126f37f`: the gear drag and the brake energy. Every gear record whose state (`[B+0x6080] + 0x88 i`)
+/// is above 1 and whose animation entry (`[F+0x6958] + 0x90 i`) has an extension `+0x10 > 0` places the foot of the
+/// strut (the object at the entry's `+0` pointer: the strut length `+0x18 - +0x20 * (1 - extension)` rotated by the
+/// entry's two angles `+0x14`, `+0x18` about the mount `+0x64/+0x70/+0x7c`) and applies a drag with `0x14119e5b0`,
+/// from the tyre widths `+0x58`, `+0x5c` and the stroke `+0x18`. With `B+0x2890 > 0.01`, a brake (`B+0x28dc` or
+/// `B+0x28e0`) and the brakes on `F+0x64d8`, the brake energy `F+0x28c` drains at the rate `F+0x290 = B+0x2890 *
+/// scale / max(B+0x281c, 1)` (scale from two `0x1406ea0b0` lines of `F+0x28c / B+0x2890`) and the flag clears when
+/// it is empty; otherwise the flag and rate are cleared. Finally `0x1411ddfd0` (replayed) is asked about the
+/// aircraft's wheel state and the contact flag `rbp-0x78` is cleared first.
+pub fn gear_drag_and_brake(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+) -> Result<(), String> {
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    for i in 0..10u64 {
+        let g = vm.u64(vm.u64(f + 0x20) + 0x6080) + i * 0x88;
+        if vm.u32(g) <= 1 {
+            continue;
+        }
+        let begin = vm.u64(f + 0x6958);
+        let count = (vm.u64(f + 0x6960).wrapping_sub(begin) as i64) / 0x90;
+        if i >= count as u64 {
+            return Err("gear state index out of range".into());
+        }
+        let elem = begin + i * 0x90;
+        let e = vm.f32(elem + 0x10);
+        if e.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
+            continue;
+        }
+        let strut = vm.u64(elem);
+        let ed = f64::from(e);
+        let pitch = vm.f32(elem + 0x14) * RAD;
+        let roll = vm.f32(elem + 0x18) * RAD;
+        let r = f64::from(vm.f32(strut + 0x18)) - f64::from(vm.f32(strut + 0x20)) * (1.0 - ed);
+        let cos_roll = f64::from(roll.cos());
+        let x = (f64::from(pitch.sin()) * r * cos_roll + f64::from(vm.f32(strut + 0x64))) as f32;
+        let y = (f64::from(vm.f32(strut + 0x70)) - f64::from(pitch.cos()) * r * cos_roll) as f32;
+        let z = (f64::from(vm.f32(strut + 0x7c)) - f64::from(roll.sin()) * r) as f32;
+        let wide = f64::from(vm.f32(g + 0x58));
+        let narrow = vm.f32(g + 0x5c);
+        let t1 = (((wide + wide) * f64::from(narrow)) * 2.0 * ed) as f32;
+        let mut t2 = (wide * 0.2) as f32;
+        if t2 > narrow {
+            t2 = narrow;
+        }
+        let t2 = t2 * vm.f32(g + 0x18);
+        let t2 = ((f64::from(t2) + f64::from(t2)) * ed) as f32;
+        let mut args = CallArgs::ints(&[f]);
+        args.xmm = [
+            None,
+            Some(x.to_bits()),
+            Some(y.to_bits()),
+            Some(z.to_bits()),
+        ];
+        args.stack = [Some(u64::from((t2 + t1).to_bits())), None, None, None];
+        env.call(vm, 0x14119e5b0, args);
+    }
+    let b = vm.u64(f + 0x20);
+    let capacity = vm.f32(b + 0x2890);
+    let braking = f64::from(capacity) > 0.01
+        && (vm.i32(b + 0x28dc) != 0 || vm.i32(b + 0x28e0) != 0)
+        && vm.i32(f + 0x64d8) != 0;
+    if braking {
+        let energy = vm.f32(f + 0x28c);
+        let ratio = energy / capacity;
+        let low = interpolate_clamped(0.0, f32::from_bits(0x3727_c5ac), 0.1, 1.0, ratio);
+        let high = interpolate_clamped(1.0, 0.1, f32::from_bits(0x3f73_3333), 1.0, ratio);
+        let scale = low * high;
+        let divisor = vm.f32(b + 0x281c);
+        let divisor = if divisor > 1.0 { divisor } else { 1.0 };
+        vm.set_f32(f + 0x290, capacity * scale / divisor);
+        let t = frame_time(vm, env);
+        let left = (f64::from(energy) - t * f64::from(vm.f32(f + 0x290))) as f32;
+        let capacity = vm.f32(vm.u64(f + 0x20) + 0x2890);
+        let value = if 0.0 > left {
+            0.0
+        } else if capacity < left {
+            capacity
+        } else {
+            left
+        };
+        vm.set_f32(f + 0x28c, value);
+        if value <= 0.0 {
+            vm.set_u32(f + 0x64d8, 0);
+        }
+    } else {
+        vm.set_u32(f + 0x64d8, 0);
+        vm.set_u32(f + 0x290, 0);
+    }
+    if vm.i32(f + 0xbcd0) != 0 || vm.i32(f + 0xbcc8) != 0 {
+        return Err("debug dump not ported".into());
+    }
+    vm.set_u32(slot(0x1758), 0);
+    vm.set_u32(slot(0x1750), 0);
+    vm.set_u32(slot(-0x78), 0);
+    let mut args = CallArgs::ints(&[f, f + 0x288, f + 0x304, slot(0x1758)]);
+    args.xmm[2] = Some(vm.f32(f + 0x34c).to_bits());
+    args.stack = [
+        Some(f + 0x304),
+        Some(u64::from(vm.f32(f + 0x354).to_bits())),
+        Some(slot(0x1750)),
+        Some(f + 0x31c),
+    ];
+    env.call(vm, 0x1411ddfd0, args);
+    Ok(())
+}
