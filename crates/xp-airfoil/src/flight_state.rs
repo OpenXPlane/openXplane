@@ -2116,20 +2116,14 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
         add_plugin_force(vm, env, f, 0.0, -moment, 0.0, 0.0, pp, 0.0)?;
         if vm.i32(f + 0x64e4) != 0 {
             let planet = env.call(vm, 0x14193ae40, CallArgs::default()).rax;
-            let mut args = CallArgs::default();
-            args.int = [
-                Some(planet),
-                Some(slot(-0x38)),
-                Some(rbp),
-                Some(slot(0x1750)),
-            ];
-            args.stack = [
-                Some(vm.f64(f + 0x64e8).to_bits()),
-                Some(vm.u64(f + 0x64f0)),
-                Some(vm.u64(f + 0x64f8)),
-                None,
-            ];
-            env.call(vm, 0x140913e60, args);
+            let geographic = [0x64e8, 0x64f0, 0x64f8].map(|o| vm.f64(f + o));
+            geodetic_to_local(
+                vm,
+                env,
+                planet,
+                [slot(-0x38), rbp, slot(0x1750)],
+                geographic,
+            );
             let b = vm.u64(f + 0x20);
             let point = [0x280c, 0x2810, 0x2814].map(|o| f64::from(vm.f32(b + o)));
             world_point_f64(vm, env, f, point, [slot(-0x50), slot(-0x68), slot(0x1758)]);
@@ -2635,5 +2629,42 @@ pub fn world_point_f64(vm: &mut Vm, env: &mut dyn Callees, f: u64, point: [f64; 
         let shift = position_component(vm, env, f, offset);
         let sum = shift + vm.f64(out[k]);
         vm.set_f64(out[k], sum);
+    }
+}
+
+/// `0x140913e60(planet, out1, out2, out3, lat, lon, alt)` with `0x1419f8ea0`: the geographic point (degrees, degrees,
+/// metres) becomes earth-centred coordinates and then the local coordinates `m * p + t` of the planet object (matrix
+/// at `+0x280..+0x2d0`, translation at `+0x2e0..+0x2f0`). The earth-centred step uses the ellipsoid at `+0xb0`
+/// (`a`, `b` and the eccentricity squared at `+0xb0`, `+0xb8`, `+0xc8`) and the height above the ellipsoid is the
+/// altitude plus the geoid height `0x1419f8ff0(ellipsoid, lat, lon)` (replayed). The sine and cosine are the platform's.
+pub fn geodetic_to_local(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    planet: u64,
+    out: [u64; 3],
+    geographic: [f64; 3],
+) {
+    const RAD: f64 = f64::from_bits(0x3f91_df46_a252_9d39);
+    let [lat, lon, alt] = geographic;
+    let shape = planet + 0xb0;
+    let geoid = f64::from_bits(env.call(vm, 0x1419f8ff0, CallArgs::ints(&[shape])).xmm0);
+    let height = geoid + alt;
+    let (lat_r, lon_r) = (lat * RAD, lon * RAD);
+    let (a, b, e2) = (vm.f64(shape), vm.f64(shape + 8), vm.f64(shape + 0x18));
+    let sin_lat = lat_r.sin();
+    let w = (1.0 - sin_lat * e2 * sin_lat).sqrt();
+    let n = a / w;
+    let rho = lat_r.cos() * (n + height);
+    let x = lon_r.cos() * rho;
+    let y = lon_r.sin() * rho;
+    let z = sin_lat * (b * b * n / (a * a) + height);
+    let m = |vm: &Vm, o: u64| vm.f64(planet + o);
+    let local = [
+        ((y * m(vm, 0x2a0) + x * m(vm, 0x280)) + z * m(vm, 0x2c0)) + m(vm, 0x2e0),
+        ((y * m(vm, 0x2a8) + x * m(vm, 0x288)) + z * m(vm, 0x2c8)) + m(vm, 0x2e8),
+        ((y * m(vm, 0x2b0) + x * m(vm, 0x290)) + z * m(vm, 0x2d0)) + m(vm, 0x2f0),
+    ];
+    for k in 0..3 {
+        vm.set_f64(out[k], local[k]);
     }
 }

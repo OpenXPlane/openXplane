@@ -879,7 +879,14 @@ def main():
             def to_frame(call, rng):
                 for pointer in (call.ints[2], call.stack[0], call.stack[2]):
                     call.put_f32(pointer, rng.choice([0.0, rng.uniform(-10, 10), rng.uniform(-0.005, 0.005)]))
-            case.stub(0x140913e60, geo)
+            case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
+            fz.preset_f64('CX', 0xb0, 6378137.0)
+            fz.preset_f64('CX', 0xb8, rng.uniform(6350000.0, 6378000.0))
+            fz.preset_f64('CX', 0xc8, rng.uniform(0.0, 0.01))
+            for off in (0x280, 0x288, 0x290, 0x2a0, 0x2a8, 0x2b0, 0x2c0, 0x2c8, 0x2d0):
+                fz.preset_f64('CX', off, rng.uniform(-1, 1))
+            for off in (0x2e0, 0x2e8, 0x2f0):
+                fz.preset_f64('CX', off, rng.uniform(-1e7, 1e7))
             case.stub(0x141296750, to_frame)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0, 0.4)))
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
@@ -900,8 +907,9 @@ def main():
             fz.preset_f32('F', 0x64dc, rng.choice([0.0, 0.005, 0.015, rng.uniform(0, 1)]))
             for off in (0x430, 0x434, 0x440, 0x444, 0x450, 0x454):
                 fz.preset_f32('F', off, rng.uniform(-1, 1))
-            for off in (0x64e8, 0x64f0, 0x64f8):
-                fz.preset_f64('F', off, rng.uniform(-100, 100))
+            fz.preset_f64('F', 0x64e8, rng.uniform(-89, 89))
+            fz.preset_f64('F', 0x64f0, rng.uniform(-179, 179))
+            fz.preset_f64('F', 0x64f8, rng.uniform(-100, 3000))
             case.emu.uc.reg_write(UC_X86_REG_R11, 0)
         if BLOCK == 'gdrag':
             def wheel_state(call, rng):

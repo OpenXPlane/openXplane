@@ -2693,10 +2693,22 @@ fn words_match(case: &VmCaseData, n: usize) {
     // a differing word passes only as two normal floats within a relative tolerance (libm differences): integers
     // and flags that differ in their bits must not hide as denormals
     let normal = |w: u32| (w >> 23) & 0xff != 0 && (w >> 23) & 0xff != 0xff;
+    let expected: std::collections::HashMap<u64, u32> = case.expected.iter().copied().collect();
+    // a double (two words of an aligned pair) that agrees to 1e-12 relative also matches (libm differences)
+    let doubles_agree = |addr: u64| {
+        let base = addr & !7;
+        let (Some(lo), Some(hi)) = (expected.get(&base), expected.get(&(base + 4))) else {
+            return false;
+        };
+        let want = f64::from_bits(u64::from(*hi) << 32 | u64::from(*lo));
+        let got = case.vm.f64(base);
+        want.is_finite() && got.is_finite() && (got - want).abs() <= 1e-12 * (1.0 + want.abs())
+    };
     for (addr, want) in &case.expected {
         let got = case.vm.u32(*addr);
         assert!(
-            got == *want
+            doubles_agree(*addr)
+                || got == *want
                 || (normal(got)
                     && normal(*want)
                     && (f32::from_bits(got) - f32::from_bits(*want)).abs()
