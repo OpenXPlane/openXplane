@@ -93,7 +93,7 @@ def main():
             for pointer in (call.ints[1], call.ints[2], call.ints[3]):
                 call.put_f32(pointer, rng.uniform(-180, 180))
 
-        case.stub(0x1406eaf20, geographic)
+        case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
         case.stub(0x1419f7ee0, local_matrix)
         case.stub(0x1419f6fd0, euler)
     print('# update_flight block vectors', BLOCK, hex(start), hex(end))
@@ -271,6 +271,22 @@ def main():
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
             for off in range(0x200, 0x278, 8):
                 fz.preset_f64('CX', off, rng.uniform(-3.0, 3.0))
+            fz.preset_f64('CX', 0xb0, 6378137.0)
+            fz.preset_f64('CX', 0xb8, rng.uniform(6350000.0, 6378000.0))
+            fz.preset_f64('CX', 0xc8, rng.uniform(0.0, 0.01))
+            fz.preset_f64('CX', 0xd0, rng.uniform(0.0, 0.01))
+            axis = rng.choice([0, 0, 0, 1, 2, 3])
+            if axis:
+                for off in (0x200, 0x220, 0x240, 0x260):
+                    fz.preset_f64('CX', off, 0.0)
+                fz.preset_f64('CX', 0x268, [0.0, 1.0, -1.0][axis - 1])
+                if axis == 1:
+                    for off in (0x208, 0x228, 0x248):
+                        fz.preset_f64('CX', off, 0.0)
+                    fz.preset_f64('CX', 0x270, rng.choice([0.0, 1.0, -1.0]))
+                    fz.preset_f64('CX', 0x230, 0.0)
+                    fz.preset_f64('CX', 0x210, 0.0)
+                    fz.preset_f64('CX', 0x250, 0.0)
             for off in (0x368, 0x36c, 0x370, 0x438, 0x43c, 0x448, 0x44c, 0x458, 0x45c):
                 fz.preset_f32('F', off, rng.uniform(-60, 60))
             for off in (0x3e0, 0x3dc, 0x3d8, 0x350, 0x358, 0x348):
@@ -640,12 +656,18 @@ def main():
                     call.put(pointer + 4, bits64 >> 32)
             CX = case.region('CX', 0x300)
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
+            for off in range(0x200, 0x278, 8):
+                fz.preset_f64('CX', off, rng.uniform(-3.0, 3.0))
+            fz.preset_f64('CX', 0xb0, 6378137.0)
+            fz.preset_f64('CX', 0xb8, rng.uniform(6350000.0, 6378000.0))
+            fz.preset_f64('CX', 0xc8, rng.uniform(0.0, 0.01))
+            fz.preset_f64('CX', 0xd0, rng.uniform(0.0, 0.01))
             def geo3(call, rng):
                 for pointer in (call.ints[1], call.ints[2], call.ints[3]):
                     bits64 = struct.unpack('<Q', struct.pack('<d', rng.uniform(-180, 180)))[0]
                     call.put(pointer, bits64 & 0xffffffff)
                     call.put(pointer + 4, bits64 >> 32)
-            case.stub(0x1406eaf20, geo3)
+            case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
             G = case.region('G', 0x88 * 10)
             EL = case.region('EL', 0x90 * 10)
             PP = case.region('PP', 0x100 * 10)

@@ -1022,14 +1022,13 @@ pub fn geodetic_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     let z = position_component(vm, env, f, 0x388);
     let y = position_component(vm, env, f, 0x380);
     let x = position_component(vm, env, f, 0x378);
-    let mut args = CallArgs::ints(&[ctx, f + 0x390, f + 0x398, f + 0x3a0]);
-    args.stack = [
-        Some(x.to_bits()),
-        Some(y.to_bits()),
-        Some(z.to_bits()),
-        None,
-    ];
-    env.call(vm, 0x1406eaf20, args);
+    crate::flight_state::local_to_geodetic(
+        vm,
+        env,
+        ctx,
+        [f + 0x390, f + 0x398, f + 0x3a0],
+        [x, y, z],
+    );
     let ctx2 = planet(vm, env);
     let a398 = position_component(vm, env, f, 0x398);
     let a390 = position_component(vm, env, f, 0x390);

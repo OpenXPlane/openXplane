@@ -1581,20 +1581,8 @@ pub fn gear_state_update(
         let point = [0x280c, 0x2810, 0x2814].map(|o| f64::from(vm.f32(b + o)));
         world_point_f64(vm, env, f, point, [slot(-0x38), slot(-0x68), slot(0x1758)]);
         let ctx = env.call(vm, 0x14193ae40, CallArgs::default()).rax;
-        let mut args = CallArgs::default();
-        args.int = [
-            Some(ctx),
-            Some(f + 0x64e8),
-            Some(f + 0x64f0),
-            Some(f + 0x64f8),
-        ];
-        args.stack = [
-            Some(vm.f64(slot(-0x38)).to_bits()),
-            Some(vm.f64(slot(-0x68)).to_bits()),
-            Some(vm.f64(slot(0x1758)).to_bits()),
-            None,
-        ];
-        env.call(vm, 0x1406eaf20, args);
+        let local = [slot(-0x38), slot(-0x68), slot(0x1758)].map(|a| vm.f64(a));
+        local_to_geodetic(vm, env, ctx, [f + 0x64e8, f + 0x64f0, f + 0x64f8], local);
     }
     vm.set_u32(f + 0x24c, 0);
     vm.set_u32(f + 0x250, 0);
@@ -2667,4 +2655,78 @@ pub fn geodetic_to_local(
     for k in 0..3 {
         vm.set_f64(out[k], local[k]);
     }
+}
+
+/// `0x1406eaf20(planet, lat_out, lon_out, alt_out, x, y, z)`: the local point is moved to earth-centred coordinates
+/// with the inverse affine map of the planet object (matrix `+0x200..+0x250`, translation `+0x260..+0x270`) and
+/// `0x1419f9330` turns them into latitude and longitude (degrees) and the altitude above the geoid (the geoid height
+/// `0x1419f8ff0` is replayed). Closed form: with `rho = sqrt(x^2 + y^2)`, `r = sqrt(rho^2 + (1.0026 z)^2)`, `c = rho
+/// / r`, `s = 1.0026 z / r`, the numerator `n = z + e'^2 b s^3` and denominator `d = rho - a e^2 c^3` give the sine
+/// and cosine of the latitude; the height is `rho / cos - N` (or from `z / sin` near the poles, `|cos| < 0.3827`).
+/// On the rotation axis (`x == 0`) the longitude is 90, -90 or 0 degrees and the latitude +-90.
+pub fn local_to_geodetic(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    planet: u64,
+    out: [u64; 3],
+    local: [f64; 3],
+) {
+    const DEG: f64 = f64::from_bits(0x404c_a5dc_1a63_c1f8);
+    const SPLIT: f64 = f64::from_bits(0x3fd8_7de2_a6ae_a963);
+    let [lx, ly, lz] = local;
+    let m = |vm: &Vm, o: u64| vm.f64(planet + o);
+    let x = ((ly * m(vm, 0x220) + lx * m(vm, 0x200)) + lz * m(vm, 0x240)) + m(vm, 0x260);
+    let y = ((ly * m(vm, 0x228) + lx * m(vm, 0x208)) + lz * m(vm, 0x248)) + m(vm, 0x268);
+    let z = ((ly * m(vm, 0x230) + lx * m(vm, 0x210)) + lz * m(vm, 0x250)) + m(vm, 0x270);
+    let shape = planet + 0xb0;
+    let mut latitude_set = false;
+    if x == 0.0 {
+        if y > 0.0 {
+            vm.set_f64(out[1], 90.0);
+        } else if 0.0 > y {
+            vm.set_f64(out[1], -90.0);
+        } else {
+            latitude_set = true;
+            vm.set_f64(out[1], 0.0);
+            if z > 0.0 {
+                vm.set_f64(out[0], 90.0);
+            } else if 0.0 > z {
+                vm.set_f64(out[0], -90.0);
+            } else {
+                vm.set_f64(out[0], 90.0);
+                return;
+            }
+        }
+    } else {
+        vm.set_f64(out[1], y.atan2(x) * DEG);
+    }
+    let (a, b, e2, e2p) = (
+        vm.f64(shape),
+        vm.f64(shape + 8),
+        vm.f64(shape + 0x18),
+        vm.f64(shape + 0x20),
+    );
+    let rho_sq = x * x + y * y;
+    let rho = rho_sq.sqrt();
+    let zz = z * 1.0026;
+    let r = (zz * zz + rho_sq).sqrt();
+    let (c, s) = (rho / r, zz / r);
+    let s3 = s * s * s;
+    let n = e2p * b * s3 + z;
+    let d = rho - a * e2 * c * c * c;
+    let norm = (d * d + n * n).sqrt();
+    let (sin_p, cos_p) = (n / norm, d / norm);
+    let radius = a / (1.0 - e2 * sin_p * sin_p).sqrt();
+    let height = if cos_p >= SPLIT {
+        rho / cos_p - radius
+    } else if cos_p <= -SPLIT {
+        rho / -cos_p - radius
+    } else {
+        (e2 - 1.0) * radius + z / sin_p
+    };
+    if !latitude_set {
+        vm.set_f64(out[0], (sin_p / cos_p).atan() * DEG);
+    }
+    let geoid = f64::from_bits(env.call(vm, 0x1419f8ff0, CallArgs::ints(&[shape])).xmm0);
+    vm.set_f64(out[2], height - geoid);
 }
