@@ -487,6 +487,75 @@ pub fn body_pass(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result
     Ok(())
 }
 
+/// `update_flight` `0x141269920..0x14126a791`: the drag of the propeller-like parts. When the aircraft's
+/// reference speed `B+0xc0c` (above 0.5) and the coefficients `B+0xc10`, `B+0xc14` are positive, every part
+/// record (`B+0x6010`, stride `0x3770`) gets the aircraft velocity `F+0x29c/0x2a8/0x2b4` (non-finite
+/// components count as zero), plus, when `B+0xc08` is set, the rotation of `(0, 0, N+0x84)` by the part's angles
+/// (`0x14120cf60`); a force of magnitude `B+0xc14 * B+0xc10 * (speed / B+0xc0c)^2 * F+0x6c * 0.5 * M+0x44` along
+/// that velocity is added at the part's offset by `0x140f26ef0`.
+pub fn part_force_pass(vm: &mut Vm, f: u64, rbp: u64) -> Result<(), String> {
+    use crate::callees::{AeroForce, add_aero_force};
+    use crate::transform::rotate_euler_offset;
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let b = vm.u64(f + 0x20);
+    let (c0c, c10, c14) = (vm.f32(b + 0xc0c), vm.f32(b + 0xc10), vm.f32(b + 0xc14));
+    let active = c0c > 0.5 && c10 > 0.0 && c14 > 0.0 && vm.i32(b + 0x91c) > 0;
+    if !active {
+        return Ok(());
+    }
+    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+    for i in 0..vm.i32(b + 0x91c) as u64 {
+        let mut vx = finite(vm.f32(f + 0x29c));
+        let mut vy = finite(vm.f32(f + 0x2a8));
+        let mut vz = finite(vm.f32(f + 0x2b4));
+        let p = vm.u64(b + 0x6010) + i * 0x3770;
+        if vm.i32(b + 0xc08) != 0 {
+            let n = vm.u64(f + 0x68c8) + i * 0x388;
+            let obj = p + 0x700;
+            let angles = [vm.f32(obj + 0x9c), vm.f32(obj + 0xa0), vm.f32(obj + 0xa4)];
+            let r = rotate_euler_offset(angles, [0.0; 3], false, 0.0, 0.0, vm.f32(n + 0x84));
+            vx += r[0];
+            vy += r[1];
+            vz += r[2];
+        }
+        vx = finite(vx);
+        vy = finite(vy);
+        vz = finite(vz);
+        let speed = {
+            let sum = vy * vy + vx * vx + vz * vz;
+            if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+        };
+        let ratio = speed / c0c;
+        vm.set_f32(slot(-0x6c), ratio);
+        let m = vm.u64(f + 0x68b0) + i * 0x2cc;
+        let scale = c14 * c10 * (ratio * ratio) * vm.f32(f + 0x6c);
+        let magnitude = (f64::from(scale) * 0.5 * f64::from(vm.f32(m + 0x44))) as f32;
+        vm.set_f32(slot(0x1758), magnitude);
+        if debug_dump_active(vm, f) {
+            return Err("debug dump not ported".into());
+        }
+        let force = AeroForce {
+            a2: vx,
+            a3: 0.0,
+            a5: vy,
+            a6: magnitude,
+            a7: vz,
+            a8: 0.0,
+            a9: vm.f32(p + 0x790),
+            a10: vm.f32(p + 0x794),
+            a11: vm.f32(p + 0x798),
+            a12: 0.0,
+            a13: 0.0,
+            a14: 0,
+            a15: 0.0,
+            a16: 0.0,
+            a17: 0.0,
+        };
+        add_aero_force(vm, f, &force);
+    }
+    Ok(())
+}
+
 /// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
 /// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
 /// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density

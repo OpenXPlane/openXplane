@@ -266,6 +266,15 @@ speed in knots (1.9438), the element force `0x1411b9840` (replayed) added to `X+
 `F+0x314/0x32c`, and the aerodynamic force `0x140f26ef0` at the element point). The locals of the original's frame
 are read and written at `rbp + offset`, as the environment calls fill them.
 
+`part_force_pass` (`0x141269920..0x14126a791`, 110 cases; the repaired-value log calls `0x1405dcad0` and `0x141a67610`
+are stubbed): the drag of the propeller-like parts. It runs when `B+0xc0c > 0.5` and `B+0xc10`, `B+0xc14` are
+positive; every part record (`B+0x6010`, stride `0x3770`, count `B+0x91c`) gets the aircraft velocity
+`F+0x29c/0x2a8/0x2b4` (a non-finite component counts as zero), plus, when `B+0xc08` is set, the rotation of
+`(0, 0, N+0x84)` by the part's angles (`0x14120cf60`, stack argument 8 = 0 so the offsets are not added); with
+`ratio = |v| / B+0xc0c` the force magnitude is `B+0xc14 * B+0xc10 * ratio^2 * F+0x6c`, times 0.5 and `M+0x44` in
+double precision, applied along `v` at the part's offset `P+0x790..0x798` by `0x140f26ef0`. The register state at the
+block start is `rsi = 0` and `xmm8 = 0.5` (double).
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

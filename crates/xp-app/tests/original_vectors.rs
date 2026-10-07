@@ -2865,6 +2865,19 @@ fn body_pass_matches_the_original_machine_code() {
 }
 
 #[test]
+fn part_force_pass_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_parts.txt");
+    assert!(cases.len() >= 100);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
+        openxplane::flight_step::part_force_pass(&mut case.vm, f, rbp)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

@@ -15,12 +15,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from xp_vmcase import VmCase  # noqa: E402
-from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_XMM11,  # noqa: E402
+from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RSI, UC_X86_REG_XMM8, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
-          'body': (0x141267978, 0x1412686a9)}
+          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
@@ -37,6 +37,8 @@ def main():
     case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.randrange(2) if rng.random() < 0.2 else 0))
     case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.randrange(2)))
     case.stub(0x141260090, lambda call, rng: None)
+    for diagnostic in (0x1405dcad0, 0x141a67610):  # the log message of a repaired value
+        case.stub(diagnostic, lambda call, rng: None)
 
     def airflow(call, rng):
         call.put_f32(call.ints[2], rng.uniform(-50, 50))
@@ -126,7 +128,32 @@ def main():
             for off in (0x6c, 0x74):
                 fz.preset_f32('F', off, rng.uniform(0.5, 400.0))
             fz.preset('F', 0x28, 7)
-        if BLOCK in ('element', 'body'):
+        if BLOCK == 'parts':
+            P = case.region('P', 0x3770 * 4)
+            M = case.region('M', 0x2cc * 4)
+            N = case.region('N', 0x388 * 4)
+            for base, off, ptr in ((B, 0x6010, P), (F, 0x68b0, M), (F, 0x68c8, N)):
+                name = {F: 'F', B: 'B'}[base]
+                fz.preset(name, off, ptr & 0xffffffff, record=True)
+                fz.preset(name, off + 4, ptr >> 32, record=True)
+            fz.preset('B', 0x91c, rng.randrange(0, 5))
+            fz.preset('B', 0xc08, rng.choice([0, 1, 1]))
+            fz.preset_f32('B', 0xc0c, rng.choice([0.2, 0.7, 3.0, 12.0, rng.uniform(0.0, 20.0)]))
+            fz.preset_f32('B', 0xc10, rng.choice([-1.0, 0.5, 2.0, rng.uniform(0.0, 3.0)]))
+            fz.preset_f32('B', 0xc14, rng.choice([-1.0, 0.5, 2.0, rng.uniform(0.0, 3.0)]))
+            for off in (0x29c, 0x2a8, 0x2b4):
+                fz.preset_f32('F', off, rng.choice([float('nan'), float('inf'), -float('inf')] + [rng.uniform(-60, 60)] * 12))
+            fz.preset_f32('F', 0x6c, rng.uniform(0.2, 1.3))
+            for k in range(4):
+                fz.preset_f32('M', 0x2cc * k + 0x44, rng.uniform(0.0, 5.0))
+                fz.preset_f32('N', 0x388 * k + 0x84, rng.choice([float('nan'), rng.uniform(-3, 3), rng.uniform(-3, 3)]))
+                for off in (0x790, 0x794, 0x798):
+                    fz.preset_f32('P', 0x3770 * k + off, rng.uniform(-3.0, 3.0))
+                for off in (0x79c, 0x7a0, 0x7a4):
+                    fz.preset_f32('P', 0x3770 * k + off, rng.uniform(-90.0, 90.0))
+            case.emu.uc.reg_write(UC_X86_REG_RSI, 0)
+            case.emu.uc.reg_write(UC_X86_REG_XMM8, struct.unpack('<Q', struct.pack('<d', 0.5))[0])
+        if BLOCK in ('element', 'body', 'parts'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
             fz.preset('F', 0x28, rng.choice([7, 12345]))
@@ -156,9 +183,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body') else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts') else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK in ('element', 'body'):
+        if BLOCK in ('element', 'body', 'parts'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)
