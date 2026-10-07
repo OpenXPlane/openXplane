@@ -1046,8 +1046,12 @@ pub fn geodetic_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         let word = vm.u32(f + from);
         vm.set_u32(f + to, word);
     }
-    let args = CallArgs::ints(&[matrix, f + 0x358, f + 0x350, f + 0x348]);
-    env.call(vm, 0x1419f6fd0, args);
+    let m: [f32; 16] = std::array::from_fn(|k| vm.f32(matrix + 4 * k as u64));
+    let seeds = [vm.f32(f + 0x358), vm.f32(f + 0x350), vm.f32(f + 0x348)];
+    let angles = crate::matrix::euler_from_matrix(&m, seeds);
+    vm.set_f32(f + 0x358, angles[0]);
+    vm.set_f32(f + 0x350, angles[1]);
+    vm.set_f32(f + 0x348, angles[2]);
     for (target, angle, old) in [
         (0x438, 0x350, old350),
         (0x448, 0x358, old358),

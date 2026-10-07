@@ -25,7 +25,7 @@ def dbits(v):
 
 def main():
     case = VmCase(EXE, SEED, [(0x1407b3000, 0x1407b4000), (0x14093c000, 0x14093d000), (0x140cba000, 0x140cbb000),
-                              (0x140cb9000, 0x140cba000), (0x1419f7000, 0x1419f9000), (0x14062c000, 0x14062d000)])
+                              (0x140cb9000, 0x140cba000), (0x1419f7000, 0x1419f9000), (0x14062c000, 0x14062d000), (0x1419f6000, 0x1419f7000), (0x14089c000, 0x14089d000)])
     rng = case.rng
     print(f'# matrix vectors {KIND} (tools/gen_matrix_vectors.py)')
     done = 0
@@ -70,6 +70,27 @@ def main():
         elif KIND == 'axis':
             run = (0x140cbabc0, [R], [dbits(axis[2])])
             header_args = f'{R:x} {dbits(angle):016x} {dbits(axis[0]):016x} {dbits(axis[1]):016x} {dbits(axis[2]):016x}'
+        elif KIND == 'euler':
+            P = case.region('P', 0x10)
+            seeds = [rng.uniform(-180, 180) for _ in range(3)]
+            for k in range(3):
+                fz.preset_f32('P', 4 * k, seeds[k])
+            import math
+
+            def rot(h, p, r):  # a rotation matrix of floats from three angles (degrees)
+                h, p, r = (math.radians(v) for v in (h, p, r))
+                ch, sh, cp, sp, cr, sr = math.cos(h), math.sin(h), math.cos(p), math.sin(p), math.cos(r), math.sin(r)
+                return [[ch * cr + sh * sp * sr, -ch * sr + sh * sp * cr, sh * cp, 0], [sr * cp, cr * cp, -sp, 0],
+                        [-sh * cr + ch * sp * sr, sh * sr + ch * sp * cr, ch * cp, 0], [0, 0, 0, 1]]
+
+            if rng.random() < 0.7:
+                mtx = rot(rng.uniform(-180, 180), rng.choice([rng.uniform(-90, 90), 90.0, -90.0, 0.0]), rng.uniform(-180, 180))
+            else:
+                mtx = [[rng.uniform(-1, 1) for _ in range(3)] + [0] for _ in range(3)] + [[0, 0, 0, 1]]
+            for k in range(16):
+                fz.preset_f32('M', 4 * k, mtx[k // 4][k % 4])
+            run = (0x1419f6fd0, [M, P, P + 4, P + 8], [])
+            header_args = f'{M:x} {P:x}'
         elif KIND == 'axes':
             run = (0x1419f7ee0, [CX, R], [])
             header_args = f'{CX:x} {R:x} {dbits(lat):016x} {dbits(lon):016x}'

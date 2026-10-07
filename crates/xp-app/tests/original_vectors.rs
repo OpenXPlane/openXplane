@@ -3605,6 +3605,15 @@ fn matrix_cases(kind: &str) {
                 let r = axis_rotation(double(&h[2]), double(&h[3]), double(&h[4]), double(&h[5]));
                 write(&mut case.vm, hex(&h[1]), &r);
             }
+            "euler" => {
+                let m: [f32; 16] = std::array::from_fn(|k| case.vm.f32(hex(&h[1]) + 4 * k as u64));
+                let p = hex(&h[2]);
+                let seeds = [case.vm.f32(p), case.vm.f32(p + 4), case.vm.f32(p + 8)];
+                let angles = openxplane::matrix::euler_from_matrix(&m, seeds);
+                for (k, a) in angles.iter().enumerate() {
+                    case.vm.set_f32(p + 4 * k as u64, *a);
+                }
+            }
             "axes" => {
                 let mut env = VmReplay {
                     calls: std::mem::take(&mut case.calls),
@@ -3653,6 +3662,11 @@ fn matrix_axis_rotation_matches_the_original_machine_code() {
 #[test]
 fn local_axes_match_the_original_machine_code() {
     matrix_cases("axes");
+}
+
+#[test]
+fn euler_angles_match_the_original_machine_code() {
+    matrix_cases("euler");
 }
 
 #[test]

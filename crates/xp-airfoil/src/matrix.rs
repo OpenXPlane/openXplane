@@ -135,3 +135,61 @@ pub fn axis_rotation(angle: f64, x: f64, y: f64, z: f64) -> Mat4 {
 pub fn rotate_by(m: &Mat4, angle: f64, x: f64, y: f64, z: f64) -> Mat4 {
     mul(m, &axis_rotation(angle, x, y, z))
 }
+
+/// `0x14089c7a0(out, a, b)`: [`mul`] for 4 x 4 matrices of floats.
+pub fn mul_f32(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
+    std::array::from_fn(|k| {
+        let (r, c) = (k / 4, k % 4);
+        (((b[4 * r] * a[c]) + b[4 * r + 1] * a[4 + c]) + b[4 * r + 2] * a[8 + c])
+            + b[4 * r + 3] * a[12 + c]
+    })
+}
+
+/// `0x1419f6fd0(m, a1, a2, a3)`: the three angles (degrees) the rotation `T * m` has, where `T` is the rotation built
+/// from the seed angles `a1`, `a2`, `a3` (their sines and cosines `s1 c1 s2 c2 s3 c3`: the rows of `T` are
+/// `(s3 s2 s1 + c3 c1, -s3 c2, c3 s1 - s3 s2 c1)`, `(s3 c1 - c3 s2 s1, c3 c2, c3 s2 c1 + s3 s1)`, `(-c2 s1, -s2,
+/// c2 c1)`). With `R = T * m` and `e = -R[2][1]` the second angle is `atan2(e, sqrt(1 - e^2))`; away from the pole the
+/// first is `atan2(R[2][0] / -q, R[2][2] / q)` and the third `atan2(-R[0][1] / q, R[1][1] / q)` with `q` that
+/// square root; at the pole (`q == 0`) the first is `atan2(R[0][2], R[0][0])` and the third zero.
+pub fn euler_from_matrix(m: &[f32; 16], seeds: [f32; 3]) -> [f32; 3] {
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    let (r1, r2, r3) = (seeds[0] * RAD, seeds[1] * RAD, seeds[2] * RAD);
+    let (s1, c1) = (r1.sin(), r1.cos());
+    let (s2, c2) = (r2.sin(), r2.cos());
+    let (s3, c3) = (r3.sin(), r3.cos());
+    let s3s2 = s3 * s2;
+    let c3s2 = c3 * s2;
+    let t = [
+        (s3s2 * s1) + (c3 * c1),
+        (-s3) * c2,
+        (c3 * s1) - (s3s2 * c1),
+        0.0,
+        (s3 * c1) - (c3s2 * s1),
+        c3 * c2,
+        (c3s2 * c1) + (s3 * s1),
+        0.0,
+        (-c2) * s1,
+        -s2,
+        c2 * c1,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    ];
+    let r = mul_f32(m, &t);
+    let e = -r[9];
+    let v = 1.0 - e * e;
+    let clamped = crate::scalar::clamp(v, 0.0, 1.0);
+    let q = clamped.sqrt();
+    if q == 0.0 {
+        [r[2].atan2(r[0]) * DEG, e.atan2(q) * DEG, 0.0]
+    } else {
+        [
+            (r[8] / -q).atan2(r[10] / q) * DEG,
+            e.atan2(q) * DEG,
+            ((-r[1]) / q).atan2(r[5] / q) * DEG,
+        ]
+    }
+}
