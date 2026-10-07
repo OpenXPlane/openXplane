@@ -1385,3 +1385,109 @@ pub fn gear_targets(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Res
     }
     Ok(())
 }
+
+/// `0x14126c4e4..0x14126c7dc`: the nose-wheel and brake demand, only while `F+0x3c == 1`. The demands `F+0x240` and
+/// `F+0x244` follow the pedal `rbp+0x1750` unless the brake or the pause conditions hold (`F+0x28 == 0` with
+/// `F+0x6824`, the globals `0x142fe2a48`, `0x1460e0a1c`, `0x1460e0a6c`, a held key of code 6 or 7 in the key table,
+/// the queries `0x1417dacf0(0x1460e0a10, 0x1d9/0x1da)` (replayed), `B+0x2840 < 0.01` or `F+0x23c != 0`): the pedal
+/// ramp `interpolate(|p|, 0.5 to 1)` signed like the pedal is combined with the speed ramp from `0x14123d110`
+/// (replayed) and `0x1408625a0(pedal, B+0x2840)` (replayed) either into the left demand alone or as a split of the
+/// average of both, and held to `0..1`. Finally, with `B+0xe94`, `F+0x238 == 0` and both demands above 0.9 the
+/// latches `F+0x228`, `F+0x22c`, `F+0x220` are cleared (the last two only with `B+0xe90`), and with `B+0xe90 == 1`
+/// and `F+0x22c == 1` the maximum of the demands and `F+0x224` becomes `F+0x220` and `F+0x224`. The register state
+/// is `xmm7 = 0.01` (double), `xmm10 = 0.5`.
+#[allow(clippy::field_reassign_with_default, clippy::needless_late_init)]
+pub fn steering_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::scalar::sign;
+    const TABLE: u64 = 0x1_460e_9708;
+    let slot = |off: u64| rbp.wrapping_add(off);
+    if vm.i32(f + 0x3c) != 1 {
+        return;
+    }
+    let b = vm.u64(f + 0x20);
+    let held = |vm: &Vm, code: i32| {
+        (0..500u64).any(|k| vm.i32(TABLE + 4 * k + 0xba44) != 0 && vm.i32(TABLE + 4 * k) == code)
+    };
+    let blocked = (vm.i32(f + 0x28) == 0 && vm.i32(f + 0x6824) != 0)
+        || vm.i32(0x1_42fe_2a48) != 0
+        || vm.i32(0x1_460e_0a1c) != 0
+        || vm.i32(0x1_460e_0a6c) != 0
+        || held(vm, 6)
+        || held(vm, 7);
+    let mut proceed = !blocked;
+    for id in [0x1d9u64, 0x1da] {
+        if proceed
+            && env
+                .call(vm, 0x1417dacf0, CallArgs::ints(&[0x1_460e_0a10, id]))
+                .rax as u8
+                != 0
+        {
+            proceed = false;
+        }
+    }
+    if proceed {
+        let b2840 = vm.f32(b + 0x2840);
+        proceed = f64::from(b2840) >= 0.01 && vm.f32(f + 0x23c) == 0.0;
+    }
+    let float_call = |vm: &mut Vm, env: &mut dyn Callees, address: u64, args: CallArgs| {
+        f32::from_bits(env.call(vm, address, args).xmm0 as u32)
+    };
+    if proceed {
+        let pedal = vm.f32(slot(0x1750));
+        let ramp = interpolate_clamped(0.5, 0.0, 1.0, 1.0, pedal.abs());
+        let signed = ramp * sign(pedal);
+        vm.set_f32(slot(0x1758), signed);
+        let speed = vm.f32(f + 0x41c);
+        let reach = float_call(vm, env, 0x14123d110, CallArgs::ints(&[f]));
+        let speed_ramp = interpolate_clamped(0.0, 1.0, reach, 0.0, speed);
+        let root = if 0.0 > speed_ramp {
+            f32::NAN
+        } else {
+            speed_ramp.sqrt()
+        };
+        let toggle = env
+            .call(vm, 0x1411e3ee0, CallArgs::ints(&[0x1_460e_0a10, 0x4e]))
+            .rax as u8
+            != 0;
+        let b2840 = vm.f32(b + 0x2840);
+        let pull = |vm: &mut Vm, env: &mut dyn Callees, x: f32| {
+            let mut args = CallArgs::default();
+            args.xmm = [Some(x.to_bits()), Some(b2840.to_bits()), None, None];
+            float_call(vm, env, 0x1408625a0, args)
+        };
+        let first = pull(vm, env, signed);
+        let value;
+        if !toggle {
+            let left = clamp(-first * root, 0.0, 1.0);
+            vm.set_f32(f + 0x240, left);
+            let second = pull(vm, env, vm.f32(slot(0x1758)));
+            value = second * root;
+        } else {
+            let mid = (vm.f32(f + 0x244) + vm.f32(f + 0x240)) * 0.5;
+            let left = clamp(mid - first * root, 0.0, 1.0);
+            vm.set_f32(f + 0x240, left);
+            let second = pull(vm, env, vm.f32(slot(0x1758)));
+            value = second * root + mid;
+        }
+        vm.set_f32(f + 0x244, clamp(value, 0.0, 1.0));
+    }
+    let b = vm.u64(f + 0x20);
+    if vm.i32(b + 0xe94) != 0
+        && vm.f32(f + 0x238) == 0.0
+        && f64::from(vm.f32(f + 0x240)) > 0.9
+        && f64::from(vm.f32(f + 0x244)) > 0.9
+    {
+        vm.set_i32(f + 0x228, 0);
+        if vm.i32(b + 0xe90) != 0 {
+            vm.set_i32(f + 0x22c, 0);
+        }
+        vm.set_i32(f + 0x220, 0);
+    }
+    if vm.i32(b + 0xe90) == 1 && vm.i32(f + 0x22c) == 1 {
+        let (d244, d240, d224) = (vm.f32(f + 0x244), vm.f32(f + 0x240), vm.f32(f + 0x224));
+        let m = if d224 > d240 { d224 } else { d240 };
+        let m = if d244 > m { d244 } else { m };
+        vm.set_f32(f + 0x220, m);
+        vm.set_f32(f + 0x224, m);
+    }
+}

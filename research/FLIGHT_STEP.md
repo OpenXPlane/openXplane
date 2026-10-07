@@ -469,6 +469,17 @@ it is then multiplied by the entry's extension `+0x10` and by -1 when the point 
 (p0.+0x18 - (1 - ext) * p0.+0x20)` is above zero. `pedal` is the float at `rbp+0x1750` (also in `xmm6` at the block start; it
 is reloaded from the slot after every gear). The register state at the block start is `xmm7 = 0.01` (double), `xmm10 = 0.5`, `rsi = rdi = 0`.
 
+`steering_state` (`0x14126c4e4..0x14126c7dc`, 100 cases; `0x1417dacf0` (two queries), `0x14123d110`, `0x1411e3ee0`, `0x1408625a0` are replayed): only while `F+0x3c == 1`.
+Unless blocked (`F+0x28 == 0` with `F+0x6824`; the globals `0x142fe2a48`, `0x1460e0a1c`, `0x1460e0a6c`; a held key of code 6
+or 7 in the key table; the queries with `0x1d9` and `0x1da`; `B+0x2840 < 0.01`; `F+0x23c != 0`), the demands `F+0x240`
+(left) and `F+0x244` (right) follow the pedal `rbp+0x1750`: the signed ramp `interpolate(|p|; 0.5 -> 0, 1 -> 1) * sign(p)` is
+stored at `rbp+0x1758`, the speed ramp `interpolate(F+0x41c; 0 -> 1, r -> 0)` (`r` from `0x14123d110`) gives a root, and
+`0x1408625a0(signed, B+0x2840)` scaled by it either replaces the left demand alone (toggle off) or splits the average of
+both (toggle on, `0x1411e3ee0(0x1460e0a10, 0x4e)`); both held to `0..1`. With `B+0xe94`, `F+0x238 == 0` and both demands
+above 0.9 the latches `F+0x228`, `F+0x22c` (only with `B+0xe90`) and `F+0x220` are cleared; with `B+0xe90 == 1` and
+`F+0x22c == 1`, `F+0x220` and `F+0x224` take the maximum of the demands and `F+0x224`. Register state: `xmm9 = 0x7fffffff`
+(the abs mask), `xmm7 = 0.01` (double), `xmm10 = 0.5`, `r12` = the key table, `rdx` = its end.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded
