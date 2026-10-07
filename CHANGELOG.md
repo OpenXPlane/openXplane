@@ -13,8 +13,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
   injected piston (the Cessna 172 SP), free and fixed turboprop, with the starter, the thrust term and the propeller
   power curve. The flight step is ported block by block: the wing and body loops, the airflow wash with the body
   shadow, the part drag, the equations of motion with the velocity and rate integration, the position setter, the
-  attitude quaternion, the aircraft-axes velocities, the geographic state and the flight angles. Each is compared
-  with the original machine code in an emulator.
+  attitude quaternion, the aircraft-axes velocities, the geographic state and the flight angles, and now the whole
+  ground contact chain: the landing gear and steering, the wing strip and body surface probes, the body contact
+  response, the ground side force and the gear drag with the brake energy. Each is compared with the original
+  machine code in an emulator.
 
 ![Takeoff from Seattle-Tacoma with the approximate flight model](site/assets/anim/takeoff.gif)
 
