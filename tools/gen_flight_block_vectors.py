@@ -471,10 +471,9 @@ def main():
         if BLOCK == 'hook':
             OBJ = case.region('OBJ', 0x100)
             case.stub(0x1411b63a0, lambda call, rng: call.ret_int(OBJ if rng.random() < 0.9 else 0))
-            for address in (0x1407cd810, 0x1408be280, 0x1408625a0):
-                case.stub(address, lambda call, rng: call.ret_f32(rng.choice([rng.uniform(-5, 20), rng.uniform(0, 3), rng.uniform(10.5, 20), rng.uniform(10.5, 20)])))
-            case.stub(0x1408ce690, lambda call, rng: call.ret_f64(rng.uniform(-1.5, 1.5)))
             case.stub(0x1411e14d0, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
+            for off in (0x368, 0x36c, 0x370):
+                fz.preset_f32('F', off, rng.choice([rng.uniform(-8, 8), rng.uniform(-3, 3), rng.uniform(-14, 14)]))
             case.stub(0x1408e25a0, lambda call, rng: None, record=False)
             for off in (0x64, 0x68, 0x6c, 0x80, 0x84, 0x88):
                 fz.preset_f32('OBJ', off, rng.uniform(-30, 30) if off >= 0x80 else rng.uniform(-3, 3))
@@ -635,7 +634,6 @@ def main():
             case.stub(0x1417dacf0, lambda call, rng: call.ret_int(rng.choice([0, 0, 0, 0, 0, 1])))
             case.stub(0x1411e3ee0, lambda call, rng: call.ret_int(rng.choice([0, 1])))
             case.stub(0x14123d110, lambda call, rng: call.ret_f32(rng.uniform(1, 80)))
-            case.stub(0x1408625a0, lambda call, rng: call.ret_f32(rng.uniform(-1, 1)))
             fz.preset('F', 0x3c, rng.choice([1, 1, 1, 0]))
             fz.preset('F', 0x28, rng.choice([0, 7]))
             fz.preset('F', 0x6824, rng.choice([0, 0, 1]))

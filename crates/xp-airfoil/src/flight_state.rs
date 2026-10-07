@@ -5,7 +5,7 @@
 use crate::flight_step::position_component;
 use crate::scalar::{clamp, lerp};
 use crate::vm::{CallArgs, Callees, Vm};
-use crate::wing_element::{interpolate_clamped, signed_sqrt};
+use crate::wing_element::{hypot2, hypot3, interpolate_clamped, signed_sqrt};
 
 fn frame_time(vm: &mut Vm, env: &mut dyn Callees) -> f64 {
     f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0)
@@ -758,8 +758,8 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) -> Re
     if !usable {
         return Ok(());
     }
-    let height = |vm: &mut Vm, env: &mut dyn Callees| -> f32 {
-        let value = f32::from_bits(env.call(vm, 0x1407cd810, CallArgs::ints(&[f])).xmm0 as u32);
+    let height = |vm: &mut Vm, _env: &mut dyn Callees| -> f32 {
+        let value = hypot3(vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
         value - vm.f32(TABLE + 0xc8)
     };
     let entry = |vm: &Vm, offset: u64, index: i32| {
@@ -802,19 +802,8 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) -> Re
         let x6 = f64::from(vm.f32(f + 0x655c)) - (r2[2] + r1[2]) * 0.5;
         let h = height(vm, env);
         let weight = interpolate_clamped(0.0, 0.01, 15.0, 1.0, h);
-        let mut args = CallArgs::default();
-        args.xmm = [
-            Some((x9 as f32).to_bits()),
-            Some((x6 as f32).to_bits()),
-            None,
-            None,
-        ];
-        let planar = f32::from_bits(env.call(vm, 0x1408be280, args).xmm0 as u32);
-        let mut args = CallArgs::default();
-        // the first argument is a double: its low half is not comparable across libm implementations
-        args.xmm = [None, Some(planar.to_bits()), None, None];
-        let _ = x8;
-        let angle = f64::from_bits(env.call(vm, 0x1408ce690, args).xmm0);
+        let planar = hypot2(x9 as f32, x6 as f32);
+        let angle = x8.atan2(f64::from(planar));
         let target = (angle * 57.2957763671875) as f32;
         let arm = interpolate_clamped(0.01, vm.f32(f + 0x6548), 1.0, target, weight);
         vm.set_f32(f + 0x6548, arm);
@@ -956,14 +945,7 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) -> Re
         (H + 0x18, (r2[1] + r1[1]) * 0.5),
         (H + 0x20, (r2[2] + r1[2]) * 0.5),
     ];
-    let mut args = CallArgs::default();
-    args.xmm = [
-        Some((vm.f64(H8) as f32).to_bits()),
-        Some(5.0f32.to_bits()),
-        None,
-        None,
-    ];
-    let ease = f32::from_bits(env.call(vm, 0x1408625a0, args).xmm0 as u32);
+    let ease = crate::engine::signed_pow(vm.f64(H8) as f32, 5.0);
     for (address, target) in targets {
         let value = interpolate_clamped(0.0, vm.f64(address) as f32, 1.0, target as f32, ease);
         vm.set_f64(address, f64::from(value));
@@ -1451,11 +1433,8 @@ pub fn steering_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
             .rax as u8
             != 0;
         let b2840 = vm.f32(b + 0x2840);
-        let pull = |vm: &mut Vm, env: &mut dyn Callees, x: f32| {
-            let mut args = CallArgs::default();
-            args.xmm = [Some(x.to_bits()), Some(b2840.to_bits()), None, None];
-            float_call(vm, env, 0x1408625a0, args)
-        };
+        let pull =
+            |_vm: &mut Vm, _env: &mut dyn Callees, x: f32| crate::engine::signed_pow(x, b2840);
         let first = pull(vm, env, signed);
         let value;
         if !toggle {

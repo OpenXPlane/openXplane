@@ -640,3 +640,7 @@ The part strip block now also runs `0x1411d9f60` natively (`controls::held_back`
 ## Input helpers (`crates/xp-airfoil/src/input.rs`)
 
 `0x1417da870(obj, code)` (`input::key_slot`): the index of the first key slot, of the 500 words at `obj+0x8cf8` (the table at `0x1460e9708` for the global input object) enabled by the flag at `+0xba44` from the slot, whose code equals `code`; a disabled slot or a code already held by an earlier enabled slot counts as zero; 500 when none matches. `0x141185030(obj)` (`input::bank_available`): `obj+0x7c9c > 0`, the byte `+0x7d34` set, binding `0x4a` (queried with the object at `+0x7b90`) clear and `[obj+0x20]+0x2270 < 2`. 30 and 80 emulator cases (`tools/gen_input_vectors.py`). The caller `0x1412741d0` (2000 lines) turns key and joystick bindings into per-part control values; it is the next target in that cluster.
+
+## Math helpers now native in the hook and steering blocks
+
+The helpers these blocks used to replay are already ported elsewhere and run natively now (vectors regenerated with the real code): `0x1407cd810` (the speed `sqrt(F+0x368^2 + F+0x36c^2 + F+0x370^2)`, `wing_element::hypot3`), `0x1408be280` (`hypot2`), `0x1408ce690` (`atan2` of a double and a float) and `0x1408625a0` (`engine::signed_pow`; it returns +0 for a zero argument, which the original does with `xorps`). The low half of a double argument is not compared in the replays.
