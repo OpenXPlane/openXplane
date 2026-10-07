@@ -3215,7 +3215,8 @@ fn hook_state_matches_the_original_machine_code() {
             &mut env,
             f,
             hex(&case.header[2]) as u32,
-        );
+        )
+        .unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }
@@ -3439,7 +3440,7 @@ fn ground_response_matches_the_original_machine_code() {
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
-        openxplane::flight_state::ground_response(&mut case.vm, &mut env, f, rbp);
+        openxplane::flight_state::ground_response(&mut case.vm, &mut env, f, rbp).unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }
@@ -3536,6 +3537,35 @@ fn late_tail_matches_the_original_machine_code() {
             calls: std::mem::take(&mut case.calls),
         };
         openxplane::flight_state::late_tail(&mut case.vm, &mut env, f).unwrap();
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn plugin_force_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("force_sink.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = hex(&case.header[0]);
+        let v: Vec<f32> = case.header[1..7].iter().map(|s| float(s)).collect();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::add_plugin_force(
+            &mut case.vm,
+            &mut env,
+            f,
+            v[0],
+            v[1],
+            v[2],
+            v[3],
+            v[4],
+            v[5],
+        )
+        .unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }

@@ -437,7 +437,7 @@ def main():
                 case.stub(address, lambda call, rng: call.ret_f32(rng.choice([rng.uniform(-5, 20), rng.uniform(0, 3), rng.uniform(10.5, 20), rng.uniform(10.5, 20)])))
             case.stub(0x1408ce690, lambda call, rng: call.ret_f64(rng.uniform(-1.5, 1.5)))
             case.stub(0x1411e14d0, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
-            case.stub(0x1408e3230, lambda call, rng: None)
+            case.stub(0x1408e25a0, lambda call, rng: None, record=False)
             for off in (0x64, 0x68, 0x6c, 0x80, 0x84, 0x88):
                 fz.preset_f32('OBJ', off, rng.uniform(-30, 30) if off >= 0x80 else rng.uniform(-3, 3))
             TABLE = 0x14578b040
@@ -865,7 +865,7 @@ def main():
         if BLOCK == 'ground':
             CX = case.region('CX', 0x300)
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
-            case.stub(0x1408e3230, lambda call, rng: None)
+            case.stub(0x1408e25a0, lambda call, rng: None, record=False)
             case.stub(0x14119e5b0, lambda call, rng: None)
             def put64f(call, pointer, v):
                 bits64 = struct.unpack('<Q', struct.pack('<d', v))[0]

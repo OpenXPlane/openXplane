@@ -728,7 +728,7 @@ fn to_world(vm: &mut Vm, env: &mut dyn Callees, f: u64, point: [f32; 3]) -> [f32
 /// The register state at the block start is `xmm8 = 0.5` (double), `xmm10 = 0.5`, `xmm12 = 1.0` (double),
 /// `r13 = -1`.
 #[allow(clippy::field_reassign_with_default)]
-pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
+pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) -> Result<(), String> {
     use crate::transform::{rotate_euler_f64, to_aircraft_frame};
     const RAD: f32 = f32::from_bits(0x3c8e_fa36);
     const DEG: f32 = f32::from_bits(0x4265_2ee0);
@@ -741,7 +741,7 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
     let b0 = vm.u64(f + 0x20);
     let usable = vm.i32(f + 0x28) == 0 && object != 0 && vm.f32(b0 + 0x4454) > 0.0;
     if !usable {
-        return;
+        return Ok(());
     }
     let height = |vm: &mut Vm, env: &mut dyn Callees| -> f32 {
         let value = f32::from_bits(env.call(vm, 0x1407cd810, CallArgs::ints(&[f])).xmm0 as u32);
@@ -796,12 +796,9 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
         ];
         let planar = f32::from_bits(env.call(vm, 0x1408be280, args).xmm0 as u32);
         let mut args = CallArgs::default();
-        args.xmm = [
-            Some(x8.to_bits() as u32),
-            Some(planar.to_bits()),
-            None,
-            None,
-        ];
+        // the first argument is a double: its low half is not comparable across libm implementations
+        args.xmm = [None, Some(planar.to_bits()), None, None];
+        let _ = x8;
         let angle = f64::from_bits(env.call(vm, 0x1408ce690, args).xmm0);
         let target = (angle * 57.2957763671875) as f32;
         let arm = interpolate_clamped(0.01, vm.f32(f + 0x6548), 1.0, target, weight);
@@ -828,20 +825,8 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
         let x7 = a.cos() * t1;
         let x8n = neg * a.sin();
         let x2 = t3 * a.cos();
-        let mut args = CallArgs::ints(&[f]);
-        args.xmm = [
-            None,
-            Some(vm.f32(b + 0x4440).to_bits()),
-            Some(x7.to_bits()),
-            Some(vm.f32(b + 0x4444).to_bits()),
-        ];
-        args.stack = [
-            Some(u64::from(x8n.to_bits())),
-            Some(u64::from(vm.f32(b + 0x4448).to_bits())),
-            Some(u64::from(x2.to_bits())),
-            None,
-        ];
-        env.call(vm, 0x1408e3230, args);
+        let (pa, pc, pp) = (vm.f32(b + 0x4440), vm.f32(b + 0x4444), vm.f32(b + 0x4448));
+        add_plugin_force(vm, env, f, pa, x7, pc, x8n, pp, x2)?;
     }
     // the tips of the arm
     let b = vm.u64(f + 0x20);
@@ -935,11 +920,11 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
         if 1.0 > h && 0.5 > vm.f32(f + 0x6528) {
             vm.set_i32(H, -1);
         } else if vm.i32(H) >= 0 {
-            return;
+            return Ok(());
         }
     }
     if vm.i32(H4) < 0 {
-        return;
+        return Ok(());
     }
     let dt = frame_time(vm, env);
     let progress = vm.f64(H8) + dt * 0.1;
@@ -968,6 +953,7 @@ pub fn hook_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, esi_in: u32) {
         let value = interpolate_clamped(0.0, vm.f64(address) as f32, 1.0, target as f32, ease);
         vm.set_f64(address, f64::from(value));
     }
+    Ok(())
 }
 
 /// `0x14126b3e8..0x14126b548`: the towing drag and the record update. With a positive drag coefficient `B+0x2894`
@@ -2090,14 +2076,14 @@ pub fn body_contact_loop(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
 /// (`0x14119e5b0`). Then, with `B+0x28dc` set and `F+0x64dc > 0.01`, a brake force is applied and the brake energy
 /// `F+0x28c` grows by `frame time * ...` up to `B+0x2890`.
 #[allow(clippy::field_reassign_with_default)]
-pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
     use crate::transform::{Frame, from_aircraft_frame};
     const RAD: f32 = f32::from_bits(0x3c8e_fa36);
     const DEG: f32 = f32::from_bits(0x4265_2ee0);
     let slot = |o: i64| (rbp as i64 + o) as u64;
     let bits = |v: f32| u64::from(v.to_bits());
     if vm.i32(slot(-0x78)) == 0 {
-        return;
+        return Ok(());
     }
     let b = vm.u64(f + 0x20);
     if vm.f32(b + 0x2804) > 0.0 && vm.f32(b + 0x2808) > 0.0 {
@@ -2136,15 +2122,8 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         let moment = factor * (speed * sine) * side * vm.f32(f + 0x64c8);
         let limit = vm.f32(b + 0x288c);
         let moment = clamp(moment, -limit, limit);
-        let mut args = CallArgs::ints(&[f]);
-        args.xmm = [None, Some(0), Some((-moment).to_bits()), Some(0)];
-        args.stack = [
-            Some(0),
-            Some(bits(vm.f32(b + 0x2800))),
-            Some(0),
-            Some(0x1_4266_1b68),
-        ];
-        env.call(vm, 0x1408e3230, args);
+        let pp = vm.f32(b + 0x2800);
+        add_plugin_force(vm, env, f, 0.0, -moment, 0.0, 0.0, pp, 0.0)?;
         if vm.i32(f + 0x64e4) != 0 {
             let planet = env.call(vm, 0x14193ae40, CallArgs::default()).rax;
             let mut args = CallArgs::default();
@@ -2211,20 +2190,8 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
             let half = (f64::from(weight) * 0.1) as f32;
             let k = interpolate_clamped(0.0, 0.0, 25.0, half, len);
             let (p9, p8, p7) = (k * x9 / len, k * x8 / len, k * x7 / len);
-            let mut args = CallArgs::ints(&[f]);
-            args.xmm = [
-                None,
-                Some(vm.f32(b + 0x280c).to_bits()),
-                Some(p7.to_bits()),
-                Some(vm.f32(b + 0x2810).to_bits()),
-            ];
-            args.stack = [
-                Some(bits(p8)),
-                Some(bits(vm.f32(b + 0x2814))),
-                Some(bits(p9)),
-                Some(0x1_4266_1b78),
-            ];
-            env.call(vm, 0x1408e3230, args);
+            let (pa, pc, pp) = (vm.f32(b + 0x280c), vm.f32(b + 0x2810), vm.f32(b + 0x2814));
+            add_plugin_force(vm, env, f, pa, p7, pc, p8, pp, p9)?;
             let b = vm.u64(f + 0x20);
             let reach = (f64::from(vm.f32(b + 0x64ac)) * 0.1) as f32;
             let mut args = CallArgs::ints(&[f]);
@@ -2245,20 +2212,8 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         let (vx, vy, vz) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
         let speed = ((vx * vx + vy * vy) + vz * vz).sqrt();
         let force = (f64::from(speed * scale) * 1.25) as f32;
-        let mut args = CallArgs::ints(&[f]);
-        args.xmm = [
-            None,
-            Some(vm.f32(b + 0x28bc).to_bits()),
-            Some(0),
-            Some(vm.f32(b + 0x28c0).to_bits()),
-        ];
-        args.stack = [
-            Some(0),
-            Some(bits(vm.f32(b + 0x28c4))),
-            Some(bits(force)),
-            Some(0x1_4266_1b80),
-        ];
-        env.call(vm, 0x1408e3230, args);
+        let (pa, pc, pp) = (vm.f32(b + 0x28bc), vm.f32(b + 0x28c0), vm.f32(b + 0x28c4));
+        add_plugin_force(vm, env, f, pa, 0.0, pc, 0.0, pp, force)?;
         let b = vm.u64(f + 0x20);
         let capacity = vm.f32(b + 0x2890);
         if capacity.partial_cmp(&vm.f32(f + 0x28c)) == Some(std::cmp::Ordering::Greater) {
@@ -2275,6 +2230,7 @@ pub fn ground_response(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
             vm.set_f32(f + 0x28c, value);
         }
     }
+    Ok(())
 }
 
 /// `0x14126ef74..0x14126f37f`: the gear drag and the brake energy. Every gear record whose state (`[B+0x6080] + 0x88 i`)
@@ -2639,5 +2595,44 @@ pub fn late_tail(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<(), Strin
     let value = u64::from(vm.u32(KIND + 4));
     let byte = env.call(vm, 0x1_424e_5fc8, CallArgs::ints(&[value])).rax as u8;
     call_end(vm, env, u64::from(byte));
+    Ok(())
+}
+
+/// `0x1408e3230(F, a, b, c, d, p, e, name)`: the plug-in force `(b, d, e)` at the point `(a, c, p)` (arguments in the
+/// original's order: `xmm1 = a`, `xmm2 = b`, `xmm3 = c`, then the stack `d`, `p`, `e`). A non-finite `b`, `d` or `e`
+/// counts as zero (the original logs it). The force is added at `F+0x2ec` (`b`), `F+0x2d8` (`d`) and `F+0x2c4`
+/// (`e`), the moments at `F+0x300` (`b c - a d`), `F+0x318` (`c e - d p`) and `F+0x330` (`a e - b p`), and `F+0x340`
+/// (the integral of `F+0x318` over the frame time) advances. The debug dump (`F+0xbcd0`/`F+0xbcc8`) is not ported.
+#[allow(clippy::too_many_arguments)]
+pub fn add_plugin_force(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    a: f32,
+    b: f32,
+    c: f32,
+    d: f32,
+    p: f32,
+    e: f32,
+) -> Result<(), String> {
+    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+    let (b, d, e) = (finite(b), finite(d), finite(e));
+    let add = |vm: &mut Vm, offset: u64, value: f32| {
+        let sum = value + vm.f32(f + offset);
+        vm.set_f32(f + offset, sum);
+    };
+    add(vm, 0x2c4, e);
+    add(vm, 0x2ec, b);
+    add(vm, 0x2d8, d);
+    add(vm, 0x300, b * c - a * d);
+    add(vm, 0x318, c * e - d * p);
+    add(vm, 0x330, a * e - b * p);
+    let t = frame_time(vm, env);
+    let moment = f64::from(vm.f32(f + 0x318));
+    let advanced = (f64::from(vm.f32(f + 0x340)) + t * moment) as f32;
+    vm.set_f32(f + 0x340, advanced);
+    if vm.i32(f + 0xbcd0) != 0 || vm.i32(f + 0xbcc8) != 0 {
+        return Err("debug dump not ported".into());
+    }
     Ok(())
 }
