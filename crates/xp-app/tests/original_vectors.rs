@@ -3675,6 +3675,34 @@ fn matrix_rotate_by_matches_the_original_machine_code() {
 }
 
 #[test]
+fn input_helpers_match_the_original_machine_code() {
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for kind in ["keyslot", "avail"] {
+        let cases = parse_vm_cases(&format!("input_{kind}.txt"));
+        assert!(cases.len() >= 30);
+        for (n, mut case) in cases.into_iter().enumerate() {
+            let obj = hex(&case.header[1]);
+            let want = hex(&case.header[3]) as u32;
+            if kind == "keyslot" {
+                let code: i32 = case.header[2].parse().unwrap();
+                assert_eq!(
+                    openxplane::input::key_slot(&case.vm, obj, code),
+                    want,
+                    "{kind} {n}"
+                );
+            } else {
+                let mut env = VmReplay {
+                    calls: std::mem::take(&mut case.calls),
+                };
+                let got = openxplane::input::bank_available(&case.vm, &mut env, obj);
+                assert_eq!(u32::from(got), want & 0xff, "{kind} {n}");
+                assert!(env.calls.is_empty(), "{kind} {n}: unused calls");
+            }
+        }
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

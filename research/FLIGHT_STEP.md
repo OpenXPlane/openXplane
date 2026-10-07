@@ -636,3 +636,7 @@ The part strip block now also runs `0x1411d9f60` natively (`controls::held_back`
 ## Height above the ground `0x1407d76f0` (`flight_state::height_above_ground`)
 
 `0x1407d76f0(F, dt)`: `(alt + dt * F+0x3f8) - altitude(ground point) - B+0x65a4`, with `alt = F+0x3a0` (engine-flag guarded) and the ground point `(F+0x378, F+0x42f5c, F+0x388)` (floats, the two guarded ones read in the order 0x3a0, 0x388, 0x378) converted by `local_to_geodetic`. Native now in the path-sample block; its vectors were regenerated with a consistent planet (identity map plus translation, a chosen geographic point and a constant geoid height).
+
+## Input helpers (`crates/xp-airfoil/src/input.rs`)
+
+`0x1417da870(obj, code)` (`input::key_slot`): the index of the first key slot, of the 500 words at `obj+0x8cf8` (the table at `0x1460e9708` for the global input object) enabled by the flag at `+0xba44` from the slot, whose code equals `code`; a disabled slot or a code already held by an earlier enabled slot counts as zero; 500 when none matches. `0x141185030(obj)` (`input::bank_available`): `obj+0x7c9c > 0`, the byte `+0x7d34` set, binding `0x4a` (queried with the object at `+0x7b90`) clear and `[obj+0x20]+0x2270 < 2`. 30 and 80 emulator cases (`tools/gen_input_vectors.py`). The caller `0x1412741d0` (2000 lines) turns key and joystick bindings into per-part control values; it is the next target in that cluster.
