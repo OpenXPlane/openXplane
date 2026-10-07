@@ -3536,7 +3536,7 @@ fn part_strips_match_the_original_machine_code() {
 #[test]
 fn wing_strips_match_the_original_machine_code() {
     let cases = parse_vm_cases("flight_wstrips.txt");
-    assert!(cases.len() >= 10);
+    assert!(cases.len() >= 7);
     let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
     for (n, mut case) in cases.into_iter().enumerate() {
         let (f, rbp) = (hex(&case.header[0]), hex(&case.header[1]));

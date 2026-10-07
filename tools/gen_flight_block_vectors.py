@@ -32,9 +32,72 @@ RECORD_VECTOR = 0x146125768
 RECORDING_ID = 0x142f2e3dc
 
 
+def vector_stubs(case, rng):
+    """Stubs implementing the std::vector helpers of the strip blocks in a bump region, as recorded effects."""
+    HP = case.region('HP', 0x20000)
+    state = {'bump': HP}
+
+    def put64(call, address, value):
+        call.put(address, value & 0xffffffff)
+        call.put(address + 4, value >> 32)
+
+    def push(call, rng):
+        vec = call.ints[0]
+        value = case.emu.read_u64(call.ints[1])
+        b, e = case.emu.read_u64(vec), case.emu.read_u64(vec + 8)
+        if b == 0:
+            b = e = state['bump']
+            state['bump'] += 0x80
+            put64(call, vec, b)
+            put64(call, vec + 0x10, b + 0x80)
+        put64(call, e, value)
+        put64(call, vec + 8, e + 8)
+
+    def copy(call, rng):
+        dest, src = call.ints[0], call.ints[1]
+        b, e = case.emu.read_u64(src), case.emu.read_u64(src + 8)
+        n = (e - b) // 8
+        nb = state['bump']
+        state['bump'] += 8 * n + 0x10
+        for k in range(n):
+            put64(call, nb + 8 * k, case.emu.read_u64(b + 8 * k))
+        put64(call, dest, nb)
+        put64(call, dest + 8, nb + 8 * n)
+        put64(call, dest + 0x10, nb + 8 * n)
+        call.ret_int(dest)
+
+    case.stub(0x140985d90, push)
+    case.stub(0x1405f3f30, copy)
+    case.stub(0x1422e7c2c, lambda call, rng: None, record=False)
+    case.stub(0x142301120, lambda call, rng: None, record=False)
+    case.stub(0x1405ddb90, lambda call, rng: None)
+
+
+def preset_wing_record(fz, name, base, rng, elements=None):
+    """The fields of a wing record the strip blocks read: the element count, the boundary arrays and the reference points."""
+    n = elements or rng.choice([1, 2, 3])
+    fz.preset(name, base + 4, n)
+    for arr in (0x5bc, 0x5e8, 0x614, 0x70):
+        for k in range(n + 1):
+            fz.preset_f32(name, base + arr + 4 * k, rng.uniform(-5, 5))
+    for off in (0x36b0, 0x36b4, 0x36bc, 0x36c0):
+        fz.preset_f32(name, base + off, rng.uniform(-5, 5))
+
+
+def preset_element_state(fz, name, base, rng):
+    for e in range(4):
+        fz.preset_f32(name, base + 0x54 + 4 * e, rng.uniform(-3, 3))
+        fz.preset_f32(name, base + 0xf4 + 4 * e, rng.uniform(-1, 1))
+
+
 def main():
     start, end = BLOCKS[BLOCK]
     case = VmCase(EXE, SEED, RANGES)
+    import collections, os
+    history = collections.deque(maxlen=40)
+    if os.environ.get('XPDEBUG'):
+        from unicorn import UC_HOOK_CODE
+        case.emu.uc.hook_add(UC_HOOK_CODE, lambda uc, a, size, user: history.append(a))
     case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.randrange(2) if rng.random() < 0.2 else 0))
     case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.randrange(2)))
     case.stub(0x141260090, lambda call, rng: None)
@@ -1091,9 +1154,11 @@ def main():
                 for i in range(3):
                     for k in range(8):
                         fz.preset_f32('VEC', 0x2d8 * (3 * j + i) + 4 * k, rng.uniform(-5, 5))
-            case.stub(0x1405f3f30, lambda call, rng: call.ret_int(call.ints[1] + 0x10))
-            for addr in (0x140985d90, 0x14121a9b0, 0x1405ddb90):
-                case.stub(addr, lambda call, rng: None)
+            vector_stubs(case, rng)
+            for p in range(3):
+                preset_wing_record(fz, 'PR', 0x3770 * p + 0x88, rng)
+            for jj in range(12):
+                preset_element_state(fz, 'VEC', 0x2d8 * jj, rng)
             fz.preset('F', 0xbcc8, 0)
             fz.preset('F', 0xbcd0, 0)
             fz.preset('B', 0x920, rng.choice([0, 1, 2, 3, 3]))
@@ -1116,9 +1181,10 @@ def main():
             W = case.region('W', 0x36c8 * 48)
             XR = case.region('XR', 0x2d8 * 48)
             IDS = case.region('IDS', 0x40 * 48)
-            case.stub(0x1405f3f30, lambda call, rng: call.ret_int(call.ints[1] + 0x10))
-            for addr in (0x140985d90, 0x14121a9b0, 0x1405ddb90):
-                case.stub(addr, lambda call, rng: None)
+            vector_stubs(case, rng)
+            for w in range(8):
+                preset_wing_record(fz, 'W', 0x36c8 * w, rng)
+                preset_element_state(fz, 'XR', 0x2d8 * w, rng)
             for base, off, ptr in ((B, 0x6028, W), (F, 0x6940, XR)):
                 name = {F: 'F', B: 'B'}[base]
                 fz.preset(name, off, ptr & 0xffffffff, record=True)
@@ -1137,7 +1203,7 @@ def main():
                 fz.preset('W', 0x36c8 * w + 0x3698, q & 0xffffffff, record=True)
                 fz.preset('W', 0x36c8 * w + 0x369c, q >> 32, record=True)
                 for k in range(n):
-                    fz.preset('IDS', 0x40 * w + 4 * k, rng.randrange(0, 48))
+                    fz.preset('IDS', 0x40 * w + 4 * k, rng.randrange(0, 8))
             for reg, val in ((UC_X86_REG_RDI, 0), (UC_X86_REG_R13, 0), (UC_X86_REG_R14, 0), (UC_X86_REG_RBX, F + 0xbcc8)):
                 case.emu.uc.reg_write(reg, val)
         if BLOCK == 'tail':
@@ -1232,6 +1298,8 @@ def main():
             case.run(start, until=end, max_instructions=3_000_000)
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
+            if history:
+                sys.stderr.write('last pcs ' + ' '.join(f'{a:x}' for a in list(history)[-25:]) + '\n')
             continue
         header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec', 'strips', 'wstrips', 'tail') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '') + (f' {case.emu.reg(UC_X86_REG_RSI) & 0xffffffff:x}' if BLOCK == 'arm' else '') + (f' {esi_v:x}' if BLOCK == 'hook' else '') + (f' {int(case.emu.uc.reg_read(UC_X86_REG_RIP) == 0x14126dd98):x}' if BLOCK == 'wprobe' else '') + (f' {case.body:x}' if BLOCK in ('bsurf', 'bblend') else '')
         out = case.dump(header, extra_words=extra)

@@ -2413,16 +2413,13 @@ pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Resu
                     }
                     env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0x88), slot(-0x68)]));
                     env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0xa0), slot(-0x38)]));
-                    let flag = u64::from(crate::flight_step::debug_dump_active(vm, f));
                     let begin_b = env
                         .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x3d8), slot(0xa0)]))
                         .rax;
                     let begin_a = env
                         .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x3f0), slot(0x88)]))
                         .rax;
-                    let mut args = CallArgs::ints(&[record, v, begin_a, begin_b]);
-                    args.stack[0] = Some(flag & 0xffff_ffff);
-                    env.call(vm, 0x14121a9b0, args);
+                    crate::flight_step::wing_chain_factor(vm, v, begin_a, begin_b);
                     let part = base + offset;
                     if vm.i32(part + 4) != 0 {
                         let value = vm.f32(v);
@@ -2490,16 +2487,13 @@ pub fn wing_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
                 }
             }
         }
-        let flag = u64::from(crate::flight_step::debug_dump_active(vm, f));
         let begin_elements = env
             .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x408), slot(0xb8)]))
             .rax;
         let begin_wings = env
             .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x420), slot(0xd0)]))
             .rax;
-        let mut args = CallArgs::ints(&[wing, xrec, begin_wings, begin_elements]);
-        args.stack[0] = Some(flag & 0xffff_ffff);
-        env.call(vm, 0x14121a9b0, args);
+        crate::flight_step::wing_chain_factor(vm, xrec, begin_wings, begin_elements);
         env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0xb8)]));
         env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0xd0)]));
     }
