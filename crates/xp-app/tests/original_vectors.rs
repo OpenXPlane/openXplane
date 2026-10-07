@@ -3132,6 +3132,18 @@ fn gear_aero_matches_the_original_machine_code() {
 }
 
 #[test]
+fn wheel_groups_match_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_wheels.txt");
+    assert!(cases.len() >= 60);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
+        openxplane::flight_state::wheel_groups(&mut case.vm, f, rbp);
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);

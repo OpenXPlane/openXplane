@@ -679,3 +679,17 @@ pub fn gear_aero(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result
     }
     Ok(())
 }
+
+/// `0x1412686a9..0x14126883f`: the number of wheel groups, a float stored at `rbp+0x1758`: the gear records
+/// (`B+0x6080`, stride `0x88`) whose first two words (kind and second flag) are both nonzero.
+pub fn wheel_groups(vm: &mut Vm, f: u64, rbp: u64) {
+    let b = vm.u64(f + 0x20);
+    let table = vm.u64(b + 0x6080);
+    let mut count = 0.0f32;
+    for i in 0..10u64 {
+        if vm.i32(table + i * 0x88) != 0 && vm.i32(table + i * 0x88 + 4) != 0 {
+            count = (f64::from(count) + 1.0) as f32;
+        }
+    }
+    vm.set_f32(rbp.wrapping_add(0x1758), count);
+}

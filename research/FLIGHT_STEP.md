@@ -414,6 +414,9 @@ along the air velocity at a point blended from the record and the state's own of
 force and the debug flag is a log. Inputs: the frame slot `rbp+0x1758` (computed before the loop from the wheel groups),
 `xmm7 = 0`, `esi = 0`.
 
+`wheel_groups` (`0x1412686a9..0x14126883f`, 80 cases): the count of gear records with both leading words nonzero, stored as a
+float at `rbp+0x1758` for `gear_aero`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded
