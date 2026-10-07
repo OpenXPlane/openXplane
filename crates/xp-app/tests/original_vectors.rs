@@ -2633,12 +2633,17 @@ fn small_cases(function: &str) -> Vec<VmCaseData> {
 }
 
 fn words_match(case: &VmCaseData, n: usize) {
+    // a differing word passes only as two normal floats within a relative tolerance (libm differences): integers
+    // and flags that differ in their bits must not hide as denormals
+    let normal = |w: u32| (w >> 23) & 0xff != 0 && (w >> 23) & 0xff != 0xff;
     for (addr, want) in &case.expected {
         let got = case.vm.u32(*addr);
         assert!(
             got == *want
-                || (f32::from_bits(got) - f32::from_bits(*want)).abs()
-                    <= 1e-5 * (1.0 + f32::from_bits(*want).abs()),
+                || (normal(got)
+                    && normal(*want)
+                    && (f32::from_bits(got) - f32::from_bits(*want)).abs()
+                        <= 1e-5 * (1.0 + f32::from_bits(*want).abs())),
             "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
         );
     }
@@ -2873,6 +2878,23 @@ fn part_force_pass_matches_the_original_machine_code() {
         let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
         openxplane::flight_step::part_force_pass(&mut case.vm, f, rbp)
             .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn rigid_body_step_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_motion.txt");
+    assert!(cases.len() >= 100);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::rigid_body_step(&mut case.vm, &mut env, f, rbp)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }
 }

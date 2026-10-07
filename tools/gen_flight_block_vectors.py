@@ -20,7 +20,7 @@ from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, U
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
-          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791)}
+          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
@@ -153,27 +153,62 @@ def main():
                     fz.preset_f32('P', 0x3770 * k + off, rng.uniform(-90.0, 90.0))
             case.emu.uc.reg_write(UC_X86_REG_RSI, 0)
             case.emu.uc.reg_write(UC_X86_REG_XMM8, struct.unpack('<Q', struct.pack('<d', 0.5))[0])
-        if BLOCK in ('element', 'body', 'parts'):
+        if BLOCK == 'motion':
+            TB = case.region('TB', 36 * 8)
+            for i in range(8):
+                fz.preset('TB', 36 * i + 8, rng.choice([0, 1, 0, 2]))
+            table = 0x14611ac80
+            case.emu.write_u32(table + 8, TB & 0xffffffff)
+            case.emu.write_u32(table + 12, TB >> 32)
+            extra = {table + 8: TB & 0xffffffff, table + 12: TB >> 32}
+            for address in (0x145899fd0, 0x145899fd4, 0x145899fd8, 0x145899fdc, 0x145899fe0, 0x145899fe4):
+                value = rng.choice([0, 1, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff]) if address >= 0x145899fe0 else rng.choice([0, 0, 0, 1])
+                case.emu.write_u32(address, value)
+                extra[address] = value
+            case.emu.uc.reg_write(UC_X86_REG_R14, 1)
+            fz.preset_f32('F', 0x78, rng.uniform(8.0, 10.0))
+            fz.preset_f32('F', 0x288, rng.uniform(100.0, 3000.0))
+            for off in (0x2f4, 0x2e0, 0x2cc, 0x30c, 0x324, 0x33c):
+                fz.preset_f32('F', off, rng.choice([float('nan')] + [rng.uniform(-5000, 5000)] * 24 + [rng.uniform(-400000, 400000)] * 4))
+            for off in (0x378, 0x380, 0x388):
+                fz.preset_f64('F', off, rng.uniform(-5000.0, 5000.0))
+            for off in (0x430, 0x434, 0x440, 0x444, 0x450, 0x454):
+                fz.preset_f32('F', off, rng.uniform(-1.0, 1.0))
+            for off in (0x3cc, 0x3d0, 0x3d4):
+                fz.preset_f32('F', off, rng.uniform(-3.0, 3.0))
+            fz.preset_f32('F', 0x538, rng.choice([0.0, 5.0, 20.0]))
+            fz.preset_f32('F', 0x53c, rng.uniform(-1.0, 1.0))
+            fz.preset('F', 0x24c, rng.choice([0, 1, 1, 1, 1]))
+            fz.preset('F', 0x28, rng.choice([0, 0, 7, 12345]))
+            fz.preset('F', 0x42f84, rng.randrange(0, 8))
+            fz.preset_f32('F', 0x42f5c, rng.choice([-10.0, 100.0, 1000.0, 20000.0]))
+            for off in (0x368, 0x36c, 0x370):
+                fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-300, 300), rng.uniform(-90, 90), rng.uniform(-110, 110)]))
+        if BLOCK in ('element', 'body', 'parts', 'motion'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
-            fz.preset('F', 0x28, rng.choice([7, 12345]))
+            if BLOCK != 'motion':
+                fz.preset('F', 0x28, rng.choice([7, 12345]))
             for w in range(48) if BLOCK == 'element' else []:
                 fz.preset('W', 0x36c8 * w + 0x58, rng.choice([0, 1]))
             case.emu.write_u32(RECORDING_ID, 12345)
             for address, value in ((RECORD_VECTOR + 8, V), (RECORD_VECTOR + 16, V + 0x4000)):
                 case.emu.write_u32(address, value & 0xffffffff)
                 case.emu.write_u32(address + 4, value >> 32)
-            extra = {RECORDING_ID: 12345}
+            extra = {**extra, RECORDING_ID: 12345}
             for address, value in ((RECORD_VECTOR + 8, V), (RECORD_VECTOR + 16, V + 0x4000)):
                 extra[address] = value & 0xffffffff
                 extra[address + 4] = value >> 32
             rbp = S + 0x400
+            if BLOCK == 'motion':
+                for off, lo, hi in ((0x1750, 500.0, 5000.0), (0x1758, 500.0, 5000.0), (-0x78, 300.0, 4000.0)):
+                    fz.preset_f32('S', 0x400 + off, rng.uniform(lo, hi))
             case.emu.uc.reg_write(UC_X86_REG_RBP, rbp)
             case.emu.uc.reg_write(UC_X86_REG_XMM15, 0x80000000)
             case.emu.uc.reg_write(UC_X86_REG_XMM11, 0x3c8efa36)
             case.emu.uc.reg_write(UC_X86_REG_R13, 0xffffffffffffffff)
         case.emu.uc.reg_write(UC_X86_REG_R15, F)
-        case.emu.uc.reg_write(UC_X86_REG_R14, 0)
+        case.emu.uc.reg_write(UC_X86_REG_R14, 1 if BLOCK == 'motion' else 0)
         case.emu.uc.reg_write(UC_X86_REG_R12, 0)
         case.emu.uc.reg_write(UC_X86_REG_XMM12, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
         case.emu.uc.reg_write(UC_X86_REG_XMM13, 0)
@@ -183,9 +218,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts') else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion') else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK in ('element', 'body', 'parts'):
+        if BLOCK in ('element', 'body', 'parts', 'motion'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)

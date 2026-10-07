@@ -275,6 +275,24 @@ positive; every part record (`B+0x6010`, stride `0x3770`, count `B+0x91c`) gets 
 double precision, applied along `v` at the part's offset `P+0x790..0x798` by `0x140f26ef0`. The register state at the
 block start is `rsi = 0` and `xmm8 = 0.5` (double).
 
+`rigid_body_step` (`0x1412709ff..0x141271fa2`, 120 cases; the engine flag, the frame time `0x140c448c0` (six separate
+queries) and the flag inside `0x1407ce850` are replayed; `0x141964300` is a plain table read and `0x1408e25a0` and
+`0x141176330` are the same non-finite-to-zero repair): the equations of motion. The totals in the aircraft axes
+(`F+0x2f4` side, `+0x2e0` normal, `+0x2cc` axial) over the mass `F+0x288 * 9.798279762268066` give the accelerations
+`+0x354/0x344/0x34c`; times the same constant they are rotated into the world axes by `0x1407ac020` (no origin shift)
+into `+0x35c/0x360/0x364`, and gravity toward the planet's centre is subtracted (`F+0x78 * position / radius`, the
+radius from the position with `6378145` added to the altitude; positions come from the doubles `+0x378/0x380/0x388`,
+zero when the engine flag is set). Euler's equations with the inertias in the frame locals `rbp+0x1750`, `rbp+0x1758`
+and `rbp-0x78` (`I1`, `I2`, `I0`) give the angular accelerations `+0x3c0 = (L - (I1-I2) w2 w3) / I0`,
+`+0x3c4 = (M - (I0-I1) w1 w3) / I2`, `+0x3c8 = (N - (I2-I0) w1 w2) / I1` with `w = F+0x3cc/0x3d0/0x3d4` and
+`L/M/N = F+0x30c/0x324/0x33c`. The velocities `+0x368/0x36c/0x370` and rates advance by `dt * acceleration` in double
+precision. With `F+0x28 == 0`, `F+0x538 < 10` and one of the globals `0x145899fd0..fdc` set, the roll rate `+0x3cc`
+is zeroed. With `F+0x24c` and both globals `0x145899fe0/4` equal to -1, an acceleration above 15, or an altitude
+(`0x1407ce850`) below the limit `F+0x42f5c` (with, when the table flag `0x141964300(0x14611ac80, F+0x42f84)` is set, a
+speed above 100), divides the velocities and rates by the acceleration and sets `F+0xda8`. The register state at the
+block start is `r14d = 1`. The comparison of the test helper accepts a difference only between two normal floats,
+because integers and flags that differ must not pass as denormals.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

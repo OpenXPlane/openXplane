@@ -556,6 +556,170 @@ pub fn part_force_pass(vm: &mut Vm, f: u64, rbp: u64) -> Result<(), String> {
     Ok(())
 }
 
+/// `update_flight` `0x1412709ff..0x141271fa2`: the equations of motion. The totals in the aircraft axes
+/// (`F+0x2f4` side, `+0x2e0` normal, `+0x2cc` axial, `+0x30c/0x324/0x33c` the moments) are divided by the mass
+/// `F+0x288 * 9.798...` into the accelerations `+0x354/0x344/0x34c`, rotated into the world axes
+/// (`from_aircraft_frame`, stored at `+0x35c/0x360/0x364`) with gravity toward the planet's centre subtracted
+/// (`F+0x78 * position / radius`, radius from the position and `6378145`), and Euler's equations with the
+/// inertias in the frame locals `rbp+0x1750`, `rbp+0x1758`, `rbp-0x78` give the angular accelerations
+/// `+0x3c0/0x3c4/0x3c8`. The velocities `+0x368..0x370` and rates `+0x3cc..0x3d4` advance by the frame time
+/// (doubles, six separate time queries). With the runaway-acceleration switches (`F+0x24c` and the globals
+/// `0x145899fe0/4`) set, an acceleration above 15, or an altitude above the limit `F+0x42f5c` (with a speed
+/// above 100 when the table flag is set), divides velocities and rates by the acceleration and sets `F+0xda8`.
+pub fn rigid_body_step(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+    use crate::transform::{Frame, from_aircraft_frame};
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let engine_flag = |vm: &mut Vm, env: &mut dyn Callees| -> bool {
+        env.call(vm, 0x1417f12c0, CallArgs::ints(&[0x1424_f5648]))
+            .rax as u8
+            != 0
+    };
+    let position = |vm: &mut Vm, env: &mut dyn Callees, offset: u64| -> f64 {
+        if engine_flag(vm, env) {
+            0.0
+        } else {
+            vm.f64(f + offset)
+        }
+    };
+    let frame_time = |vm: &mut Vm, env: &mut dyn Callees| {
+        f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0)
+    };
+    let check = |vm: &mut Vm, address: u64| {
+        if !vm.f32(address).is_finite() {
+            vm.set_f32(address, 0.0);
+        }
+    };
+    const EARTH: f64 = 6378145.0;
+    let z = position(vm, env, 0x388) as f32;
+    let y = (position(vm, env, 0x380) + EARTH) as f32;
+    let x = position(vm, env, 0x378) as f32;
+    let radius = {
+        let sum = y * y + x * x + z * z;
+        if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+    };
+    for off in [0x2f4, 0x2e0, 0x2cc] {
+        check(vm, f + off);
+    }
+    let mass = vm.f32(f + 0x288) * f32::from_bits(0x411c_c5c1);
+    let side = vm.f32(f + 0x2f4) / mass;
+    vm.set_f32(f + 0x354, side);
+    let normal = vm.f32(f + 0x2e0) / mass;
+    vm.set_f32(f + 0x344, normal);
+    let axial = vm.f32(f + 0x2cc) / mass;
+    vm.set_f32(f + 0x34c, axial);
+    let k = f32::from_bits(0x411c_c5c1);
+    let frame = Frame {
+        origin: [vm.f64(f + 0x378), vm.f64(f + 0x380), vm.f64(f + 0x388)],
+        rotation: [
+            [vm.f32(f + 0x430), vm.f32(f + 0x434)],
+            [vm.f32(f + 0x440), vm.f32(f + 0x444)],
+            [vm.f32(f + 0x450), vm.f32(f + 0x454)],
+        ],
+    };
+    let world = from_aircraft_frame(&frame, [side * k, normal * k, axial * k], false, false);
+    for (k, v) in world.iter().enumerate() {
+        vm.set_f32(f + 0x35c + 4 * k as u64, *v);
+    }
+    for off in [0x35c, 0x360, 0x364] {
+        check(vm, f + off);
+    }
+    let g = f64::from(vm.f32(f + 0x78));
+    let r = f64::from(radius);
+    let px = position(vm, env, 0x378);
+    let gx = g * px / r;
+    vm.set_f32(f + 0x35c, (f64::from(vm.f32(f + 0x35c)) - gx) as f32);
+    let py = position(vm, env, 0x380) + EARTH;
+    let gy = py * g / r;
+    vm.set_f32(f + 0x360, (f64::from(vm.f32(f + 0x360)) - gy) as f32);
+    let pz = position(vm, env, 0x388);
+    let gz = g * pz / r;
+    vm.set_f32(f + 0x364, (f64::from(vm.f32(f + 0x364)) - gz) as f32);
+    for off in [0x35c, 0x360, 0x364] {
+        check(vm, f + off);
+    }
+    let (w1, w2, w3) = (vm.f32(f + 0x3cc), vm.f32(f + 0x3d0), vm.f32(f + 0x3d4));
+    let (i1, i2, i0) = (
+        vm.f32(slot(0x1750)),
+        vm.f32(slot(0x1758)),
+        vm.f32(slot(-0x78)),
+    );
+    let (l, m, n) = (vm.f32(f + 0x30c), vm.f32(f + 0x324), vm.f32(f + 0x33c));
+    vm.set_f32(f + 0x3c0, (l - (i1 - i2) * w2 * w3) / i0);
+    vm.set_f32(f + 0x3c4, (m - (i0 - i1) * w1 * w3) / i2);
+    vm.set_f32(f + 0x3c8, (n - (i2 - i0) * w1 * w2) / i1);
+    if debug_dump_active(vm, f) {
+        return Err("debug dump not ported".into());
+    }
+    for off in [0x368, 0x36c, 0x370] {
+        check(vm, f + off);
+    }
+    for (target, rate) in [
+        (0x368, 0x35c),
+        (0x36c, 0x360),
+        (0x370, 0x364),
+        (0x3cc, 0x3c0),
+        (0x3d0, 0x3c4),
+        (0x3d4, 0x3c8),
+    ] {
+        let dt = frame_time(vm, env);
+        let step = dt * f64::from(vm.f32(f + rate));
+        vm.set_f32(f + target, (f64::from(vm.f32(f + target)) + step) as f32);
+    }
+    if vm.i32(f + 0x28) == 0 {
+        let reading = vm.f32(f + 0x53c) * 0.0 + vm.f32(f + 0x538);
+        let limit = 10.0f32;
+        if limit > reading
+            && (0x145899fd0u64..=0x145899fdc)
+                .step_by(4)
+                .any(|a| vm.i32(a) != 0)
+        {
+            vm.set_i32(f + 0x3cc, 0);
+        }
+    }
+    // 0x141964300(0x14611ac80, F+0x42f84): a word of the table entry
+    let table = vm.u64(0x1_4611_ac80 + 8);
+    let flag_word = vm.i32(table + (i64::from(vm.i32(f + 0x42f84)) * 36) as u64 + 8);
+    let (a1, a2, a3) = (vm.f32(f + 0x354), vm.f32(f + 0x34c), vm.f32(f + 0x344));
+    let acceleration = {
+        let sum = a3 * a3 + a2 * a2 + a1 * a1;
+        if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+    };
+    let mut clamp = false;
+    if vm.i32(f + 0x24c) != 0 && vm.i32(0x1_4589_9fe0) == -1 && vm.i32(0x1_4589_9fe4) == -1 {
+        if acceleration > 15.0 {
+            clamp = true;
+        } else {
+            let limit = f64::from(vm.f32(f + 0x42f5c));
+            let altitude = position(vm, env, 0x380);
+            if flag_word == 0 {
+                clamp = limit > altitude;
+            } else if limit > altitude {
+                let (v1, v2, v3) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+                let speed = {
+                    let sum = v1 * v1 + v2 * v2 + v3 * v3;
+                    if 0.0 > sum { f32::NAN } else { sum.sqrt() }
+                };
+                clamp = speed > 100.0;
+            }
+        }
+    }
+    if clamp {
+        if vm.i32(f + 0x24c) != 0 {
+            for off in [0x368, 0x36c, 0x370, 0x3cc, 0x3d0, 0x3d4] {
+                vm.set_f32(f + off, vm.f32(f + off) / acceleration);
+            }
+        }
+        vm.set_i32(f + 0xda8, 1);
+    }
+    for off in [0x368, 0x36c, 0x370] {
+        check(vm, f + off);
+    }
+    if debug_dump_active(vm, f) {
+        return Err("debug dump not ported".into());
+    }
+    Ok(())
+}
+
 /// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
 /// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
 /// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density
