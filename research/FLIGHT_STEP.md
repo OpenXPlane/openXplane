@@ -293,6 +293,17 @@ speed above 100), divides the velocities and rates by the acceleration and sets 
 block start is `r14d = 1`. The comparison of the test helper accepts a difference only between two normal floats,
 because integers and flags that differ must not pass as denormals.
 
+`set_position` (`0x141a6ace0(F, x, y, z)`, 150 cases; the terrain functions `0x141963d30`, `0x141962b00`,
+`0x14195f4b0` and `0x141962750` are replayed with random results, so the glue around them is verified but not the
+terrain logic): stores the position doubles `F+0x378/0x380/0x388` (a component whose float32 value is not finite
+becomes zero), derives the ground-probe lengths from the vector `B+0x64f4..0x64fc` (`|b|`) and the distance
+travelled in a step: `F+0x42f50 = 0.2 |b| + min(|b|, speed * dt)`, `F+0x42f54 = 2 |b|`,
+`F+0x42f58 = 1.01 (|b| + F+0x42f50)`, then asks the terrain object at `F+0x42e40` for the ground under a
+vertical segment through the position. With the probe state valid (`F+0x42f88`) the ground height `F+0x42f5c` is
+taken from the probe, or, when the probe reports a hit, extrapolated from the cached plane
+(`F+0x42f60..0x42f74`, divided by the slope term snapped away from zero by 0.01); otherwise the state is initialised
+(`-500.0`, the cell `F+0x42f84 = -1`, a unit normal) and the height comes from `0x141962750`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

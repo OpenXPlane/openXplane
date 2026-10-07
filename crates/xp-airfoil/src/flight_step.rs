@@ -720,6 +720,162 @@ pub fn rigid_body_step(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> 
     Ok(())
 }
 
+/// `0x1407ce820/0x1407ce850/0x1407ce880(F)`: the position doubles `F+0x378/0x380/0x388`, zero when the engine
+/// flag is set.
+fn position_component(vm: &mut Vm, env: &mut dyn Callees, f: u64, offset: u64) -> f64 {
+    let flag = env
+        .call(vm, 0x1417f12c0, CallArgs::ints(&[0x1424_f5648]))
+        .rax as u8
+        != 0;
+    if flag { 0.0 } else { vm.f64(f + offset) }
+}
+
+/// `0x141a6ace0(F, x, y, z)`: sets the aircraft's position (doubles `F+0x378/0x380/0x388`; a component whose
+/// float32 value is not finite becomes zero) and refreshes the ground probe state at it. With the speed over the
+/// frame time and the length of the vector `B+0x64f4..0x64fc` it derives the probe lengths `F+0x42f50`
+/// (`0.2 |b| + min(|b|, speed * dt)`), `F+0x42f54` (`2 |b|`) and `F+0x42f58`
+/// (`1.01 (|b| + F+0x42f50)`), then queries the terrain object at `F+0x42e40` with a segment from `(x, y -
+/// F+0x42f54, z)` to `(x, y + F+0x42f50, z)` (the terrain functions `0x141963d30`, `0x141962b00`, `0x14195f4b0` and
+/// `0x141962750` are replayed): the ground height `F+0x42f5c` comes from the probe, or from the cached plane
+/// (`F+0x42f60..0x42f74`, the slope terms) when the probe reports a cached hit. `rbp` locates the original's frame
+/// locals, whose addresses are passed to the terrain functions.
+#[allow(clippy::field_reassign_with_default)]
+pub fn set_position(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, position: [f64; 3]) {
+    use crate::scalar::snap;
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let finite_f32 = |v: f64| (v as f32).is_finite();
+    let x = if finite_f32(position[0]) {
+        position[0]
+    } else {
+        0.0
+    };
+    let y = if finite_f32(position[1]) {
+        position[1]
+    } else {
+        0.0
+    };
+    vm.set_f64(slot(0xd8), position[2]);
+    if !finite_f32(position[2]) {
+        vm.set_f64(slot(0xd8), 0.0);
+    }
+    vm.set_f64(f + 0x378, x);
+    vm.set_f64(f + 0x380, y);
+    let z = vm.f64(slot(0xd8));
+    vm.set_f64(f + 0x388, z);
+    let b = vm.u64(f + 0x20);
+    let (w0, w1, w2) = (vm.f32(b + 0x64f4), vm.f32(b + 0x64f8), vm.f32(b + 0x64fc));
+    let (v1, v2, v3) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+    let dt = f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0);
+    let root = |sum: f32| if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+    let speed = root(v1 * v1 + v2 * v2 + v3 * v3);
+    let travelled = (dt * f64::from(speed)) as f32;
+    let reach = if 0.0 > travelled {
+        0.0
+    } else {
+        let norm = root(w0 * w0 + w1 * w1 + w2 * w2);
+        if norm < travelled { norm } else { travelled }
+    };
+    let norm = root(w0 * w0 + w1 * w1 + w2 * w2);
+    let f50 = (f64::from(norm) * 0.2 + f64::from(reach)) as f32;
+    vm.set_f32(f + 0x42f50, f50);
+    vm.set_f32(f + 0x42f54, (f64::from(norm) + f64::from(norm)) as f32);
+    vm.set_f32(f + 0x42f58, (f64::from(norm + f50) * 1.01) as f32);
+    let component =
+        |vm: &mut Vm, env: &mut dyn Callees, offset: u64| position_component(vm, env, f, offset);
+    let up = vm.f32(f + 0x42f50);
+    let p70 = component(vm, env, 0x378) as f32;
+    let p6c = (f64::from(up) + component(vm, env, 0x380)) as f32;
+    let p68 = component(vm, env, 0x388) as f32;
+    let p80 = component(vm, env, 0x378) as f32;
+    let down = vm.f32(f + 0x42f54);
+    let p7c = (component(vm, env, 0x380) - f64::from(down)) as f32;
+    let p78 = component(vm, env, 0x388) as f32;
+    for (off, v) in [
+        (-0x70, p70),
+        (-0x6c, p6c),
+        (-0x68, p68),
+        (-0x80, p80),
+        (-0x7c, p7c),
+        (-0x78, p78),
+    ] {
+        vm.set_f32(slot(off), v);
+    }
+    vm.set_i32(slot(-0x64), 0);
+    vm.set_i32(slot(-0x74), 0);
+    let terrain = f + 0x42e40;
+    let (r12, r14, r15, r78) = (f + 0x42f60, f + 0x42f6c, f + 0x42f84, f + 0x42f78);
+    let ground = f + 0x42f5c;
+    let (p70_at, p80_at) = (slot(-0x70), slot(-0x80));
+    let probe = |vm: &mut Vm, env: &mut dyn Callees, tail: [u64; 3]| -> u32 {
+        let mut args = CallArgs::default();
+        args.int = [Some(terrain), Some(p70_at), Some(p80_at), Some(ground)];
+        args.stack = [Some(tail[0]), Some(tail[1]), Some(tail[2]), None];
+        env.call(vm, 0x14195f4b0, args).rax as u32
+    };
+    if vm.i32(f + 0x42f88) != 0 {
+        let mut args = CallArgs::default();
+        args.int = [Some(terrain), Some(p80_at), Some(p70_at), None];
+        args.xmm[3] = Some(vm.f32(f + 0x42f58).to_bits());
+        args.stack = [
+            Some(r12),
+            Some(r14),
+            Some(r78),
+            Some(u64::from(vm.u32(r15))),
+        ];
+        env.call(vm, 0x141963d30, args);
+    } else {
+        let mut args = CallArgs::default();
+        args.int[0] = Some(terrain);
+        args.stack[0] = Some(u64::from(vm.u32(f + 0x28)));
+        env.call(vm, 0x141962b00, args);
+    }
+    if vm.i32(f + 0x42f88) != 0 {
+        if probe(vm, env, [0, 0, 0]) != 0 {
+            return;
+        }
+        let v = snap(vm.f32(f + 0x42f70), f32::from_bits(0xbc23_d70a), 0.01);
+        let dz = f64::from(vm.f32(f + 0x42f68)) - position_component(vm, env, f, 0x388);
+        let t7 = f64::from(vm.f32(f + 0x42f74)) * dz;
+        let dx = f64::from(vm.f32(r12)) - position_component(vm, env, f, 0x378);
+        let t2 = f64::from(vm.f32(r14)) * dx + t7;
+        let h = t2 / f64::from(v) + f64::from(vm.f32(f + 0x42f64));
+        vm.set_f32(ground, h as f32);
+    } else {
+        vm.set_f32(ground, -500.0);
+        vm.set_i32(r15, -1);
+        let x0 = position_component(vm, env, f, 0x378) as f32;
+        vm.set_f32(r12, x0);
+        let g = vm.u32(ground);
+        vm.set_u32(f + 0x42f64, g);
+        let z0 = position_component(vm, env, f, 0x388) as f32;
+        vm.set_f32(f + 0x42f68, z0);
+        vm.set_i32(r14, 0);
+        vm.set_u32(f + 0x42f70, 0x3f80_0000);
+        vm.set_u32(f + 0x42f74, 0);
+        vm.set_i32(r78, 0);
+        vm.set_u32(f + 0x42f7c, 0);
+        vm.set_u32(f + 0x42f80, 0);
+        if probe(vm, env, [r14, r78, r15]) != 0 {
+            return;
+        }
+        let cell = vm.u32(f + 0x28);
+        let zf = position_component(vm, env, f, 0x388) as f32;
+        let xf = position_component(vm, env, f, 0x378) as f32;
+        let mut args = CallArgs::default();
+        args.int = [
+            Some(0x1_4611_ac80),
+            None,
+            None,
+            Some(u64::from(cell.wrapping_add(0xc))),
+        ];
+        args.xmm[1] = Some(xf.to_bits());
+        args.xmm[2] = Some(zf.to_bits());
+        args.stack = [Some(r14), Some(r15), None, None];
+        let h = f32::from_bits(env.call(vm, 0x141962750, args).xmm0 as u32);
+        vm.set_f32(ground, h);
+    }
+}
+
 /// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
 /// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
 /// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density

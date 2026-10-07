@@ -2900,6 +2900,23 @@ fn rigid_body_step_matches_the_original_machine_code() {
 }
 
 #[test]
+fn set_position_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("position.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let (f, rbp) = (hex(&case.header[0]), hex(&case.header[1]));
+        let position = [2, 3, 4].map(|k| f64::from_bits(hex(&case.header[k])));
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::set_position(&mut case.vm, &mut env, f, rbp, position);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);
