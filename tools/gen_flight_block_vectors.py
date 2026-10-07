@@ -972,10 +972,16 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM11, struct.unpack('<Q', struct.pack('<d', 0.01))[0])
             case.emu.uc.reg_write(UC_X86_REG_RDI, 0)
         if BLOCK == 'reset':
-            case.stub(0x14120c960, lambda call, rng: call.ret_int(0))
-            case.stub(0x1409830b0, lambda call, rng: None)
             case.stub(0x1412763c0, lambda call, rng: None)
             fz.preset('F', 0x675c, rng.choice([0, 0, 1]))
+            vb = 0x6f0000200000
+            fz.preset('F', 0x430d8, vb & 0xffffffff)
+            fz.preset('F', 0x430dc, vb >> 32)
+            ve = vb + rng.choice([0, 0, 8, 24])
+            fz.preset('F', 0x430e0, ve & 0xffffffff)
+            fz.preset('F', 0x430e4, ve >> 32)
+            fz.preset('F', 0xbcc8, 0)
+            fz.preset('F', 0xbcd0, 0)
             for off in range(0x294, 0x340, 4):
                 fz.preset_f32('F', off, rng.uniform(-100, 100))
         if BLOCK == 'vec':
@@ -1008,14 +1014,21 @@ def main():
             for reg, val in ((UC_X86_REG_RDI, 0), (UC_X86_REG_R13, 1), (UC_X86_REG_RBX, F + 0xbcc8)):
                 case.emu.uc.reg_write(reg, val)
         if BLOCK == 'strips':
-            VEC = case.region('VEC', 0x80)
+            VEC = case.region('VEC', 0x2d8 * 3 * 4)
             PR = case.region('PR', 0x3770 * 3)
+            for j in range(4):
+                ptr = VEC + 0x2d8 * 3 * j
+                fz.preset('F', 0x68e0 + 24 * j, ptr & 0xffffffff, record=True)
+                fz.preset('F', 0x68e4 + 24 * j, ptr >> 32, record=True)
+                for i in range(3):
+                    for k in range(8):
+                        fz.preset_f32('VEC', 0x2d8 * (3 * j + i) + 4 * k, rng.uniform(-5, 5))
             case.stub(0x1411d9f60, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
-            case.stub(0x1411b4730, lambda call, rng: call.ret_int(VEC + 0x20 * (call.ints[2] & 3)))
             case.stub(0x1405f3f30, lambda call, rng: call.ret_int(call.ints[1] + 0x10))
-            case.stub(0x14120c960, lambda call, rng: call.ret_int(rng.choice([0, 0, 0x100])) if False else call.ret_int(0))
             for addr in (0x140985d90, 0x14121a9b0, 0x1405ddb90):
                 case.stub(addr, lambda call, rng: None)
+            fz.preset('F', 0xbcc8, 0)
+            fz.preset('F', 0xbcd0, 0)
             fz.preset('B', 0x920, rng.choice([0, 1, 2, 3, 3]))
             fz.preset('B', 0x6010, PR & 0xffffffff, record=True)
             fz.preset('B', 0x6014, PR >> 32, record=True)
@@ -1025,17 +1038,13 @@ def main():
                 fz.preset('PR', 0x3770 * p + 4, rng.choice([0, 1, 1]))
                 fz.preset('PR', 0x3770 * p + 0x8c, rng.choice([0, 1, 2, 3, 5]))
                 fz.preset_f32('PR', 0x3770 * p + 0xa0, rng.uniform(-3, 3))
-            for k in range(4 * 8):
-                fz.preset_f32('VEC', 4 * k, rng.uniform(-5, 5))
             for reg, val in ((UC_X86_REG_RDI, 0), (UC_X86_REG_R13, 1), (UC_X86_REG_R14, 0), (UC_X86_REG_RBX, F + 0xbcc8)):
                 case.emu.uc.reg_write(reg, val)
         if BLOCK == 'wstrips':
             W = case.region('W', 0x36c8 * 48)
             XR = case.region('XR', 0x2d8 * 48)
             IDS = case.region('IDS', 0x40 * 48)
-            case.stub(0x1411da150, lambda call, rng: call.ret_int(rng.choice([0, 1, 1, 1])))
             case.stub(0x1405f3f30, lambda call, rng: call.ret_int(call.ints[1] + 0x10))
-            case.stub(0x14120c960, lambda call, rng: call.ret_int(0))
             for addr in (0x140985d90, 0x14121a9b0, 0x1405ddb90):
                 case.stub(addr, lambda call, rng: None)
             for base, off, ptr in ((B, 0x6028, W), (F, 0x6940, XR)):
@@ -1044,7 +1053,10 @@ def main():
                 fz.preset(name, off + 4, ptr >> 32, record=True)
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
             fz.preset('F', 0x24, B >> 32, record=True)
+            fz.preset('F', 0xbcc8, 0)
+            fz.preset('F', 0xbcd0, 0)
             for w in range(48):
+                fz.preset('W', 0x36c8 * w + 0x678, rng.choice([0, 1, 1, 1]))
                 n = rng.choice([0, 1, 2, 3, 5])
                 p = IDS + 0x40 * w
                 fz.preset('W', 0x36c8 * w + 0x3690, p & 0xffffffff, record=True)
@@ -1057,8 +1069,6 @@ def main():
             for reg, val in ((UC_X86_REG_RDI, 0), (UC_X86_REG_R13, 0), (UC_X86_REG_R14, 0), (UC_X86_REG_RBX, F + 0xbcc8)):
                 case.emu.uc.reg_write(reg, val)
         if BLOCK == 'tail':
-            hit_rate = rng.choice([0.0, 0.0, 0.05, 0.3])
-            case.stub(0x1417b2e70, lambda call, rng: call.ret_int(rng.choice([1, 0x201, 0x81]) if rng.random() < hit_rate else rng.choice([0, 0x100, 0x200])))
             case.stub(0x1407debf0, lambda call, rng: None)
             case.stub(0x1424e5fc8, lambda call, rng: call.ret_int(rng.getrandbits(16)))
             for address in dirty:
@@ -1070,6 +1080,13 @@ def main():
                 extra[address] = word & 0xffffffff
             putg(0x1424e5fc8, 0x1424e5fc8 & 0xffffffff)
             putg(0x1424e5fcc, 0x1424e5fc8 >> 32)
+            hit_rate = rng.choice([0.0, 0.0, 0.05, 0.3])
+            keys = bytearray(0x20)
+            first = 0x1460ad818 + 0xaf2f
+            for index in range(19):
+                keys[first - 0x1460b8740 + index] = rng.choice([1, 0x81, 0xff]) if rng.random() < hit_rate else 0
+            for k in range(8):
+                putg(0x1460b8740 + 4 * k, int.from_bytes(keys[4 * k:4 * k + 4], 'little'))
             putg(0x1460b83b0, 2)
             putg(0x1460b83b4, rng.getrandbits(32))
             fz.preset('F', 0x28, rng.getrandbits(32))

@@ -2307,7 +2307,7 @@ pub fn gear_drag_and_brake(
 /// per-source force tables (`F+0x2bc..0x338` apart from the totals) and `F+0x294` are cleared; `0x1409830b0` is
 /// called on `F+0x430d8` and `0x1412763c0` on the object (both replayed).
 pub fn step_reset(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
-    env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8]));
+    // the log switch `0x14120c960` only decides whether a log line is written
     if vm.i32(f + 0x675c) == 0 {
         for offset in [0x30c, 0x2cc, 0x324, 0x2e0, 0x33c, 0x2f4] {
             vm.set_u32(f + offset, 0);
@@ -2319,7 +2319,11 @@ pub fn step_reset(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     ] {
         vm.set_u32(f + offset, 0);
     }
-    env.call(vm, 0x1409830b0, CallArgs::ints(&[f + 0x430d8]));
+    // `0x1409830b0`: the vector at `F+0x430d8` is cleared (its end returns to its begin)
+    let begin = vm.u64(f + 0x430d8);
+    if begin != vm.u64(f + 0x430e0) {
+        vm.set_u64(f + 0x430e0, begin);
+    }
     env.call(vm, 0x1412763c0, CallArgs::ints(&[f]));
 }
 
@@ -2402,9 +2406,8 @@ pub fn find_marked_source(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) 
 /// switch `0x14120c960(F+0xbcc8)` is queried around it (a nonzero answer would log values: not ported).
 pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
     let slot = |o: i64| (rbp as i64 + o) as u64;
-    let log = |vm: &mut Vm, env: &mut dyn Callees| -> Result<(), String> {
-        let answer = env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8])).rax as u32;
-        if answer != 0 {
+    let log = |vm: &mut Vm, _env: &mut dyn Callees| -> Result<(), String> {
+        if crate::flight_step::debug_dump_active(vm, f) {
             return Err("log output not ported".into());
         }
         Ok(())
@@ -2421,9 +2424,8 @@ pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Resu
                     let base = vm.u64(vm.u64(f + 0x20) + 0x6010);
                     let record = base + 0x88 + offset;
                     vm.set_u64(slot(-0x68), record);
-                    let v = env
-                        .call(vm, 0x1411b4730, CallArgs::ints(&[f, u64::from(i), j]))
-                        .rax;
+                    // `0x1411b4730(F, i, j)`: element `i` of the vector of records number `j`
+                    let v = vm.u64(f + 0x68e0 + 24 * j) + i64::from(i as i32) as u64 * 0x2d8;
                     vm.set_u64(slot(-0x38), v);
                     for vector in [0x88, 0xa0] {
                         for k in 0..3 {
@@ -2432,7 +2434,7 @@ pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Resu
                     }
                     env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0x88), slot(-0x68)]));
                     env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0xa0), slot(-0x38)]));
-                    let flag = env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8])).rax;
+                    let flag = u64::from(crate::flight_step::debug_dump_active(vm, f));
                     let begin_b = env
                         .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x3d8), slot(0xa0)]))
                         .rax;
@@ -2477,8 +2479,7 @@ pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Resu
 pub fn wing_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     let slot = |o: i64| (rbp as i64 + o) as u64;
     for w in 0..0x30u64 {
-        let selected = env.call(vm, 0x1411da150, CallArgs::ints(&[f, w])).rax as u32;
-        if selected == 0 {
+        if crate::flight_step::wing_enabled(vm, env, f, w as i32) == 0 {
             continue;
         }
         let b = vm.u64(f + 0x20);
@@ -2510,7 +2511,7 @@ pub fn wing_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
                 }
             }
         }
-        let flag = env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8])).rax;
+        let flag = u64::from(crate::flight_step::debug_dump_active(vm, f));
         let begin_elements = env
             .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x408), slot(0xb8)]))
             .rax;
@@ -2538,11 +2539,8 @@ pub fn late_tail(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<(), Strin
         args.stack[0] = Some(0);
         env.call(vm, 0x1407debf0, args);
     };
-    let reported = (0..=0x12u64).any(|index| {
-        env.call(vm, 0x1417b2e70, CallArgs::ints(&[0x1_460a_d818, index]))
-            .rax as u8
-            != 0
-    });
+    // `0x1417b2e70(table, index)`: the key state byte `table[index + 0xaf2f]`
+    let reported = (0..=0x12u64).any(|index| vm.u8(0x1_460a_d818 + index + 0xaf2f) != 0);
     if !reported {
         let mode = u64::from(vm.u32(f + 0x28));
         call_end(vm, env, mode);
