@@ -2050,3 +2050,33 @@ pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
         blend_to(vm, env, s + offset, value);
     }
 }
+
+/// `0x14126dd98..0x14126e9a0`: the contact pass over the 39 bodies (`[B+0x6040]`, stride `0x34c8`). A body is
+/// skipped when its model index `+0x5f0` (up to 0x26) is bound by `0x1407ace10(F, 1, 0x179, index)`, when `+0x54` is
+/// nonzero or when its byte `+0x588` is clear; the others run [`body_surface_probe`] and [`body_contact_blend`]. The
+/// body counter lives in the frame slot `rbp+0x1750`.
+pub fn body_contact_loop(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    for j in 0..39u64 {
+        vm.set_u32(slot(0x1750), j as u32);
+        let bodies = vm.u64(vm.u64(f + 0x20) + 0x6040);
+        let at = bodies + j * 0x34c8;
+        let index = vm.u32(at + 0x5f0);
+        if index <= 0x26 {
+            let args = CallArgs::ints(&[f, 1, 0x179, u64::from(index)]);
+            if env.call(vm, 0x1407ace10, args).rax as u32 != 0 {
+                continue;
+            }
+        }
+        if vm.i32(at + 0x54) != 0 {
+            continue;
+        }
+        let bodies = vm.u64(vm.u64(f + 0x20) + 0x6040);
+        if vm.u8(bodies + j * 0x34c8 + 0x588) == 0 {
+            continue;
+        }
+        body_surface_probe(vm, env, f, rbp, at);
+        body_contact_blend(vm, env, f, rbp, at);
+    }
+    vm.set_u32(slot(0x1750), 39);
+}
