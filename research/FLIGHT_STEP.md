@@ -355,6 +355,19 @@ doubles are set, `F+0x65b0` is raised; the second set (`F+0x65c0..0x6610`) works
 `F+0x6618/0x661c/0x6620/0x6624` in feet. The register state at the block start is `xmm7 = F+0x368`,
 `xmm9 = F+0x370` (floats) and `xmm11 = 0.0`.
 
+`instruments` (`crates/xp-airfoil/src/flight_state.rs`, `0x14127307c..0x141273779`, 100 cases; the engine flag, frame time,
+the magnetic variation `0x14076b5d0`, `0x141244b60`, `0x1407d7bc0` and `0x1407cc570` are replayed): the cockpit quantities.
+`F+0x6638` and `F+0x663c` accumulate the horizontal and the total distance (a double increment added to the float),
+`F+0x41c` is the equivalent airspeed in knots (`sqrt(F+0x70) * speed * 1.9438445`), `F+0x420` the Mach number,
+`F+0x424` the dynamic pressure (`speed^2 * F+0x6c / 2`), `F+0x428` and `F+0x42c` the replayed variation values; the
+instruments `F+0x500/0x504` (the angles `F+0x404/0x408` scaled by a ramp of the speed between 5 and 10),
+`F+0x508` (the heading difference wrapped to -180..180), `F+0x50c`, `F+0x510` (the normal acceleration held to
+-0.1..1), `F+0x514` are blended toward their targets by `lerp` with rates from the frame time (divided by
+`B+0x24a4` or `B+0x2498` for some); then the rates of change `F+0x51c/0x52c` (factor `10 dt`) and `F+0x534/0x53c`
+(factor `dt`) are smoothed derivatives of the speed-scaled flight path angle, the scaled angles `F+0x404/0x408`
+(stored at `F+0x518`, `F+0x520`, `F+0x528`), the replayed load term and the ground speed in knots. The register state
+at the block start is `xmm8 = 1.0` (double) and `xmm11 = 0.0`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

@@ -3,7 +3,13 @@
 //! (`tools/gen_flight_block_vectors.py`), with the callees outside this port replayed.
 
 use crate::flight_step::position_component;
+use crate::scalar::{clamp, lerp};
 use crate::vm::{CallArgs, Callees, Vm};
+use crate::wing_element::interpolate_clamped;
+
+fn frame_time(vm: &mut Vm, env: &mut dyn Callees) -> f64 {
+    f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0)
+}
 
 fn planet(vm: &mut Vm, env: &mut dyn Callees) -> u64 {
     env.call(vm, 0x14193ae40, CallArgs::default()).rax
@@ -127,5 +133,126 @@ pub fn path_samples(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
         args.stack = [Some(bits(vm, 3)), Some(0), Some(0), None];
         let distance = f64::from_bits(env.call(vm, 0x1406e2be0, args).xmm0);
         vm.set_f32(f + target, (distance * 3.2808399200439453) as f32);
+    }
+}
+
+/// A float function of the flight object that is replayed: `0x14076b5d0(0x145890720, lon, lat)`,
+/// `0x141244b60(F, angle)`, `0x1407d7bc0(F, 2.0)` and `0x1407cc570(F, speed, 1)`.
+fn replayed_float(vm: &mut Vm, env: &mut dyn Callees, address: u64, args: CallArgs) -> f32 {
+    f32::from_bits(env.call(vm, address, args).xmm0 as u32)
+}
+
+/// `0x14127307c..0x141273779`: the cockpit quantities. Distances travelled (`F+0x6638` horizontal, `F+0x663c`
+/// total, doubles added to floats), the equivalent airspeed in knots `F+0x41c`, the Mach number `F+0x420`, the
+/// dynamic pressure `F+0x424`, the magnetic variation `F+0x428` and `F+0x42c` (replayed), and smoothed
+/// instruments `F+0x500..0x514` (angles and loads blended with `lerp` at rates from the frame time and the aircraft's
+/// time constants `B+0x24a4`, `B+0x2498`), then the rates of change of the pitch, roll, load and speed terms
+/// `F+0x518..0x53c`. The register state at the block start is `xmm8 = 1.0` (double), `xmm11 = 0.0`.
+pub fn instruments(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    const KNOTS: f32 = f32::from_bits(0x3ff8_cfe5);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    let sqrt = |sum: f32| if 0.0 > sum { f32::NAN } else { sum.sqrt() };
+    let b = vm.u64(f + 0x20);
+    let (v0, v1, v2) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+    let horizontal = sqrt(v0 * v0 + v2 * v2);
+    let dt = frame_time(vm, env);
+    let value = f64::from(vm.f32(f + 0x6638)) + dt * f64::from(horizontal);
+    vm.set_f32(f + 0x6638, value as f32);
+    let speed = vm.f32(f + 0x400);
+    let dt = frame_time(vm, env);
+    let value = f64::from(vm.f32(f + 0x663c)) + dt * f64::from(speed);
+    vm.set_f32(f + 0x663c, value as f32);
+    vm.set_f32(f + 0x41c, sqrt(vm.f32(f + 0x70)) * speed * KNOTS);
+    vm.set_f32(f + 0x420, speed / vm.f32(f + 0x74));
+    vm.set_f32(
+        f + 0x424,
+        (f64::from(speed * speed * vm.f32(f + 0x6c)) * 0.5) as f32,
+    );
+    let lat = position_component(vm, env, f, 0x398) as f32;
+    let lon = position_component(vm, env, f, 0x390) as f32;
+    let mut args = CallArgs::ints(&[0x1_4589_0720]);
+    args.xmm[1] = Some(lon.to_bits());
+    args.xmm[2] = Some(lat.to_bits());
+    let variation = replayed_float(vm, env, 0x14076b5d0, args);
+    vm.set_f32(f + 0x428, variation);
+    let mut args = CallArgs::ints(&[f]);
+    args.xmm[1] = Some(vm.f32(f + 0x358).to_bits());
+    let value = replayed_float(vm, env, 0x141244b60, args);
+    vm.set_f32(f + 0x42c, value);
+    let dt = frame_time(vm, env);
+    let factor = (dt / f64::from(vm.f32(b + 0x24a4))) as f32;
+    let speed3 = sqrt(v0 * v0 + v1 * v1 + v2 * v2);
+    let ramp = interpolate_clamped(5.0, 0.0, 10.0, 1.0, speed3);
+    let target = ramp * vm.f32(f + 0x404);
+    vm.set_f32(f + 0x500, lerp(vm.f32(f + 0x500), target, factor));
+    let dt = frame_time(vm, env);
+    let factor = dt as f32;
+    let ramp = interpolate_clamped(5.0, 0.0, 10.0, 1.0, speed3);
+    let target = ramp * vm.f32(f + 0x408);
+    vm.set_f32(f + 0x504, lerp(vm.f32(f + 0x504), target, factor));
+    let dt = frame_time(vm, env);
+    let factor = (dt / f64::from(vm.f32(b + 0x2498))) as f32;
+    let mut args = CallArgs::ints(&[f]);
+    args.xmm[1] = Some(2.0f32.to_bits());
+    let reference = replayed_float(vm, env, 0x1407d7bc0, args);
+    let mut x = vm.f32(f + 0x358) - reference;
+    while -180.0 > x {
+        x += 360.0;
+    }
+    while x > 180.0 {
+        x += -360.0;
+    }
+    let factor = clamp(factor, 0.0, 1.0);
+    vm.set_f32(f + 0x508, (1.0 - factor) * vm.f32(f + 0x508) + factor * x);
+    let dt = frame_time(vm, env);
+    let factor = clamp((dt / f64::from(vm.f32(b + 0x24a4))) as f32, 0.0, 1.0);
+    vm.set_f32(
+        f + 0x50c,
+        (1.0 - factor) * vm.f32(f + 0x50c) + factor * vm.f32(f + 0x350),
+    );
+    let dt = frame_time(vm, env);
+    let factor = (dt * 0.2) as f32;
+    let value = clamp(vm.f32(f + 0x344), -0.1, 1.0);
+    vm.set_f32(f + 0x510, lerp(vm.f32(f + 0x510), value, factor));
+    let dt = frame_time(vm, env);
+    let factor = (dt + dt) as f32;
+    vm.set_f32(
+        f + 0x514,
+        lerp(vm.f32(f + 0x514), vm.f32(f + 0x34c), factor),
+    );
+    let s = vm.f32(f + 0x400);
+    let ramp = interpolate_clamped(1.0, 0.0, 5.0, 1.0, s * KNOTS);
+    let a414 = ramp * vm.f32(f + 0x414);
+    let a404 = ramp * vm.f32(f + 0x404);
+    let a408 = ramp * vm.f32(f + 0x408);
+    let mut args = CallArgs::ints(&[f]);
+    args.xmm[1] = Some(s.to_bits());
+    args.int[2] = Some(1);
+    let load = replayed_float(vm, env, 0x1407cc570, args) * KNOTS;
+    let ground = {
+        let (g0, g2) = (vm.f32(f + 0x368), vm.f32(f + 0x370));
+        sqrt(g0 * g0 + g2 * g2) * KNOTS
+    };
+    for (rate, previous, value) in [(0x51c, 0x518, a414), (0x52c, 0x528, a408)] {
+        let dt = frame_time(vm, env);
+        let factor = (dt * 10.0) as f32;
+        let dt = frame_time(vm, env);
+        let inverse = (1.0 / dt) as f32;
+        let delta = (value - vm.f32(f + previous)) * inverse;
+        vm.set_f32(f + rate, lerp(vm.f32(f + rate), delta, factor));
+        vm.set_f32(f + previous, value);
+        if previous == 0x518 {
+            vm.set_f32(f + 0x524, vm.f32(f + 0x3d0) * DEG);
+            vm.set_f32(f + 0x520, a404);
+        }
+    }
+    for (rate, previous, value) in [(0x534, 0x530, load), (0x53c, 0x538, ground)] {
+        let dt = frame_time(vm, env);
+        let factor = dt as f32;
+        let dt = frame_time(vm, env);
+        let inverse = (1.0 / dt) as f32;
+        let delta = (value - vm.f32(f + previous)) * inverse;
+        vm.set_f32(f + rate, lerp(vm.f32(f + rate), delta, factor));
+        vm.set_f32(f + previous, value);
     }
 }
