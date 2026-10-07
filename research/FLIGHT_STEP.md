@@ -381,6 +381,19 @@ aircraft heavier than 0.99 of `B+0x288c` with the positive parameters `B+0x28e8/
 precision with the frame time). The register state at the block start is `rdi = 0`, `rsi = 1`, `xmm8 = 1.0` and
 `xmm10 = 0.5` (doubles).
 
+`late_state` (`crates/xp-airfoil/src/flight_state.rs`, `0x141273dfb..0x14127402d`, 120 cases; the fuel and load update
+`0x141245750` (550 instructions), the engine update `0x14125e4f0` (a large function) and the input-binding query are
+replayed): with `B+0xc54` the former runs, otherwise `F+0x6490`/`F+0x64a8` are cleared and `F+0x6494` takes `F+0x5c`.
+With the aircraft feature `B+0x8c4` and the global `0x142f01978` set, the control assist `F+0x6594` is computed:
+with `B+0x8c8`, `ramp(F+0x404 / B+0x8ec between 0.75 and 1) * (signed_sqrt(F+0x41c / B+0x7b0) - 0.25) * 1.3333334`
+unless the binding query with mode 2 is active (then 0); without it, 1 when the mode 1 binding is inactive and either
+`F+0x6c98` exceeds a quarter of `B+0x7b0` with `F+0x404 > B+0x8ec` or the time `F+0x6f4c` is later than the sim time
+`0x142f01918` (otherwise 0). With `F+0x28 == 0` the engine update runs. With `F+0xdbc` the angles `F+0x3d8` (to +-45)
+and `F+0x3dc` (to +-20) are limited by replacing an out-of-range value with the limit (NaN passes) and the quaternion
+`F+0x3e4` is rebuilt from `F+0x3e0`, `F+0x3dc`, `F+0x3d8`. The register state at the block start is `rdi = 0`, `rsi = 1`.
+After this block the function only looks up a name for the aircraft (a loop over 19 entries and the string copy
+`0x1407debf0` into `F+0x2c`), which is not ported.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

@@ -5,7 +5,7 @@
 use crate::flight_step::position_component;
 use crate::scalar::{clamp, lerp};
 use crate::vm::{CallArgs, Callees, Vm};
-use crate::wing_element::interpolate_clamped;
+use crate::wing_element::{interpolate_clamped, signed_sqrt};
 
 fn frame_time(vm: &mut Vm, env: &mut dyn Callees) -> f64 {
     f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0)
@@ -367,4 +367,79 @@ pub fn force_coefficients(
     vm.set_f32(b + 0x28fc, value as f32);
     vm.set_f32(b + 0x28fc, limited(vm.f32(b + 0x28fc)));
     Ok(())
+}
+
+/// `0x1407ace10(F, mode, 0x100, 0, 1.0)`: an input-binding query with a mode word.
+fn mode_query(vm: &mut Vm, env: &mut dyn Callees, f: u64, mode: u64) -> bool {
+    let args = CallArgs::ints(&[f, mode, 0x100, 0]);
+    env.call(vm, 0x1407ace10, args).rax as u32 != 0
+}
+
+/// `0x141273dfb..0x14127402d`: the last state updates. With `B+0xc54` the fuel and load update `0x141245750` (replayed)
+/// runs, otherwise `F+0x6490` and `F+0x64a8` are cleared and `F+0x6494` takes `F+0x5c`. When the aircraft has the
+/// feature `B+0x8c4` and the global `0x142f01978` is set, the control assist `F+0x6594` is computed: with `B+0x8c8`
+/// from the equivalent airspeed `signed_sqrt(F+0x41c / B+0x7b0)` and the angle `F+0x404 / B+0x8ec` (zero when the
+/// binding with mode 2 is active), otherwise 1 when the binding with mode 1 is inactive and either the speed
+/// `F+0x6c98` exceeds a quarter of `B+0x7b0` with the angle above `B+0x8ec` or the time `F+0x6f4c` is in the future,
+/// else 0. With `F+0x28 == 0` the engine update `0x14125e4f0` (replayed) runs. With `F+0xdbc` the pitch and roll
+/// `F+0x3d8` (to +-45) and `F+0x3dc` (to +-20) are limited by replacing an out-of-range value with the limit, and
+/// the quaternion `F+0x3e4` is rebuilt from the heading `F+0x3e0` and the two angles. The register state at the block
+/// start is `rdi = 0`, `rsi = 1`, `xmm13 = 0.0` and `xmm14 = 1.0`.
+pub fn late_state(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    let b = vm.u64(f + 0x20);
+    if vm.i32(b + 0xc54) != 0 {
+        env.call(vm, 0x141245750, CallArgs::ints(&[f]));
+    } else {
+        vm.set_i32(f + 0x6490, 0);
+        let word = vm.u32(f + 0x5c);
+        vm.set_u32(f + 0x6494, word);
+        vm.set_i32(f + 0x64a8, 0);
+    }
+    let b = vm.u64(f + 0x20);
+    if vm.i32(b + 0x8c4) != 0 && vm.i32(0x1_42f0_1978) != 0 {
+        if vm.i32(b + 0x8c8) != 0 {
+            let mut assist = 0.0f32;
+            if !mode_query(vm, env, f, 2) {
+                let t = signed_sqrt(vm.f32(f + 0x41c) / vm.f32(b + 0x7b0));
+                let scale = (t - 0.25) * f32::from_bits(0x3faa_aaab) + 0.0;
+                let ramp =
+                    interpolate_clamped(0.75, 0.0, 1.0, 1.0, vm.f32(f + 0x404) / vm.f32(b + 0x8ec));
+                assist = ramp * scale;
+            }
+            vm.set_f32(f + 0x6594, assist);
+        } else {
+            let fast = f64::from(vm.f32(f + 0x6c98)) > f64::from(vm.f32(b + 0x7b0)) * 0.25
+                && vm.f32(f + 0x404) > vm.f32(b + 0x8ec);
+            let pending = f64::from(vm.f32(f + 0x6f4c)) > vm.f64(0x1_42f0_1918);
+            let mut value = 0i32;
+            if fast || pending {
+                value = i32::from(!mode_query(vm, env, f, 1));
+            }
+            vm.set_f32(f + 0x6594, value as f32);
+        }
+    }
+    if vm.i32(f + 0x28) == 0 {
+        env.call(vm, 0x14125e4f0, CallArgs::ints(&[f]));
+    }
+    if vm.i32(f + 0xdbc) != 0 {
+        let limit = |value: f32, lo: f32, hi: f32, bound: i32| -> f32 {
+            if lo > value || value > hi {
+                if value > hi {
+                    bound as f32
+                } else {
+                    -bound as f32
+                }
+            } else {
+                value
+            }
+        };
+        let pitch = limit(vm.f32(f + 0x3d8), -45.0, 45.0, 45);
+        vm.set_f32(f + 0x3d8, pitch);
+        let roll = limit(vm.f32(f + 0x3dc), -20.0, 20.0, 20);
+        vm.set_f32(f + 0x3dc, roll);
+        let q = crate::attitude::euler_to_quaternion(vm.f32(f + 0x3e0), roll, pitch);
+        for (k, v) in q.iter().enumerate() {
+            vm.set_f32(f + 0x3e4 + 4 * k as u64, *v);
+        }
+    }
 }

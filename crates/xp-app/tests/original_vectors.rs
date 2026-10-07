@@ -3083,6 +3083,21 @@ fn force_coefficients_match_the_original_machine_code() {
 }
 
 #[test]
+fn late_state_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_late.txt");
+    assert!(cases.len() >= 100);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_state::late_state(&mut case.vm, &mut env, f);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);
