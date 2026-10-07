@@ -84,7 +84,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURIT
 <!-- compat:start -->
 ## How close to the original is it?
 
-**About 34% implemented, about 19% verified identical to the original.** Early stage: it loads
+**About 35% implemented, about 21% verified identical to the original.** Early stage: it loads
 the original content, draws it, and flies an approximation; it does not yet behave like X-Plane.
 
 - *Implemented* counts work that exists in any form, including approximations (the flight model is one).
@@ -99,7 +99,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 | Aircraft files (ACF) | 8 | 30% | 10% | All properties are preserved; typed: mass, CG, wings, gear, engine and controls subset. Loader schema of 1117 properties extracted; six values confirmed in code. |
 | 3D models (OBJ8) | 7 | 35% | 5% | Geometry, nested transforms, rotation/translation animation, textures. No normal/lit maps, instruments, panels or most dynamic animation. |
 | Airfoil evaluation (AFL) | 6 | 90% | 85% | All 34 airfoils; the whole profile function (selection, stall, buffet, blending, Mach factor) matches the original bit for bit on 1800 emulator cases. |
-| Flight model | 28 | 56% | 43% | An approximate rigid-body model that takes off and flies. Verified against the original: the airfoil and per-element aerodynamics (control surfaces, wing element, supersonic regime), the whole engine update (power, propeller speed, thrust, starter) and the whole per-engine propeller force function (blade stations, airflow, ground effect, thrust and moment terms). The engine control orchestrator now runs every engine kind natively (piston, turboprop and electric handlers, starter, thrust). Three blocks of the flight step (wing aspect factors, rocket and blown-flap effects, the wing element loop), the body loop and the body aerodynamic functions are ported. The rest of update_flight (radiators, gear, chute, water, totals plumbing), the wind sampler, the wash and the connection of these parts to the model are not ported. |
+| Flight model | 28 | 62% | 50% | An approximate rigid-body model that takes off and flies. Verified against the original: the airfoil and per-element aerodynamics (control surfaces, wing element, supersonic regime), the whole engine update and the per-engine propeller force function, the engine control orchestrator for every engine kind, the airflow wash (jets, slipstream, wing wake, body shadow), and many blocks of the flight step: wing aspect factors, rocket and blown-flap effects, the wing element loop, the body loop and body aerodynamics, the part drag, the equations of motion (accelerations, gravity, Euler's equations, velocity and rate integration), the position setter with the ground-probe glue, the attitude quaternion, the aircraft-axes velocities, the geographic state and the flight angles. Not ported: the gear, radiator, chute, cable, water and anchor blocks, the path-sample bookkeeping, the terrain, geodesy and wind callees, and the connection of the ported parts into a running model. |
 | Datarefs and commands | 8 | 28% | 15% | Registries and catalogs of 5503 datarefs and 3012 commands from the original, its default keyboard map (71 keys), values for 6 datarefs; 30 key commands act in the flight viewer. |
 | Scenery and world | 14 | 10% | 0% | Airport ground from apt.dat (runways, taxiways, aprons). No DSF, terrain, objects, lights or weather. |
 | Cockpit, instruments, Lua systems | 10 | 0% | 0% | Not started. |

@@ -26,9 +26,9 @@
   {
    "name": "Flight model",
    "weight": 28,
-   "implemented": 0.56,
-   "verified": 0.43,
-   "note": "An approximate rigid-body model that takes off and flies. Verified against the original: the airfoil and per-element aerodynamics (control surfaces, wing element, supersonic regime), the whole engine update (power, propeller speed, thrust, starter) and the whole per-engine propeller force function (blade stations, airflow, ground effect, thrust and moment terms). The engine control orchestrator now runs every engine kind natively (piston, turboprop and electric handlers, starter, thrust). Three blocks of the flight step (wing aspect factors, rocket and blown-flap effects, the wing element loop), the body loop and the body aerodynamic functions are ported. The rest of update_flight (radiators, gear, chute, water, totals plumbing), the wind sampler, the wash and the connection of these parts to the model are not ported."
+   "implemented": 0.62,
+   "verified": 0.5,
+   "note": "An approximate rigid-body model that takes off and flies. Verified against the original: the airfoil and per-element aerodynamics (control surfaces, wing element, supersonic regime), the whole engine update and the per-engine propeller force function, the engine control orchestrator for every engine kind, the airflow wash (jets, slipstream, wing wake, body shadow), and many blocks of the flight step: wing aspect factors, rocket and blown-flap effects, the wing element loop, the body loop and body aerodynamics, the part drag, the equations of motion (accelerations, gravity, Euler's equations, velocity and rate integration), the position setter with the ground-probe glue, the attitude quaternion, the aircraft-axes velocities, the geographic state and the flight angles. Not ported: the gear, radiator, chute, cable, water and anchor blocks, the path-sample bookkeeping, the terrain, geodesy and wind callees, and the connection of the ported parts into a running model."
   },
   {
    "name": "Datarefs and commands",
