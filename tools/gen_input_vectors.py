@@ -17,7 +17,7 @@ EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.ar
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000), (0x141245000, 0x141247000), (0x140819000, 0x14081a000)])
+    case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000), (0x141245000, 0x141247000), (0x1407cc000, 0x1407cd000), (0x1407e7000, 0x1407e8000), (0x140819000, 0x14081a000)])
     case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
     rng = case.rng
     print(f'# input vectors {KIND} (tools/gen_input_vectors.py)')
@@ -65,6 +65,16 @@ def main():
                 fz.preset_f32('BB', off, rng.uniform(0, 3))
             run = (0x141245750, [FF])
             OBJ = FF
+        elif KIND == 'airspeed':
+            speed = rng.choice([rng.uniform(-400, 400), rng.uniform(-100, 100), rng.uniform(250, 900), 0.0])
+            mode = rng.choice([0, 1])
+            fz.preset_f32('OBJ', 0x5c, rng.uniform(-50, 40))
+            fz.preset_f32('OBJ', 0x68, rng.choice([101325.0, rng.uniform(20000, 105000)]))
+            fz.preset_f32('OBJ', 0x6c, rng.uniform(0.2, 1.3))
+            fz.preset_f32('OBJ', 0x70, rng.uniform(0.2, 1.3))
+            fz.preset_f32('OBJ', 0x74, rng.choice([340.29, rng.uniform(290, 340), 0.0]))
+            run = (0x1407cc570, [OBJ, 0, mode], [speed])
+            arg = f'{speed}'
         elif KIND == 'variation':
             a = rng.choice([rng.uniform(-95, 95), rng.uniform(-90, 90), 0.0, 90.0, -90.0, 12.5, 5.0])
             b = rng.choice([rng.uniform(-185, 185), rng.uniform(-180, 180), 0.0, 175.0, 180.0, -180.0, 17.0])
@@ -97,13 +107,17 @@ def main():
             fz.preset('B', 0x2270, rng.choice([0, 1, 2, 3]))
             run = (0x141185030, [OBJ])
         try:
-            case.run(run[0], ints=run[1], floats=[0.0] + run[2] if KIND == 'variation' else [], stack=[], max_instructions=100000)
+            case.run(run[0], ints=run[1], floats=[0.0] + run[2] if KIND in ('variation', 'airspeed') else [], stack=[], max_instructions=100000)
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
         result = case.emu.reg(UC_X86_REG_RAX) & 0xffffffff
         if KIND == 'start':
             OBJ = run[1][0]
+        if KIND == 'airspeed':
+            import struct
+            result = case.emu.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff
+            arg = '%08x %d' % (struct.unpack('<I', struct.pack('<f', run[2][0]))[0], run[1][2])
         if KIND == 'variation':
             import struct
             bits = lambda v: struct.unpack('<I', struct.pack('<f', v))[0]

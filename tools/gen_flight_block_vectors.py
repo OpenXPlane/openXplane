@@ -404,13 +404,14 @@ def main():
                 fz.preset_f64('F', off, rng.choice([rng.uniform(-90, 90)] * 12 + [0.0]))
         if BLOCK == 'instruments':
             fz.preset_f32('F', 0x410, rng.uniform(-400, 400))
-            for address in (0x1407cc570,):
-                case.stub(address, lambda call, rng: call.ret_f32(rng.uniform(-30, 30)))
+            fz.preset_f32('F', 0x5c, rng.uniform(-50, 40))
+            fz.preset_f32('F', 0x68, rng.choice([101325.0, rng.uniform(20000, 105000)]))
+            fz.preset_f32('F', 0x6c, rng.uniform(0.2, 1.3))
+            fz.preset_f32('F', 0x70, rng.uniform(0.2, 1.3))
+            fz.preset_f32('F', 0x74, rng.choice([340.29, rng.uniform(290, 340)]))
             case.stub(0x1417f12c0, lambda call, rng: call.ret_int(0))
             for off in (0x368, 0x36c, 0x370, 0x400, 0x404, 0x408, 0x414, 0x3d0, 0x344, 0x34c, 0x350, 0x358):
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-3, 3), rng.uniform(-200, 200)]) if off in (0x358,) else (rng.uniform(-1.2, 1.2) if off in (0x368, 0x36c, 0x370) and rng.random() < 0.5 else rng.uniform(-60, 60)))
-            for off in (0x70, 0x6c, 0x74):
-                fz.preset_f32('F', off, rng.uniform(0.2, 1.5))
             for off in (0x24a4, 0x2498):
                 fz.preset_f32('B', off, rng.uniform(0.05, 5.0))
             for off in (0x500, 0x504, 0x508, 0x50c, 0x510, 0x514, 0x518, 0x51c, 0x520, 0x524, 0x528, 0x52c, 0x530, 0x534, 0x538, 0x53c, 0x6638, 0x663c):

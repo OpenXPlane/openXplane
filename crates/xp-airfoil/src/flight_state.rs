@@ -143,12 +143,6 @@ pub fn path_samples(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     }
 }
 
-/// A float function of the flight object that is replayed: `0x14076b5d0(0x145890720, lon, lat)`,
-/// `0x141244b60(F, angle)`, `0x1407d7bc0(F, 2.0)` and `0x1407cc570(F, speed, 1)`.
-fn replayed_float(vm: &mut Vm, env: &mut dyn Callees, address: u64, args: CallArgs) -> f32 {
-    f32::from_bits(env.call(vm, address, args).xmm0 as u32)
-}
-
 /// `0x14127307c..0x141273779`: the cockpit quantities. Distances travelled (`F+0x6638` horizontal, `F+0x663c`
 /// total, doubles added to floats), the equivalent airspeed in knots `F+0x41c`, the Mach number `F+0x420`, the
 /// dynamic pressure `F+0x424`, the magnetic variation `F+0x428` and `F+0x42c` (replayed), and smoothed
@@ -232,10 +226,7 @@ pub fn instruments(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     let a414 = ramp * vm.f32(f + 0x414);
     let a404 = ramp * vm.f32(f + 0x404);
     let a408 = ramp * vm.f32(f + 0x408);
-    let mut args = CallArgs::ints(&[f]);
-    args.xmm[1] = Some(s.to_bits());
-    args.int[2] = Some(1);
-    let load = replayed_float(vm, env, 0x1407cc570, args) * KNOTS;
+    let load = equivalent_airspeed(vm, f, s, 1) * KNOTS;
     let ground = {
         let (g0, g2) = (vm.f32(f + 0x368), vm.f32(f + 0x370));
         sqrt(g0 * g0 + g2 * g2) * KNOTS
@@ -3147,4 +3138,111 @@ pub fn start_sequence(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
         }
         _ => {}
     }
+}
+
+/// `0x1407e7b10(x)`: the impact pressure (Pa) at the true speed `x` m/s of the standard atmosphere: the isentropic
+/// formula `101325 ((1 + x^2 1.7271e-6)^3.5 - 1)` below the speed of sound `340.29`, the Rayleigh pitot formula above.
+fn impact_pressure(x: f32) -> f32 {
+    if 340.29f32 > x {
+        let t = x * x * f32::from_bits(0x35e7_cf3e) + 1.0;
+        return (t.powf(f32::from_bits(0x4060_0001)) - 1.0) * 101_325.0;
+    }
+    let ratio = x / 340.29f32;
+    let inverse = 340.29f32 / x;
+    let denominator = f32::from_bits(0x40b3_3333) - inverse * inverse * f32::from_bits(0x3f4c_cccc);
+    let p = (f32::from_bits(0x40b8_51ec) / denominator).powf(f32::from_bits(0x4020_0001));
+    let square = ratio * ratio;
+    let a = f64::from(p);
+    let b = f64::from(square) * 1.2f64 * 101_325.0;
+    ((a * b) - 101_325.0) as f32
+}
+
+/// `0x1407cc4b0(v, a, t, p)`: the pressure term of the speed `v` against the speed of sound `a` for the temperature
+/// factor `t` and the static pressure `p` (isentropic below `a`, Rayleigh above).
+fn pressure_term(v: f32, a: f32, t: f32, p: f32) -> f32 {
+    let square = v * v;
+    if v > a {
+        let numerator = t * f32::from_bits(0x4083_a83b) / p * square;
+        let denominator = t * 4.0 / p * square - f32::from_bits(0x3f4c_cccc);
+        let power = (numerator / denominator).powf(f32::from_bits(0x4020_0001));
+        power * (t * f32::from_bits(0x3f5b_6db8) * square)
+    } else {
+        let base = t * f32::from_bits(0x3e12_4924) / p * square + 1.0;
+        base.powf(f32::from_bits(0x4060_0001)) * p
+    }
+}
+
+/// `0x1407cc570(obj, speed, mode)`: the equivalent airspeed for the true `speed` from the air state of the object
+/// (`+0x5c` temperature, `+0x68` pressure, `+0x6c` and `+0x70` density terms, `+0x74` speed of sound). Below the
+/// speed of sound (`|speed| < +0x74`) a closed formula; above it the impact pressure is solved for by up to ten
+/// Newton steps (`impact_pressure` and its derivative) until the step is below half the Mach number.
+pub fn equivalent_airspeed(vm: &Vm, obj: u64, speed: f32, mode: i32) -> f32 {
+    let (a_sound, t6c, p68, d70) = (
+        vm.f32(obj + 0x74),
+        vm.f32(obj + 0x6c),
+        vm.f32(obj + 0x68),
+        vm.f32(obj + 0x70),
+    );
+    if a_sound > speed.abs() {
+        let temperature = vm.f32(obj + 0x5c) + f32::from_bits(0x4388_9333);
+        let x = speed * speed / 2009.0 / temperature + 1.0;
+        let q = (x.powf(f32::from_bits(0x4060_0000)) - 1.0) * p68 * f32::from_bits(0x399a_d277)
+            / f32::from_bits(0x41ef_5c29)
+            + 1.0;
+        let r = (q.powf(f32::from_bits(0x3e92_4925)) - 1.0) * f32::from_bits(0x490d_54d6);
+        let sign = if 0.0 > speed { -1.0f64 } else { 1.0 };
+        let root = if 0.0 > r { f32::NAN } else { r.sqrt() };
+        return root * (sign as f32);
+    }
+    if speed == 0.0 || p68 == 0.0 || a_sound == 0.0 || t6c == 0.0 {
+        return 0.0;
+    }
+    let ratio = speed / a_sound;
+    let target = pressure_term(speed, a_sound, t6c, p68);
+    let mut factor = 0.0f32;
+    if mode == 0 {
+        let m2 = f64::from(ratio * ratio);
+        let ray = (m2 * 5.76 / (m2 * 5.6 - 0.8)).powf(2.5);
+        let iso = (m2 * 0.2 + 1.0).powf(3.5);
+        factor = (1.0 - ray * (m2 * 1.2) / iso) as f32;
+    }
+    let corrected = target - factor * target - p68;
+    let mut dynamic = corrected + corrected;
+    dynamic /= f32::from_bits(0x3f9c_cccd);
+    let q = if 0.0 > dynamic {
+        f32::NAN
+    } else {
+        dynamic.sqrt()
+    };
+    let r = if 0.0 > d70 { f32::NAN } else { d70.sqrt() };
+    let mut guess = ((f64::from(q + r * speed)) * 0.5) as f32;
+    let mut pressure = impact_pressure(guess);
+    let tolerance = f64::from(ratio) * 0.5;
+    for _ in 0..10 {
+        let square = guess * guess;
+        let derivative = if 340.29f32 > guess {
+            let t = (square * f32::from_bits(0x3efa_e147) / f32::from_bits(0x488a_87c0) + 1.0)
+                .powf(f32::from_bits(0x3fc0_0002));
+            t * (guess * f32::from_bits(0x3f9c_cccd)) / f32::from_bits(0x3fb3_3333)
+        } else {
+            let power = (f32::from_bits(0x40b8_51ec)
+                / (f32::from_bits(0x40b3_3333) - f32::from_bits(0x47b4_eeea) / square))
+                .powf(f32::from_bits(0x3ecc_cccc));
+            let lead = f64::from(power);
+            let poly = (f32::from_bits(0x47e2_2aa5) - (square + square))
+                * (guess * f32::from_bits(0x4033_3333))
+                * f32::from_bits(0x47c5_e680);
+            let top = lead * (f64::from(poly) * 1.2f64);
+            let bottom = 340.29f64.powf(4.0) * f64::from_bits(0x3fd9_9999_6000_0000)
+                - f64::from(square * f32::from_bits(0x489e_510d));
+            (top / bottom) as f32
+        };
+        let delta = (pressure - corrected) / derivative;
+        guess -= delta;
+        pressure = impact_pressure(guess);
+        if f64::from(delta.abs()).partial_cmp(&tolerance) != Some(std::cmp::Ordering::Greater) {
+            break;
+        }
+    }
+    guess
 }

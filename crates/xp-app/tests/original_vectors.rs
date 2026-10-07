@@ -3771,6 +3771,30 @@ fn start_sequence_matches_the_original_machine_code() {
 }
 
 #[test]
+fn equivalent_airspeed_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("input_airspeed.txt");
+    assert!(cases.len() >= 200);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, case) in cases.into_iter().enumerate() {
+        let speed = f32::from_bits(hex(&case.header[2]) as u32);
+        let mode: i32 = case.header[3].parse().unwrap();
+        let want = f32::from_bits(hex(&case.header[4]) as u32);
+        let got = openxplane::flight_state::equivalent_airspeed(
+            &case.vm,
+            hex(&case.header[1]),
+            speed,
+            mode,
+        );
+        let same =
+            (got.is_nan() && want.is_nan()) || (got - want).abs() <= 1e-4 * (1.0 + want.abs());
+        assert!(
+            same,
+            "case {n}: {got} vs {want} (speed {speed}, mode {mode})"
+        );
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);
