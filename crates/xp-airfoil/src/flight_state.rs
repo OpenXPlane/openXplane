@@ -2553,3 +2553,59 @@ pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Resu
     }
     Ok(())
 }
+
+/// `0x141265de3..0x141265f7d`: the wing strips. For each of the 48 wings (`[B+0x6028] + 0x36c8 w`) that
+/// `0x1411da150(F, w)` selects, the wing's id vector (`+0x3690`..`+0x3698`, 32-bit ids) is turned into two pointer
+/// vectors: the wing records `[B+0x6028] + 0x36c8 id` (at `rbp+0xd0`) and the element records `[F+0x6940] + 0x2d8 id`
+/// (at `rbp+0xb8`), pushed with `0x140985d90`; then `0x14121a9b0(wing, [F+0x6940] + 0x2d8 w, begin_wings,
+/// begin_elements, log)` is called (iterators from `0x1405f3f30`) and the vectors are released with `0x1405ddb90`.
+pub fn wing_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    for w in 0..0x30u64 {
+        let selected = env.call(vm, 0x1411da150, CallArgs::ints(&[f, w])).rax as u32;
+        if selected == 0 {
+            continue;
+        }
+        let b = vm.u64(f + 0x20);
+        let wing = vm.u64(b + 0x6028) + 0x36c8 * w;
+        let xrec = vm.u64(f + 0x6940) + 0x2d8 * w;
+        vm.set_u64(slot(-0x38), xrec);
+        for vector in [0xd0, 0xb8] {
+            for k in 0..3 {
+                vm.set_u64(slot(vector + 8 * k), 0);
+            }
+        }
+        let count =
+            |vm: &Vm| (vm.u64(wing + 0x3698).wrapping_sub(vm.u64(wing + 0x3690))) as i64 >> 2;
+        if count(vm) != 0 {
+            let mut index = 0u32;
+            loop {
+                let ids = vm.u64(wing + 0x3690);
+                let id = i64::from(vm.i32(ids + 4 * u64::from(index)));
+                let table = vm.u64(vm.u64(f + 0x20) + 0x6028);
+                vm.set_u64(slot(-0x68), (id * 0x36c8) as u64 + table);
+                env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0xd0), slot(-0x68)]));
+                let id = i64::from(vm.i32(vm.u64(wing + 0x3690) + 4 * u64::from(index)));
+                let table = vm.u64(f + 0x6940);
+                vm.set_u64(slot(-0x68), (id * 0x2d8) as u64 + table);
+                env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0xb8), slot(-0x68)]));
+                index = index.wrapping_add(1);
+                if i64::from(index as i32) as u64 >= count(vm) as u64 {
+                    break;
+                }
+            }
+        }
+        let flag = env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8])).rax;
+        let begin_elements = env
+            .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x408), slot(0xb8)]))
+            .rax;
+        let begin_wings = env
+            .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x420), slot(0xd0)]))
+            .rax;
+        let mut args = CallArgs::ints(&[wing, xrec, begin_wings, begin_elements]);
+        args.stack[0] = Some(flag & 0xffff_ffff);
+        env.call(vm, 0x14121a9b0, args);
+        env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0xb8)]));
+        env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0xd0)]));
+    }
+}
