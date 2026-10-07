@@ -2683,6 +2683,15 @@ fn small_cases(function: &str) -> Vec<VmCaseData> {
     cases
 }
 
+/// Every expected word must be bit-identical (for ports without libm calls).
+fn words_match_exact(case: &VmCaseData, n: usize) {
+    for (addr, want) in &case.expected {
+        let got = case.vm.u32(*addr);
+        assert_eq!(got, *want, "case {n}: {addr:#x}");
+    }
+    words_match(case, n);
+}
+
 fn words_match(case: &VmCaseData, n: usize) {
     words_match_with(case, n, false);
 }
@@ -3497,6 +3506,29 @@ fn gear_drag_and_brake_matches_the_original_machine_code() {
 }
 
 #[test]
+fn terrain_probe_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("terrain_probe.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let mut hits = 0;
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h: Vec<u64> = case.header.iter().map(|s| hex(s)).collect();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let grid = case.vm.u64(0x1461_179f8);
+        assert_eq!(grid, h[5], "case {n}: grid");
+        let got =
+            openxplane::terrain::probe(&mut case.vm, &mut env, h[0], h[1], h[2], h[3], h[4], grid);
+        assert_eq!(u64::from(got), h[6], "case {n}: result");
+        hits += u64::from(got);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_exact(&case, n);
+    }
+    assert!(hits >= 30);
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);
@@ -3514,7 +3546,7 @@ fn point_drag_matches_the_original_machine_code() {
         };
         openxplane::flight_state::point_drag(&mut case.vm, &mut env, f, p, drag).unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
-        words_match(&case, n);
+        words_match_exact(&case, n);
     }
 }
 

@@ -3,15 +3,15 @@
 
     python3 tools/gen_gear_drag_vectors.py Xplane12/X-Plane.exe TRIALS SEED > crates/xp-app/tests/data/gear_drag.txt
 
-The header of a case is `F x y z drag` (float32 bits). The point transform 0x1407ac020 and the terrain probe
-0x141960dc0 are replayed (their results land in the callee frame, which the test rebases onto its own scratch).
+The header of a case is `F x y z drag` (float32 bits). The point transform 0x1407ac020 (and the probe's grid height and normal helpers)
+are replayed (their results land in the callee frame, which the test rebases onto its own scratch).
 """
 import struct
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from xp_vmcase import VmCase, entry_rsp  # noqa: E402
+from xp_vmcase import VmCase, entry_rsp, setup_terrain, stub_terrain_helpers  # noqa: E402
 
 EXE, TRIALS, SEED = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 
@@ -29,25 +29,15 @@ def main():
         for address in (call.ints[2], call.stack[0], call.stack[2]):
             call.put_f32(address, rng.choice([0.0, rng.uniform(-10, 10)]))
 
-    state = {}
-
-    def probe(call, rng):
-        # 0x141960dc0(obj, &p, &a, &b, 0, ptr): a[1] is compared with the point's y
-        a = call.ints[2]
-        y = struct.unpack('<f', struct.pack('<I', case.emu.read_u32(call.ints[1] + 4)))[0]
-        call.put_f32(a, rng.uniform(-3, 3))
-        call.put_f32(a + 4, y + rng.choice([-1.0, 1.0, 0.0, rng.uniform(-2, 2)]))
-        call.ret_int(rng.choice([0, 1, 1, 1]))
-
     case.stub(0x1407ac020, transform)
-    case.stub(0x141960dc0, probe)
+    stub_terrain_helpers(case)
     case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0.0, 0.1)))
     case.stub(0x1408e25a0, lambda call, rng: None, record=False)
     print('# gear drag vectors (tools/gen_gear_drag_vectors.py)')
     done = 0
     while done < TRIALS:
         case.reset()
-        F = case.region('F', 0xc000)
+        F = case.region('F', 0x44000)
         fz = case.fz
         sp = entry_rsp(1)
         fz.region('S', sp - 0x800, 0x900)
@@ -56,6 +46,7 @@ def main():
         for off in (0x2c4, 0x2ec, 0x2d8, 0x300, 0x318, 0x330, 0x340, 0x3cc, 0x3d0, 0x3d4, 0x430, 0x434, 0x440, 0x444,
                     0x450, 0x454, 0x368, 0x36c, 0x370):
             fz.preset_f32('F', off, rng.uniform(-1, 1) if off >= 0x3cc and off < 0x460 else rng.uniform(-50, 50))
+        setup_terrain(case, rng)
         x, y, z = (rng.choice([0.0, rng.uniform(-5, 5)]) for _ in range(3))
         drag = rng.choice([0.0, rng.uniform(0, 4), rng.uniform(0, 60)])
         fz.preset('S', 0x828, bits(drag))

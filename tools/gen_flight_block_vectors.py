@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from xp_vmcase import VmCase, entry_rsp  # noqa: E402
+from xp_vmcase import setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RBX, UC_X86_REG_RIP, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_XMM10, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
@@ -39,16 +39,9 @@ def stub_point_drag(case):
         for address in (call.ints[2], call.stack[0], call.stack[2]):
             call.put_f32(address, rng.choice([0.0, rng.uniform(-10, 10)]))
 
-    def probe(call, rng):
-        a = call.ints[2]
-        y = struct.unpack('<f', struct.pack('<I', case.emu.read_u32(call.ints[1] + 4)))[0]
-        call.put_f32(a, rng.uniform(-3, 3))
-        call.put_f32(a + 4, y + rng.choice([-1.0, 1.0, 0.0, rng.uniform(-2, 2)]))
-        call.ret_int(rng.choice([0, 1, 1, 1]))
-
     inside = (0x14119e5b0, 0x14119e960)
     case.stub(0x1407ac020, transform, caller=inside)
-    case.stub(0x141960dc0, probe, caller=inside)
+    stub_terrain_helpers(case)
     case.stub(0x1408e25a0, lambda call, rng: None, record=False)
 
 
@@ -1062,6 +1055,7 @@ def main():
             case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
             case.stub(0x1408e25a0, lambda call, rng: None, record=False)
             stub_point_drag(case)
+            setup_terrain(case, rng)
             def put64f(call, pointer, v):
                 bits64 = struct.unpack('<Q', struct.pack('<d', v))[0]
                 call.put(pointer, bits64 & 0xffffffff)
@@ -1112,6 +1106,7 @@ def main():
                     call.put_f32(pointer, rng.uniform(-1, 1))
             case.stub(0x1411ddfd0, wheel_state)
             stub_point_drag(case)
+            setup_terrain(case, rng)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.01, 0.2, 2.0, rng.uniform(0, 1)])))
             G = case.region('G', 0x88 * 10)
             X = case.region('X', 0x90 * 10)

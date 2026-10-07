@@ -127,3 +127,49 @@ class VmCase:
 def entry_rsp(stack_args=0):
     """The stack pointer at the entry of a function called through Emulator.call with `stack_args` stack arguments."""
     return ((STACK_TOP - 0x1000 - 0x20 - 8 * stack_args) & ~0xf) - 8
+
+
+GRID_GLOBAL = 0x1461179f8
+
+
+def setup_terrain(case, rng, mesh_name='F', mesh_off=0x42e40, triangles=6):
+    """Presets a terrain mesh object inside region `mesh_name` (triangles, hole range, top height) and, at random, the
+    global grid object that 0x141945c90 returns. The probe 0x141960dc0 and its helpers then run on real memory."""
+    fz = case.fz
+    count = rng.randrange(0, triangles + 1) if rng.random() < 0.15 else rng.randrange(3, triangles + 3)
+    tri = case.region('M', 36 * max(count, 1) + 64)
+    for k in range(count):
+        for i in range(9):
+            lo, hi = (-8.0, 25.0) if i % 3 == 1 else (-12.0, 12.0)
+            fz.preset_f32('M', 36 * k + 4 * i, rng.uniform(lo, hi))
+    fz.preset(mesh_name, mesh_off + 0x28, tri & 0xffffffff)
+    fz.preset(mesh_name, mesh_off + 0x2c, tri >> 32)
+    g0 = 0 if rng.random() < 0.7 else rng.randrange(0, count + 1)
+    g1 = count if rng.random() < 0.7 else rng.randrange(g0, count + 1)
+    h0 = rng.randrange(0, count + 1)
+    h1 = h0 if rng.random() < 0.6 else rng.randrange(h0, count + 1)
+    for off, v in ((0x74, h0), (0x78, h1), (0x7c, g0), (0x80, g1)):
+        fz.preset(mesh_name, mesh_off + off, v)
+    fz.preset_f32(mesh_name, mesh_off + 0x84, rng.choice([100.0, 100.0, rng.uniform(-5, 30)]))
+    grid = 0
+    if rng.random() < 0.6:
+        grid = case.region('GR', 0x80)
+        cell = case.region('GC', 16)
+        fz.preset_f32('GC', 0, rng.uniform(-3, 3))
+        fz.preset_f32('GC', 4, rng.uniform(-3, 3))
+        fz.preset_f32('GR', 8, rng.choice([1.0, 4.0, 20.0]))
+        fz.preset('GR', 0x48, cell & 0xffffffff)
+        fz.preset('GR', 0x4c, cell >> 32)
+    fz.region('GL', GRID_GLOBAL, 8)
+    fz.preset('GL', 0, grid & 0xffffffff)
+    fz.preset('GL', 4, grid >> 32)
+
+
+def stub_terrain_helpers(case, caller=(0x141960dc0, 0x141961200)):
+    """Replaces the helpers of the probe that are not ported: the grid height and the triangle normal."""
+    case.stub(0x14194dc20, lambda call, rng: call.ret_f32(rng.uniform(-3, 3)), caller=caller)
+
+    def normal(call, rng):
+        for k in range(3):
+            call.put_f32(call.ints[3] + 4 * k, rng.uniform(-1, 1))
+    case.stub(0x1406ed6a0, normal, caller=caller)

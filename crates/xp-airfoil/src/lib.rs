@@ -28,6 +28,7 @@ pub mod runtime;
 pub mod scalar;
 pub mod shadow;
 pub mod stall;
+pub mod terrain;
 pub mod transform;
 pub mod vm;
 pub mod wash;
