@@ -20,7 +20,7 @@ from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, U
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
-          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7), 'angles': (0x1412728f7, 0x141272a96), 'path': (0x141272a96, 0x14127307c), 'instruments': (0x14127307c, 0x141273779), 'coeff': (0x141273779, 0x141273dfb), 'late': (0x141273dfb, 0x14127402d), 'arm': (0x14126a791, 0x14126aad6), 'gear': (0x14126883f, 0x141269920), 'wheels': (0x1412686a9, 0x14126883f), 'hook': (0x14126aad6, 0x14126b3ee), 'tow': (0x14126b3e8, 0x14126b548), 'floats': (0x14126b548, 0x14126b757), 'waves': (0x14126b757, 0x14126bf30), 'pull': (0x14126bf30, 0x14126c034), 'gtarget': (0x14126c034, 0x14126c4e4), 'steer': (0x14126c4e4, 0x14126c7dc), 'gstate': (0x14126c7dc, 0x14126d1f2), 'wcontact': (0x14126d1f2, 0x14126d5d3), 'wprobe': (0x14126d5d3, 0x14126dd98), 'bsurf': (0x14126de36, 0x14126e4c8), 'bblend': (0x14126e4c8, 0x14126e974), 'bloop': (0x14126dd98, 0x14126e9a0), 'ground': (0x14126e9a0, 0x14126ef74), 'gdrag': (0x14126ef74, 0x14126f37f), 'reset': (0x141265731, 0x14126580a), 'vec': (0x141265810, 0x1412659b9)}
+          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7), 'angles': (0x1412728f7, 0x141272a96), 'path': (0x141272a96, 0x14127307c), 'instruments': (0x14127307c, 0x141273779), 'coeff': (0x141273779, 0x141273dfb), 'late': (0x141273dfb, 0x14127402d), 'arm': (0x14126a791, 0x14126aad6), 'gear': (0x14126883f, 0x141269920), 'wheels': (0x1412686a9, 0x14126883f), 'hook': (0x14126aad6, 0x14126b3ee), 'tow': (0x14126b3e8, 0x14126b548), 'floats': (0x14126b548, 0x14126b757), 'waves': (0x14126b757, 0x14126bf30), 'pull': (0x14126bf30, 0x14126c034), 'gtarget': (0x14126c034, 0x14126c4e4), 'steer': (0x14126c4e4, 0x14126c7dc), 'gstate': (0x14126c7dc, 0x14126d1f2), 'wcontact': (0x14126d1f2, 0x14126d5d3), 'wprobe': (0x14126d5d3, 0x14126dd98), 'bsurf': (0x14126de36, 0x14126e4c8), 'bblend': (0x14126e4c8, 0x14126e974), 'bloop': (0x14126dd98, 0x14126e9a0), 'ground': (0x14126e9a0, 0x14126ef74), 'gdrag': (0x14126ef74, 0x14126f37f), 'reset': (0x141265731, 0x14126580a), 'vec': (0x141265810, 0x1412659b9), 'strips': (0x1412659b9, 0x141265de3)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
@@ -981,6 +981,28 @@ def main():
             fz.preset('F', 0xb9a8, rng.choice([0, 0, 1]))
             for reg, val in ((UC_X86_REG_RDI, 0), (UC_X86_REG_R13, 1), (UC_X86_REG_RBX, F + 0xbcc8)):
                 case.emu.uc.reg_write(reg, val)
+        if BLOCK == 'strips':
+            VEC = case.region('VEC', 0x80)
+            PR = case.region('PR', 0x3770 * 3)
+            case.stub(0x1411d9f60, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
+            case.stub(0x1411b4730, lambda call, rng: call.ret_int(VEC + 0x20 * (call.ints[2] & 3)))
+            case.stub(0x1405f3f30, lambda call, rng: call.ret_int(call.ints[1] + 0x10))
+            case.stub(0x14120c960, lambda call, rng: call.ret_int(rng.choice([0, 0, 0x100])) if False else call.ret_int(0))
+            for addr in (0x140985d90, 0x14121a9b0, 0x1405ddb90):
+                case.stub(addr, lambda call, rng: None)
+            fz.preset('B', 0x920, rng.choice([0, 1, 2, 3, 3]))
+            fz.preset('B', 0x6010, PR & 0xffffffff, record=True)
+            fz.preset('B', 0x6014, PR >> 32, record=True)
+            fz.preset('F', 0x20, B & 0xffffffff, record=True)
+            fz.preset('F', 0x24, B >> 32, record=True)
+            for p in range(3):
+                fz.preset('PR', 0x3770 * p + 4, rng.choice([0, 1, 1]))
+                fz.preset('PR', 0x3770 * p + 0x8c, rng.choice([0, 1, 2, 3, 5]))
+                fz.preset_f32('PR', 0x3770 * p + 0xa0, rng.uniform(-3, 3))
+            for k in range(4 * 8):
+                fz.preset_f32('VEC', 4 * k, rng.uniform(-5, 5))
+            for reg, val in ((UC_X86_REG_RDI, 0), (UC_X86_REG_R13, 1), (UC_X86_REG_R14, 0), (UC_X86_REG_RBX, F + 0xbcc8)):
+                case.emu.uc.reg_write(reg, val)
         if BLOCK == 'angles':
             for off in (0x3f4, 0x3f8, 0x3fc, 0x368, 0x370):
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.01, 0.01), 0.0]))
@@ -992,10 +1014,10 @@ def main():
                 fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.5, 0.5), 0.0]))
             for off in (0x430, 0x434, 0x440, 0x444, 0x450, 0x454):
                 fz.preset_f32('F', off, rng.uniform(-1.0, 1.0))
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec', 'strips'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
-            if BLOCK not in ('motion', 'late', 'arm', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec'):
+            if BLOCK not in ('motion', 'late', 'arm', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec', 'strips'):
                 fz.preset('F', 0x28, rng.choice([7, 12345]))
             for w in range(48) if BLOCK == 'element' else []:
                 fz.preset('W', 0x36c8 * w + 0x58, rng.choice([0, 1]))
@@ -1008,6 +1030,9 @@ def main():
                 extra[address] = value & 0xffffffff
                 extra[address + 4] = value >> 32
             rbp = S + 0x400
+            if BLOCK == 'strips':
+                fz.preset('S', 0x400 + 0x1750, F & 0xffffffff)
+                fz.preset('S', 0x400 + 0x1754, F >> 32)
             if BLOCK == 'ground':
                 fz.preset('S', 0x400 - 0x78, rng.choice([0, 1, 1, 1, 1, 1]))
             if BLOCK == 'bblend':
@@ -1032,8 +1057,10 @@ def main():
         case.emu.uc.reg_write(UC_X86_REG_R15, F)
         if BLOCK == 'reset':
             case.emu.uc.reg_write(UC_X86_REG_RCX, F)
-        if BLOCK == 'vec':
+        if BLOCK in ('vec', 'strips'):
             case.emu.uc.reg_write(UC_X86_REG_R13, 1)
+        if BLOCK == 'strips':
+            case.emu.uc.reg_write(UC_X86_REG_R14, 0)
         case.emu.uc.reg_write(UC_X86_REG_R14, case.body + 0x630 if BLOCK in ('bsurf', 'bblend') else 1 if BLOCK == 'motion' else (F + 0x6548 if BLOCK == 'hook' else (1 if BLOCK == 'floats' else 0)))
         case.emu.uc.reg_write(UC_X86_REG_R12, 0x1460e9708 if BLOCK == 'steer' else 0)
         if BLOCK not in ('integrate', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'hook'):
@@ -1045,9 +1072,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '') + (f' {case.emu.reg(UC_X86_REG_RSI) & 0xffffffff:x}' if BLOCK == 'arm' else '') + (f' {esi_v:x}' if BLOCK == 'hook' else '') + (f' {int(case.emu.uc.reg_read(UC_X86_REG_RIP) == 0x14126dd98):x}' if BLOCK == 'wprobe' else '') + (f' {case.body:x}' if BLOCK in ('bsurf', 'bblend') else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec', 'strips') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '') + (f' {case.emu.reg(UC_X86_REG_RSI) & 0xffffffff:x}' if BLOCK == 'arm' else '') + (f' {esi_v:x}' if BLOCK == 'hook' else '') + (f' {int(case.emu.uc.reg_read(UC_X86_REG_RIP) == 0x14126dd98):x}' if BLOCK == 'wprobe' else '') + (f' {case.body:x}' if BLOCK in ('bsurf', 'bblend') else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic', 'angles', 'path', 'instruments', 'coeff', 'late', 'arm', 'gear', 'wheels', 'hook', 'tow', 'floats', 'waves', 'pull', 'gtarget', 'steer', 'gstate', 'wcontact', 'wprobe', 'bsurf', 'bblend', 'bloop', 'ground', 'gdrag', 'reset', 'vec', 'strips'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)

@@ -2478,3 +2478,78 @@ pub fn find_marked_source(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) 
     }
     env.call(vm, 0x1411b10a0, CallArgs::ints(&[f + 0xb8a0]));
 }
+
+/// `0x1412659b9..0x141265de3`: the part strips. For each of the `B+0x920` parts (`[B+0x6010] + 0x88 + 0x3770 i`)
+/// that `0x1411d9f60(F, i, 1)` selects, four vectors `v = 0x1411b4730(F, i, j)` (`j` < 4) of floats are set up: the
+/// record pointer and `v` are put into two single-element vectors (`0x140985d90`, iterated with `0x1405f3f30`) and
+/// handed to `0x14121a9b0(record, v, begin_a, begin_b, log)`; when the part's `+4` is set `v[0]` is doubled; then
+/// `v[1 + k] = part[+0xa0] * v[0]` for the `+0x8c` entries. The vectors are released with `0x1405ddb90`. The log
+/// switch `0x14120c960(F+0xbcc8)` is queried around it (a nonzero answer would log values: not ported).
+pub fn part_strips(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    let log = |vm: &mut Vm, env: &mut dyn Callees| -> Result<(), String> {
+        let answer = env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8])).rax as u32;
+        if answer != 0 {
+            return Err("log output not ported".into());
+        }
+        Ok(())
+    };
+    let mut i = 0u32;
+    if vm.i32(vm.u64(f + 0x20) + 0x920) > 0 {
+        loop {
+            let selected = env
+                .call(vm, 0x1411d9f60, CallArgs::ints(&[f, u64::from(i), 1]))
+                .rax as u32;
+            if selected != 0 {
+                let offset = i64::from(i as i32) as u64 * 0x3770;
+                for j in 0..4u64 {
+                    let base = vm.u64(vm.u64(f + 0x20) + 0x6010);
+                    let record = base + 0x88 + offset;
+                    vm.set_u64(slot(-0x68), record);
+                    let v = env
+                        .call(vm, 0x1411b4730, CallArgs::ints(&[f, u64::from(i), j]))
+                        .rax;
+                    vm.set_u64(slot(-0x38), v);
+                    for vector in [0x88, 0xa0] {
+                        for k in 0..3 {
+                            vm.set_u64(slot(vector + 8 * k), 0);
+                        }
+                    }
+                    env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0x88), slot(-0x68)]));
+                    env.call(vm, 0x140985d90, CallArgs::ints(&[slot(0xa0), slot(-0x38)]));
+                    let flag = env.call(vm, 0x14120c960, CallArgs::ints(&[f + 0xbcc8])).rax;
+                    let begin_b = env
+                        .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x3d8), slot(0xa0)]))
+                        .rax;
+                    let begin_a = env
+                        .call(vm, 0x1405f3f30, CallArgs::ints(&[slot(0x3f0), slot(0x88)]))
+                        .rax;
+                    let mut args = CallArgs::ints(&[record, v, begin_a, begin_b]);
+                    args.stack[0] = Some(flag & 0xffff_ffff);
+                    env.call(vm, 0x14121a9b0, args);
+                    let part = base + offset;
+                    if vm.i32(part + 4) != 0 {
+                        let value = vm.f32(v);
+                        vm.set_f32(v, (f64::from(value) + f64::from(value)) as f32);
+                        log(vm, env)?;
+                    }
+                    let mut k = 0u64;
+                    while (k as i32) < vm.i32(part + 0x8c) {
+                        let scaled = vm.f32(part + 0xa0) * vm.f32(v);
+                        vm.set_f32(v + 4 + 4 * k, scaled);
+                        log(vm, env)?;
+                        k += 1;
+                    }
+                    log(vm, env)?;
+                    env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0xa0)]));
+                    env.call(vm, 0x1405ddb90, CallArgs::ints(&[slot(0x88)]));
+                }
+            }
+            i += 1;
+            if (i as i32) >= vm.i32(vm.u64(f + 0x20) + 0x920) {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
