@@ -256,3 +256,115 @@ pub fn instruments(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
         vm.set_f32(f + previous, value);
     }
 }
+
+/// `0x141273779..0x141273dfb`: the force coefficients and the trim estimate. `F+0x258` is set when the aircraft
+/// type word `F+0x42f84` is 2 to 6 (`0x141964140`) and `F+0x25c` when the switch `F+0x24c` is on and it is not. The
+/// forces `F+0x2c0/0x2d4/0x2e8` are turned into the wind axes with the sine and cosine pairs `F+0x460/0x464` and
+/// `F+0x468/0x46c`: `F+0x298`, `F+0x2b0`, `F+0x2a4`; with the dynamic pressure `F+0x424` and the reference area
+/// `B+0x2880` they give the coefficients `F+0x65a4`, `F+0x65a8` and the ratio `F+0x65ac`. For an aircraft heavier
+/// than 0.99 of `B+0x288c` with the positive parameters `B+0x28e8/0x28ec/0x28f0`, the estimate `B+0x28f4` (clamped to
+/// -100..100) is computed from the mix of the tail-surface fractions (nine records at `F+0xbbb4`, each queried
+/// through `0x141a6ba30`, replayed) and the aircraft's coefficients, then integrated twice into `B+0x28f8` and
+/// `B+0x28fc` (both clamped) with the frame time. The register state at the block start is `rdi = 0`, `rsi = 1`,
+/// `xmm8 = 1.0` (double) and `xmm10 = 0.5` (double).
+pub fn force_coefficients(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+) -> Result<(), String> {
+    const G: f32 = f32::from_bits(0x411c_c5c1);
+    const DEG: f32 = f32::from_bits(0x4265_2ee0);
+    let b = vm.u64(f + 0x20);
+    let kind = vm.i32(f + 0x42f84).wrapping_sub(2) as u32 <= 4;
+    vm.set_i32(f + 0x258, i32::from(kind));
+    vm.set_i32(f + 0x25c, i32::from(vm.i32(f + 0x24c) != 0 && !kind));
+    let (c460, c464, c468, c46c) = (
+        vm.f32(f + 0x460),
+        vm.f32(f + 0x464),
+        vm.f32(f + 0x468),
+        vm.f32(f + 0x46c),
+    );
+    let (f2c0, f2d4, f2e8) = (vm.f32(f + 0x2c0), vm.f32(f + 0x2d4), vm.f32(f + 0x2e8));
+    vm.set_f32(f + 0x298, f2d4 * c464 - f2c0 * c460);
+    vm.set_f32(f + 0x2b0, f2e8 * c46c - f2c0 * c468);
+    vm.set_f32(f + 0x2a4, f2c0 * c464 + f2d4 * c460 + f2e8 * c468);
+    if vm.i32(f + 0xbcd0) != 0 || vm.i32(f + 0xbcc8) != 0 {
+        return Err("debug dump not ported".into());
+    }
+    let (q, area) = (vm.f32(f + 0x424), vm.f32(b + 0x2880));
+    let (drag, side) = (vm.f32(f + 0x298), vm.f32(f + 0x2a4));
+    vm.set_f32(f + 0x65a4, drag / (q * area));
+    vm.set_f32(f + 0x65a8, side / (q * area));
+    vm.set_f32(f + 0x65ac, drag / side);
+    let mass = vm.f32(f + 0x288);
+    let heavy = f64::from(mass) > f64::from(vm.f32(b + 0x288c)) * 0.99;
+    if !heavy {
+        return Ok(());
+    }
+    let (p1, p2, p3) = (vm.f32(b + 0x28e8), vm.f32(b + 0x28ec), vm.f32(b + 0x28f0));
+    let valid = p1 > 0.0 && p2 > 0.0 && p3 > 0.0;
+    if !valid {
+        return Ok(());
+    }
+    let mut x12 = (f64::from(mass * p1) * 0.5) as f32;
+    let wind = f64::from(vm.f32(b + 0x64f4));
+    let (mut x7, mut x11) = (0.0f32, 0.0f32);
+    let mut x9;
+    if vm.i32(b) < 0x4b0 {
+        x9 = (wind * 0.5) as f32;
+    } else {
+        x9 = (wind * 0.33) as f32;
+        for i in 0..9u64 {
+            let w = vm.f32(f + 0xbbb4 + 4 * i);
+            if w > 0.0 {
+                vm.set_u32(rbp + 0x50, 0);
+                vm.set_u32(rbp + 0x54, 0);
+                vm.set_u32(rbp + 0x58, 0);
+                env.call(vm, 0x141a6ba30, CallArgs::ints(&[b, i, rbp + 0x50]));
+                let x = vm.f32(rbp + 0x50).abs();
+                if x > 0.0 {
+                    x7 += w;
+                    x11 += x * w;
+                }
+            }
+        }
+    }
+    let held = if x7 > 0.01 { x7 } else { 0.01 };
+    x11 /= held;
+    let sum = x7 + x12;
+    x11 *= x7;
+    x9 *= x12;
+    x11 += x9;
+    x11 /= sum;
+    let b2898 = f64::from(vm.f32(b + 0x2898));
+    let x9d = f64::from(x11);
+    let g = f64::from(G);
+    let t = (1.0 - f64::from(p1)) * b2898 * 0.5 * g * x9d / f64::from(p2);
+    let x7 = t as f32;
+    let x5 = (f64::from(p3) * (f64::from(x7) * 0.025)) as f32;
+    let x8 = x11 * x11 * sum;
+    let mut acc = f64::from(f2d4) * 0.5 * x9d;
+    let weight = sum * vm.f32(f + 0x344) * G * x11;
+    acc -= f64::from(weight);
+    acc -= b2898 * 0.5 * g * x9d;
+    let c = vm.f32(b + 0x28e4) * vm.f32(b + 0x2888);
+    acc += f64::from(c) * 0.5 * g * x9d;
+    x12 = x12 * G * x11;
+    acc += f64::from(x12);
+    acc -= f64::from(x7 * vm.f32(b + 0x28fc));
+    acc -= f64::from(x5 * vm.f32(b + 0x28f8));
+    let estimate = acc as f32 / x8 * DEG;
+    let limited = |v: f32| clamp(v, -100.0, 100.0);
+    vm.set_f32(b + 0x28f4, estimate);
+    vm.set_f32(b + 0x28f4, limited(vm.f32(b + 0x28f4)));
+    let dt = frame_time(vm, env);
+    let value = f64::from(vm.f32(b + 0x28f8)) + dt * f64::from(vm.f32(b + 0x28f4));
+    vm.set_f32(b + 0x28f8, value as f32);
+    vm.set_f32(b + 0x28f8, limited(vm.f32(b + 0x28f8)));
+    let dt = frame_time(vm, env);
+    let value = f64::from(vm.f32(b + 0x28fc)) + dt * f64::from(vm.f32(b + 0x28f8));
+    vm.set_f32(b + 0x28fc, value as f32);
+    vm.set_f32(b + 0x28fc, limited(vm.f32(b + 0x28fc)));
+    Ok(())
+}

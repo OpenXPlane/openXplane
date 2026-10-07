@@ -368,6 +368,19 @@ instruments `F+0x500/0x504` (the angles `F+0x404/0x408` scaled by a ramp of the 
 (stored at `F+0x518`, `F+0x520`, `F+0x528`), the replayed load term and the ground speed in knots. The register state
 at the block start is `xmm8 = 1.0` (double) and `xmm11 = 0.0`.
 
+`force_coefficients` (`crates/xp-airfoil/src/flight_state.rs`, `0x141273779..0x141273dfb`, 140 cases; the per-record query
+`0x141a6ba30` and the frame time are replayed): `F+0x258` is set when the type word `F+0x42f84` is 2 to 6
+(`0x141964140`: `idx - 2 <= 4` unsigned) and `F+0x25c` when `F+0x24c` is set and it is not. The aircraft-axes
+forces `F+0x2c0/0x2d4/0x2e8` are rotated by the pairs `F+0x460/0x464` and `F+0x468/0x46c` into `F+0x298`
+(`2d4 c464 - 2c0 c460`), `F+0x2b0` (`2e8 c46c - 2c0 c468`) and `F+0x2a4` (`2c0 c464 + 2d4 c460 + 2e8 c468`); over
+`F+0x424 * B+0x2880` they give the coefficients `F+0x65a4/0x65a8` and `F+0x65ac = F+0x298 / F+0x2a4`. For an
+aircraft heavier than 0.99 of `B+0x288c` with the positive parameters `B+0x28e8/0x28ec/0x28f0`, the estimate
+`B+0x28f4` (an angle in degrees, clamped to -100..100) is computed from half the loaded mass and a wind term
+(`B+0x64f4` times 0.5, or 0.33 and a weighted mix of nine fractions at `F+0xbbb4`, each queried through
+`0x141a6ba30`, when `B+0` is at least 0x4b0), then integrated twice (`B+0x28f8`, `B+0x28fc`, both clamped, double
+precision with the frame time). The register state at the block start is `rdi = 0`, `rsi = 1`, `xmm8 = 1.0` and
+`xmm10 = 0.5` (doubles).
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded
