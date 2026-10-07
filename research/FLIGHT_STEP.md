@@ -581,7 +581,7 @@ Ported as `flight_state::gear_drag_and_brake`. For each of the 10 gear records (
 
 ## Start of the step (`0x141265731..0x14126580a`)
 
-Ported as `flight_state::step_reset`. The log switch `0x14120c960(F+0xbcc8)` is queried (a nonzero answer only writes a log line), unless `F+0x675c` is set the six force totals (`F+0x30c, 0x2cc, 0x324, 0x2e0, 0x33c, 0x2f4`) are cleared, the per-source tables `F+0x2bc..0x334` and `F+0x294` are cleared, and `0x1409830b0(F+0x430d8)` and `0x1412763c0(F)` are called (replayed; their effects are not established). Verified on 30 emulator cases. The test harness now also requires that the port writes no word of the flight object that the original left alone.
+Ported as `flight_state::step_reset`. The log switch `0x14120c960(F+0xbcc8)` is queried (a nonzero answer only writes a log line), unless `F+0x675c` is set the six force totals (`F+0x30c, 0x2cc, 0x324, 0x2e0, 0x33c, 0x2f4`) are cleared, the per-source tables `F+0x2bc..0x334` and `F+0x294` are cleared, and `0x1409830b0(F+0x430d8)` is called (its end returns to its begin) and `0x1412763c0(F)` runs natively as `flight_step::atmosphere_step` (its weather accessors are replayed). Verified on 40 emulator cases with the altitude and the atmosphere table randomized. The test harness now also requires that the port writes no word of the flight object that the original left alone.
 
 ## The marked source scan (`0x141265810..0x1412659b9`)
 

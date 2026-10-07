@@ -1127,7 +1127,16 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM11, struct.unpack('<Q', struct.pack('<d', 0.01))[0])
             case.emu.uc.reg_write(UC_X86_REG_RDI, 0)
         if BLOCK == 'reset':
-            case.stub(0x1412763c0, lambda call, rng: None)
+            for i in range(0x803 * 2):
+                case.emu.write_u32(0x14612bd90 + 4 * i, struct.unpack('<I', struct.pack('<f', 0.3 + ((i * 37) % 101) / 100.0))[0])
+            alt = struct.unpack('<Q', struct.pack('<d', rng.uniform(-900.0, 14000.0)))[0]
+            fz.preset('F', 0x3a0, alt & 0xffffffff)
+            fz.preset('F', 0x3a4, alt >> 32)
+            case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.randrange(2)))
+            case.stub(0x141ba6750, lambda call, rng: call.ret_f32(rng.uniform(-40.0, 40.0)))
+            case.stub(0x141ba6290, lambda call, rng: call.ret_f32(rng.uniform(-20.0, 20.0)))
+            case.stub(0x141ba6df0, lambda call, rng: call.ret_f32(rng.uniform(0.0, 5000.0)))
+            case.stub(0x141ba63a0, lambda call, rng: call.ret_f32(rng.uniform(0.2, 1.4)))
             fz.preset('F', 0x675c, rng.choice([0, 0, 1]))
             vb = 0x6f0000200000
             fz.preset('F', 0x430d8, vb & 0xffffffff)

@@ -2268,7 +2268,7 @@ pub fn gear_drag_and_brake(
 /// `0x141265731..0x14126580a`: the start of the flight step. The log switch `0x14120c960(F+0xbcc8)` is queried (a
 /// nonzero answer only writes a log line), and unless `F+0x675c` is set the six force totals are cleared; the
 /// per-source force tables (`F+0x2bc..0x338` apart from the totals) and `F+0x294` are cleared; `0x1409830b0` is
-/// called on `F+0x430d8` and `0x1412763c0` on the object (both replayed).
+/// called on `F+0x430d8` and the atmosphere step `0x1412763c0` runs natively (`flight_step::atmosphere_step`).
 pub fn step_reset(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     // the log switch `0x14120c960` only decides whether a log line is written
     if vm.i32(f + 0x675c) == 0 {
@@ -2287,7 +2287,7 @@ pub fn step_reset(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     if begin != vm.u64(f + 0x430e0) {
         vm.set_u64(f + 0x430e0, begin);
     }
-    env.call(vm, 0x1412763c0, CallArgs::ints(&[f]));
+    crate::flight_step::atmosphere_step(vm, env, f);
 }
 
 /// `0x141265810..0x1412659b9`: with `F+0x28 == 0`, the ids that `0x1411bbfb0(F+0xb8a0, 0, 0, 1, 0, 0, 0, 0, 0, &ids)`

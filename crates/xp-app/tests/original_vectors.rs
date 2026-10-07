@@ -3492,6 +3492,7 @@ fn step_reset_matches_the_original_machine_code() {
     let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
     for (n, mut case) in cases.into_iter().enumerate() {
         let f = hex(&case.header[0]);
+        fill_atmosphere_table(&mut case.vm);
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
