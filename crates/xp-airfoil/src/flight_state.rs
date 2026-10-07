@@ -1844,3 +1844,92 @@ pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -
     vm.set_i32(slot(0x1750), 48);
     true
 }
+
+/// `0x14126de36..0x14126e4c8`: the contact points of one body's surface. For a body whose `+0x5f4` is -1 and whose
+/// last row sits above `0.05` of the wind height `B+0x64fc`, every point of every row of the body (`+0x660 + 0xd8 a`,
+/// `+0x658` points of three floats) is moved by the body's Euler angles and offset and tested against the ground with
+/// `0x1411c7a50`: the direction is the point's offset from the row's centroid scaled to half the body height
+/// (`+0xc`; a point at the centroid uses the height above the body's middle `(+0x24 + +0x28) / 2` instead). A nonzero
+/// answer raises `F+0x24c`. The body's `+0x2c` is cleared first. The drag and its tenth come from the frame slots
+/// `rbp-0x10` and `rbp-0x8`.
+pub fn body_surface_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, s: u64) {
+    use crate::transform::rotate_pairs;
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let slot = |o: i64| (rbp as i64 + o) as u64;
+    vm.set_i32(s + 0x2c, 0);
+    if vm.i32(s + 0x5f4) != -1 {
+        return;
+    }
+    let rows = vm.i32(s + 0x654);
+    let last = (s as i64 + 0x58c + i64::from(rows) * 0xd8) as u64;
+    let rise = f64::from(vm.f32(last) - vm.f32(s + 0x664));
+    let b = vm.u64(f + 0x20);
+    let limit = f64::from(vm.f32(b + 0x64fc)) * 0.05;
+    if rise.partial_cmp(&limit) != Some(std::cmp::Ordering::Greater) {
+        return;
+    }
+    let middle = (f64::from(vm.f32(s + 0x28) + vm.f32(s + 0x24)) * 0.5) as f32;
+    let half = (f64::from(vm.f32(s + 0xc)) * 0.5) as f32;
+    if rows <= 0 {
+        return;
+    }
+    let (drag, tenth) = (vm.f32(slot(-0x10)), vm.f32(slot(-0x8)));
+    let _ = tenth;
+    let g = s + 0x588;
+    let angle = |o: u64| vm.f32(g + o) * RAD;
+    let (r9c, ra0, ra4) = (angle(0x9c), angle(0xa0), angle(0xa4));
+    let p = [
+        r9c.sin(),
+        r9c.cos(),
+        ra0.sin(),
+        ra0.cos(),
+        ra4.sin(),
+        ra4.cos(),
+    ];
+    let offsets = [vm.f32(g + 0x90), vm.f32(g + 0x94), vm.f32(g + 0x98)];
+    let count = vm.i32(s + 0x658);
+    for a in 0..rows as u64 {
+        let row = s + 0x660 + a * 0xd8;
+        let point = |vm: &Vm, m: u64| {
+            let at = row - 4 + 12 * m;
+            [vm.f32(at), vm.f32(at + 4), vm.f32(at + 8)]
+        };
+        if count <= 0 {
+            continue;
+        }
+        let nf = count as f32;
+        let mut c = [0.0f32; 3];
+        for m in 0..count as u64 {
+            let q = point(vm, m);
+            for k in 0..3 {
+                c[k] += q[k] / nf;
+            }
+        }
+        for m in 0..count as u64 {
+            let [x, y, z] = point(vm, m);
+            let mut at = rotate_pairs(x, y, z, p);
+            for k in 0..3 {
+                at[k] += offsets[k];
+            }
+            let (dx, dy, dz) = (x - c[0], y - c[1], z - c[2]);
+            let near = dy * dy + dx * dx;
+            let len = (dz * dz + near).sqrt();
+            let (ux, uy, uz) = if f64::from(len) > 0.01 {
+                (-dx * half / len, -dy * half / len, -dz * half / len)
+            } else {
+                let dz2 = z - middle;
+                let len2 = (dz2 * dz2 + near).sqrt();
+                (-dx * half / len2, -dy * half / len2, -dz2 * half / len2)
+            };
+            let out = rotate_pairs(ux, uy, uz, p);
+            let args = CallArgs {
+                int: [Some(f), Some(0xffff_ffff), None, None],
+                xmm: [None, None, Some(at[0].to_bits()), Some(out[0].to_bits())],
+                stack: [at[1], out[1], drag, at[2]].map(|v| Some(u64::from(v.to_bits()))),
+            };
+            if env.call(vm, 0x1411c7a50, args).rax as u32 != 0 {
+                vm.set_i32(f + 0x24c, 1);
+            }
+        }
+    }
+}

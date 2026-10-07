@@ -558,3 +558,7 @@ is available to verify it).
 ## Wing strip contact probe (`0x14126d5d3..0x14126dd98`)
 
 Ported as `flight_state::wing_ground_probe`. Early out (to `0x14126ef6b`) unless `F+0x42ec8 > altitude - |wind|`; otherwise loops the 48 wings, skipping those bound by `0x1407ace10(F,1,0x251,i)` or with byte `+0x678 == 0`, and issues three `0x1411c7a50` calls per wing from the normalised strip direction. Verified against the emulator (30 cases, 26 entering the loop). Not established: the stack slots beyond the fourth (`0x40`, `0x48` and the two pointer arguments) of the `0x1411c7a50` calls are not compared.
+
+## Body surface contact probe (`0x14126de36..0x14126e4c8`)
+
+Ported as `flight_state::body_surface_probe`. For a body with `+0x5f4 == -1` whose last row rises above `0.05 * B+0x64fc`, every point of every row (`+0x660 + 0xd8 a`, `+0x658` points) is rotated by the body's Euler angles (`+0x9c/0xa0/0xa4`, `rotate_pairs`) and offset (`+0x90..0x98`), and `0x1411c7a50(F, -1, ...)` is called with the point and the direction from the row centroid, scaled to half the body height (`+0xc`; a point within 0.01 of the centroid uses `z - (+0x24 + +0x28)/2`). A nonzero reply sets `F+0x24c`. Verified on 80 emulator cases (206 replayed calls); the sine/cosine come from the platform libm, compared at 1e-5 relative. Mutation checks catch the centroid, the middle height sign and the flag value; the 0.01 and 0.05 thresholds are not probed near their edges. Not established: the callee's remaining stack arguments (tenth of drag, null pointers).
