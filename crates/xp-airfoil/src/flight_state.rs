@@ -179,9 +179,14 @@ pub fn instruments(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     let lon = position_component(vm, env, f, 0x390) as f32;
     let variation = magnetic_variation(vm, 0x1_4589_0720, lon, lat);
     vm.set_f32(f + 0x428, variation);
-    let mut args = CallArgs::ints(&[f]);
-    args.xmm[1] = Some(vm.f32(f + 0x358).to_bits());
-    let value = replayed_float(vm, env, 0x141244b60, args);
+    // `0x141244b60(F, angle)`: `angle + F+0x428` wrapped to 0..360
+    let mut value = vm.f32(f + 0x358) + vm.f32(f + 0x428);
+    while 0.0 > value {
+        value += 360.0;
+    }
+    while value > 360.0 {
+        value += -360.0;
+    }
     vm.set_f32(f + 0x42c, value);
     let dt = frame_time(vm, env);
     let factor = (dt / f64::from(vm.f32(b + 0x24a4))) as f32;

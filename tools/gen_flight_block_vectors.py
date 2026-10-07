@@ -341,7 +341,7 @@ def main():
                 fz.preset_f64('F', off, rng.choice([rng.uniform(-90, 90)] * 12 + [0.0]))
         if BLOCK == 'instruments':
             fz.preset_f32('F', 0x410, rng.uniform(-400, 400))
-            for address in (0x141244b60, 0x1407cc570):
+            for address in (0x1407cc570,):
                 case.stub(address, lambda call, rng: call.ret_f32(rng.uniform(-30, 30)))
             case.stub(0x1417f12c0, lambda call, rng: call.ret_int(0))
             for off in (0x368, 0x36c, 0x370, 0x400, 0x404, 0x408, 0x414, 0x3d0, 0x344, 0x34c, 0x350, 0x358):
