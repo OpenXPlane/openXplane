@@ -20,6 +20,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ![Takeoff from Seattle-Tacoma with the approximate flight model](site/assets/anim/takeoff.gif)
 
+### Datarefs
+
+- 2388 datarefs are mapped to the field of the flight object (or the global simulation object) that the original's getter reads, with the unit factor and writability (`research/FLIGHT_DATAREFS.md`, `research/FLIGHT_FIELDS.md`).
+
 ### Viewer and scenes
 
 - The Cessna 172 SP exterior (OBJ8 with textures, lighting and glass) and airports from apt.dat.
