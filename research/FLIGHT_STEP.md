@@ -480,6 +480,18 @@ above 0.9 the latches `F+0x228`, `F+0x22c` (only with `B+0xe90`) and `F+0x220` a
 `F+0x22c == 1`, `F+0x220` and `F+0x224` take the maximum of the demands and `F+0x224`. Register state: `xmm9 = 0x7fffffff`
 (the abs mask), `xmm7 = 0.01` (double), `xmm10 = 0.5`, `r12` = the key table, `rdx` = its end.
 
+`gear_state_update` (`0x14126c7dc..0x14126d1f2`, 40 cases; the bindings `0x72`/`0x73`, `0x1411daa80`, `0x140816eb0`, the planet object and `0x1406eaf20` are replayed):
+the brake state of the ten gear animation entries (`F+0x6958`, `0x90` bytes): each entry's `+0x50` is cleared, then for
+gears whose record has `+8` set it takes `F+0x224`, adds the left demand `F+0x240` when the wheel's lateral offset
+`sin(entry+0x14) * (p0+0x18 - (1 - ext) * p0+0x20) * cos(entry+0x18) + p0+0x64` is below -0.01 (cleared again when binding `0x72` is
+set) and the right demand `F+0x244` when it is above 0.01 (binding `0x73`); with `B+0xe7c` the history
+`F+0xbdd8` limits and smooths it (`0x1411daa80`, decay `3.858e-6` with the global `0x142f01968`, `0.25 *` the change of the
+history slot `F+0xbe00+4i`), and the final value is held to `0..1`. Unless the sim speed `0x142f01920 >= 1` with `F+0x24c` set and
+`F+0x64e4` set, the point `(B+0x280c, B+0x2814, B+0x2810)` is converted to the world and then to the geographic doubles
+`F+0x64e8/0x64f0/0x64f8`. Then `F+0x24c/0x250` are cleared, the floats `+0x2d0/0x2d4` of each enabled wing's element record are
+cleared, and each gear entry with a kind takes `+0x20 = record+0x24` and clears `+0x2c..0x40`, `+0x64`, `+0x5c`.
+Register state: `xmm7 = 0.01` (double), `xmm9 = 0x7fffffff`, `xmm12 = 1.0` (double), `r14 = 0`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

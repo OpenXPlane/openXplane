@@ -1491,3 +1491,159 @@ pub fn steering_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         vm.set_f32(f + 0x224, m);
     }
 }
+
+/// `0x14126c7dc..0x14126d1f2`: the gear brake state. For each of ten gears (`B+0x6080` field `+8` set) the brake
+/// target `+0x50` of its animation entry (`F+0x6958`, `0x90` bytes) takes the demand `F+0x224`, adds the left demand
+/// `F+0x240` when the wheel's lateral offset `sin(entry+0x14) * (p0+0x18 - (1 - ext) * p0+0x20) * cos(entry+0x18) +
+/// p0+0x64` is below -0.01 and the right demand `F+0x244` when it is above 0.01, each cleared by its binding
+/// (`0x72`, `0x73`); with `B+0xe7c` a decaying memory (`F+0xbe28` and the history `F+0xbe00..`) limits it through
+/// `0x1411daa80` (replayed). Unless the sim speed `0x142f01920` is above 1 with `F+0x24c` set and `F+0x64e4` clear, the
+/// world frame of the point `(B+0x280c, y, B+0x2810)` (`0x140816eb0`, replayed) is converted to the geographic doubles
+/// `F+0x64e8/0x64f0/0x64f8` (`0x1406eaf20`, replayed). Then `F+0x24c/0x250` are cleared, the two floats `+0x2d0/+0x2d4`
+/// of the element record of every enabled wing (`F+0x6940`, stride `0x2d8`) are cleared, and for each gear with a kind
+/// the entry's `+0x20` takes the record's `+0x24` and `+0x2c..0x40`, `+0x64`, `+0x5c` are cleared. The register
+/// state at the block start is `xmm7 = 0.01` (double), `xmm9 = 0x7fffffff`, `xmm12 = 1.0` (double), `r14 = 0`.
+#[allow(clippy::field_reassign_with_default)]
+pub fn gear_state_update(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+) -> Result<(), String> {
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let in_range = |vm: &Vm, i: u64| {
+        let begin = vm.u64(f + 0x6958);
+        (i as i64) < (vm.u64(f + 0x6960).wrapping_sub(begin) as i64) / 0x90
+    };
+    let side = |vm: &Vm, elem: u64| -> f64 {
+        let p0 = vm.u64(elem);
+        let a = f64::from((vm.f32(elem + 0x14) * RAD).sin());
+        let lever = f64::from(vm.f32(p0 + 0x18))
+            - (1.0 - f64::from(vm.f32(elem + 0x10))) * f64::from(vm.f32(p0 + 0x20));
+        a * lever * f64::from((vm.f32(elem + 0x18) * RAD).cos()) + f64::from(vm.f32(p0 + 0x64))
+    };
+    let bind = |vm: &mut Vm, env: &mut dyn Callees, id: u64| {
+        let mut args = CallArgs::ints(&[f, 1, id, 0]);
+        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
+        env.call(vm, 0x1407ace10, args).rax as u32 != 0
+    };
+    for i in 0..10u64 {
+        if !in_range(vm, i) {
+            return Err("gear state index out of range".into());
+        }
+        let begin = vm.u64(f + 0x6958);
+        let elem = begin + i * 0x90;
+        vm.set_i32(elem + 0x50, 0);
+        let b = vm.u64(f + 0x20);
+        if vm.i32(vm.u64(b + 0x6080) + i * 0x88 + 8) == 0 {
+            continue;
+        }
+        let base = vm.f32(f + 0x224) + vm.f32(elem + 0x50);
+        vm.set_f32(elem + 0x50, base);
+        if -0.01 > side(vm, elem) {
+            vm.set_f32(elem + 0x50, vm.f32(f + 0x240) + base);
+            if bind(vm, env, 0x72) {
+                vm.set_i32(elem + 0x50, 0);
+            }
+        }
+        if side(vm, elem) > 0.01 {
+            vm.set_f32(elem + 0x50, vm.f32(f + 0x244) + vm.f32(elem + 0x50));
+            if bind(vm, env, 0x73) {
+                vm.set_i32(elem + 0x50, 0);
+            }
+        }
+        let b = vm.u64(f + 0x20);
+        if vm.i32(b + 0xe7c) != 0 {
+            let memory = f + 0xbdd8;
+            let held = vm.f32(elem + 0x50);
+            let owner = vm.u64(memory + 8);
+            let mut args = CallArgs::ints(&[memory, u64::from(vm.u32(owner + 0xe7c))]);
+            args.int[1] = Some(u64::from(vm.u32(owner + 0xe7c)));
+            let floor = f32::from_bits(env.call(vm, 0x1411daa80, args).xmm0 as u32);
+            let decay = if vm.i32(0x1_42f0_1968) != 0 {
+                f32::from_bits(0x3681_742e)
+            } else {
+                0.0
+            };
+            let lowered = vm.f32(memory + 0x50) - decay;
+            let level = if lowered > floor { lowered } else { floor };
+            vm.set_f32(memory + 0x50, level);
+            let change = (vm.f32(memory + 0x28 + 4 * i) - held).abs();
+            let eased = (f64::from(level) - f64::from(change) * 0.25) as f32;
+            vm.set_f32(memory + 0x50, eased);
+            vm.set_f32(memory + 0x28 + 4 * i, held);
+            let x1 = vm.f32(memory + 0x50);
+            let first = clamp(x1, 0.0, 1.0);
+            vm.set_f32(memory + 0x50, first);
+            let e = vm.f32(elem + 0x50);
+            let result = if 0.0 > e {
+                0.0
+            } else if first < e {
+                first
+            } else {
+                e
+            };
+            vm.set_f32(elem + 0x50, result);
+        }
+        let e = vm.f32(elem + 0x50);
+        vm.set_f32(elem + 0x50, clamp(e, 0.0, 1.0));
+    }
+    let sim_speed = vm.f64(0x1_42f0_1920);
+    if 1.0 > sim_speed || vm.i32(f + 0x24c) == 0 || vm.i32(f + 0x64e4) == 0 {
+        let b = vm.u64(f + 0x20);
+        let mut args = CallArgs::default();
+        args.int[0] = Some(f);
+        args.int[2] = Some(slot(-0x38));
+        args.xmm[1] = Some(f64::from(vm.f32(b + 0x280c)).to_bits() as u32);
+        args.xmm[3] = Some(f64::from(vm.f32(b + 0x2810)).to_bits() as u32);
+        args.stack = [
+            Some(slot(-0x68)),
+            Some(f64::from(vm.f32(b + 0x2814)).to_bits()),
+            Some(slot(0x1758)),
+            Some(1),
+        ];
+        env.call(vm, 0x140816eb0, args);
+        let ctx = env.call(vm, 0x14193ae40, CallArgs::default()).rax;
+        let mut args = CallArgs::default();
+        args.int = [
+            Some(ctx),
+            Some(f + 0x64e8),
+            Some(f + 0x64f0),
+            Some(f + 0x64f8),
+        ];
+        args.stack = [
+            Some(vm.f64(slot(-0x38)).to_bits()),
+            Some(vm.f64(slot(-0x68)).to_bits()),
+            Some(vm.f64(slot(0x1758)).to_bits()),
+            None,
+        ];
+        env.call(vm, 0x1406eaf20, args);
+    }
+    vm.set_u32(f + 0x24c, 0);
+    vm.set_u32(f + 0x250, 0);
+    for w in 0..48u64 {
+        let b = vm.u64(f + 0x20);
+        if vm.u8(vm.u64(b + 0x6028) + w * 0x36c8 + 0x678) != 0 {
+            let x = vm.u64(f + 0x6940) + w * 0x2d8;
+            vm.set_u32(x + 0x2d0, 0);
+            vm.set_u32(x + 0x2d4, 0);
+        }
+    }
+    for i in 0..10u64 {
+        let b = vm.u64(f + 0x20);
+        let g = vm.u64(b + 0x6080) + i * 0x88;
+        if vm.i32(g) == 0 {
+            continue;
+        }
+        if !in_range(vm, i) {
+            return Err("gear state index out of range".into());
+        }
+        let elem = vm.u64(f + 0x6958) + i * 0x90;
+        vm.set_u32(elem + 0x20, vm.u32(g + 0x24));
+        for off in [0x2c, 0x30, 0x34, 0x38, 0x3c, 0x40, 0x64, 0x5c] {
+            vm.set_u32(elem + off, 0);
+        }
+    }
+    Ok(())
+}
