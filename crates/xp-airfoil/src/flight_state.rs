@@ -2632,9 +2632,28 @@ pub fn geodetic_to_local(
     out: [u64; 3],
     geographic: [f64; 3],
 ) {
+    let [x, y, z] = geodetic_to_ecef(vm, env, planet + 0xb0, geographic);
+    let m = |vm: &Vm, o: u64| vm.f64(planet + o);
+    let local = [
+        ((y * m(vm, 0x2a0) + x * m(vm, 0x280)) + z * m(vm, 0x2c0)) + m(vm, 0x2e0),
+        ((y * m(vm, 0x2a8) + x * m(vm, 0x288)) + z * m(vm, 0x2c8)) + m(vm, 0x2e8),
+        ((y * m(vm, 0x2b0) + x * m(vm, 0x290)) + z * m(vm, 0x2d0)) + m(vm, 0x2f0),
+    ];
+    for k in 0..3 {
+        vm.set_f64(out[k], local[k]);
+    }
+}
+
+/// `0x1419f8ea0(ellipsoid, x_out, y_out, z_out, lat, lon, alt)`: earth-centred coordinates of a geographic point
+/// (see [`geodetic_to_local`]); the geoid height `0x1419f8ff0(ellipsoid, lat, lon)` is replayed.
+pub fn geodetic_to_ecef(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    shape: u64,
+    geographic: [f64; 3],
+) -> [f64; 3] {
     const RAD: f64 = f64::from_bits(0x3f91_df46_a252_9d39);
     let [lat, lon, alt] = geographic;
-    let shape = planet + 0xb0;
     let geoid = f64::from_bits(env.call(vm, 0x1419f8ff0, CallArgs::ints(&[shape])).xmm0);
     let height = geoid + alt;
     let (lat_r, lon_r) = (lat * RAD, lon * RAD);
@@ -2646,15 +2665,7 @@ pub fn geodetic_to_local(
     let x = lon_r.cos() * rho;
     let y = lon_r.sin() * rho;
     let z = sin_lat * (b * b * n / (a * a) + height);
-    let m = |vm: &Vm, o: u64| vm.f64(planet + o);
-    let local = [
-        ((y * m(vm, 0x2a0) + x * m(vm, 0x280)) + z * m(vm, 0x2c0)) + m(vm, 0x2e0),
-        ((y * m(vm, 0x2a8) + x * m(vm, 0x288)) + z * m(vm, 0x2c8)) + m(vm, 0x2e8),
-        ((y * m(vm, 0x2b0) + x * m(vm, 0x290)) + z * m(vm, 0x2d0)) + m(vm, 0x2f0),
-    ];
-    for k in 0..3 {
-        vm.set_f64(out[k], local[k]);
-    }
+    [x, y, z]
 }
 
 /// `0x1406eaf20(planet, lat_out, lon_out, alt_out, x, y, z)`: the local point is moved to earth-centred coordinates
@@ -2729,4 +2740,47 @@ pub fn local_to_geodetic(
     }
     let geoid = f64::from_bits(env.call(vm, 0x1419f8ff0, CallArgs::ints(&[shape])).xmm0);
     vm.set_f64(out[2], height - geoid);
+}
+
+/// `0x1419f7ee0(planet, out, lat, lon)`: the local-axes matrix for a geographic point (degrees) as floats at `out`
+/// (three rows of three, 16 bytes apart; the double 4 x 4 behind it is left at `out + 0x40`). `0x1419f8960` builds
+/// the east-north-up frame of the point on the ellipsoid (the rotation rows `(-sin lon, cos lon, 0)`,
+/// `(-sin lat cos lon, -sin lat sin lon, cos lat)`, `(cos lon cos lat, sin lon cos lat, sin lat)` and the earth-centred
+/// origin of the point at altitude zero as translation); `0x1419f8af0` turns it by 90 degrees about the x axis and
+/// inverts it; the planet's inverse matrix (`planet + 0x200`) is multiplied on and the result narrowed to floats.
+pub fn local_axes(vm: &mut Vm, env: &mut dyn Callees, planet: u64, out: u64, lat: f64, lon: f64) {
+    use crate::matrix::{identity, mul, read, rigid_inverse, rotate_by};
+    const RAD: f64 = f64::from_bits(0x3f91_df46_a252_9d39);
+    let origin = geodetic_to_ecef(vm, env, planet + 0xb0, [lat, lon, 0.0]);
+    let r_lat = lat * RAD;
+    let (sin_lat, cos_lat) = (r_lat.sin(), r_lat.cos());
+    let r_lon = lon * RAD;
+    let (sin_lon, cos_lon) = (r_lon.sin(), r_lon.cos());
+    let neg_sin_lat = -sin_lat;
+    let enu = [
+        -sin_lon,
+        cos_lon,
+        0.0,
+        0.0,
+        neg_sin_lat * cos_lon,
+        neg_sin_lat * sin_lon,
+        cos_lat,
+        0.0,
+        cos_lon * cos_lat,
+        sin_lon * cos_lat,
+        sin_lat,
+        0.0,
+        origin[0],
+        origin[1],
+        origin[2],
+        1.0,
+    ];
+    let turned = rotate_by(&identity(), 90.0, 1.0, 0.0, 0.0);
+    let inverse = rigid_inverse(&mul(&enu, &turned));
+    let planet_inverse = read(vm, planet + 0x200);
+    let product = mul(&inverse, &planet_inverse);
+    crate::matrix::write(vm, out + 0x40, &product);
+    for (k, v) in product.iter().enumerate() {
+        vm.set_f32(out + 4 * k as u64, *v as f32);
+    }
 }

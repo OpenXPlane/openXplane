@@ -1033,10 +1033,7 @@ pub fn geodetic_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     let a398 = position_component(vm, env, f, 0x398);
     let a390 = position_component(vm, env, f, 0x390);
     let matrix = rbp + 0x15a0;
-    let mut args = CallArgs::ints(&[ctx2, matrix]);
-    args.xmm[2] = Some(a390.to_bits() as u32);
-    args.xmm[3] = Some(a398.to_bits() as u32);
-    env.call(vm, 0x1419f7ee0, args);
+    crate::flight_state::local_axes(vm, env, ctx2, matrix, a390, a398);
     let m = |vm: &Vm, row: u64, col: u64| vm.f32(matrix + 0x10 * row + 4 * col);
     let (v0, v1, v2) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
     for (offset, col) in [(0x3f4, 0), (0x3f8, 1), (0x3fc, 2)] {

@@ -2694,7 +2694,8 @@ fn words_match(case: &VmCaseData, n: usize) {
     // and flags that differ in their bits must not hide as denormals
     let normal = |w: u32| (w >> 23) & 0xff != 0 && (w >> 23) & 0xff != 0xff;
     let expected: std::collections::HashMap<u64, u32> = case.expected.iter().copied().collect();
-    // a double (two words of an aligned pair) that agrees to 1e-12 relative also matches (libm differences)
+    // a double (two words of an aligned pair) that agrees to 1e-7 also matches (libm differences, amplified by
+    // the cancellation in the earth-centred coordinates)
     let doubles_agree = |addr: u64| {
         let base = addr & !7;
         let (Some(lo), Some(hi)) = (expected.get(&base), expected.get(&(base + 4))) else {
@@ -2702,7 +2703,7 @@ fn words_match(case: &VmCaseData, n: usize) {
         };
         let want = f64::from_bits(u64::from(*hi) << 32 | u64::from(*lo));
         let got = case.vm.f64(base);
-        want.is_finite() && got.is_finite() && (got - want).abs() <= 1e-12 * (1.0 + want.abs())
+        want.is_finite() && got.is_finite() && (got - want).abs() <= 1e-7 * (1.0 + want.abs())
     };
     for (addr, want) in &case.expected {
         let got = case.vm.u32(*addr);
@@ -3604,6 +3605,20 @@ fn matrix_cases(kind: &str) {
                 let r = axis_rotation(double(&h[2]), double(&h[3]), double(&h[4]), double(&h[5]));
                 write(&mut case.vm, hex(&h[1]), &r);
             }
+            "axes" => {
+                let mut env = VmReplay {
+                    calls: std::mem::take(&mut case.calls),
+                };
+                openxplane::flight_state::local_axes(
+                    &mut case.vm,
+                    &mut env,
+                    hex(&h[1]),
+                    hex(&h[2]),
+                    double(&h[3]),
+                    double(&h[4]),
+                );
+                assert!(env.calls.is_empty(), "case {n}: unused calls");
+            }
             _ => {
                 let m = read(&case.vm, hex(&h[1]));
                 let r = rotate_by(
@@ -3633,6 +3648,11 @@ fn matrix_rigid_inverse_matches_the_original_machine_code() {
 #[test]
 fn matrix_axis_rotation_matches_the_original_machine_code() {
     matrix_cases("axis");
+}
+
+#[test]
+fn local_axes_match_the_original_machine_code() {
+    matrix_cases("axes");
 }
 
 #[test]

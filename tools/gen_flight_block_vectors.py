@@ -94,7 +94,6 @@ def main():
                 call.put_f32(pointer, rng.uniform(-180, 180))
 
         case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
-        case.stub(0x1419f7ee0, local_matrix)
         case.stub(0x1419f6fd0, euler)
     print('# update_flight block vectors', BLOCK, hex(start), hex(end))
     rng = case.rng

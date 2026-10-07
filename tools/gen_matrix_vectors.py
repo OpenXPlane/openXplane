@@ -25,7 +25,7 @@ def dbits(v):
 
 def main():
     case = VmCase(EXE, SEED, [(0x1407b3000, 0x1407b4000), (0x14093c000, 0x14093d000), (0x140cba000, 0x140cbb000),
-                              (0x140cb9000, 0x140cba000)])
+                              (0x140cb9000, 0x140cba000), (0x1419f7000, 0x1419f9000), (0x14062c000, 0x14062d000)])
     rng = case.rng
     print(f'# matrix vectors {KIND} (tools/gen_matrix_vectors.py)')
     done = 0
@@ -35,7 +35,16 @@ def main():
         M = case.region('M', 0x80)
         A = case.region('A', 0x80)
         B = case.region('B', 0x80)
-        R = case.region('R', 0x80)
+        R = case.region('R', 0xc0)
+        CX = case.region('CX', 0x300)
+        lat = rng.uniform(-89, 89)
+        lon = rng.uniform(-179, 179)
+        case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
+        fz.preset_f64('CX', 0xb0, 6378137.0)
+        fz.preset_f64('CX', 0xb8, rng.uniform(6350000.0, 6378000.0))
+        fz.preset_f64('CX', 0xc8, rng.uniform(0.0, 0.01))
+        for off in range(0x200, 0x240, 8):
+            fz.preset_f64('CX', off, rng.uniform(-1, 1))
         angle = rng.choice([rng.uniform(-360, 360), rng.uniform(-90, 90), 0.0, 90.0])
         axis = [rng.choice([0.0, rng.uniform(-3, 3)]) for _ in range(3)]
         mode = rng.randrange(6)
@@ -61,6 +70,9 @@ def main():
         elif KIND == 'axis':
             run = (0x140cbabc0, [R], [dbits(axis[2])])
             header_args = f'{R:x} {dbits(angle):016x} {dbits(axis[0]):016x} {dbits(axis[1]):016x} {dbits(axis[2]):016x}'
+        elif KIND == 'axes':
+            run = (0x1419f7ee0, [CX, R], [])
+            header_args = f'{CX:x} {R:x} {dbits(lat):016x} {dbits(lon):016x}'
         else:
             run = (0x140cb9860, [M], [dbits(axis[2])])
             header_args = f'{M:x} {dbits(angle):016x} {dbits(axis[0]):016x} {dbits(axis[1]):016x} {dbits(axis[2]):016x}'
@@ -72,7 +84,7 @@ def main():
             off = sp + 0x28 + 8 * k - (sp - 0x800)
             fz.preset('S', off, value & 0xffffffff)
             fz.preset('S', off + 4, value >> 32)
-        for reg, value in ((UC_X86_REG_XMM1, angle), (UC_X86_REG_XMM2, axis[0]), (UC_X86_REG_XMM3, axis[1])):
+        for reg, value in ((UC_X86_REG_XMM1, angle), (UC_X86_REG_XMM2, axis[0] if KIND != 'axes' else lat), (UC_X86_REG_XMM3, axis[1] if KIND != 'axes' else lon)):
             case.emu.uc.reg_write(reg, dbits(value))
         try:
             case.run(run[0], ints=run[1], floats=[], stack=run[2], max_instructions=20000)
