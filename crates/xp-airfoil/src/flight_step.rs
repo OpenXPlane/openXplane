@@ -959,6 +959,141 @@ pub fn integrate_motion(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, ca
     }
 }
 
+/// `update_flight` `0x14127223b..0x141272395`: the velocities in the aircraft axes. The world velocity
+/// `F+0x368/0x36c/0x370` moved into the aircraft frame (`0x141296750`, no origin shift) is stored at
+/// `F+0x2a0/0x2ac/0x2b8`; the air velocity at the centre of gravity (`0x14121b580` at the origin, with the wash
+/// switched off; replayed) lands in `F+0x29c/0x2a8/0x2b4`; its direction angles (`0x141183bf0`, radians) are stored at
+/// `F+0x404/0x408/0x40c` and its speed at `F+0x400`, and the three angles are then converted to degrees and scaled
+/// by the speed held to `0..1`.
+pub fn body_velocities(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
+    use crate::callees::direction_angles;
+    use crate::transform::{Frame, to_aircraft_frame};
+    let frame = Frame {
+        origin: [vm.f64(f + 0x378), vm.f64(f + 0x380), vm.f64(f + 0x388)],
+        rotation: [
+            [vm.f32(f + 0x430), vm.f32(f + 0x434)],
+            [vm.f32(f + 0x440), vm.f32(f + 0x444)],
+            [vm.f32(f + 0x450), vm.f32(f + 0x454)],
+        ],
+    };
+    let velocity = [vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370)];
+    let local = to_aircraft_frame(&frame, velocity, false, false);
+    for (offset, v) in [(0x2a0, local[0]), (0x2ac, local[1]), (0x2b8, local[2])] {
+        vm.set_f32(f + offset, v);
+    }
+    let mut args = CallArgs::ints(&[f, 0, f + 0x29c]);
+    args.int[1] = None;
+    args.xmm[1] = Some(0);
+    args.xmm[3] = Some(0);
+    args.stack[0] = Some(f + 0x2a8);
+    args.stack[1] = None;
+    args.stack[2] = Some(f + 0x2b4);
+    env.call(vm, 0x14121b580, args);
+    let air = [vm.f32(f + 0x29c), vm.f32(f + 0x2a8), vm.f32(f + 0x2b4)];
+    let [roll, pitch, yaw, speed] = direction_angles(air[0], air[1], air[2]);
+    vm.set_f32(f + 0x404, roll);
+    vm.set_f32(f + 0x408, pitch);
+    vm.set_f32(f + 0x40c, yaw);
+    vm.set_f32(f + 0x400, speed);
+    let factor = crate::scalar::clamp(speed, 0.0, 1.0);
+    for offset in [0x404, 0x408, 0x40c] {
+        let scaled = factor * f32::from_bits(0x4265_2ee0);
+        vm.set_f32(f + offset, scaled * vm.f32(f + offset));
+    }
+}
+
+/// `update_flight` `0x141272395..0x1412728f7`: the geographic state. With the planet object (`0x14193ae40`, a
+/// function-local static; replayed) the position becomes the double triple `F+0x390/0x398/0x3a0`
+/// (`0x1406eaf20`, replayed), the local-axes matrix for that position (`0x1419f7ee0`, replayed, three rows of three
+/// floats at `rbp+0x15a0` with a 16-byte stride) turns the world velocity into `F+0x3f4/0x3f8/0x3fc`, the matrix
+/// then gives the Euler angles `F+0x358/0x350/0x348` (`0x1419f6fd0`, replayed, seeded with `F+0x3e0/0x3dc/0x3d8`)
+/// whose change over the frame time (in radians per second) is stored at `F+0x438/0x448/0x458` and smoothed into the
+/// accelerations `F+0x43c/0x44c/0x45c` (`lerp` with the factor `20 dt`); finally the position goes through the
+/// planet object's 4 x 4 double matrix into `F+0x3a8/0x3b0/0x3b8`.
+pub fn geodetic_state(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+    use crate::scalar::lerp;
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let frame_time = |vm: &mut Vm, env: &mut dyn Callees| {
+        f64::from_bits(env.call(vm, 0x140c448c0, CallArgs::default()).xmm0)
+    };
+    let planet =
+        |vm: &mut Vm, env: &mut dyn Callees| env.call(vm, 0x14193ae40, CallArgs::default()).rax;
+    let ctx = planet(vm, env);
+    let z = position_component(vm, env, f, 0x388);
+    let y = position_component(vm, env, f, 0x380);
+    let x = position_component(vm, env, f, 0x378);
+    let mut args = CallArgs::ints(&[ctx, f + 0x390, f + 0x398, f + 0x3a0]);
+    args.stack = [
+        Some(x.to_bits()),
+        Some(y.to_bits()),
+        Some(z.to_bits()),
+        None,
+    ];
+    env.call(vm, 0x1406eaf20, args);
+    let ctx2 = planet(vm, env);
+    let a398 = position_component(vm, env, f, 0x398);
+    let a390 = position_component(vm, env, f, 0x390);
+    let matrix = rbp + 0x15a0;
+    let mut args = CallArgs::ints(&[ctx2, matrix]);
+    args.xmm[2] = Some(a390.to_bits() as u32);
+    args.xmm[3] = Some(a398.to_bits() as u32);
+    env.call(vm, 0x1419f7ee0, args);
+    let m = |vm: &Vm, row: u64, col: u64| vm.f32(matrix + 0x10 * row + 4 * col);
+    let (v0, v1, v2) = (vm.f32(f + 0x368), vm.f32(f + 0x36c), vm.f32(f + 0x370));
+    for (offset, col) in [(0x3f4, 0), (0x3f8, 1), (0x3fc, 2)] {
+        let value = m(vm, 1, col) * v1 + m(vm, 0, col) * v0 + m(vm, 2, col) * v2;
+        vm.set_f32(f + offset, value);
+    }
+    let (old350, old358, old348) = (vm.f32(f + 0x350), vm.f32(f + 0x358), vm.f32(f + 0x348));
+    let (old438, old448, old458) = (vm.f32(f + 0x438), vm.f32(f + 0x448), vm.f32(f + 0x458));
+    for (to, from) in [(0x358, 0x3e0), (0x350, 0x3dc), (0x348, 0x3d8)] {
+        let word = vm.u32(f + from);
+        vm.set_u32(f + to, word);
+    }
+    let args = CallArgs::ints(&[matrix, f + 0x358, f + 0x350, f + 0x348]);
+    env.call(vm, 0x1419f6fd0, args);
+    for (target, angle, old) in [
+        (0x438, 0x350, old350),
+        (0x448, 0x358, old358),
+        (0x458, 0x348, old348),
+    ] {
+        let dt = frame_time(vm, env);
+        let inverse = (1.0 / dt) as f32;
+        let rate = (vm.f32(f + angle) - old) * RAD * inverse;
+        vm.set_f32(f + target, rate);
+    }
+    for (acceleration, rate, old) in [
+        (0x43c, 0x438, old438),
+        (0x44c, 0x448, old448),
+        (0x45c, 0x458, old458),
+    ] {
+        let dt = frame_time(vm, env);
+        let factor = (dt * 20.0) as f32;
+        let dt = frame_time(vm, env);
+        let inverse = (1.0 / dt) as f32;
+        let delta = (vm.f32(f + rate) - old) * inverse;
+        let smoothed = lerp(vm.f32(f + acceleration), delta, factor);
+        vm.set_f32(f + acceleration, smoothed);
+    }
+    let ctx3 = planet(vm, env);
+    let pz = position_component(vm, env, f, 0x388);
+    let py = position_component(vm, env, f, 0x380);
+    let px = position_component(vm, env, f, 0x378);
+    let c = |vm: &Vm, offset: u64| vm.f64(ctx3 + offset);
+    vm.set_f64(
+        f + 0x3a8,
+        ((py * c(vm, 0x220) + px * c(vm, 0x200)) + pz * c(vm, 0x240)) + c(vm, 0x260),
+    );
+    vm.set_f64(
+        f + 0x3b0,
+        ((c(vm, 0x228) * py + c(vm, 0x208) * px) + c(vm, 0x248) * pz) + c(vm, 0x268),
+    );
+    vm.set_f64(
+        f + 0x3b8,
+        ((px * c(vm, 0x210) + py * c(vm, 0x230)) + c(vm, 0x250) * pz) + c(vm, 0x270),
+    );
+}
+
 /// `0x1412763c0(F)`: the atmosphere of the step at the aircraft's altitude `F+0x3a0` (zero when the engine flag
 /// `0x1417f12c0` is set): the gravity `F+0x78` (`GM / (r + h)^2`), the temperature `F+0x5c` (`0x141ba6750`), the
 /// offsets from the standard profile `F+0x58` (`0x141ba6290`) and `F+0x60` (the table temperature), the density

@@ -323,6 +323,22 @@ key in `0x142f03778/0x142f03780` and `0x140f5c540` accepts it) is advanced by th
 `0x14578b780`. The register state at the block start is `xmm12 = 0.0174533` (the constant is loaded early in the
 function).
 
+`body_velocities` (`0x14127223b..0x141272395`, 120 cases; the airflow `0x14121b580` is replayed): the world velocity
+`F+0x368/0x36c/0x370` moved into the aircraft axes by `0x141296750` (no origin shift) is stored at
+`F+0x2a0/0x2ac/0x2b8`; the air velocity at the centre of gravity (the airflow at the origin, the wash switched off by
+the last argument `r12d = 0`; its other three trailing arguments are the wash's excluded indices, -1) lands in
+`F+0x29c/0x2a8/0x2b4`; `0x141183bf0` gives its direction angles (stored at `F+0x404/0x408/0x40c`, radians) and its
+speed (`F+0x400`), and the three angles are then converted to degrees scaled by the speed held to `0..1`.
+
+`geodetic_state` (`0x141272395..0x1412728f7`, 80 cases; the planet object `0x14193ae40`, the geographic conversion
+`0x1406eaf20`, the local matrix `0x1419f7ee0` and the matrix-to-Euler `0x1419f6fd0` are replayed): the position becomes
+the doubles `F+0x390/0x398/0x3a0`; the matrix (three rows of three floats 16 bytes apart at `rbp+0x15a0`) turns the world
+velocity into the local velocity `F+0x3f4/0x3f8/0x3fc`; the Euler angles `F+0x358/0x350/0x348` (seeded from
+`F+0x3e0/0x3dc/0x3d8`) change over the frame time into the rates `F+0x438/0x448/0x458` (radians per second), which
+are smoothed into the accelerations `F+0x43c/0x44c/0x45c` by `lerp` with the factor `20 dt` (nine frame-time
+queries); finally the position goes through the planet object's 4 x 4 double matrix (`+0x200..0x270`) into
+`F+0x3a8/0x3b0/0x3b8`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

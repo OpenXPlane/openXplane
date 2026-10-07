@@ -20,7 +20,7 @@ from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R14, U
 
 EXE, BLOCK, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 BLOCKS = {'aspect': (0x141265f7d, 0x14126644a), 'thrust': (0x14126644a, 0x141266b52), 'element': (0x141266b52, 0x141267978),
-          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b)}
+          'body': (0x141267978, 0x1412686a9), 'parts': (0x141269920, 0x14126a791), 'motion': (0x1412709ff, 0x141271fa2), 'integrate': (0x141271fa2, 0x14127223b), 'velocity': (0x14127223b, 0x141272395), 'geodetic': (0x141272395, 0x1412728f7)}
 SIM_TIME = 0x142f01918
 RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 0x141220000), (0x141290000, 0x1412a0000),
           (0x140860000, 0x140870000), (0x1406e0000, 0x1406f0000), (0x1411a0000, 0x1411d0000), (0x140910000, 0x140911000),
@@ -74,6 +74,28 @@ def main():
         case.stub(0x140f5c540, lambda call, rng: call.ret_int(rng.randrange(2)))
         case.stub(0x140f42620, lambda call, rng: call.ret_int(rng.randrange(1 << 40)))
         case.stub(0x140f3c2d0, lambda call, rng: None)
+    if BLOCK == 'geodetic':
+        def put_f64(call, address, value):
+            bits64 = struct.unpack('<Q', struct.pack('<d', value))[0]
+            call.put(address, bits64 & 0xffffffff)
+            call.put(address + 4, bits64 >> 32)
+
+        def geographic(call, rng):  # 0x1406eaf20: three doubles through three pointers
+            for pointer in (call.ints[1], call.ints[2], call.ints[3]):
+                put_f64(call, pointer, rng.uniform(-180, 180))
+
+        def local_matrix(call, rng):  # 0x1419f7ee0: three rows of three floats, 16 bytes apart
+            for row in range(3):
+                for col in range(3):
+                    call.put_f32(call.ints[1] + 0x10 * row + 4 * col, rng.uniform(-1, 1))
+
+        def euler(call, rng):  # 0x1419f6fd0: three angles through three pointers
+            for pointer in (call.ints[1], call.ints[2], call.ints[3]):
+                call.put_f32(pointer, rng.uniform(-180, 180))
+
+        case.stub(0x1406eaf20, geographic)
+        case.stub(0x1419f7ee0, local_matrix)
+        case.stub(0x1419f6fd0, euler)
     print('# update_flight block vectors', BLOCK, hex(start), hex(end))
     rng = case.rng
     done = attempts = 0
@@ -243,7 +265,25 @@ def main():
                 fz.preset_f32('F', off, rng.uniform(-50, 50))
             fz.preset_f32('F', 0x42f70, rng.choice([0.0, 0.005, -0.005, 0.5, -0.7, 1.0, 3.0]))
             case.emu.uc.reg_write(UC_X86_REG_XMM12, 0x3c8efa36)
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate'):
+        if BLOCK == 'geodetic':
+            CX = case.region('CX', 0x300)
+            case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
+            for off in range(0x200, 0x278, 8):
+                fz.preset_f64('CX', off, rng.uniform(-3.0, 3.0))
+            for off in (0x368, 0x36c, 0x370, 0x438, 0x43c, 0x448, 0x44c, 0x458, 0x45c):
+                fz.preset_f32('F', off, rng.uniform(-60, 60))
+            for off in (0x3e0, 0x3dc, 0x3d8, 0x350, 0x358, 0x348):
+                fz.preset_f32('F', off, rng.uniform(-180, 180))
+            for off in (0x378, 0x380, 0x388, 0x390, 0x398):
+                fz.preset_f64('F', off, rng.uniform(-5000, 5000))
+            case.emu.uc.reg_write(UC_X86_REG_XMM12, 0x3c8efa36)
+            case.emu.uc.reg_write(UC_X86_REG_XMM8, 0)
+        if BLOCK == 'velocity':
+            for off in (0x368, 0x36c, 0x370):
+                fz.preset_f32('F', off, rng.choice([rng.uniform(-60, 60), rng.uniform(-0.5, 0.5), 0.0]))
+            for off in (0x430, 0x434, 0x440, 0x444, 0x450, 0x454):
+                fz.preset_f32('F', off, rng.uniform(-1.0, 1.0))
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic'):
             S = case.region('S', 0x2000)
             V = case.region('V', 0x4000)
             if BLOCK != 'motion':
@@ -269,7 +309,7 @@ def main():
         case.emu.uc.reg_write(UC_X86_REG_R15, F)
         case.emu.uc.reg_write(UC_X86_REG_R14, 1 if BLOCK == 'motion' else 0)
         case.emu.uc.reg_write(UC_X86_REG_R12, 0)
-        if BLOCK != 'integrate':
+        if BLOCK not in ('integrate', 'geodetic'):
             case.emu.uc.reg_write(UC_X86_REG_XMM12, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
         case.emu.uc.reg_write(UC_X86_REG_XMM13, 0)
         case.emu.uc.reg_write(UC_X86_REG_XMM14, struct.unpack('<I', struct.pack('<f', 1.0))[0])
@@ -278,9 +318,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '')
+        header = f'{F:x}' + (f' {rbp:x}' if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic') else '') + (f' {entry_rsp(0) - 0xc0:x}' if BLOCK == 'integrate' else '')
         out = case.dump(header, extra_words=extra)
-        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate'):
+        if BLOCK in ('element', 'body', 'parts', 'motion', 'integrate', 'velocity', 'geodetic'):
             lines = out.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not S <= int(t.split('=')[0], 16) < S + 0x2000)
             out = '\n'.join(lines)

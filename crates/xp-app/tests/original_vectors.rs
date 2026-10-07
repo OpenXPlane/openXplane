@@ -2994,6 +2994,37 @@ fn integrate_motion_matches_the_original_machine_code() {
 }
 
 #[test]
+fn body_velocities_match_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_velocity.txt");
+    assert!(cases.len() >= 100);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::body_velocities(&mut case.vm, &mut env, f);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
+fn geodetic_state_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_geodetic.txt");
+    assert!(cases.len() >= 60);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let f = u64::from_str_radix(&case.header[0], 16).unwrap();
+        let rbp = u64::from_str_radix(&case.header[1], 16).unwrap();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::flight_step::geodetic_state(&mut case.vm, &mut env, f, rbp);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn atmosphere_step_matches_the_original_machine_code() {
     let cases = parse_vm_cases("atmosphere_step.txt");
     assert!(cases.len() >= 100);
