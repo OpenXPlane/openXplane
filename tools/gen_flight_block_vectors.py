@@ -405,8 +405,25 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM8, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
             case.emu.uc.reg_write(UC_X86_REG_XMM10, struct.unpack('<Q', struct.pack('<d', 0.5))[0])
         if BLOCK == 'late':
-            for address in (0x141245750, 0x14125e4f0):
-                case.stub(address, lambda call, rng: None)
+            case.stub(0x14125e4f0, lambda call, rng: None)
+            case.stub(0x1407cdce0, lambda call, rng: None)
+            case.stub(0x1407d6a00, lambda call, rng: None)
+            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.01, 0.02, 0.3, 1.0, 5.0, 40.0, rng.uniform(0, 3)])))
+            fz.preset('F', 0x6484, rng.choice([0, 1, 2]))
+            fz.preset('F', 0x6488, rng.choice([0, 1]))
+            fz.preset('F', 0x648c, rng.choice([0, 0, 1]))
+            fz.preset('F', 0x64a8, rng.choice([0, 1, 2, 3, 4, 5, 6]))
+            fz.preset_f32('F', 0x6490, rng.choice([0.0, 11.5, 13.0, rng.uniform(0, 100), 100.0]))
+            fz.preset_f32('F', 0x6494, rng.choice([rng.uniform(0, 520), 316.5, 15.0]))
+            fz.preset_f32('F', 0x6498, rng.choice([0.0, 0.995, 1.0, rng.uniform(0, 1)]))
+            fz.preset_f32('F', 0x649c, rng.choice([0.0, rng.uniform(0, 30), rng.uniform(0, 80)]))
+            fz.preset_f32('F', 0x64a0, rng.uniform(0, 2))
+            fz.preset_f32('F', 0x64a4, rng.choice([0.0, 450.0, rng.uniform(0, 500)]))
+            fz.preset_f32('F', 0x754, rng.uniform(0, 100))
+            for off in (0xc58, 0xc5c, 0xc60, 0xc64):
+                fz.preset_f32('B', off, rng.uniform(1.0, 60.0))
+            for off in (0xc7c, 0xc80, 0xc84, 0xc88):
+                fz.preset_f32('B', off, rng.uniform(0, 3))
             fz.preset('B', 0xc54, rng.choice([0, 1]))
             fz.preset('B', 0x8c4, rng.choice([0, 1, 1]))
             fz.preset('B', 0x8c8, rng.choice([0, 1]))

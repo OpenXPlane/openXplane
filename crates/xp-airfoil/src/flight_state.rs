@@ -382,7 +382,7 @@ fn mode_query(vm: &mut Vm, env: &mut dyn Callees, f: u64, mode: u64) -> bool {
     env.call(vm, 0x1407ace10, args).rax as u32 != 0
 }
 
-/// `0x141273dfb..0x14127402d`: the last state updates. With `B+0xc54` the fuel and load update `0x141245750` (replayed)
+/// `0x141273dfb..0x14127402d`: the last state updates. With `B+0xc54` the start sequence `0x141245750` (`start_sequence`)
 /// runs, otherwise `F+0x6490` and `F+0x64a8` are cleared and `F+0x6494` takes `F+0x5c`. When the aircraft has the
 /// feature `B+0x8c4` and the global `0x142f01978` is set, the control assist `F+0x6594` is computed: with `B+0x8c8`
 /// from the equivalent airspeed `signed_sqrt(F+0x41c / B+0x7b0)` and the angle `F+0x404 / B+0x8ec` (zero when the
@@ -395,7 +395,7 @@ fn mode_query(vm: &mut Vm, env: &mut dyn Callees, f: u64, mode: u64) -> bool {
 pub fn late_state(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     let b = vm.u64(f + 0x20);
     if vm.i32(b + 0xc54) != 0 {
-        env.call(vm, 0x141245750, CallArgs::ints(&[f]));
+        start_sequence(vm, env, f);
     } else {
         vm.set_i32(f + 0x6490, 0);
         let word = vm.u32(f + 0x5c);
