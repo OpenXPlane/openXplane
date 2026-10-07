@@ -492,6 +492,14 @@ history slot `F+0xbe00+4i`), and the final value is held to `0..1`. Unless the s
 cleared, and each gear entry with a kind takes `+0x20 = record+0x24` and clears `+0x2c..0x40`, `+0x64`, `+0x5c`.
 Register state: `xmm7 = 0.01` (double), `xmm9 = 0x7fffffff`, `xmm12 = 1.0` (double), `r14 = 0`.
 
+`wheel_contact` (`0x14126d1f2..0x14126d5d3`, 60 cases; `0x1411878f0`, the tire function `0x1411c8690` and the strut function `0x1411c7a50` are replayed, their terrain logic is not
+verified): the latch `F+0x224` moves toward `F+0x220` at 1 per second (10 when it is above the target and the latches
+`B+0xe90`/`F+0x22c` do not both hold; not at all while both hold and it is above or `B+0xe90 >= 2`), `F+0x64c8` eases toward `F+0x64c4`
+by `2 dt`. Each of the ten gears with a kind goes to the tire function `0x1411c8690(entry, F+0x28, i)` when it is not of kind 1 and
+`|B+0x65a8|`, `|F+0x348|`, `|F+0x350|` are all below 45 degrees; otherwise to `0x1411c7a50(F, i, ...)` with the foot point computed
+from the entry's pose. The returned contact counts add up; `F+0x24c = count > 0`, `F+0x250 = count >= 3`, `F+0x64cc = pedal * B+0x2808`.
+Register state: `xmm9 = 0x7fffffff`, `xmm11 = rad`, `xmm12 = 1.0` (double), `rcx = B`.
+
 The body functions (`crates/xp-airfoil/src/body.rs`), verified as functions: `body_aero` (`0x141a51600`: the
 cross-flow forces of a body record from its lengths `+0x10/0x14/0x18`, end points, `|sin|` and `cos^4` of the angle
 and the dynamic pressure; 300 cases) and `body_wave_drag` (`0x141a522d0`: the supersonic wave term of a gridded

@@ -1647,3 +1647,113 @@ pub fn gear_state_update(
     }
     Ok(())
 }
+
+/// `0x14126d1f2..0x14126d5d3`: the wheel contact. The latch value `F+0x224` moves toward `F+0x220` (at 1 per second,
+/// 10 per second when it is above the target and the latches `B+0xe90` / `F+0x22c` do not both hold; not at all while
+/// both hold and the target is below it or `B+0xe90 >= 2`); `0x1411878f0(F)` runs (replayed) and `F+0x64c8` eases
+/// toward `F+0x64c4` by `2 dt`. Then each of the ten gears with a kind is handed to the contact function (replayed):
+/// the tire function `0x1411c8690(entry, F+0x28, i)` when the gear's kind is not 1 and `|B+0x65a8|`, `|F+0x348|`,
+/// `|F+0x350|` are below 45 degrees, otherwise the strut function `0x1411c7a50` with the foot point computed from the
+/// entry's pose. The contact counts add up in `rbp+0x1758`; afterwards `F+0x24c = count > 0`, `F+0x250 = count >= 3`
+/// and `F+0x64cc = pedal * B+0x2808`. Register state: `xmm9 = 0x7fffffff`, `xmm11 = rad`, `xmm12 = 1.0` (double).
+#[allow(clippy::field_reassign_with_default)]
+pub fn wheel_contact(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Result<(), String> {
+    const RAD: f32 = f32::from_bits(0x3c8e_fa36);
+    let slot = |off: i64| rbp.wrapping_add(off as u64);
+    let b = vm.u64(f + 0x20);
+    let rising = vm.f32(f + 0x224) > vm.f32(f + 0x220);
+    let (latch, held) = (vm.i32(b + 0xe90), vm.i32(f + 0x22c) != 0);
+    let mut rate = 1.0f64;
+    let adjust = if latch != 0 && held {
+        !rising && latch < 2
+    } else {
+        if rising {
+            rate = 10.0;
+        }
+        true
+    };
+    if adjust {
+        let dt = frame_time(vm, env);
+        let step = (dt * rate) as f32;
+        let (target, current) = (vm.f32(f + 0x220), vm.f32(f + 0x224));
+        let gap = target - current;
+        let lowered = -step;
+        let delta = if lowered > gap {
+            lowered
+        } else if step < gap {
+            step
+        } else {
+            gap
+        };
+        vm.set_f32(f + 0x224, current + delta);
+    }
+    env.call(vm, 0x1411878f0, CallArgs::ints(&[f]));
+    let dt = frame_time(vm, env);
+    let factor = (dt + dt) as f32;
+    vm.set_f32(
+        f + 0x64c8,
+        lerp(vm.f32(f + 0x64c8), vm.f32(f + 0x64c4), factor),
+    );
+    let mut contacts = 0i32;
+    vm.set_i32(slot(0x1758), 0);
+    for i in 0..10u64 {
+        let b = vm.u64(f + 0x20);
+        let g = vm.u64(b + 0x6080) + i * 0x88;
+        let kind = vm.i32(g);
+        if kind == 0 {
+            continue;
+        }
+        let begin = vm.u64(f + 0x6958);
+        let count = (vm.u64(f + 0x6960).wrapping_sub(begin) as i64) / 0x90;
+        if (i as i64) >= count {
+            return Err("gear state index out of range".into());
+        }
+        let elem = begin + i * 0x90;
+        let tilt_ok = vm.f32(b + 0x65a8).abs() < 45.0
+            && vm.f32(f + 0x348).abs() < 45.0
+            && vm.f32(f + 0x350).abs() < 45.0;
+        let result = if kind != 1 && tilt_ok {
+            env.call(
+                vm,
+                0x1411c8690,
+                CallArgs::ints(&[elem, u64::from(vm.u32(f + 0x28)), i]),
+            )
+            .rax as i32
+        } else {
+            let a7 = vm.f32(b + 0x65a8) * RAD;
+            let drop = -vm.f32(f + 0x42f50) * a7.sin();
+            let p0 = vm.u64(elem);
+            let a8 = vm.f32(elem + 0x18) * RAD;
+            let lever = f64::from(vm.f32(p0 + 0x18))
+                - (1.0 - f64::from(vm.f32(elem + 0x10))) * f64::from(vm.f32(p0 + 0x20));
+            let x11 = (f64::from(vm.f32(p0 + 0x7c)) - f64::from(a8.sin()) * lever) as f32;
+            let b = vm.u64(f + 0x20);
+            let g = vm.u64(b + 0x6080) + i * 0x88;
+            let x10 = vm.f32(g + 0x30) / vm.f32(g + 0x34);
+            let x9 = a7.cos() * vm.f32(f + 0x42f50);
+            let a14 = vm.f32(elem + 0x14) * RAD;
+            let cos8 = f64::from(a8.cos());
+            let x6 = (f64::from(vm.f32(p0 + 0x70)) - f64::from(a14.cos()) * lever * cos8) as f32;
+            let x2 = (f64::from(a14.sin()) * lever * cos8 + f64::from(vm.f32(p0 + 0x64))) as f32;
+            let mut args = CallArgs::default();
+            args.int = [Some(f), Some(i), None, None];
+            args.xmm = [None, None, Some(x2.to_bits()), Some(0)];
+            args.stack = [
+                Some(u64::from(x6.to_bits())),
+                Some(u64::from(x9.to_bits())),
+                Some(u64::from(x10.to_bits())),
+                Some(u64::from(x11.to_bits())),
+            ];
+            let _ = drop;
+            env.call(vm, 0x1411c7a50, args).rax as i32
+        };
+        contacts = vm.i32(slot(0x1758)).wrapping_add(result);
+        vm.set_i32(slot(0x1758), contacts);
+    }
+    vm.set_i32(f + 0x24c, i32::from(contacts > 0));
+    vm.set_i32(f + 0x250, i32::from(contacts >= 3));
+    let b = vm.u64(f + 0x20);
+    vm.set_f32(f + 0x64cc, vm.f32(slot(0x1750)) * vm.f32(b + 0x2808));
+    vm.set_i32(slot(-0x78), 0);
+    Ok(())
+}
