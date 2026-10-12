@@ -34,6 +34,7 @@ pub mod stall;
 pub mod strut;
 pub mod terrain;
 pub mod tire;
+pub mod wheel;
 pub mod transform;
 pub mod vm;
 pub mod wash;

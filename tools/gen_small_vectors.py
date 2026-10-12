@@ -15,11 +15,11 @@ from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_XMM0  # noqa: E402
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
 
 EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-ADDRESS = {'ceiling': 0x1411dd610, 'lever': 0x1411b0a30, 'pilot': 0x1411d9d80, 'wave': 0x1408bd9d0}[KIND]
+ADDRESS = {'ceiling': 0x1411dd610, 'lever': 0x1411b0a30, 'pilot': 0x1411d9d80, 'wave': 0x1408bd9d0, 'caster': 0x141240d40, 'servo': 0x1410c9620}[KIND]
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x1411dd000, 0x1411de000), (0x1411b0000, 0x1411b1000), (0x1411d9000, 0x1411da000)])
+    case = VmCase(EXE, SEED, [(0x1411dd000, 0x1411de000), (0x1411b0000, 0x1411b1000), (0x1411d9000, 0x1411da000), (0x141240000, 0x141241000), (0x1410c9000, 0x1410ca000), (0x140c44000, 0x140c45000)])
     rng = case.rng
     print(f'# small vectors {KIND} (tools/gen_small_vectors.py)')
     done = 0
@@ -28,7 +28,7 @@ def main():
         fz = case.fz
         F = case.region('F', 0x7000)
         B = case.region('B', 0x6700)
-        sp = entry_rsp(0)
+        sp = entry_rsp(3 if KIND == 'servo' else 0)
         fz.region('S', sp - 0x800, 0x900)
         fz.preset('S', 0x800, RET_ADDR & 0xffffffff, record=False)
         fz.preset('S', 0x804, RET_ADDR >> 32, record=False)
@@ -59,6 +59,35 @@ def main():
             for off in (0xb74, 0x928, 0xb70, 0xb64, 0xb08, 0xb24):
                 fz.preset_f32('B', off, rng.uniform(-3, 3))
             run = (B, n)
+        elif KIND == 'caster':
+            G = case.region('G', 0x88 * 3)
+            put('B', 0x6080, G)
+            for k in range(3):
+                fz.preset('G', 0x88 * k, rng.choice([0, 1, 2, 3, 3, 3]))
+                fz.preset('G', 0x88 * k + 0xc, rng.choice([0, 0, 1]))
+                for off in (0x50, 0x54):
+                    fz.preset_f32('G', 0x88 * k + off, rng.choice([0.0, 0.01, 0.0100001, 0.5, 0.5, 0.3]))
+                fz.preset_f32('G', 0x88 * k + 0x7c, rng.choice([0.0, -0.0, 0.3, -0.3, -0.3, 0.3, 0.3]))
+            fz.preset('F', 0x214, rng.choice([0, 0, 0, 0, 0, 1]))
+            fz.preset('F', 0x204, rng.choice([0, 1]))
+            fz.preset_f32('F', 0x210, rng.choice([0.0, 0.5, 0.4999, 0.8]))
+            run = (F, n)
+        elif KIND == 'servo':
+            ST = case.region('ST', 0x10)
+            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.05, 0.2, rng.uniform(0, 0.5)])))
+            fz.preset_f32('ST', 0, rng.uniform(-3, 3))
+            f32 = lambda v: struct.unpack('<f', struct.pack('<f', v))[0]
+            bit = lambda v: struct.unpack('<I', struct.pack('<f', v))[0]
+            a, k, b = f32(rng.uniform(-3, 3)), f32(rng.choice([rng.uniform(0.2, 5), -rng.uniform(0.2, 5)])), f32(rng.uniform(-3, 3))
+            lo = f32(rng.uniform(-2, 0))
+            hi = f32(rng.choice([lo, rng.uniform(-1, 2)]))
+            free = rng.choice([0, 0, 1])
+            stack = [bit(lo), bit(hi), free]
+            for j, value in enumerate(stack):
+                off = 0x800 + 0x28 + 8 * j
+                fz.preset('S', off, value)
+                fz.preset('S', off + 4, 0)
+            run = (a, k, ST, b, lo, hi, free, stack)
         elif KIND == 'wave':
             fz.region('NZ', 0x14578f1f0, 0x100000)
             x = rng.choice([rng.uniform(-3, 3), rng.uniform(-300, 300), rng.uniform(0, 5)])
@@ -91,18 +120,23 @@ def main():
             fz.preset('F', 0x67fc, rng.choice([0, 1]))
             run = (F, 0)
         try:
-            if KIND == 'wave':
+            if KIND == 'servo':
+                case.run(ADDRESS, ints=[0, 0, run[2], 0], floats=[run[0], run[1], 0.0, run[3]], stack=run[7], max_instructions=200000)
+            elif KIND == 'wave':
                 case.run(ADDRESS, ints=[0, run[1], 0, 0], floats=[struct.unpack('<f', struct.pack('<I', run[0]))[0]], max_instructions=200000)
             else:
                 case.run(ADDRESS, ints=[run[0], run[1], 0, 0], max_instructions=200000)
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        if KIND == 'pilot':
+        if KIND in ('pilot', 'caster'):
             result = case.emu.reg(UC_X86_REG_RAX) & 0xff
         else:
             result = case.emu.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff
-        text = case.dump(f'{run[0]:x} {run[1]:x} {result:x}')
+        if KIND == 'servo':
+            text = case.dump(' '.join(f'{x:x}' for x in (bit(run[0]), bit(run[1]), run[2], bit(run[3]), bit(run[4]), bit(run[5]), run[6], result)))
+        else:
+            text = case.dump(f'{run[0]:x} {run[1]:x} {result:x}')
         lines = text.split('\n')
         lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not sp - 0x800 <= int(t.split('=')[0], 16) < sp + 0x100)
         print('\n'.join(lines))

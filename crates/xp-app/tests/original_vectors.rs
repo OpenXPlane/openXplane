@@ -3733,6 +3733,45 @@ fn small_engine_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn wheel_helpers_match_the_original_machine_code() {
+    use openxplane::wheel::{caster_locked, servo};
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let cases = parse_vm_cases("small_caster.txt");
+    assert!(cases.len() >= 100);
+    let mut locked = 0;
+    for (n, case) in cases.into_iter().enumerate() {
+        let want = hex(&case.header[2]);
+        let got = caster_locked(&case.vm, hex(&case.header[0]), hex(&case.header[1]) as i32);
+        locked += usize::from(got);
+        assert_eq!(u64::from(got), want & 0xff, "caster case {n}");
+    }
+    assert!(locked >= 10);
+    let cases = parse_vm_cases("small_servo.txt");
+    assert!(cases.len() >= 100);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let f = |i: usize| f32::from_bits(hex(&h[i]) as u32);
+        let got = servo(
+            &mut case.vm,
+            &mut env,
+            f(0),
+            f(1),
+            hex(&h[2]),
+            f(3),
+            f(4),
+            f(5),
+            hex(&h[6]) as i32,
+        );
+        assert_eq!(u64::from(got.to_bits()), hex(&h[7]) & 0xffff_ffff, "servo case {n}");
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_exact(&case, n);
+    }
+}
+
+#[test]
 fn input_binding_matches_the_original_machine_code() {
     let cases = parse_vm_cases("binding.txt");
     assert!(cases.len() >= 200);

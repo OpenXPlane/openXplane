@@ -725,3 +725,19 @@ The flight state blocks (`flight_state`: gear targets, start sequence, ground pr
 `flight_state::gear_drag_and_brake` now sums the masses with `mass::weight_and_balance` natively (the gear-drag vectors were regenerated with the whole weight and balance chain in the emulator).
 
 The three strut call sites of the ground contact blocks (gear wheels, wing strips, body points) now call `strut::strut_contact` natively (the outputs of `wing_ground_probe`, `body_surface_probe` and `body_contact_loop` became `Result`); `weight_and_balance` answers its removed-item query with `binding::bound`. The vectors of `wcontact`, `wprobe`, `bsurf`, `bloop`, `gdrag`, the balance, tire and strut functions were regenerated with the whole chain in the emulator (mesh, tire, balance, vectors; the sound trigger and the vector growth are replayed). The wheel contact variant `0x1411c8690` and the blend contact `0x1411cb1e0` are still replayed.
+
+## Wheel model helpers
+
+Two callees of the wheel contact model `0x1411c8690`, ported natively in `wheel.rs` and checked against the
+original in the emulator (`tools/gen_small_vectors.py`, kinds `caster` and `servo`, 200 and 120 cases):
+
+- `0x141240d40(F, gear)` (`caster_locked`): false while `F+0x214` is set or the gear record
+  (`[B+0x6080] + 0x88 gear`) has kind <= 1; needs `+0x50 > 0.01`, `+0x54 > 0.01` or `+0xc` set; then true for a
+  negative `+0x7c` (unless `+0xc` is clear while `F+0x204` is set) and, for a positive `+0x7c`, when
+  `F+0x210 < 0.5`.
+- `0x1410c9620(a, k, &state, b, lo, hi, free)` (`servo`): value `a + (state - b) k / 0.025` limited to
+  `lo..hi`; the rate `a - value` (limited to the magnitude of the correction unless `free`) divided by `k` is
+  integrated into `state` over the frame time.
+
+Not yet ported: `0x141240fc0` (rotation from three angles through `0x140cb9900`), the wheel model body
+`0x1411c8690` and the blend contact `0x1411cb1e0`.

@@ -49,7 +49,7 @@ fn aircraft_object(vm: &Vm, index: i32) -> u64 {
         .wrapping_add((i64::from(index) * 0x433c0) as u64)
 }
 
-fn time(vm: &mut Vm, env: &mut dyn Callees) -> f64 {
+pub(crate) fn time(vm: &mut Vm, env: &mut dyn Callees) -> f64 {
     f64::from_bits(
         env.call(vm, 0x140c448c0, CallArgs::ints(&[TIME_SOURCE]))
             .xmm0,
