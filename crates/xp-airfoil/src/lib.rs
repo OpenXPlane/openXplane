@@ -23,6 +23,7 @@ pub mod forces;
 pub mod fuel;
 pub mod gear;
 pub mod input;
+pub mod limits;
 pub mod mass;
 pub mod matrix;
 pub mod piston;

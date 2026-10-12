@@ -3931,6 +3931,39 @@ fn gear_lever_matches_the_original_machine_code() {
 }
 
 #[test]
+fn engine_limit_queries_match_the_original_machine_code() {
+    use openxplane::limits::{blend_factor, engine_ratio, limit_a, limit_b};
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (name, kind) in [
+        ("small_ratio.txt", 0),
+        ("small_blend.txt", 1),
+        ("small_limita.txt", 2),
+        ("small_limitb.txt", 3),
+    ] {
+        let cases = parse_vm_cases(name);
+        assert!(cases.len() >= 100, "{name}");
+        for (n, mut case) in cases.into_iter().enumerate() {
+            let (base, arg, want) = (
+                hex(&case.header[0]),
+                hex(&case.header[1]) as u32 as i32,
+                hex(&case.header[2]),
+            );
+            let mut env = VmReplay {
+                calls: std::mem::take(&mut case.calls),
+            };
+            let got = match kind {
+                0 => u64::from(engine_ratio(&case.vm, base, arg).to_bits()),
+                1 => u64::from(blend_factor(&case.vm, base, arg).to_bits()),
+                2 => u64::from(limit_a(&mut case.vm, &mut env, base, arg).unwrap()),
+                _ => u64::from(limit_b(&mut case.vm, &mut env, base, arg).unwrap()),
+            };
+            assert_eq!(got, want, "{name} case {n}");
+            assert!(env.calls.is_empty(), "{name} case {n}: unused calls");
+        }
+    }
+}
+
+#[test]
 fn input_binding_matches_the_original_machine_code() {
     let cases = parse_vm_cases("binding.txt");
     assert!(cases.len() >= 200);

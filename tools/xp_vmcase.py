@@ -547,11 +547,24 @@ def setup_wheel_world(case, rng, F, B, gears=3, wheel_records=None):
     fz.preset_f32('F', 0x218, rng.choice([0.0, 0.0, 0.5]))
     fz.region('TD', 0x142f01910, 8)
     fz.preset_f64('TD', 0, rng.uniform(0, 1000))
-    ENG = case.region('ENG', 0x68)
+    setup_binding(case, rng, [0x88 + g for g in range(gears)])
+    return G, WRS
+
+
+def setup_binding(case, rng, idents, engines=3):
+    """Presets what the input-binding query 0x1407ace10 reads for the given idents (flight object `F`, aircraft
+    object `B`, the engine records, the static id tables) and stubs the replayed 0x14082be10."""
+    fz = case.fz
+
+    def put(name, off, v):
+        fz.preset(name, off, v & 0xffffffff)
+        fz.preset(name, off + 4, v >> 32)
+    ENG = case.region('ENG', 0x68 * engines)
     OBJ = case.region('OBJ', 0x40)
     ENGL = case.region('ENGL', 0x2cc)
     put('B', 0x5ff8, ENG)
-    fz.preset('ENG', 0, rng.choice([0, 1, 2, 3, 5]))
+    for e in range(engines):
+        fz.preset('ENG', 0x68 * e, rng.choice([0, 1, 2, 3, 5]))
     put('B', 0x1d18, rng.choice([0, OBJ]))
     put('F', 0x68b0, ENGL)
     fz.preset_f32('ENGL', 0x218, rng.choice([0.0, 0.3, 1.0, -0.5]))
@@ -565,8 +578,7 @@ def setup_wheel_world(case, rng, F, B, gears=3, wheel_records=None):
     fz.preset('B', 0xad8, rng.choice([-1, 0, 3, 12, 13, 40]) & 0xffffffff)
     fz.preset('B', 0xc90, rng.randrange(0, 8))
     fz.preset_f32('B', 0x1b7c, rng.choice([0.0, 0.5, 1.0, 0.2]))
-    for gear in range(gears):
-        ident = 0x88 + gear
+    for ident in idents:
         fz.preset('F', 0xdc0 + 4 * ident, rng.choice([0, 0, 0, 6, 1]))
         byte_at = 0x55f0 + ident
         fz.preset('F', byte_at & ~3, rng.choice([0, 0, 1]) << (8 * (byte_at & 3)), record=True)
@@ -579,7 +591,6 @@ def setup_wheel_world(case, rng, F, B, gears=3, wheel_records=None):
     fz.region('GT', 0x142f01918, 8)
     fz.preset_f64('GT', 0, rng.choice([0.0, 0.5, 0.9, -1.0]))
     case.stub(0x14082be10, lambda call, rng: call.ret_int(rng.choice([0, 1])))
-    return G, WRS
 
 
 def setup_blend_world(case, rng, F, B):
