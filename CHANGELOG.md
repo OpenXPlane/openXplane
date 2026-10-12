@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Delta-wing weight now evaluates tangent in double precision and rounds once to float32, correcting
+  a 3-ULP mismatch exposed by an expanded original-code corpus. New strict geometry checks compare
+  4062 cases / 8124 outputs bit for bit in debug and release on the tested macOS host.
+  [Evidence and limits](research/WING_GEOMETRY_EXACT.md).
+
 - Every engine kind of the reference build is ported and runs inside the engine controls: electric, carburetted and
   injected piston (the Cessna 172 SP), free and fixed turboprop, with the starter, the thrust term and the propeller
   power curve. The flight step is ported block by block: the wing and body loops, the airflow wash with the body

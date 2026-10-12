@@ -75,3 +75,11 @@ the 400 cases differ.
 - The emulator is not X-Plane: threading, the graphics driver and file access do not exist.
 - Random vectors can miss rare edge cases; the cases deliberately include exact grid corners, zero bounds and
   the wrap boundaries but are not exhaustive.
+
+## Additional exact geometry corpus (2026-10-12)
+
+The existing 1500-case geometry test permits an ULP tolerance. A new, independent 4062-case
+fixture requires bit equality for both helpers and exposed a 3-ULP delta-wing weight error.
+Rounding a double tangent to float32 corrects that case on the tested macOS host; the new test
+passes in debug/release. [WING_GEOMETRY_EXACT.md](WING_GEOMETRY_EXACT.md) records evidence,
+reproduction and the remaining cross-platform transcendental limitations.

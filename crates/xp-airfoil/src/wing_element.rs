@@ -348,7 +348,11 @@ pub fn delta_wing_weight(b: &Boundary, i: usize, field_18: f32, field_1c: f32) -
     let s = sweep_degrees(b, i);
     let abs = s.abs();
     let limited = if 15.0 > abs { 15.0 } else { 75.0f32.min(abs) };
-    let tangent = (limited * RADIANS_PER_DEGREE).tan();
+    // The original tanf result matches double evaluation rounded to f32 in
+    // the original-code corpus; a platform f32 tan can differ by one ulp,
+    // which is amplified by the following ratio.
+    let radians = limited * RADIANS_PER_DEGREE;
+    let tangent = f64::from(radians).tan() as f32;
     let c = (4.0f64 / f64::from(tangent)) as f32;
 
     let ramp = clamp01_low_high((sweep_degrees(b, i) - 40.0) * 0.1 + 0.0);
