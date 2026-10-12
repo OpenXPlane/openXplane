@@ -70,6 +70,34 @@ impl NoiseTable {
         (f64::from(low + high) * 2.0 - 1.0) as f32
     }
 
+    /// Table-backed equivalent of `engine_small::wave_noise`, without a virtual-memory adapter.
+    pub fn fractal1(&self, x: f32, seed: i32) -> Result<f32, String> {
+        let base = (seed as u32).wrapping_mul(100);
+        let sample = |scale: f64| {
+            let a = ((f64::from(x) * scale) as f32).abs();
+            if !a.is_finite() || a >= 4294967296.0 {
+                return Err("noise coordinate outside supported domain".to_string());
+            }
+            let i = a as u32;
+            let fraction = a - i as f32;
+            let at = |offset: u32| {
+                self.values[(base.wrapping_add(i).wrapping_add(offset) & 0x3ffff) as usize]
+            };
+            let value = (1.0 - fraction) * at(0) + at(1) * fraction;
+            Ok((f64::from(value) * 2.0 - 1.0) as f32)
+        };
+        let mut result = f64::from(sample(2.0)?) * 0.5;
+        result += f64::from(sample(1.0)?);
+        for (scale, weight) in [(4.0, 0.25), (8.0, 0.125), (16.0, 0.0625), (32.0, 0.03125)] {
+            result += f64::from(sample(scale)?) * weight;
+        }
+        let result = result as f32;
+        if !result.is_finite() {
+            return Err("non-finite noise result".into());
+        }
+        Ok(result)
+    }
+
     /// `0x1411e1940`: six two-dimensional octaves, accumulated in double precision.
     /// Coordinates outside the diagnostic domain are rejected before table lookup.
     pub fn fractal2(&self, x: f32, y: f32, seed: i32) -> Result<f32, String> {

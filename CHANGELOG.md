@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Ported the complete delta-wing target coefficient construction, including both
+  noise factors and their intermediate rounding. All 7584 coefficient words match
+  original-code replay with recorded CRT results; platform trigonometry is checked
+  separately. [Evidence and limits](research/DELTA_WING_TARGET.md).
+
 - Ported the six-octave two-dimensional noise used by delta-wing modulation;
   1756 original-code cases compare exactly with an explicit synthetic table.
   [Evidence and limits](research/NOISE2_EXACT.md).

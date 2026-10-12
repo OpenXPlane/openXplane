@@ -397,9 +397,149 @@ pub fn delta_parameters(sweep_deg: f32) -> DeltaParameters {
     }
 }
 
+/// Operands of the delta coefficient construction, after angle wrapping and ice scaling.
+#[derive(Debug, Clone, Copy)]
+pub struct DeltaInputs {
+    pub alpha_deg: f32,
+    /// Quarter-chord sweep plus `Flow+0x408 * Wing.is_right`.
+    pub sweep_deg: f32,
+    pub v: f32,
+    pub lift_scale: f32,
+    /// Thickness evaluated at the element midpoint by `0x14121bfd0`.
+    pub thickness: f32,
+    pub extra: [f32; 3],
+    pub x: f32,
+    pub z: f32,
+    pub span: f32,
+    pub z_reference: f32,
+    pub running_time_seconds: f64,
+}
+
+/// Original CRT results can be supplied for deterministic replay across platforms.
+#[derive(Debug, Clone, Copy)]
+pub struct DeltaTrig {
+    pub cos_alpha: f32,
+    pub sin_abs_alpha: f32,
+}
+
+pub fn delta_coefficients(
+    input: &DeltaInputs,
+    noise: &crate::buffet::NoiseTable,
+) -> Result<[f32; 4], String> {
+    delta_coefficients_with_trig(
+        input,
+        noise,
+        DeltaTrig {
+            cos_alpha: (input.alpha_deg * RADIANS_PER_DEGREE).cos(),
+            sin_abs_alpha: (input.alpha_deg.abs() * RADIANS_PER_DEGREE).sin(),
+        },
+    )
+}
+
+/// `0x1411b7efa..0x1411b8779`, with explicit runtime table, clock and CRT results.
+pub fn delta_coefficients_with_trig(
+    input: &DeltaInputs,
+    noise: &crate::buffet::NoiseTable,
+    trig: DeltaTrig,
+) -> Result<[f32; 4], String> {
+    let i = input;
+    if ![
+        i.alpha_deg,
+        i.sweep_deg,
+        i.v,
+        i.lift_scale,
+        i.thickness,
+        i.extra[0],
+        i.extra[1],
+        i.extra[2],
+        i.x,
+        i.z,
+        i.span,
+        i.z_reference,
+        trig.cos_alpha,
+        trig.sin_abs_alpha,
+    ]
+    .iter()
+    .all(|v| v.is_finite())
+        || !i.running_time_seconds.is_finite()
+        || i.v <= 0.0
+        || i.span <= 0.0
+    {
+        return Err("invalid delta-wing operand".into());
+    }
+    let p = delta_parameters(i.sweep_deg);
+    let sign = if 0.0 > i.alpha_deg { -1.0 } else { 1.0 };
+    let abs_alpha = i.alpha_deg.abs();
+    let signed_peak = sign * p.peak_lift;
+    let endpoint60 = (f64::from(sign) * 0.25) as f32;
+    let curve = |a0: f32, v0: f32, a1: f32, v1: f32, exponent: f64| {
+        let raw = (1.0 / (a1 - a0)) * (abs_alpha - a0) + 0.0;
+        let position = if 0.0 > raw { 0.0 } else { sse_min(1.0, raw) };
+        let power = if position > 0.0 {
+            f64::from(position).powf(exponent) as f32
+        } else {
+            0.0
+        };
+        (v1 - v0) * (power - 0.0) + v0
+    };
+    let mut cl = curve(
+        0.0,
+        p.lift_slope * i.alpha_deg,
+        p.peak_alpha_deg,
+        signed_peak,
+        2.0,
+    );
+    if abs_alpha > p.peak_alpha_deg {
+        cl = curve(p.peak_alpha_deg, signed_peak, 60.0, endpoint60, 0.25);
+    }
+    if abs_alpha > 60.0 {
+        cl = interpolate_clamped(60.0, endpoint60, 90.0, sign * trig.cos_alpha, abs_alpha);
+    }
+    let mut cm = (f64::from(-cl) * 0.15) as f32;
+    let baseline_drag = (f64::from(i.thickness) * 0.1) as f32;
+    let peak_drag =
+        (f64::from(cl * cl) * 1.5 / f64::from(i.v * PI) + f64::from(baseline_drag)) as f32;
+    let mut cd = interpolate_clamped(
+        p.peak_alpha_deg,
+        peak_drag,
+        90.0,
+        trig.sin_abs_alpha,
+        abs_alpha,
+    );
+    cl += i.lift_scale * i.extra[0];
+    cd += i.extra[1];
+    cm += i.extra[2];
+    let ratio = abs_alpha / p.peak_alpha_deg;
+    let half = ratio - 0.5;
+    let activation = clamp_zero_one((half + half) + 0.0);
+    let y = (f64::from(i.x - i.span) * 4.0 / f64::from(i.span)) as f32;
+    let seed2 = (f64::from(i.z - i.z_reference) * 4.0 / f64::from(i.span)) as f32;
+    let seed1 = i.x.abs() / i.span;
+    let convert_seed = |value: f32| -> Result<i32, String> {
+        if !value.is_finite() || !(-2147483648.0..2147483648.0).contains(&value) {
+            return Err("delta noise seed outside supported domain".into());
+        }
+        Ok(value as i32)
+    };
+    let n2 = noise.fractal2(
+        (i.running_time_seconds * 4.0) as f32,
+        y,
+        convert_seed(seed2)?,
+    )?;
+    let n1 = noise.fractal1(i.running_time_seconds as f32, convert_seed(seed1)?)?;
+    let factor2 = f64::from(n2) * (f64::from(activation) * 0.1) + 1.0;
+    let factor1 = f64::from(n1) * (f64::from(activation) * 0.5) + 1.0;
+    cl = (factor2 * f64::from((factor1 * f64::from(cl)) as f32)) as f32;
+    let result = [cl, cd, cm, ratio];
+    if result.iter().any(|v| !v.is_finite()) {
+        return Err("non-finite delta-wing coefficient".into());
+    }
+    Ok(result)
+}
+
 /// Final delta-wing coefficient blend (`0x1411b8779..0x1411b885a`).
 /// Inputs are the coefficients computed by the earlier straight/delta branches.
-/// This does not supply the unported delta noise/trigonometric inputs.
+/// Use `delta_coefficients` to construct the delta inputs with explicit runtime state.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DeltaBlend {
     pub cl: f32,

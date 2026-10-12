@@ -110,3 +110,9 @@ platform powf mismatches. The intermediate delta coefficient/noise construction 
 
 See [NOISE2_EXACT.md](NOISE2_EXACT.md): 1756 original-code cases compare
 `NoiseTable::fractal2` bit for bit with a reproducible synthetic table and no stubs.
+
+## Delta-wing target construction
+
+See [DELTA_WING_TARGET.md](DELTA_WING_TARGET.md): 1896 full-range original-code
+cases without stubs; 7584 coefficient words exact with recorded CRT endpoints.
+Platform trigonometry is tested separately with a documented absolute tolerance.
