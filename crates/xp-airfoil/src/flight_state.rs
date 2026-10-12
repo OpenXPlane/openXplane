@@ -2489,7 +2489,7 @@ pub fn late_tail(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> Result<(), Strin
 const DRAG_FRAME: u64 = 0x7e00_0000_0000;
 
 /// `0x14119e5b0(F, x, y, z, drag)`: the drag `drag` applied as a plug-in force at the body point `(x, y, z)`. The
-/// point is transformed by `0x1407ac020` (replayed) and probed against the terrain with `terrain::probe` (`0x141960dc0`; their
+/// point is transformed by `0x1407ac020` (`to_world`) and probed against the terrain with `terrain::probe` (`0x141960dc0`; their
 /// results are floats in a local frame, `DRAG_FRAME + 0x40..0x4c` for the point and `+0x50`, `+0x60` for the probe's
 /// results). When the probe answers true and its value `+0x54` is above the point's `+0x44`, the point's wind-axis
 /// offset is formed with the matrices at `F+0x3cc` and `F+0x430/0x440/0x450`, turned into the force
@@ -2506,16 +2506,10 @@ pub fn point_drag(
     for offset in [0x40, 0x44, 0x48, 0x50, 0x54, 0x58, 0x60, 0x64, 0x68] {
         vm.set_u32(frame + offset, 0);
     }
-    let mut args = CallArgs::ints(&[f]);
-    args.int[2] = Some(frame + 0x40);
-    args.xmm = [
-        None,
-        Some(x.to_bits()),
-        Some(y.to_bits()),
-        Some(y.to_bits()),
-    ];
-    args.stack = [None, Some(u64::from(z.to_bits())), None, Some(1)];
-    env.call(vm, 0x1407ac020, args);
+    let world = to_world(vm, env, f, [x, y, z]);
+    for (k, v) in world.into_iter().enumerate() {
+        vm.set_f32(frame + 0x40 + 4 * k as u64, v);
+    }
     // the global at `0x1461179f8` is the grid object `0x141945c90` returns
     let grid = vm.u64(0x1461_179f8);
     let hit = crate::terrain::probe(

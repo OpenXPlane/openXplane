@@ -24,12 +24,7 @@ def main():
     case = VmCase(EXE, SEED, [(0x14119e000, 0x14119f000), (0x1408e0000, 0x1408e4000), (0x140c40000, 0x140c50000)])
     rng = case.rng
 
-    def transform(call, rng):
-        # 0x1407ac020 writes the point to r8 (x), stack arg 5 (y) and stack arg 7 (z)
-        for address in (call.ints[2], call.stack[0], call.stack[2]):
-            call.put_f32(address, rng.choice([0.0, rng.uniform(-10, 10)]))
-
-    case.stub(0x1407ac020, transform)
+    case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.randrange(2)))
     stub_terrain_helpers(case)
     case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0.0, 0.1)))
     case.stub(0x1408e25a0, lambda call, rng: None, record=False)

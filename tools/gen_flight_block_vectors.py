@@ -35,12 +35,6 @@ RECORDING_ID = 0x142f2e3dc
 
 def stub_point_drag(case):
     """The callees of 0x14119e5b0 (the drag of a gear point): the point transform and the terrain probe."""
-    def transform(call, rng):
-        for address in (call.ints[2], call.stack[0], call.stack[2]):
-            call.put_f32(address, rng.choice([0.0, rng.uniform(-10, 10)]))
-
-    inside = (0x14119e5b0, 0x14119e960)
-    case.stub(0x1407ac020, transform, caller=inside)
     stub_terrain_helpers(case)
     case.stub(0x1408e25a0, lambda call, rng: None, record=False)
 
