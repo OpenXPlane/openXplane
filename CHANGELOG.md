@@ -19,6 +19,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
   machine code in an emulator. The terrain mesh probes (vertical ray and segment with moving cells and surface
   roughness), the strut and tire contact, the weight and balance sums and the input binding query are ported too,
   and the contact blocks now run them natively instead of replaying them.
+  The wheel contact model and the body surface blend contact are ported whole, together with the wind sampler
+  (rotating gust, two turbulence scales, storm cell), the grid terrain height, the gear lever step and the engine
+  ratio, blend and limit queries; the engine controls now run the engine update of the jet and rocket kinds and apply
+  its thrust force to the flight object. Running the update on whole objects fixed the power input of one engine
+  term.
 
 ![Takeoff from Seattle-Tacoma with the approximate flight model](site/assets/anim/takeoff.gif)
 
