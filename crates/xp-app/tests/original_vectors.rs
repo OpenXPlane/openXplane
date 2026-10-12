@@ -3948,6 +3948,37 @@ fn flight_init_matches_the_original_machine_code() {
 }
 
 #[test]
+fn init_callees_match_the_original_machine_code() {
+    use openxplane::flight_init::{clear_arrays, reset_balance_state, reset_flags, throttle_step};
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for kind in ["throttle", "resetb", "flags", "clear"] {
+        let cases = parse_vm_cases(&format!("init_{kind}.txt"));
+        assert!(cases.len() >= 100, "{kind}");
+        for (n, mut case) in cases.into_iter().enumerate() {
+            let mut env = VmReplay {
+                calls: std::mem::take(&mut case.calls),
+            };
+            let h: Vec<u64> = case.header.iter().map(|t| hex(t)).collect();
+            match kind {
+                "throttle" => throttle_step(
+                    &mut case.vm,
+                    &mut env,
+                    h[0],
+                    h[1] as i32,
+                    f32::from_bits(h[2] as u32),
+                    f32::from_bits(h[3] as u32),
+                ),
+                "resetb" => reset_balance_state(&mut case.vm, &mut env, h[0]),
+                "flags" => reset_flags(&mut case.vm, &mut env, h[0], h[1] as u32),
+                _ => clear_arrays(&mut case.vm, h[0]),
+            }
+            assert!(env.calls.is_empty(), "{kind} case {n}: unused calls");
+            words_match_exact(&case, n);
+        }
+    }
+}
+
+#[test]
 fn engine_limit_queries_match_the_original_machine_code() {
     use openxplane::limits::{blend_factor, engine_ratio, limit_a, limit_b};
     let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();

@@ -5,6 +5,8 @@
 use crate::vm::{CallArgs, Callees, Vm};
 
 const TABLE: u64 = 0x1_4612_43b0;
+/// The locals of the original whose addresses go to callees.
+const SCRATCH: u64 = 0x7e00_0800_0000;
 const INDEX: u64 = 0x1_4265_52ac;
 const FLAG_ARG: u64 = 0x1_424f_5648;
 const METRES_TO_FEET: f32 = f32::from_bits(0x4051_f948);
@@ -22,11 +24,7 @@ const ONE: u32 = 0x3f80_0000;
 pub fn flight_init(vm: &mut Vm, env: &mut dyn Callees, ctx: u64, scale: f32) -> Result<(), String> {
     let fo = |vm: &Vm| vm.u64(ctx);
     let bo = |vm: &Vm| vm.u64(ctx + 8);
-    let lookup = |vm: &mut Vm, env: &mut dyn Callees| {
-        let index = u64::from(vm.u32(INDEX));
-        env.call(vm, 0x141a64250, CallArgs::ints(&[TABLE, index]))
-            .rax
-    };
+    let lookup = |vm: &mut Vm, _env: &mut dyn Callees| flight_object(vm, vm.i32(INDEX));
 
     let f = fo(vm);
     vm.set_i32(f + 0xdac, 0);
@@ -37,12 +35,12 @@ pub fn flight_init(vm: &mut Vm, env: &mut dyn Callees, ctx: u64, scale: f32) -> 
     }
     let object = vm.u64(f + 0x42f98);
     if object != 0 {
-        env.call(vm, 0x14087e590, CallArgs::ints(&[object]));
+        clear_arrays(vm, object);
     }
     let f = fo(vm);
-    env.call(vm, 0x1411aedb0, CallArgs::ints(&[f]));
+    reset_flight_object(vm, f)?;
     let f = fo(vm);
-    env.call(vm, 0x1411dd2c0, CallArgs::ints(&[f + 0xb580]));
+    reset_balance_state(vm, env, f + 0xb580);
     for (offset, value) in [(0xb0, 0), (0xb4, 2), (0xb8, 2), (0xd8, 0), (0xd4, 0)] {
         let f = fo(vm);
         vm.set_i32(f + offset, value);
@@ -101,7 +99,7 @@ pub fn flight_init(vm: &mut Vm, env: &mut dyn Callees, ctx: u64, scale: f32) -> 
         let r = rec(vm);
         vm.set_i32(r + 0x208, i32::from(kind == 7));
         let f = fo(vm);
-        env.call(vm, 0x14122cbc0, CallArgs::ints(&[f, e as u64]));
+        throttle_step(vm, env, f, e, 0.0, 0.0);
         let r = rec(vm);
         vm.set_i32(r, 0);
         let r = rec(vm);
@@ -195,7 +193,7 @@ pub fn flight_init(vm: &mut Vm, env: &mut dyn Callees, ctx: u64, scale: f32) -> 
     }
 
     let f = fo(vm);
-    env.call(vm, 0x14121a690, CallArgs::ints(&[f + 0xbb30, 0]));
+    reset_flags(vm, env, f + 0xbb30, 0);
     let value = vm.u32(bo(vm) + 0x2924);
     let f = fo(vm);
     vm.set_u32(f + 0x6534, value);
@@ -416,11 +414,7 @@ pub fn flight_init(vm: &mut Vm, env: &mut dyn Callees, ctx: u64, scale: f32) -> 
     let f = fo(vm);
     if vm.i32(f + 0x28) == 0 {
         let handle = vm.u64(bo(vm) + 0x1d18);
-        let mut present = false;
-        if handle != 0 {
-            let r = env.call(vm, 0x14082be10, CallArgs::ints(&[handle, 2]));
-            present = r.rax != 0;
-        }
+        let present = handle != 0 && handle_slot(vm, handle, 2)? != 0;
         let words: [(u64, u32); 8] = [
             (0xaf38, 1),
             (0xaf30, 0),
@@ -596,4 +590,367 @@ pub fn flight_init(vm: &mut Vm, env: &mut dyn Callees, ctx: u64, scale: f32) -> 
         vm.set_i32(f + offset, 0);
     }
     Ok(())
+}
+
+/// `0x141a64250(table, index)`: the flight object `index`, at `[table] + index * 0x433c0` (the table of flight
+/// objects is at `0x1461243b0`).
+pub fn flight_object(vm: &Vm, index: i32) -> u64 {
+    vm.u64(TABLE)
+        .wrapping_add((i64::from(index) * 0x433c0) as u64)
+}
+
+/// `0x14082be10(handle, index)`: the pointer in slot `index` (`0..2`) at `handle + 0xe8`; a larger index is the
+/// original's fatal-error call (an `Err` here).
+pub fn handle_slot(vm: &Vm, handle: u64, index: i32) -> Result<u64, String> {
+    if index >= 3 {
+        return Err("handle slot index out of range".into());
+    }
+    Ok(vm.u64(handle.wrapping_add((0xe8 + 8 * i64::from(index)) as u64)))
+}
+
+/// `0x14087e590(object)`: zeroes the three float arrays `[object+0x10]`, `[object+0x18]`, `[object+0x20]` for as
+/// many entries as the vector `[[object]+0x58] .. [[object]+0x60]` of 0x180-byte elements holds (the original's
+/// vectorised `memset` calls and its scalar tail amount to the same words).
+pub fn clear_arrays(vm: &mut Vm, object: u64) {
+    let owner = vm.u64(object);
+    let span = vm.u64(owner + 0x60).wrapping_sub(vm.u64(owner + 0x58)) as i64;
+    let count = (span / 0x180) as i32;
+    for i in 0..i64::from(count.max(0)) {
+        for array in [0x10, 0x18, 0x20] {
+            let base = vm.u64(object + array);
+            vm.set_u32(base.wrapping_add((4 * i) as u64), 0);
+        }
+    }
+}
+
+/// `0x14122cbc0(F, engine, a, b)`: the throttle state `E+0` / the lever position `E+0x280` of an engine record
+/// (`[F+0x68b0] + 0x2cc engine`) stepped by the input `a` and the delta `b`. With both zero both are cleared; modes
+/// 2 and 3 of the record (`+0x298`) with `B+0xa90` set go on to `0x14122c470` (replayed); mode 2 integrates the
+/// lever `E+0x280 += b` held to `0..1`; otherwise `E+0 = max(0, min(x, 1))` of `a + b`, where with `B+0xae4 == 3`
+/// and `a > 0.05` the upper end is the held `0.0505` rather than `x` when `x < 0.0505`.
+pub fn throttle_step(vm: &mut Vm, env: &mut dyn Callees, f: u64, engine: i32, a: f32, b: f32) {
+    let record = |vm: &Vm| {
+        vm.u64(f + 0x68b0)
+            .wrapping_add((i64::from(engine) * 0x2cc) as u64)
+    };
+    if a == 0.0 && b == 0.0 {
+        let r = record(vm);
+        vm.set_u32(r + 0x280, 0);
+        vm.set_u32(r, 0);
+        return;
+    }
+    let aircraft = vm.u64(f + 0x20);
+    if vm.i32(aircraft + 0xa90) != 0 {
+        let mode = vm.i32(record(vm) + 0x298);
+        if mode == 2 || mode == 3 {
+            let mut args = CallArgs::ints(&[f, engine as u32 as u64]);
+            args.xmm[2] = Some(a.to_bits());
+            args.xmm[3] = Some(b.to_bits());
+            env.call(vm, 0x14122c470, args);
+            return;
+        }
+    }
+    let r = record(vm);
+    if vm.i32(r + 0x298) == 2 {
+        let x = b + vm.f32(r + 0x280);
+        vm.set_f32(r + 0x280, crate::scalar::clamp(x, 0.0, 1.0));
+        return;
+    }
+    let x = a + b;
+    let top = if vm.i32(aircraft + 0xae4) == 3 && a > 0.05 && f32::from_bits(0x3d4e_d917) > x {
+        f32::from_bits(0x3d4e_d917)
+    } else if 1.0 < x {
+        1.0
+    } else {
+        x
+    };
+    let v = if 0.0 > top { 0.0 } else { top };
+    vm.set_f32(r, v);
+}
+
+/// `0x1411dd2c0(this)`: resets the weight-and-balance state object at `F+0xb580` (`[this]` is `F`, `[this+8]`
+/// is `B`): the counters, the per-engine and per-part arrays (`B+0x91c`, `B+0x920` entries), the engine records'
+/// `+0x2b4`, the entries of the vector `[B+0x60e0] .. [B+0x60e8]` (0x120 bytes; their pointer at `+0x118` is
+/// released by `0x140b0c6d0`, replayed) and the two values of `B+0x225c` and `B+0x2260`.
+pub fn reset_balance_state(vm: &mut Vm, env: &mut dyn Callees, this: u64) {
+    vm.set_u64(this + 0x10, 1);
+    for (offset, wide) in [
+        (0x18, true),
+        (0x20, true),
+        (0x28, true),
+        (0x38, false),
+        (0x44, true),
+        (0x50, true),
+        (0x30, true),
+        (0x3c, false),
+        (0x40, false),
+        (0x4c, false),
+        (0x58, true),
+        (0x60, true),
+        (0x2cc, true),
+        (0x8c, true),
+        (0x68, true),
+        (0x94, true),
+        (0x9c, true),
+        (0x2d4, true),
+        (0xc4, true),
+        (0xa4, true),
+        (0x70, true),
+        (0xac, true),
+        (0x2a8, true),
+        (0x78, false),
+    ] {
+        match (offset, wide) {
+            (0x38 | 0x3c | 0x40, _) => vm.set_u32(this + offset, 1),
+            (_, true) => vm.set_u64(this + offset, 0),
+            (_, false) => vm.set_u32(this + offset, 0),
+        }
+    }
+    let b = vm.u64(this + 8);
+    vm.set_u8(this + 0x2bd, 0);
+    vm.set_u32(this + 0x2c0, 0);
+    if vm.i32(b + 0x91c) > 0 {
+        let mut k = 0u64;
+        loop {
+            vm.set_u32(this + 0xcc + 4 * k, 0);
+            vm.set_u32(this + 0x10c + 4 * k, 0);
+            vm.set_u32(this + 0x2dc + 4 * k, 0);
+            k += 1;
+            if k as i64 >= i64::from(vm.i32(vm.u64(this + 8) + 0x91c)) {
+                break;
+            }
+        }
+    }
+    if vm.i32(b + 0x920) > 0 {
+        let mut k = 0u64;
+        loop {
+            vm.set_u32(this + 0x14c + 4 * k, 0);
+            vm.set_u32(this + 0x18c + 4 * k, 0);
+            k += 1;
+            if k as i64 >= i64::from(vm.i32(vm.u64(this + 8) + 0x920)) {
+                break;
+            }
+        }
+    }
+    for offset in [
+        0x1cc, 0x1d4, 0x1dc, 0x1e4, 0x1f4, 0x200, 0x20c, 0x1ec, 0x214, 0x21c,
+    ] {
+        vm.set_u64(this + offset, 0);
+    }
+    vm.set_u32(this + 0x1fc, 0);
+    vm.set_u32(this + 0x208, 0);
+    vm.set_u32(this + 0x224, 0);
+    if vm.i32(b + 0x91c) > 0 {
+        let mut k = 0u64;
+        loop {
+            vm.set_u32(this + 0x228 + 4 * k, 0);
+            let r = vm.u64(vm.u64(this) + 0x68b0);
+            vm.set_u32(r + 0x2cc * k + 0x2b4, 0);
+            k += 1;
+            if k as i64 >= i64::from(vm.i32(vm.u64(this + 8) + 0x91c)) {
+                break;
+            }
+        }
+    }
+    if vm.i32(b + 0x920) > 0 {
+        let mut k = 0u64;
+        loop {
+            vm.set_u32(this + 0x268 + 4 * k, 0);
+            k += 1;
+            if k as i64 >= i64::from(vm.i32(vm.u64(this + 8) + 0x920)) {
+                break;
+            }
+        }
+    }
+    let (end, mut entry) = (vm.u64(b + 0x60e8), vm.u64(b + 0x60e0));
+    if entry != end {
+        loop {
+            let pointer = vm.u64(entry + 0x118);
+            if pointer != 0 {
+                env.call(vm, 0x140b0c6d0, CallArgs::ints(&[pointer]));
+            }
+            entry = entry.wrapping_add(0x120);
+            if entry == end {
+                break;
+            }
+        }
+    }
+    let b = vm.u64(this + 8);
+    for offset in [0x7c, 0xb4, 0x84, 0xbc, 0x2b0] {
+        vm.set_u64(this + offset, 0);
+    }
+    let v = vm.u32(b + 0x225c);
+    vm.set_u32(this + 0x2b8, v);
+    vm.set_u8(this + 0x2bc, u8::from(vm.f32(b + 0x225c) >= 30.0));
+    let w = vm.u32(b + 0x2260);
+    vm.set_u32(this + 0x2c8, 0);
+    vm.set_u32(this + 0x2c4, w);
+}
+
+/// `0x14121a690(this, flag)`: resets the control-state object at `F+0xbb30`: the sum `+0x54` of the nine
+/// `0x141a6ba30` values times `B+0x3f7c..` (replayed), the nine ones at `+0x60..0x80`, the modes `+0x168/+0x16c`
+/// (1 or 3 by the input binding queries `0x14123d190`, replayed, the slots' signs `+0x4c` and `B+0x1cb4`,
+/// `B+0x1cc0/0x1cc4` and the six words `B+0x1cc8..`), the flag `+0x17c/+0x180` (`flag` unless `B+0x28a4 > 0.1`),
+/// the sum `+0x160` of `+0x84..+0xa4` and the engine records' `+0x1d4`.
+pub fn reset_flags(vm: &mut Vm, env: &mut dyn Callees, this: u64, flag: u32) {
+    vm.set_u32(this + 0x54, 0);
+    let mut b = vm.u64(this + 8);
+    for i in 0..9u64 {
+        vm.set_u64(SCRATCH, 0);
+        vm.set_u32(SCRATCH + 8, 0);
+        env.call(vm, 0x141a6ba30, CallArgs::ints(&[b, i, SCRATCH]));
+        b = vm.u64(this + 8);
+        let product = vm.f32(SCRATCH + 8) * vm.f32(b + 0x3f7c + 4 * i);
+        let sum = product + vm.f32(this + 0x54);
+        vm.set_f32(this + 0x54, sum);
+    }
+    vm.set_u32(this + 0x178, 0);
+    vm.set_u64(this + 0x190, 0);
+    vm.set_u32(this + 0x15c, 0);
+    vm.set_u64(this + 0x188, 0);
+    vm.set_u32(this + 0x184, 0);
+    for k in 0..9 {
+        vm.set_u32(this + 0x60 + 4 * k, 1);
+    }
+    vm.set_u32(this + 0x16c, 4);
+    vm.set_u32(this + 0x168, 4);
+    let set = |vm: &mut Vm, a: u32, c: u32| {
+        vm.set_u32(this + 0x168, a);
+        vm.set_u32(this + 0x16c, c);
+    };
+    let no_four = |vm: &Vm, b: u64| (0..6).all(|k| vm.i32(b + 0x1cc8 + 4 * k) != 4);
+    if vm.i32(b + 0x1cc4) != 0 && vm.i32(b + 0x1cc0) == 0 {
+        vm.set_u32(this + 0x16c, 1);
+        vm.set_u32(this + 0x168, 1);
+    }
+    if no_four(vm, b) {
+        vm.set_u32(this + 0x16c, 1);
+        vm.set_u32(this + 0x168, 1);
+    }
+    let (mut negative, mut positive) = (false, false);
+    let slots = vm.i32(b + 0x91c);
+    if slots > 0 {
+        let items = vm.u64(b + 0x5ff8);
+        for k in 0..slots as u64 {
+            let v = vm.f32(items + 0x68 * k + 0x4c);
+            negative |= 0.0 > v;
+            positive |= v > 0.0;
+        }
+    }
+    let (mut first, mut third) = (false, false);
+    for i in 0..9u64 {
+        first |= env.call(vm, 0x14123d190, CallArgs::ints(&[this, i, 1])).rax as u32 != 0;
+        third |= env.call(vm, 0x14123d190, CallArgs::ints(&[this, i, 3])).rax as u32 != 0;
+    }
+    if negative && positive && first && third {
+        let b = vm.u64(this + 8);
+        if vm.i32(b + 0x1cc4) != 0 && vm.i32(b + 0x1cc0) == 0 {
+            set(vm, 1, 3);
+        }
+        if no_four(vm, b) {
+            set(vm, 1, 3);
+        }
+    }
+    let b = vm.u64(this + 8);
+    if vm.i32(b + 0x1cb4) != 0 {
+        set(vm, 1, 3);
+    }
+    vm.set_u64(this + 0x170, 0);
+    let on = !(0.1 <= f64::from(vm.f32(b + 0x28a4)) || vm.f32(b + 0x28a4).is_nan());
+    let value = if on { 1 } else { flag };
+    vm.set_u32(this + 0x17c, value);
+    vm.set_u32(this + 0x180, value);
+    vm.set_u32(this + 0x164, 0);
+    let mut sum = vm.f32(this + 0x84) + 0.0;
+    for k in 1..9 {
+        sum += vm.f32(this + 0x84 + 4 * k);
+    }
+    vm.set_f32(this + 0x160, sum);
+    if vm.i32(b + 0x91c) > 0 {
+        let mut k = 0u64;
+        loop {
+            let r = vm.u64(vm.u64(this) + 0x68b0);
+            vm.set_u32(r + 0x2cc * k + 0x1d4, 0);
+            k += 1;
+            if k as i64 >= i64::from(vm.i32(vm.u64(this + 8) + 0x91c)) {
+                break;
+            }
+        }
+    }
+}
+
+/// `0x140f5dd10(table)`: clears the flag `+0x50` and four runs of 500 words at `+0xff8`, `+0x5e18`, `+0x65e8`
+/// and `+0x6db8` (the table at `0x145783800`).
+pub fn clear_table(vm: &mut Vm, table: u64) {
+    vm.set_u8(table + 0x50, 0);
+    for k in 0..500u64 {
+        for offset in [0xff8, 0x5e18, 0x65e8, 0x6db8] {
+            vm.set_u32(table + offset + 4 * k, 0);
+        }
+    }
+}
+
+/// `0x1411aedb0(F)`: the first reset of a flight object: `F+0xbdb8` from `B+0xeb8` and `F+0xbdc4 = 1`; the words
+/// `+0x68` and `+0x60` of the ten gear animation entries (`[F+0x6958]`, 0x90 bytes; out of range is an `Err`);
+/// three 0.85 at `F+0xbe2c..`; the eight copies of `B+0x1b94` of the aircraft object `F+0x28` at `F+0x7a4..`; the
+/// four tables of 770 floats at `F+0xdc0` (0), `F+0x19c8` (60), `F+0x25d0` (5), `F+0x3de0` (120), `F+0x49e8`
+/// (100); and, on the primary object (`F+0x28 == 0`), the table `0x145783800`, the word `0x14576ce84`, the 16
+/// bytes `0x142fe84e8` and six groups of three `u64` of the flight object `0x1426552ac`.
+pub fn reset_flight_object(vm: &mut Vm, f: u64) -> Result<(), String> {
+    let b = vm.u64(f + 0x20);
+    let v = vm.u32(b + 0xeb8);
+    vm.set_u32(f + 0xbdb8, v);
+    vm.set_u32(f + 0xbdc4, 1);
+    let entry = |vm: &Vm, i: u64| -> Result<u64, String> {
+        let begin = vm.u64(f + 0x6958);
+        let count = (vm.u64(f + 0x6960).wrapping_sub(begin) as i64) / 0x90;
+        if count as u64 <= i {
+            return Err("gear animation index out of range".into());
+        }
+        Ok(begin + 0x90 * i)
+    };
+    for i in 0..10 {
+        let e = entry(vm, i)?;
+        vm.set_u32(e + 0x68, 0);
+    }
+    for i in 0..10 {
+        let e = entry(vm, i)?;
+        vm.set_u32(e + 0x60, 0);
+    }
+    for offset in [0xbe2c, 0xbe30, 0xbe34] {
+        vm.set_u32(f + offset, 0x3f59_999a);
+    }
+    for k in 0..8u64 {
+        let object = aircraft_by_index(vm, vm.i32(f + 0x28));
+        let v = vm.u32(object + 0x1b94);
+        vm.set_u32(f + 0x7a4 + 4 * k, v);
+    }
+    for k in 0..0x302u64 {
+        vm.set_u32(f + 0xdc0 + 4 * k, 0);
+        vm.set_u32(f + 0x19c8 + 4 * k, 0x4270_0000);
+        vm.set_u32(f + 0x25d0 + 4 * k, 0x40a0_0000);
+        vm.set_u32(f + 0x3de0 + 4 * k, 0x42f0_0000);
+        vm.set_u32(f + 0x49e8 + 4 * k, 0x42c8_0000);
+    }
+    vm.set_u64(f + 0x48, 0);
+    vm.set_u32(f + 0x50, 0);
+    if vm.i32(f + 0x28) == 0 {
+        clear_table(vm, 0x1_4578_3800);
+        vm.set_u32(0x1_4576_ce84, 0);
+        vm.set_u64(0x1_42fe_84e8, 0);
+        vm.set_u64(0x1_42fe_84f0, 0);
+        for group in [0x6b14u64, 0x6b34, 0x6b54, 0x6b74, 0x6b94, 0x6bb4] {
+            let t = flight_object(vm, vm.i32(INDEX));
+            vm.set_u64(t + group, 0);
+            vm.set_u64(t + group + 8, 0);
+            vm.set_u64(t + group + 16, 0);
+        }
+    }
+    Ok(())
+}
+
+/// `0x141a64260(table, index)`: the aircraft object `index`, at `[0x146124398] + index * 0x6668`.
+pub fn aircraft_by_index(vm: &Vm, index: i32) -> u64 {
+    vm.u64(0x1_4612_4398)
+        .wrapping_add((i64::from(index) * 0x6668) as u64)
 }

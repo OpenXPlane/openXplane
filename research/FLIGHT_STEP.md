@@ -853,3 +853,17 @@ the ten gear records has both `+0` and `+0xc` set; the ten gear animation entrie
 checked: out of range is the original's fatal-error call, an `Err` here) take `1.0`/`0.0` at `+0x10` and the
 retract/extend values at `+0x14/+0x18/+0x1c` from the gear records. Not established: the semantics of most of the
 flag fields (named only by offset) and the callees' own effects.
+
+### Callees of the initialisation (ported natively, vectors `tools/gen_init_callee_vectors.py`)
+
+`flight_init::flight_object` (`0x141a64250`: `[0x1461243b0] + index * 0x433c0`), `aircraft_by_index` (`0x141a64260`:
+`[0x146124398] + index * 0x6668`), `handle_slot` (`0x14082be10`: the pointer at `handle + 0xe8 + 8 index`, index
+below 3), `clear_arrays` (`0x14087e590`: zeroes three float arrays for `(end - begin) / 0x180` entries; the
+vectorised `memset` path and its scalar tail write the same words), `throttle_step` (`0x14122cbc0`: the engine
+record's `+0x280` lever and `+0` throttle; mode 2/3 with `B+0xa90` goes to `0x14122c470`, replayed), `reset_balance_state`
+(`0x1411dd2c0`), `reset_flags` (`0x14121a690`; the nine `0x141a6ba30` values and the binding queries
+`0x14123d190` replayed), `reset_flight_object` (`0x1411aedb0`) and `clear_table` (`0x140f5dd10`). The vectors
+pre-set every word the function writes to a nonzero value (a dry run finds them), so a missing or misplaced store
+shows. Still replayed in the initialisation: `0x14120ad10` (a switch on `B+0x2414` that allocates the flight
+model controller object, vtable pointers `0x14265fee0` ...), `0x1411b0420`, `0x1411ddfd0` (ported as
+`mass::weight_and_balance`, not wired) and the atmosphere accessor `0x141ba6750`.
