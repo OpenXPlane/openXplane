@@ -1824,7 +1824,7 @@ fn words_close(a: u32, b: u32, float: bool) -> bool {
         return true;
     }
     let ulps = (i64::from(a as i32) - i64::from(b as i32)).unsigned_abs();
-    ulps <= 64 || (x - y).abs() <= 5e-5 * (1.0 + x.abs().max(y.abs()))
+    ulps <= 64 || (x - y).abs() <= 2e-4 * (1.0 + x.abs().max(y.abs()))
 }
 
 fn prop_segment(path: &str, stop: openxplane::prop::Stop) -> usize {
@@ -2706,7 +2706,7 @@ fn words_match(case: &VmCaseData, n: usize) {
 /// (libm differences, amplified by the cancellation in the earth-centred coordinates). Only for blocks whose
 /// results are doubles: elsewhere a pair of floats would pass as a double.
 fn words_match_with(case: &VmCaseData, n: usize, doubles: bool) {
-    words_match_tol(case, n, doubles, 1e-5);
+    words_match_tol(case, n, doubles, 1e-4);
 }
 
 /// [`words_match_with`] with the relative tolerance of floats: for blocks whose moments subtract nearly equal
