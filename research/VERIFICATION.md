@@ -128,3 +128,15 @@ match exactly; Cl/Cd/Cm account for platform CRT differences separately.
 See [DELTA_WING_FORCE.md](DELTA_WING_FORCE.md): 200 whole-function cases with
 explicit runtime state and disclosed profile/query substitutions; 194 complete
 output sets exact, worst 35 ULP. Local atan correction also passes the old corpus.
+
+## Aircraft reference bounds
+
+See [AIRCRAFT_REFERENCE_BOUNDS.md](AIRCRAFT_REFERENCE_BOUNDS.md): 1013 original
+writer-block executions with explicit point vectors and no stubs, 10130 exact words.
+Upstream point production and live reference-state wiring remain separate.
+
+## Grouped-wing dimensions
+
+See [WING_GROUP_DIMENSIONS.md](WING_GROUP_DIMENSIONS.md): 635 original writer
+cases without stubs, 4445 exact arithmetic words with recorded cosines. Platform
+trigonometry and upstream grouping are accounted for separately.

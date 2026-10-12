@@ -9,6 +9,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Recovered grouped-wing aspect and shape writers. The shape parameter comes from a
+  discretized area centroid, rather than raw chord taper. 635 original-code cases
+  compare 4445 arithmetic outputs exactly with recorded CRT cosines.
+  [Evidence and limits](research/WING_GROUP_DIMENSIONS.md).
+
+- Recovered aircraft reference bounds and sizes from the original writer: origin-inclusive
+  bounds and 1% padded absolute extents. 1013 original-code cases compare all ten
+  words exactly. [Evidence and limits](research/AIRCRAFT_REFERENCE_BOUNDS.md).
+
 - Interactive flight now uses the recovered delta coefficient branch for swept wings,
   with AFL thickness, model time and its existing noise table. Five local Cessna
   behavioural checks pass, including a 60-degree swept-wing smoke case. Runtime
