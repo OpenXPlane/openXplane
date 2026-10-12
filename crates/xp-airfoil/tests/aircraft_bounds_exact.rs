@@ -15,7 +15,9 @@ fn bounds_and_reference_sizes_match_original_bits() {
             .collect();
         assert_eq!(raw.len(), len * 3 + 10);
         let points: Vec<[f32; 3]> = raw[..len * 3]
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|p| std::array::from_fn(|i| f32::from_bits(p[i])))
             .collect();
         let result = aircraft_bounds(&points).unwrap();
