@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-openXplane (crate `openxplane`, Rust edition 2024): an independent open engine aiming at gradual compatibility with X-Plane content. Approach: reverse-engineer the reference X-Plane 12 build, implement subsystems independently, compare against the reference. No flight simulation yet. README.md and `research/*.md` are written in Russian.
+openXplane (crate `openxplane`, Rust edition 2024): an independent open engine aiming at gradual compatibility with X-Plane content. Approach: reverse-engineer the reference X-Plane 12 build, implement subsystems independently, compare against the reference. An approximate Cessna flight model and airport flight viewer run; they are not the original flight model. README.md and `research/*.md` are written in Russian.
 
 ## Commands
 
@@ -53,3 +53,19 @@ port. Prefer extending this over hand-reading disassembly when porting a new fun
 - Do not guess unknown semantics: the ACF loader preserves unknown properties, order, duplicates, string values and line numbers; typed reads (`unique_property`, `float_property`) reject missing/duplicate/non-finite values rather than choosing a precedence.
 - Preserve float32 semantics of the reference (unit-conversion constants, float32 dataref access) rather than "cleaning up" to f64.
 - Inputs not yet recovered (angle multiplier/divisor, mode parameter, noise table, time advance) are passed in explicitly by callers, not defaulted.
+
+## Interactive input
+
+Use `pilot::CommandInput` for viewer commands: it separates held regular brakes from the maximum-brake latch
+and uses the loaded model's flap detent count. `apply_command` is the stateless single-command helper.
+Viewer releases are matched by physical key; focus loss/reset clears held input. These are openXplane
+policies, not recovered original command handlers (`research/INPUT_HANDLING.md`).
+
+## Native UI
+
+`ui` rasterizes independent Alt/Esc menus into a wgpu overlay (system TTF via ab_glyph).
+`flight_setup` uses the existing Install ACF catalog and an editable airport identifier. In `fly`,
+StartFlight loads a complete new airport_flight, uploads replacement GPU meshes on the same device,
+then commits scene/Flight; errors leave the current session active. UI artwork/layout and selection
+semantics are openXplane policy, not original handlers; evidence/limits are in `research/UI.md`.
+`OPENXPLANE_UI_RELOAD_SMOKE=<airport>` with `--smoke` exercises the same reload path using the next ACF.

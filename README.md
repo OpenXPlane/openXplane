@@ -17,6 +17,53 @@ reference build. The first reference is a provided X-Plane 12.
 Architecture and milestones, modelled on [openOMSI](https://github.com/openOMSI-Project/openOMSI):
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+<!-- compat:start -->
+## How close to the original is it?
+
+**About 25% implemented, about 7% verified identical to the original.** Early stage: it loads
+the original content, draws it, and flies an approximation; it does not yet behave like X-Plane.
+
+- *Implemented* counts work that exists in any form, including approximations (the flight model is one).
+- *Verified identical* counts only what has been confirmed to match the original's own code, bit for bit.
+
+This is a self-assessed, weighted rubric, not a measurement (method and per-subsystem numbers in
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md); data in [docs/compat.json](docs/compat.json), updated with
+`python3 tools/compat_score.py --write`).
+
+| Subsystem | Weight | Implemented | Verified identical | Notes |
+|---|---:|---:|---:|---|
+| Aircraft files (ACF) | 8 | 30% | 10% | All properties are preserved; typed: mass, CG, wings, gear, engine and controls subset. Loader schema of 1117 properties extracted; six values confirmed in code. |
+| 3D models (OBJ8) | 7 | 35% | 5% | Geometry, nested transforms, rotation/translation animation, textures. No normal/lit maps, instruments, panels or most dynamic animation. |
+| Airfoil evaluation (AFL) | 6 | 90% | 60% | All 34 airfoils; angle correction, lookup, stall, buffet and blending. The profile stage matches the original bit for bit on 1200 vectors. |
+| Flight model | 28 | 25% | 2% | Approximate model takes off and flies. Nine numerical wing stages match 10881 original-instruction vectors; span remainder rounding is corrected. Full geometry/input construction, wing function and force caller remain pending. |
+| Datarefs and commands | 8 | 28% | 15% | Registries and catalogs of 5503 datarefs and 3012 commands from the original, its default keyboard map (71 keys), values for 6 datarefs; 32 key commands act in the flight viewer. |
+| Scenery and world | 14 | 10% | 0% | Airport ground from apt.dat (runways, taxiways, aprons). No DSF, terrain, objects, lights or weather. |
+| Cockpit, instruments, Lua systems | 10 | 0% | 0% | Not started. |
+| Rendering | 6 | 20% | 0% | wgpu viewer with lighting and glass. No PBR, shadows, sky, clouds or instrument screens. |
+| Audio, weather, multiplayer, plugins | 7 | 0% | 0% | Not started. |
+| Platforms and distribution | 6 | 50% | 0% | CI on Linux, macOS and Windows, nightly builds, standard folder layout. Native Alt/Esc menus, ACF cycling and airport-code flight setup, limited settings; no launcher or full selector. |
+
+## Roadmap
+
+1. **Content without simulation** (mostly done): ACF, OBJ8, AFL, apt.dat and the viewer work. Left: PANEL_3D, normal/lit maps, instruments, an apt.dat index.
+2. **Datarefs and commands** (in progress): Registries and original catalogs exist. Left: values for the other 5497 datarefs, command handlers, wiring to the aircraft state.
+3. **Flight model** (in progress): Approximate model flies. Nine numerical wing stages match 10881 original-instruction vectors. Next: geometry helpers, remaining input construction and force corrections, then the complete wing/force caller, engine and gear.
+4. **World** (started): Airport ground from apt.dat. Left: DSF terrain, library objects, lights, start locations, weather.
+5. **Cockpit and systems** (planned): Instruments, panels, the stock Cessna's Lua scripts and controls.
+6. **Audio, multiplayer, plugins** (planned): Sound, networking and the plugin interface.
+7. **Platforms and distribution** (started): CI, nightly builds, native Alt/Esc menus and flight setup (ACF cycling and airport identifier) exist. Left: original UI resource recovery, airport search/runway selection, full settings, a launcher and tagged releases.
+
+Next up:
+
+- Recover wing geometry helpers and remaining caller inputs; compose and compare the complete wing element and force caller
+- Fill datarefs from the aircraft state and drive them from the flight model
+- Read DSF scenery tiles for terrain under the airport
+- Recover the engine and propeller model
+- Instruments and the stock Cessna's Lua scripts
+
+Details and the target crate layout: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+<!-- compat:end -->
+
 ## Current state
 
 The ACF property loader, OBJ8 geometry reading and a static-view window of the stock Cessna on wgpu all work.
@@ -118,7 +165,7 @@ explicitly. Instructions and confirmation of the state order:
 cargo run --offline -- view "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
 ```
 
-Left mouse button and movement rotate the camera; the wheel zooms; `R` resets; `Esc` closes. The window redraws
+Left mouse button and movement rotate the camera; the wheel zooms; `R` resets; `Alt` opens the menu bar; `Esc` opens the main menu. The window redraws
 on camera and size changes, not continuously in the background.
 
 To save an image without a window:
@@ -203,11 +250,15 @@ cargo run --release --offline -- wing-info "Xplane12/Cessna 172 SP/Cessna_172SP.
 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 60
 ```
 
-`fly` opens a window with the Cessna on the first runway of the airport. Keys: Down/Up arrows pitch (Down =
-nose up), Left/Right roll, Z/X rudder, PageUp/PageDown or W/S throttle, Space or B brakes, F/V flaps, P pause,
-R reset, mouse drag to look around, scroll to zoom, Esc to quit. The window title shows speed, altitude, vertical
-speed, pitch, bank, heading, throttle and a stall warning. `fly-render` runs a scripted takeoff and saves
-chase-camera frames at the given times.
+`fly` opens a window with the Cessna on the first runway of the airport. It uses the **original's default
+keyboard map**, read from the reference build: F1/F2/F3 throttle down/up/full, `1`/`2` flaps up/down, `B` brakes
+(hold), `V` maximum brakes, `[` `]` pitch trim, `5 6 7` rudder trim, `8 9 0` aileron trim, `P` pause, `W` default
+view, `Q E R F` and `= -` move the camera. The original has no keyboard stick, so openXplane adds one: arrow keys
+pitch and roll, `Z`/`X` rudder (`Tab` gives them their original meaning back), `Delete` resets, `Alt` opens the menu bar, `Esc` opens the main menu (Quit exits).
+Commands without anything to act on yet (mixture, magnetos, carb heat...) are reported in the window title as not
+simulated. The title also shows speed, altitude, vertical speed, pitch, bank, heading, throttle, flaps and a stall
+warning. Full table: [docs/KEYBOARD.md](docs/KEYBOARD.md); source of the map: [research/KEYMAP.md](research/KEYMAP.md).
+`fly-render` runs a scripted takeoff and saves chase-camera frames at the given times.
 
 ![Cessna climbing out of KSEA](assets/screenshots/flight-climb.png)
 
@@ -280,3 +331,12 @@ Results of the first investigation: [research/BASELINE.md](research/BASELINE.md)
 
 MIT, see [LICENSE](LICENSE). X-Plane is a trademark of its respective owner. openXplane is an independent
 project and is not affiliated with it.
+
+## Native menus
+
+`Alt` shows the top menu bar; `Esc` opens Main Menu. Resume Flight, restarting the loaded
+flight, pause, keyboard stick, camera and telemetry controls work. In `fly`, New Flight cycles through
+available ACF files and accepts an airport identifier; Start New Flight replaces the session in the same
+window. Mouse and Tab/arrows/Enter operate the menus. The original menu artwork and full selector
+with airport search and runway choice are still pending.
+Details and preview commands: [docs/UI.md](docs/UI.md); evidence: [research/UI.md](research/UI.md).

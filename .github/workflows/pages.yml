@@ -22,7 +22,7 @@ jobs:
       - name: Collect documents next to the site
         run: |
           mkdir -p site/docs/research
-          cp README.md docs/*.md site/docs/
+          cp README.md docs/*.md docs/*.json site/docs/
           cp research/*.md site/docs/research/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

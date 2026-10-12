@@ -17,6 +17,7 @@ use crate::{
     profile::{self, Inputs},
     runtime::RunningTime,
     wing::{Element, Wing, aspect_ratios},
+    wing_aero,
 };
 use glam::{Mat3, Quat, Vec3};
 use std::{collections::BTreeMap, path::Path};
@@ -25,8 +26,6 @@ const G: f32 = 9.80665;
 const LB_TO_N: f32 = 4.448_222;
 const HP_TO_W: f32 = 745.7;
 const SEA_LEVEL_DENSITY: f32 = 1.225;
-/// Lift slope per radian of a thin airfoil in the flow factor of the wing element function (0.1 per degree).
-const LIFT_SLOPE: f32 = 5.729_578;
 /// Published Cessna 172 inertias (kg m^2) at 1043 kg: about the lateral (pitch), longitudinal (roll)
 /// and vertical (yaw) axes. Scaled with mass.
 const INERTIA_REF: (f32, f32, f32, f32) = (1043.0, 1825.0, 1285.0, 2667.0);
@@ -59,6 +58,10 @@ pub struct Controls {
     pub brake: f32,
     /// Flap handle 0..1 (up to the largest ACF detent).
     pub flaps: f32,
+    /// Trim added to the matching stick axis, -1..1.
+    pub elevator_trim: f32,
+    pub aileron_trim: f32,
+    pub rudder_trim: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -78,6 +81,7 @@ struct ElementData {
     foils: [Option<usize>; 3],
     weights: [f32; 3],
     ar: f32,
+    flow_factors: wing_aero::FlowFactors,
     /// aileron, elevator, rudder, flap: fraction of the element carrying the surface.
     controls: [f32; 4],
     control_chord: [f32; 4],
@@ -173,29 +177,12 @@ fn synthetic_noise() -> NoiseTable {
 /// weight rises from 0 at `_foil_rat_mid_outer` to 1 at `_foil_rat_tip`, the middle takes the rest;
 /// equal neighbouring airfoil names zero the outer weight; equal ratios give 0.5.
 pub fn foil_weights(t: f32, ratios: [f32; 4], names: [&str; 3]) -> [f32; 3] {
-    let ramp = |from: f32, to: f32| {
-        if from == to {
-            0.5
-        } else {
-            ((1.0 / (to - from)) * (t - from)).clamp(0.0, 1.0)
-        }
-    };
-    let mut root = ramp(ratios[1], ratios[0]);
-    let mut tip = ramp(ratios[2], ratios[3]);
-    if names[0] == names[1] {
-        root = 0.0;
-    }
-    if names[1] == names[2] {
-        tip = 0.0;
-    }
-    [root, 1.0 - root - tip, tip]
+    wing_aero::span_weights(t, ratios, names[0] == names[1], names[1] == names[2])
 }
 
-/// Fades a factor towards 1 as the absolute angle goes from 20 to 70 degrees (the caller of the
-/// profile function does this to the angle multiplier).
+/// Reference instruction chain: transition from 20 to 90 degrees, with divisor 70.
 pub fn fade_to_one(x: f32, alpha_deg: f32) -> f32 {
-    let t = ((alpha_deg.abs() - 20.0) / 50.0).clamp(0.0, 1.0);
-    x + (1.0 - x) * t
+    wing_aero::fade_to_one(x, alpha_deg)
 }
 
 fn control_deflection(
@@ -208,10 +195,11 @@ fn control_deflection(
     // range = (up, down) limits in degrees; the result is positive for the trailing edge down.
     let (up, down) = range;
     let signed = |s: f32| if s >= 0.0 { -s * up } else { -s * down };
+    let sum = |stick: f32, trim: f32| (stick + trim).clamp(-1.0, 1.0);
     match control {
-        0 => signed(c.aileron * side),
-        1 => signed(c.elevator),
-        2 => signed(-c.rudder),
+        0 => signed(sum(c.aileron, c.aileron_trim) * side),
+        1 => signed(sum(c.elevator, c.elevator_trim)),
+        2 => signed(-sum(c.rudder, c.rudder_trim)),
         _ => flap_deg,
     }
 }
@@ -281,6 +269,9 @@ impl FlightModel {
 
         let mut elements = Vec::new();
         for (w, ar) in wings.iter().zip(&ars) {
+            let ar = (*ar).max(0.5);
+            // Static assumptions of this prototype; errors are reported at load time.
+            let flow_factors = wing_aero::flow_factors(ar, 1.0)?;
             let names = [
                 w.airfoils[0].as_str(),
                 w.airfoils[1].as_str(),
@@ -307,7 +298,8 @@ impl FlightModel {
                     element: e,
                     foils,
                     weights,
-                    ar: (*ar).max(0.5),
+                    ar,
+                    flow_factors,
                     controls: w.controls[e.index],
                     control_chord: chord,
                     side: w.side,
@@ -465,6 +457,10 @@ impl FlightModel {
         self.state.velocity = self.state.orientation * Vec3::NEG_Z * speed;
     }
 
+    pub fn flap_detent_count(&self) -> usize {
+        self.flap_detents.len()
+    }
+
     fn flap_degrees(&self, handle: f32) -> f32 {
         if self.flap_detents.is_empty() {
             return 0.0;
@@ -528,10 +524,10 @@ impl FlightModel {
             };
             let alpha_deg = wn.atan2(wt).to_degrees() + shift - downwash;
             let re_meg = rho * vp * e.chord / mu / 1.0e6;
-            // finite-wing flow factor and compressibility-style factor of the wing element function
-            let y = 1.0 / (1.0 + LIFT_SLOPE / (std::f32::consts::PI * ed.ar));
-            let k = ((8.0 * y + 1.0).sqrt() + 1.0) * 0.25;
-            let multiplier = fade_to_one(y / k, alpha_deg);
+            // Recovered arithmetic; whole-surface AR and efficiency=1 remain prototype assumptions.
+            let factors = ed.flow_factors;
+            let k = factors.lift_scale;
+            let multiplier = fade_to_one(factors.alpha_multiplier, alpha_deg);
             let coords = [e.center.x / 10.0, e.center.y / 10.0, e.center.z / 10.0];
             let (mut cl, mut cd, mut cm) = (0.0f32, 0.0f32, 0.0f32);
             for slot in 0..3 {
@@ -568,7 +564,11 @@ impl FlightModel {
                 cl_weighted += cl * e.area;
                 area_sum += e.area;
             }
-            cd += cl * cl / (std::f32::consts::PI * ed.ar);
+            // Original arithmetic; the prototype still assumes efficiency=1 and scale=1.
+            let Ok((_, total_cd)) = wing_aero::induced_drag(cl, cd, ed.ar, 1.0, 1.0) else {
+                continue;
+            };
+            cd = total_cd;
             if ed.controls[3] > 0.0 {
                 cd += 0.012 * (flap_deg / 10.0).powi(2) * ed.controls[3];
             }
@@ -637,7 +637,7 @@ impl FlightModel {
                     0.0
                 };
             // wheel heading: the nose direction in the ground plane, steered for the nose wheel
-            let steer = -c.rudder * g.steer_max_rad;
+            let steer = -(c.rudder + c.rudder_trim).clamp(-1.0, 1.0) * g.steer_max_rad;
             let heading = st.orientation * (Quat::from_rotation_y(steer) * Vec3::NEG_Z);
             let long_dir = Vec3::new(heading.x, 0.0, heading.z).normalize_or_zero();
             let lat_dir = Vec3::new(-long_dir.z, 0.0, long_dir.x);
@@ -760,10 +760,11 @@ mod tests {
     }
 
     #[test]
-    fn angle_factors_fade_to_one_between_20_and_70_degrees() {
+    fn angle_factors_fade_to_one_between_20_and_90_degrees() {
         assert_eq!(fade_to_one(0.8, 10.0), 0.8);
         assert_eq!(fade_to_one(0.8, -20.0), 0.8);
-        assert!((fade_to_one(0.8, 45.0) - 0.9).abs() < 1e-6);
+        assert!((fade_to_one(0.8, 55.0) - 0.9).abs() < 1e-6);
+        assert!(fade_to_one(0.8, 70.0) < 1.0);
         assert_eq!(fade_to_one(0.8, -90.0), 1.0);
     }
 

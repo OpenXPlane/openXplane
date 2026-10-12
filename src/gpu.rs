@@ -49,6 +49,8 @@ struct GpuMesh {
 }
 
 pub struct Renderer {
+    texture_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     camera_buffer: wgpu::Buffer,
@@ -193,6 +195,34 @@ impl Renderer {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+        let meshes = Self::upload_scene(&device, &queue, &texture_layout, &sampler, scene)?;
+        Ok(Self {
+            texture_layout,
+            sampler,
+            device,
+            queue,
+            camera_buffer,
+            camera_group,
+            opaque,
+            transparent,
+            meshes,
+            format,
+            clear: wgpu::Color {
+                r: scene.background[0],
+                g: scene.background[1],
+                b: scene.background[2],
+                a: 1.0,
+            },
+        })
+    }
+
+    fn upload_scene(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        texture_layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler,
+        scene: &Scene,
+    ) -> Result<Vec<GpuMesh>, Box<dyn std::error::Error>> {
         let mut meshes = Vec::new();
         for mesh in &scene.meshes {
             let vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -233,7 +263,7 @@ impl Renderer {
             let view = texture.create_view(&Default::default());
             let material = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("material"),
-                layout: &texture_layout,
+                layout: texture_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -241,7 +271,7 @@ impl Renderer {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
+                        resource: wgpu::BindingResource::Sampler(sampler),
                     },
                 ],
             });
@@ -253,22 +283,24 @@ impl Renderer {
                 center: mesh.center,
             });
         }
-        Ok(Self {
-            device,
-            queue,
-            camera_buffer,
-            camera_group,
-            opaque,
-            transparent,
-            meshes,
-            format,
-            clear: wgpu::Color {
-                r: scene.background[0],
-                g: scene.background[1],
-                b: scene.background[2],
-                a: 1.0,
-            },
-        })
+        Ok(meshes)
+    }
+    pub fn replace_scene(&mut self, scene: &Scene) -> Result<(), Box<dyn std::error::Error>> {
+        let meshes = Self::upload_scene(
+            &self.device,
+            &self.queue,
+            &self.texture_layout,
+            &self.sampler,
+            scene,
+        )?;
+        self.meshes = meshes;
+        self.clear = wgpu::Color {
+            r: scene.background[0],
+            g: scene.background[1],
+            b: scene.background[2],
+            a: 1.0,
+        };
+        Ok(())
     }
 
     /// Re-uploads the vertices of the meshes from `first` on (the moving aircraft) and updates their

@@ -1,11 +1,53 @@
 use openxplane::{Aircraft, reference_candidates};
+mod flight_setup;
 mod gpu;
 mod scene;
+mod ui;
 mod viewer;
 use std::{collections::BTreeSet, env, fs, path::Path, process::ExitCode};
 
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 3 && args[0] == "ui-preview" {
+        let mut menus = ui::Menus::new()?;
+        match args[1].to_str() {
+            Some("alt") => menus.alt(),
+            Some("esc") => menus.escape(),
+            Some("settings") => menus.page = ui::Page::Settings,
+            Some("config") => {
+                menus.page = ui::Page::Configuration;
+                menus.setup = Some(flight_setup::FlightSetup {
+                    root: Default::default(),
+                    aircraft: vec!["Cessna_172SP.acf".into(), "Cessna_172SP_G1000.acf".into()],
+                    selected: 0,
+                    airport: "KSEA".into(),
+                    editing_airport: false,
+                    error: None,
+                });
+            }
+            _ => return Err("ui-preview requires alt, esc, settings or config".into()),
+        }
+        let pixels = menus.paint(
+            1100,
+            720,
+            1.0,
+            &ui::Info {
+                flying: true,
+                paused: false,
+                keyboard_stick: true,
+                telemetry: vec![],
+            },
+        );
+        let mut image = image::RgbaImage::from_pixel(1100, 720, image::Rgba([30, 49, 69, 255]));
+        for (pixel, overlay) in image.pixels_mut().zip(pixels.chunks_exact(4)) {
+            let alpha = overlay[3] as f32 / 255.0;
+            for i in 0..3 {
+                pixel[i] = (overlay[i] as f32 * alpha + pixel[i] as f32 * (1.0 - alpha)) as u8;
+            }
+        }
+        image.save(&args[2])?;
+        return Ok(true);
+    }
     if args.len() == 5 && args[0] == "airfoil-replay" {
         let airfoil = openxplane::airfoil::Airfoil::parse(&fs::read_to_string(&args[1])?)?;
         let inputs = openxplane::profile::parse_replay(&fs::read_to_string(&args[2])?)?;
@@ -490,7 +532,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         return Ok(true);
     }
     if args.len() != 2 || args[0] != "inspect" {
-        return Err("Usage: openxplane airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png>".into());
+        return Err("Usage: openxplane ui-preview <alt|esc|settings|config> <output.png> | airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png>".into());
     }
     let root = fs::canonicalize(&args[1])?;
     let install = openxplane::install::Install::open(&root)?;

@@ -244,6 +244,9 @@ impl AircraftBody {
 
 /// An airport scene with the aircraft, its body vertices and a flight model resting on the first runway.
 pub struct FlightSession {
+    pub root: std::path::PathBuf,
+    pub aircraft_path: std::path::PathBuf,
+    pub airport_id: String,
     pub scene: Scene,
     pub body: AircraftBody,
     pub model: openxplane::flight::FlightModel,
@@ -327,6 +330,9 @@ pub fn airport_flight(
     let base_center: Vec<Vec3> = aircraft.meshes.iter().map(|m| m.center).collect();
     meshes.extend(aircraft.meshes);
     let mut session = FlightSession {
+        root: root.to_path_buf(),
+        aircraft_path: aircraft_path.to_path_buf(),
+        airport_id: icao.to_string(),
         scene: Scene {
             meshes,
             center: Vec3::ZERO,

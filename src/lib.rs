@@ -9,12 +9,15 @@ pub mod dataref;
 pub mod discord;
 pub mod flight;
 pub mod install;
+pub mod keymap;
 pub mod obj8;
+pub mod pilot;
 pub mod profile;
 pub mod regimes;
 pub mod runtime;
 pub mod stall;
 pub mod wing;
+pub mod wing_aero;
 pub mod world;
 use std::path::{Path, PathBuf};
 

@@ -7,6 +7,7 @@ const DISCORD = "";
 const DOCS = [
   ["README", "Overview and commands"],
   ["ARCHITECTURE", "Architecture and roadmap"],
+  ["COMPATIBILITY", "Compatibility estimate"],
   ["research/BASELINE", "Reference build"],
   ["research/VERIFICATION", "Verification against the original"],
   ["research/ACF_LOADING", "ACF loading"],
@@ -22,35 +23,32 @@ const DOCS = [
   ["research/ACF_SCHEMA", "ACF loader schema"],
   ["research/DATAREFS", "Datarefs"],
   ["research/COMMANDS", "Commands"],
+  ["research/KEYMAP", "Default keyboard map"],
   ["research/VIEWER", "Cessna viewer"],
+  ["KEYBOARD", "Keyboard"],
   ["DISCORD", "Discord"],
   ["research/APT_DAT", "apt.dat airports"],
   ["research/INSTALL_LAYOUT", "Installation layout"],
   ["research/WORLD_GEOMETRY", "Airport geometry"],
 ];
 
-const STATUS = [
-  ["ACF (aircraft)", "done", "Properties; typed mass, fuel, CG, engine count"],
-  ["OBJ8", "part", "Geometry, rotation and translation animations; no normal/lit maps or instruments"],
-  ["AFL (airfoils)", "done", "34 airfoils, lookup, stall, buffet, regime blending"],
-  ["apt.dat", "part", "Airports, runways, metadata; no taxiways or frequencies"],
-  ["Datarefs and commands", "part", "Typed dataref registry (5503-record catalog), six ACF-backed datarefs, command registry (3012-command catalog); nothing drives aircraft state yet"],
-  ["Viewer", "part", "wgpu, Metal; static, no simulation"],
-  ["Flight model", "part", "Approximate model (not the original's): wing elements from the verified airfoil code, thrust, gear, controls; takes off and flies"],
-  ["World", "part", "Airport ground from apt.dat (runways, taxiways, aprons) with the aircraft on a runway; no terrain, DSF or objects"],
-  ["Cockpit, Lua, audio, network", "todo", ""],
-];
-const BADGE = { done: "done", part: "partial", todo: "planned" };
-
-const MILESTONES = [
-  "Content without simulation: ACF, OBJ8, AFL, apt.dat, viewer",
-  "Datarefs and commands",
-  "Flight model",
-  "World: DSF, terrain, libraries",
-  "Cockpit and systems",
-  "Audio, weather, multiplayer, plugins",
-  "Platforms and distribution",
-];
+// Compatibility estimate and roadmap come from docs/compat.json (generated numbers in docs/COMPATIBILITY.md).
+let compat = null;
+async function loadCompat() {
+  if (compat) return compat;
+  try {
+    const res = await fetch("docs/compat.json");
+    if (!res.ok) throw new Error(res.status);
+    compat = await res.json();
+  } catch {
+    compat = null;
+  }
+  return compat;
+}
+function totals(c) {
+  const sum = (k) => c.subsystems.reduce((a, s) => a + s.weight * s[k], 0);
+  return { implemented: sum("implemented"), verified: sum("verified") };
+}
 
 const $ = (s) => document.querySelector(s);
 const view = $("#view");
@@ -62,21 +60,54 @@ function renderHome() {
   if (REPO) { const h = frag.querySelector("#hero-repo"); h.href = REPO; h.hidden = false; }
   if (DISCORD) { const h = frag.querySelector("#hero-discord"); h.href = DISCORD; h.hidden = false; }
   view.replaceChildren(frag);
+  loadCompat().then((c) => {
+    const chip = view.querySelector("#compat-chip");
+    if (!c || !chip) return;
+    const t = totals(c);
+    chip.querySelector("span:last-child").textContent =
+      `≈${t.implemented.toFixed(0)}% implemented · ≈${Math.round(t.verified)}% verified identical`;
+    chip.hidden = false;
+  });
 }
 
-function renderStatus() {
+async function renderStatus() {
   const frag = clone("status");
-  const rows = frag.querySelector("#status-rows");
-  for (const [name, state, note] of STATUS) {
+  view.replaceChildren(frag);
+  const c = await loadCompat();
+  if (!c) { view.querySelector("#status-summary").textContent = "Could not load the status data."; return; }
+  const t = totals(c);
+  view.querySelector("#status-summary").innerHTML =
+    `<b>About ${t.implemented.toFixed(0)}% implemented, about ${Math.round(t.verified)}% verified identical to the original.</b> ` +
+    "<i>Implemented</i> counts work that exists in any form, including approximations; <i>verified identical</i> counts only what " +
+    "has been confirmed against the original's own code. This is a self-assessed rubric, not a measurement.";
+  view.querySelector("#status-method").textContent = c.method;
+  const rows = view.querySelector("#status-rows");
+  for (const s of c.subsystems) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td></td><td><span class="badge ${state}">${BADGE[state]}</span></td>`;
-    tr.children[0].textContent = name;
-    tr.children[1].append(note);
+    tr.innerHTML = '<td></td><td class="num"></td><td></td><td></td>';
+    tr.children[0].textContent = s.name;
+    tr.children[1].textContent = s.weight;
+    const bar = (v, cls) => `<div class="bar" title="${(v * 100).toFixed(0)}%"><span class="${cls}" style="width:${v * 100}%"></span></div><small>${(v * 100).toFixed(0)}%</small>`;
+    tr.children[2].innerHTML = bar(s.implemented, "impl");
+    tr.children[3].innerHTML = bar(s.verified, "ver");
+    const note = document.createElement("div");
+    note.className = "note"; note.textContent = s.note;
+    tr.children[0].append(note);
     rows.append(tr);
   }
-  const ol = frag.querySelector("#milestones");
-  for (const m of MILESTONES) { const li = document.createElement("li"); li.textContent = m; ol.append(li); }
-  view.replaceChildren(frag);
+  const ol = view.querySelector("#milestones");
+  for (const r of c.roadmap) {
+    const li = document.createElement("li");
+    li.innerHTML = '<b></b> <span class="badge"></span><div class="note"></div>';
+    li.querySelector("b").textContent = r.title;
+    const b = li.querySelector(".badge");
+    b.textContent = r.state;
+    b.className = "badge " + ({ "mostly done": "done", "in progress": "part", started: "part" }[r.state] || "todo");
+    li.querySelector(".note").textContent = r.detail;
+    ol.append(li);
+  }
+  const ul = view.querySelector("#next-list");
+  for (const n of c.next) { const li = document.createElement("li"); li.textContent = n; ul.append(li); }
 }
 
 async function renderDoc(name) {

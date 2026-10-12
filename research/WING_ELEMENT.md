@@ -2,7 +2,7 @@
 
 Date: 2026-10-06. The reference and SHA256 are in [BASELINE.md](BASELINE.md). Static analysis of the function at
 `0x1411b6630 .. 0x1411b8df7` (10183 bytes), the caller of the profile function
-[`0x141a44350`](AFL_REGIMES.md). It is **not ported yet**; this note records what is established so the port
+[`0x141a44350`](AFL_REGIMES.md). It is **partially ported**: flow and angle-factor blocks are verified in [WING_FACTORS.md](WING_FACTORS.md); this note records what is established so the port
 can be done in verified pieces with the emulator ([VERIFICATION.md](VERIFICATION.md)).
 
 About 1400 of its 2284 instructions are diagnostic logging (stream calls), guarded by two flags at
@@ -38,26 +38,26 @@ the induced-drag term). It returns a float in `XMM0`: the weighted normalised an
    `1.4638e-05` (-50), `1.7231e-05` (0) and `1.9608e-05` (+50) against a temperature-like field
    (`+0x5c(%rdi)`), using the interpolation helper `0x1406ea0b0`; `Re_meg` is the chord Reynolds number divided by
    `1e6`. This `Re_meg` is the regime parameter passed to the profile function.
-3. **Position inputs.** The corner coordinates interpolated at the element centre and divided by the three
+3. **Position inputs.** The corner coordinates interpolated at the integer element index and divided by the three
    aircraft reference values (`+0x64f4`, `+0x64f8`, `+0x64fc`) give normalised x, y and z of the element. They are
    passed on as the `x`, `y`, `phase` noise coordinates of the stall perturbation
    ([BUFFET.md](BUFFET.md)). Confirmed in `0x141a44350`: its second and third float arguments are forwarded as the
    noise `x` and `y`, and the stack float as `phase`. The earlier note that those two arguments were an angle
    multiplier and divisor was wrong; the multiplier and divisor come from step 4.
 4. **Angle and the angle correction factors.** An element angle is wrapped into -180..180 degrees (`xmm9`).
-   Two factors are faded towards 1 as the absolute angle grows from 20 to 70 degrees
-   (`x' = clamp(x + (1 - x) / 70 * (|angle| - 20))`, kept between `x` and 1): the flow factor `y` of step 2 and a
+   Two factors are faded towards 1 as the absolute angle grows from 20 to 90 degrees
+   (`x' = clamp(x + (1 - x) / 70 * (|angle| - 20))`, kept between `x` and 1): the flow factor `y/k` of step 2 and a
    flap/slat factor built from the per-element flags `+0x56c`, `+0x594` and the fields `+0x1a0`, `+0x1a4`. The
    faded values (`xmm14`, `xmm15`) are passed to the profile function together with the angle, so they are, as far
    as the data flow shows, the angle multiplier and divisor that `0x141a412c0` takes
-   ([AERO_LOOKUP.md](AERO_LOOKUP.md)). This reading is from the register flow and is still to be confirmed in
-   the emulator.
+   ([AERO_LOOKUP.md](AERO_LOOKUP.md)). The fade arithmetic is now verified in the emulator ([WING_FACTORS.md](WING_FACTORS.md));
+   construction of the flap/slat operand is still pending.
 5. **Three airfoils.** The element's span position `t = (index + 0.5) / elements` gives weights by the four
    `_foil_rat_*` ratios: the root weight falls from 1 at `_foil_rat_rot` to 0 at `_foil_rat_mid_inner`, the tip
    weight rises from 0 at `_foil_rat_mid_outer` to 1 at `_foil_rat_tip`, the middle weight is the rest. A weight is
    forced to 0 when the neighbouring airfoil has the same name. When equal ratios make the division undefined the
    weight is 0.5.
-6. **Blend.** For each airfoil with a nonzero weight the profile function is called with its table object, the
+6. **Blend.** For each airfoil with a positive weight the profile function is called with its table object, the
    normalised position, the flags, `Re_meg`, the angles and four output pointers; its Cl, Cd, Cm and the
    normalised angle are multiplied by the weight and summed into the accumulators.
 7. **Extra terms and compressibility.** The three extra stack floats are added to the accumulators and Cl is
@@ -76,7 +76,7 @@ the induced-drag term). It returns a float in `XMM0`: the weighted normalised an
 The meaning of the objects' fields beyond what the diagnostics name; the sources of `R8`'s arrays (they come from
 the caller's per-element flow computation); the behaviour of helpers `0x14082b800`, `0x14121bfd0`, `0x1411e1940`,
 `0x1408bd9d0`, `0x1411a0230`, `0x1411a00f0` and of the C runtime functions `0x14230b380`, `0x14230be80`,
-`0x14230c1d0`; the exact formulas of steps 2, 4 and 9; and whether the temperature field is in degrees Celsius.
+`0x14230c1d0`; the remaining formulas of steps 2 and 4, and step 9; and whether the temperature field is in degrees Celsius.
 Steps 5, 6 and 7 are read in full; the rest is read at the level of the constants and data flow above.
 
 ## Plan
@@ -85,3 +85,25 @@ Port from the bottom up and verify each helper against the original in the emula
 interpolation helper is already done; next the two geometry helpers, the shaping function and the noise terms,
 then this function with synthetic objects whose fields are filled at exactly the offsets read (found by tracing
 memory reads in the emulator), so the verification does not depend on knowing every field's meaning.
+
+## Roadmap progress (2026-10-07)
+
+The flow factor/lift scale and angle-factor fade now have a Rust port and 2180 bit-identical comparisons
+against original instruction blocks. The correct fade transition is 20..90 degrees (divisor 70), correcting
+the prototype's earlier 20..70 assumption. These blocks are used by the approximate model; the rest of the
+wing element and the production of its inputs remain pending. See [WING_FACTORS.md](WING_FACTORS.md).
+
+## Further verified stages (2026-10-07)
+
+Viscosity/chord/Reynolds, flap/slat construction, induced drag, ice factor construction and
+conditional ice application now match 5156 original-instruction vectors in debug and release.
+See [WING_CORRECTIONS.md](WING_CORRECTIONS.md). Induced drag is integrated with the prototype's
+existing assumed operands; the other new stages require caller/input recovery before integration.
+Step 2 and the construction in step 4 are now ported numerically; their inputs/units remain unresolved.
+
+## Span and coordinates (2026-10-12)
+
+Span weights (including original string comparison) now match 2440 cases; the old float32
+middle remainder is corrected to the original float64 chain. Profile/noise coordinates and span
+fraction match 1105 cases. Coordinates interpolate at the integer index, not index+0.5; that
+increment is used only for the span fraction. See [WING_SPAN.md](WING_SPAN.md).

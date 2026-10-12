@@ -23,7 +23,7 @@ module appears, not in advance.
 | `xp-texture` | DDS/PNG, mipmaps, normal/lit | `image` in `gpu.rs` |
 | `xp-scenery` | apt.dat, earth_nav.dat, DSF, libraries | `apt.rs`, `world.rs`, `install.rs` |
 | `xp-dataref` | registry of datarefs and commands | `dataref.rs`, `commands.rs` |
-| `xp-sim` | flight model, engines, landing gear, weather | none |
+| `xp-sim` | flight model, engines, landing gear, weather | `wing.rs`, `flight.rs` (approximate), `pilot.rs` |
 | `xp-script` | runtime for the stock Lua scripts | none |
 | `xp-render` | wgpu renderer | `gpu.rs`, `scene.rs`, `viewer.rs` |
 | `xp-audio`, `xp-net`, `xp-plugin` | audio, multiplayer, plugins | none |
@@ -44,6 +44,8 @@ the original content, not only unit tests.
    to the aircraft state, the built-in command handlers. Everything after depends on it.
 3. **Flight model**: wing forces from AFL, propeller and engine, landing gear, mass and centre of gravity,
    atmosphere; a simulation step; comparing trajectories with the reference on fixed inputs.
+   Flow/lift factors and the angle fade are now verified on 2180 original-instruction cases
+   ([WING_FACTORS.md](../research/WING_FACTORS.md)); geometry helpers and the remaining wing element are next.
 4. **World** (started): the airport ground from apt.dat is drawn with the aircraft on a runway. Remaining: DSF,
    terrain, library objects, airport lighting, spawn from start locations.
 5. **Cockpit and systems**: instruments, panels, the stock Cessna's Lua, controls, input.

@@ -6,6 +6,7 @@ description = "Independent X-Plane-compatible engine research and content loader
 license = "MIT"
 
 [dependencies]
+ab_glyph = "0.2.32"
 bytemuck = { version = "1.25.2", features = ["derive"] }
 glam = "0.30.10"
 image = { version = "0.25.10", default-features = false, features = ["png", "dds"] }

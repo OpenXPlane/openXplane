@@ -12,7 +12,7 @@ X-Plane. The code is `src/wing.rs` and `src/flight.rs`.
 | ACF mass, CG, wing geometry, gear springs and dampers, engine power, control deflection limits and chord ratios, flap detents | ACF properties ([ACF_SCHEMA.md](ACF_SCHEMA.md); lengths with the build's float32 feet constant) |
 | Airfoil tables, finite-grid lookup, stall hysteresis, buffet perturbation, three-table blending | `profile::evaluate`, verified bit for bit against the original machine code ([VERIFICATION.md](VERIFICATION.md)) |
 | Span weights of the root, middle and tip airfoils of an element | the wing element function, read in full ([WING_ELEMENT.md](WING_ELEMENT.md) step 5) |
-| The flow factor `y = 1/(1 + 5.73/(pi AR))`, the factor `k = (sqrt(8y + 1) + 1)/4` that multiplies Cl, the multiplier `y/k` faded to 1 between 20 and 70 degrees, the induced drag `Cl^2/(pi AR)` | the same function, from the constants and data flow (steps 2, 4, 7, 8); `AR` is taken as the aspect ratio of the whole surface, which is how the function's inputs behave but was not confirmed |
+| The flow factor `y = 1/(1 + 5.73/(pi AR))`, the factor `k = (sqrt(8y + 1) + 1)/4` that multiplies Cl, the multiplier `y/k` faded to 1 between 20 and 90 degrees, the induced drag `Cl^2/(pi AR)` | the same function, from the constants and data flow (steps 2, 4, 7, 8); `AR` is taken as the aspect ratio of the whole surface, which is how the function's inputs behave but was not confirmed |
 
 ## What is openXplane's own simplification
 
@@ -71,7 +71,26 @@ does not change the physics.
 
 ## Not done
 
-Trim, flap and gear controls beyond the flap handle, engine start and fuel flow, the propeller as a blade
+Gear controls beyond the fixed gear, engine start and fuel flow, the propeller as a blade
 element model, ground effect, wind and turbulence, retractable gear, a proper autopilot, and comparison with
 trajectories of the original. The tuning constants above are placeholders to be replaced by recovered
 original behaviour.
+
+## Input follow-up (2026-10-07)
+
+The flight viewer now tracks press/release pairs by physical key and keeps the initial logical binding when
+modifiers change. Focus loss releases held axes and regular brakes. The maximum-brake latch is independent of
+the held brake, and flap step commands use the loaded model's detent count. Reset clears held keys and the
+command state. Free-camera mouse dragging updates the visible camera yaw. These are openXplane input rules,
+not a claim that the original's command handlers have been recovered.
+
+## Verified factor update (2026-10-07)
+
+Flow/lift factors and the angle fade use the original float32/double operation order, verified on 2180
+original-instruction vectors ([WING_FACTORS.md](WING_FACTORS.md)). The fade now completes at 90°, correcting
+the former 70° transition. Whole-surface aspect ratio, efficiency=1, the profile divisor and upstream flow
+remain prototype assumptions. Existing local takeoff, stability, control-sign and stall tests still pass.
+
+Verified induced-drag arithmetic is now delegated to `wing_aero::induced_drag`, with the
+prototype retaining efficiency=1 and scale=1. The separately verified Reynolds/flap/ice stages
+are not integrated with guessed input mappings: [WING_CORRECTIONS.md](WING_CORRECTIONS.md).

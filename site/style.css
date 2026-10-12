@@ -143,3 +143,12 @@ blockquote { margin: 1em 0; padding: .2em 1em; border-left: 4px solid var(--prim
   article, .content { padding: 16px; } article { margin: 12px 8px; padding: 4px 16px 16px; }
   .footer { margin: 32px 16px 0; }
 }
+
+.status td.num { text-align: right; }
+.bar { width: 120px; height: 8px; border-radius: 4px; background: var(--chip-bg); overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
+.bar span { display: block; height: 100%; }
+.bar .impl { background: var(--primary); }
+.bar .ver { background: var(--ok); }
+.note { color: var(--secondary-text); font-size: .85rem; font-weight: 400; margin-top: 2px; }
+.status small { color: var(--secondary-text); }
+.milestones li { margin: .8em 0; }

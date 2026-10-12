@@ -151,7 +151,27 @@ class Emulator:
             uc.emu_start(addr, RET_ADDR, count=max_instructions)
         except UcError as error:
             raise RuntimeError(f'emulation failed in {addr:#x} at {uc.reg_read(UC_X86_REG_RIP):#x}: {error}')
+        if uc.reg_read(UC_X86_REG_RIP) != RET_ADDR:
+            raise RuntimeError(f'instruction budget exhausted in {addr:#x} before return')
         return uc.reg_read(UC_X86_REG_RAX)
+
+    def run_range(self, begin, end, max_instructions=10000):
+        """Execute a recovered instruction block with registers/memory prepared by the caller.
+        `end` is the exclusive stop boundary. No functions or instructions are replaced."""
+        def stop_at_end(uc, address, size, user):
+            if address == end:
+                uc.emu_stop()
+
+        # An exact hook also stops inside a translation block cached by an earlier run.
+        hook = self.uc.hook_add(UC_HOOK_CODE, stop_at_end)
+        try:
+            self.uc.emu_start(begin, end, count=max_instructions)
+        except UcError as error:
+            raise RuntimeError(f'block emulation failed at {self.uc.reg_read(UC_X86_REG_RIP):#x}: {error}')
+        finally:
+            self.uc.hook_del(hook)
+        if self.uc.reg_read(UC_X86_REG_RIP) != end:
+            raise RuntimeError(f'block {begin:#x} did not reach {end:#x} before instruction limit')
 
     def xmm0_f32(self):
         return struct.unpack('<f', (self.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff).to_bytes(4, 'little'))[0]
