@@ -4,7 +4,7 @@
     python3 tools/gen_binding_vectors.py Xplane12/X-Plane.exe TRIALS SEED > crates/xp-app/tests/data/binding.txt
 
 The header of a case is `F mode a b amount result`. The static tables at 0x142515560 and 0x142515366 are
-recorded with the cases; 0x141238b40 and 0x14082be10 are replayed.
+recorded with the cases; 0x14082be10 is replayed.
 """
 import struct
 import sys
@@ -76,14 +76,16 @@ def main():
             fz.preset_f32('B', 0x2c9c + 4 * 0xfa, rng.uniform(-2, 2))
             fz.preset('F', (0x55f0 + 0xfa) & ~3, rng.choice([0, 1]) << (8 * ((0x55f0 + 0xfa) & 3)), record=True)
         # the static tables of the executable
-        fz.region('T2', 0x142515560, 4 * 0x302)
-        fz.region('T3', 0x142515364, 40 * 13 + 4)
         for entry in {ident, 0xfa}:
-            fz.preset('T2', 4 * entry, case.emu.read_u32(0x142515560 + 4 * entry))
+            fz.preset('IT2', 4 * entry, case.emu.read_u32(0x142515560 + 4 * entry))
         for k in range(13):
             word = case.emu.read_u32(0x142515364 + 40 * k)
-            fz.preset('T3', 40 * k, word)
-        case.stub(0x141238b40, lambda call, rng: call.ret_int(rng.choice([0, 1])))
+            fz.preset('IT3', 40 * k, word)
+        ENGL = case.region('ENGL', 0x2cc)
+        put('F', 0x68b0, ENGL)
+        fz.preset_f32('ENGL', 0x218, rng.choice([0.0, 0.3, 1.0, -0.5]))
+        fz.region('GT', 0x142f01918, 8)
+        fz.preset_f64('GT', 0, rng.choice([0.0, 0.5, 0.9, -1.0]))
         case.stub(0x14082be10, lambda call, rng: call.ret_int(rng.choice([0, 1])))
         off = sp + 0x28 - (sp - 0x800)
         fz.preset('S', off, bits(amount))

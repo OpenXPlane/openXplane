@@ -369,8 +369,7 @@ pub fn force_coefficients(
 
 /// `0x1407ace10(F, mode, 0x100, 0, 1.0)`: an input-binding query with a mode word.
 fn mode_query(vm: &mut Vm, env: &mut dyn Callees, f: u64, mode: u64) -> bool {
-    let args = CallArgs::ints(&[f, mode, 0x100, 0]);
-    env.call(vm, 0x1407ace10, args).rax as u32 != 0
+    crate::binding::bound(vm, env, f, mode as i32, 0x100, 0)
 }
 
 /// `0x141273dfb..0x14127402d`: the last state updates. With `B+0xc54` the start sequence `0x141245750` (`start_sequence`)
@@ -1483,9 +1482,7 @@ pub fn gear_state_update(
         a * lever * f64::from((vm.f32(elem + 0x18) * RAD).cos()) + f64::from(vm.f32(p0 + 0x64))
     };
     let bind = |vm: &mut Vm, env: &mut dyn Callees, id: u64| {
-        let mut args = CallArgs::ints(&[f, 1, id, 0]);
-        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
-        env.call(vm, 0x1407ace10, args).rax as u32 != 0
+        crate::binding::bound(vm, env, f, 1, id as i32, 0)
     };
     for i in 0..10u64 {
         if !in_range(vm, i) {
@@ -1722,9 +1719,7 @@ pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -
     vm.set_f32(slot(-0x8), tenth);
     vm.set_i32(slot(0x1750), 0);
     for i in 0..48u64 {
-        let mut args = CallArgs::ints(&[f, 1, 0x251, i]);
-        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
-        if env.call(vm, 0x1407ace10, args).rax as u32 != 0 {
+        if crate::binding::bound(vm, env, f, 1, 0x251, i as i32) {
             continue;
         }
         let b = vm.u64(f + 0x20);
@@ -1997,11 +1992,8 @@ pub fn body_contact_loop(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         let bodies = vm.u64(vm.u64(f + 0x20) + 0x6040);
         let at = bodies + j * 0x34c8;
         let index = vm.u32(at + 0x5f0);
-        if index <= 0x26 {
-            let args = CallArgs::ints(&[f, 1, 0x179, u64::from(index)]);
-            if env.call(vm, 0x1407ace10, args).rax as u32 != 0 {
-                continue;
-            }
+        if index <= 0x26 && crate::binding::bound(vm, env, f, 1, 0x179, index as i32) {
+            continue;
         }
         if vm.i32(at + 0x54) != 0 {
             continue;
@@ -2968,9 +2960,7 @@ const START_CURVES: [[f32; 24]; 4] = [
 pub fn start_sequence(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     let (s90, s94, s98, s9c, sa4, sa8) = (0x6490, 0x6494, 0x6498, 0x649c, 0x64a4, 0x64a8);
     let bind = |vm: &mut Vm, env: &mut dyn Callees, id: u64| -> bool {
-        let mut args = CallArgs::ints(&[f, 2, id, 0]);
-        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
-        env.call(vm, 0x1407ace10, args).rax as u32 != 0
+        crate::binding::bound(vm, env, f, 2, id as i32, 0)
     };
     let tenth = |vm: &mut Vm, env: &mut dyn Callees| (frame_time(vm, env) / 10.0) as f32;
     // the position `x` on a curve: the interpolation between the neighbouring entries; `None` below zero
@@ -3327,9 +3317,7 @@ pub fn engine_runtime(vm: &mut Vm, env: &mut dyn Callees, f: u64) {
     let to_c = |x: f32| ((f64::from(x) - 32.0) / 1.8f64) as f32;
     let to_f = |x: f32| (f64::from(x) * 1.8f64 + 32.0) as f32;
     let bind = |vm: &mut Vm, env: &mut dyn Callees, id: u64, i: u64| -> bool {
-        let mut args = CallArgs::ints(&[f, 1, id, i]);
-        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
-        env.call(vm, 0x1407ace10, args).rax as u32 != 0
+        crate::binding::bound(vm, env, f, 1, id as i32, i as i32)
     };
     if vm.i32(f + 0x6760) != 0 {
         return;

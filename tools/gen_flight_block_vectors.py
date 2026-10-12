@@ -111,7 +111,6 @@ def main():
     if os.environ.get('XPDEBUG'):
         from unicorn import UC_HOOK_CODE
         case.emu.uc.hook_add(UC_HOOK_CODE, lambda uc, a, size, user: history.append(a))
-    case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.randrange(2) if rng.random() < 0.2 else 0))
     case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.randrange(2)))
     case.stub(0x141260090, lambda call, rng: None)
     for diagnostic in (0x1405dcad0, 0x141a67610):  # the log message of a repaired value

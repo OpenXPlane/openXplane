@@ -19,7 +19,6 @@ EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.ar
 
 def main():
     case = VmCase(EXE, SEED, [(0x1417da000, 0x1417db000), (0x141185000, 0x141186000), (0x14076b000, 0x14076c000), (0x141245000, 0x141247000), (0x14125e000, 0x141261000), (0x1407cc000, 0x1407cd000), (0x1407e7000, 0x1407e8000), (0x140819000, 0x14081a000)])
-    case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
     import os
     trace = os.environ.get('XPTRACE')
     if trace:

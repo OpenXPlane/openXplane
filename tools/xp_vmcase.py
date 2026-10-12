@@ -78,6 +78,9 @@ class VmCase:
         self.fz._written.clear()
         self.calls = []
         self.regions = {}
+        # the static input tables of the binding query: random-filled on first read like any other input
+        self.fz.region('IT2', 0x142515560, 4 * 0x302)
+        self.fz.region('IT3', 0x142515364, 40 * 13 + 4)
 
     def region(self, name, size):
         addr = self.emu.alloc(size)

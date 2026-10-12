@@ -8,7 +8,7 @@ const ID_TABLE: u64 = 0x1_4251_5560;
 const ROW_TABLE: u64 = 0x1_4251_5366;
 
 /// `0x1407ace10(F, mode, a, b, amount)`: `mode` 1 is the press, 2 the release query; returns the original's `eax`.
-/// `0x141238b40` and `0x14082be10` are replayed.
+/// `0x14082be10` is replayed.
 pub fn input_active(
     vm: &mut Vm,
     env: &mut dyn Callees,
@@ -37,8 +37,10 @@ pub fn input_active(
     } else {
         let b0 = aircraft(vm);
         if vm.i32(b0 + 0x918) != 0 {
-            let answer = env.call(vm, 0x141238b40, CallArgs::ints(&[f, 0])).rax as u32;
-            if answer != 0 && vm.i32(b0 + 0x91c) == 1 {
+            // `0x141238b40(F, 0)`: the lever setting of engine 0 above the global double `0x142f01918`
+            let lever = vm.f32(vm.u64(f + 0x68b0) + 0x218);
+            let answer = f64::from(lever) > vm.f64(0x1_42f0_1918);
+            if answer && vm.i32(b0 + 0x91c) == 1 {
                 let engines = vm.u64(b0 + 0x5ff8);
                 if (vm.u32(engines).wrapping_sub(1)) <= 1 {
                     esi = false;
@@ -201,4 +203,9 @@ pub fn input_active(
         }
     }
     Ok(true)
+}
+
+/// The query as the flight step makes it: `0x1407ace10(F, mode, id, index, 1.0)` on the real flight object.
+pub fn bound(vm: &mut Vm, env: &mut dyn Callees, f: u64, mode: i32, id: i32, index: i32) -> bool {
+    input_active(vm, env, f, mode, id, index, 1.0).unwrap_or(false)
 }
