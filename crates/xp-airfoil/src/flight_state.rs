@@ -1194,7 +1194,7 @@ pub fn float_waves(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
 /// `0x1411e4bd0(0x145899fa0)` and `0x1409057f0(0x142edf4b0)` run (replayed); with `F+0x28 == 1` and one of the globals
 /// `0x145899fd0/fd4` set, the force `-(0x145899fc4, fc8, fcc)` (world axes) is added at `(0, B+0x2638, B+0x263c)`.
 /// The larger in magnitude of `F+0xf0` and `F+0xfc` (the second wins a tie) plus `F+0x108` is stored as a float at
-/// `rbp+0x1750`; when `F+0x3c == 1` and `0x1411d9d80(F)` (replayed) is zero it is `F+0x108 + F+0xec` instead.
+/// `rbp+0x1750`; when `F+0x3c == 1` and `engine_small::pilot_active` (`0x1411d9d80`) is false it is `F+0x108 + F+0xec` instead.
 pub fn world_pull(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     use crate::callees::add_world_force;
     match vm.i32(f + 0x28) {
@@ -1222,7 +1222,7 @@ pub fn world_pull(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
     let f108 = vm.f32(f + 0x108);
     pick += f108;
     vm.set_f32(rbp.wrapping_add(0x1750), pick);
-    if vm.i32(f + 0x3c) == 1 && env.call(vm, 0x1411d9d80, CallArgs::ints(&[f])).rax as u32 == 0 {
+    if vm.i32(f + 0x3c) == 1 && !crate::engine_small::pilot_active(vm, f) {
         vm.set_f32(rbp.wrapping_add(0x1750), f108 + vm.f32(f + 0xec));
     }
 }

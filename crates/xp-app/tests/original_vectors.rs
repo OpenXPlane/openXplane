@@ -3698,6 +3698,33 @@ fn strut_contact_matches_the_original_machine_code() {
 }
 
 #[test]
+fn small_engine_helpers_match_the_original_machine_code() {
+    use openxplane::engine_small::{engine_lever, pilot_active, throttle_ceiling};
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (name, kind) in [
+        ("small_ceiling.txt", 0),
+        ("small_lever.txt", 1),
+        ("small_pilot.txt", 2),
+    ] {
+        let cases = parse_vm_cases(name);
+        assert!(cases.len() >= 50, "{name}");
+        for (n, case) in cases.into_iter().enumerate() {
+            let (base, index, want) = (
+                hex(&case.header[0]),
+                hex(&case.header[1]) as i32,
+                hex(&case.header[2]) as u32,
+            );
+            let got = match kind {
+                0 => throttle_ceiling(&case.vm, base, index).to_bits(),
+                1 => engine_lever(&case.vm, base, index).to_bits(),
+                _ => u32::from(pilot_active(&case.vm, base)),
+            };
+            assert_eq!(got, want, "{name} case {n}");
+        }
+    }
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);

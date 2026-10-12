@@ -707,7 +707,6 @@ def main():
         if BLOCK == 'pull':
             for address in (0x1411e4bd0, 0x1409057f0):
                 case.stub(address, lambda call, rng: None)
-            case.stub(0x1411d9d80, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
             fz.preset('F', 0x28, rng.choice([0, 1, 1, 2]))
             fz.preset('F', 0x3c, rng.choice([0, 1, 1]))
             for off in (0xf0, 0xfc, 0x108, 0xec):

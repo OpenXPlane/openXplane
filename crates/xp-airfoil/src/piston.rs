@@ -254,7 +254,7 @@ fn piston_levers(
             vm.set_i32(m + 0x22c, 0);
         }
     }
-    let gain = reply_f32(env.call(vm, 0x1411dd610, CallArgs::ints(&[f, u64::from(n as u32)])));
+    let gain = crate::engine_small::throttle_ceiling(vm, f, n);
     let x2 = vm.f32(m + 4);
     let x10 = gain * scale;
     let x7 = scale * vm.f32(b + 0x9dc);
@@ -1045,7 +1045,7 @@ fn kind12_finish(
     if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
         let v = running as f32 * vm.f32(m + 0x22c) * vm.f32(m + 0xcc);
         vm.set_f32(m + 0xcc, v);
-        let t = reply_f32(env.call(vm, 0x1411b0a30, CallArgs::ints(&[b, u64::from(n as u32)])));
+        let t = crate::engine_small::engine_lever(vm, b, n);
         vm.set_f32(m + 0xcc, t * vm.f32(m + 0x210) + v);
     }
     let cl = if 0.0 > d15 { 0.0 } else { sse_min(1.0, d15) };
