@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from xp_vmcase import setup_strut_world, setup_balance, setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
+from xp_vmcase import setup_strut_world, setup_wheel_world, setup_balance, setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RBX, UC_X86_REG_RIP, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_XMM10, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
@@ -27,7 +27,10 @@ RANGES = [(0x141265000, 0x141275000), (0x1411d0000, 0x1411e0000), (0x141210000, 
           (0x141220000, 0x141230000), (0x140810000, 0x140820000), (0x1407d0000, 0x1407e0000), (0x1408b0000, 0x1408c0000),
           (0x140900000, 0x140910000), (0x141a50000, 0x141a60000), (0x1411b0000, 0x1411c0000), (0x141180000, 0x141190000),
           (0x1411e0000, 0x1411f0000), (0x141a60000, 0x141a70000), (0x140620000, 0x140630000), (0x140f20000, 0x140f30000), (0x141170000, 0x141180000),
-          (0x1407ce000, 0x1407cf000), (0x140880000, 0x14088b000), (0x140f5f000, 0x140f60000), (0x1411d9000, 0x1411da000)]
+          (0x1407ce000, 0x1407cf000), (0x140880000, 0x14088b000), (0x140f5f000, 0x140f60000), (0x1411d9000, 0x1411da000),
+          (0x141240000, 0x141242000), (0x1410c9000, 0x1410ca000), (0x1407ac000, 0x1407ae000), (0x14195f000, 0x141965000),
+          (0x140984000, 0x140985000), (0x1406ea000, 0x1406eb000), (0x140cb9000, 0x140cbc000), (0x140cc3000, 0x140cc4000),
+          (0x14089c000, 0x14089d000), (0x1419f9000, 0x1419fa000), (0x1408e2000, 0x1408e4000), (0x141238000, 0x141239000)]
 RECORD_VECTOR = 0x146125768
 RECORDING_ID = 0x142f2e3dc
 
@@ -870,38 +873,21 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM9, 0x7fffffff)
         if BLOCK == 'wcontact':
             case.stub(0x1411878f0, lambda call, rng: None)
-            case.stub(0x1411c8690, lambda call, rng: call.ret_int(rng.choice([0, 1, 1, 2])))
             setup_strut_world(case, rng, F, B)
-            G = case.region('G', 0x88 * 10)
             EL = case.region('EL', 0x90 * 10)
-            PP = case.region('PP', 0x100 * 10)
-            for base, off, ptr in ((B, 0x6080, G), (F, 0x6958, EL), (F, 0x6960, EL + 0x90 * rng.choice([10, 10, 10, 9]))):
+            G, WRS = setup_wheel_world(case, rng, F, B, gears=10, wheel_records=[('EL', 0x90 * i) for i in range(10)])
+            for base, off, ptr in ((F, 0x6958, EL), (F, 0x6960, EL + 0x90 * rng.choice([10, 10, 10, 9]))):
                 name = {F: 'F', B: 'B'}[base]
                 fz.preset(name, off, ptr & 0xffffffff, record=True)
                 fz.preset(name, off + 4, ptr >> 32, record=True)
             fz.preset('B', 0xe90, rng.choice([0, 1, 2, 3]))
             fz.preset('F', 0x22c, rng.choice([0, 1]))
-            fz.preset('F', 0x28, rng.choice([0, 7]))
             for off in (0x220, 0x224, 0x64c4, 0x64c8):
                 fz.preset_f32('F', off, rng.uniform(0, 1))
             fz.preset_f32('F', 0x348, rng.choice([rng.uniform(-60, 60), rng.uniform(-30, 30)]))
             fz.preset_f32('F', 0x350, rng.choice([rng.uniform(-60, 60), rng.uniform(-30, 30)]))
             fz.preset_f32('B', 0x65a8, rng.choice([rng.uniform(-60, 60), rng.uniform(-30, 30)]))
-            fz.preset_f32('F', 0x42f50, rng.uniform(0, 3))
             fz.preset_f32('B', 0x2808, rng.uniform(0, 3))
-            for i in range(10):
-                gb = 0x88 * i
-                fz.preset('G', gb, rng.choice([0, 1, 2, 3]))
-                for off, lo, hi in ((0x30, 0.5, 3), (0x34, 0.5, 3), (0x38, -1, 1)):
-                    fz.preset_f32('G', gb + off, rng.uniform(lo, hi))
-                eb = 0x90 * i
-                for off, lo, hi in ((0x10, 0, 1.2), (0x14, -90, 90), (0x18, -90, 90)):
-                    fz.preset_f32('EL', eb + off, rng.uniform(lo, hi))
-                pt = PP + 0x100 * i
-                fz.preset('EL', eb, pt & 0xffffffff, record=True)
-                fz.preset('EL', eb + 4, pt >> 32, record=True)
-                for off, lo, hi in ((0x18, -3, 3), (0x20, -3, 3), (0x64, -2, 2), (0x70, -2, 2), (0x7c, -3, 3)):
-                    fz.preset_f32('PP', 0x100 * i + off, rng.uniform(lo, hi))
             case.emu.uc.reg_write(UC_X86_REG_RCX, B)
             case.emu.uc.reg_write(UC_X86_REG_XMM9, 0x7fffffff)
         if BLOCK == 'wprobe':

@@ -2479,6 +2479,12 @@ impl openxplane::vm::Callees for VmReplay {
         address: u64,
         args: openxplane::vm::CallArgs,
     ) -> openxplane::vm::Reply {
+        if std::env::var_os("XP_TRACE").is_some() {
+            eprintln!(
+                "call {address:#x} (next recorded {:#x})",
+                self.calls.front().map_or(0, |c| c.address)
+            );
+        }
         let c = self
             .calls
             .pop_front()
@@ -2700,6 +2706,12 @@ fn words_match(case: &VmCaseData, n: usize) {
 /// (libm differences, amplified by the cancellation in the earth-centred coordinates). Only for blocks whose
 /// results are doubles: elsewhere a pair of floats would pass as a double.
 fn words_match_with(case: &VmCaseData, n: usize, doubles: bool) {
+    words_match_tol(case, n, doubles, 1e-5);
+}
+
+/// [`words_match_with`] with the relative tolerance of floats: for blocks whose moments subtract nearly equal
+/// products of libm results.
+fn words_match_tol(case: &VmCaseData, n: usize, doubles: bool, tolerance: f32) {
     // a word of the flight object the original left alone must not be written by the port either
     if let Some(f) = u64::from_str_radix(&case.header[0], 16)
         .ok()
@@ -2743,7 +2755,7 @@ fn words_match_with(case: &VmCaseData, n: usize, doubles: bool) {
                 || (normal(got)
                     && normal(*want)
                     && (f32::from_bits(got) - f32::from_bits(*want)).abs()
-                        <= 1e-5 * (1.0 + f32::from_bits(*want).abs())),
+                        <= tolerance * (1.0 + f32::from_bits(*want).abs())),
             "case {n}: {addr:#x}: {got:#x} vs {want:#x}"
         );
     }
@@ -3392,7 +3404,7 @@ fn wheel_contact_matches_the_original_machine_code() {
         openxplane::flight_state::wheel_contact(&mut case.vm, &mut env, f, rbp)
             .unwrap_or_else(|e| panic!("case {n}: {e}"));
         assert!(env.calls.is_empty(), "case {n}: unused calls");
-        words_match(&case, n);
+        words_match_tol(&case, n, true, 1e-4);
     }
 }
 
@@ -3765,7 +3777,11 @@ fn wheel_helpers_match_the_original_machine_code() {
             f(5),
             hex(&h[6]) as i32,
         );
-        assert_eq!(u64::from(got.to_bits()), hex(&h[7]) & 0xffff_ffff, "servo case {n}");
+        assert_eq!(
+            u64::from(got.to_bits()),
+            hex(&h[7]) & 0xffff_ffff,
+            "servo case {n}"
+        );
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match_exact(&case, n);
     }
@@ -3799,6 +3815,38 @@ fn wheel_axis_point_matches_the_original_machine_code() {
         }
         words_match_with(&case, n, false);
     }
+}
+
+#[test]
+fn wheel_model_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("wheel_model.txt");
+    assert!(cases.len() >= 200);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let mut grounded = 0;
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let got = openxplane::wheel::wheel_model_in(
+            &mut case.vm,
+            &mut env,
+            hex(&h[0]),
+            hex(&h[1]) as i32,
+            hex(&h[2]) as i32,
+            0x7fef_ffff_ee00,
+        )
+        .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert_eq!(u64::from(got), hex(&h[3]), "case {n}: result");
+        assert!(
+            env.calls.is_empty(),
+            "case {n}: {} calls unused",
+            env.calls.len()
+        );
+        grounded += usize::from(got);
+        words_match_tol(&case, n, true, 1e-4);
+    }
+    assert!(grounded >= 20, "{grounded}");
 }
 
 #[test]

@@ -181,7 +181,7 @@ def stub_terrain_helpers(case, caller=(0x141960dc0, 0x141961200)):
 SURFACES = 0x14611ac88
 
 
-def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26), heights=(-8.0, 25.0)):
+def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26), heights=(-8.0, 25.0), extent=12.0):
     """Presets a mesh object for 0x14195ffc0 in region `mesh_name`: triangles, flag words, the five range bounds,
     moving cells with their spheres, the surface records and the noise table."""
     fz = case.fz
@@ -192,7 +192,7 @@ def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26)
     tri = case.region('TR', 36 * count)
     for k in range(count):
         for i in range(9):
-            lo, hi = heights if i % 3 == 1 else (-12.0, 12.0)
+            lo, hi = heights if i % 3 == 1 else (-extent, extent)
             fz.preset_f32('TR', 36 * k + 4 * i, rng.uniform(lo, hi))
     flags = case.region('FL', 4 * count)
     for k in range(count):
@@ -356,7 +356,7 @@ def setup_balance(case, rng, F, B):
     case.stub(0x140f42620, lambda call, rng: call.ret_int(ENT))
 
 
-def setup_strut_world(case, rng, F, B, mesh_triangles=(8, 20)):
+def setup_strut_world(case, rng, F, B, mesh_triangles=(8, 20), mesh_extent=12.0, mesh_heights=(-3.0, 3.0)):
     """Presets what 0x1411c7a50 needs around a flight object whose blocks already set the wheel vector, the
     matrices and the position: the terrain mesh, the weight and balance, the aircraft tables, the surface table
     with the wetness, the contact and recorder vectors and the replayed callees."""
@@ -366,7 +366,7 @@ def setup_strut_world(case, rng, F, B, mesh_triangles=(8, 20)):
     def put(name, off, v):
         fz.preset(name, off, v & 0xffffffff)
         fz.preset(name, off + 4, v >> 32)
-    setup_segment_mesh(case, rng, 'F', 0x42e40, triangles=mesh_triangles, heights=(-3.0, 3.0))
+    setup_segment_mesh(case, rng, 'F', 0x42e40, triangles=mesh_triangles, heights=mesh_heights, extent=mesh_extent)
     setup_balance(case, rng, F, B)
     fz.region('TB', 0x1461243b0, 8)
     put('TB', 0, F)
@@ -449,3 +449,122 @@ def setup_strut_world(case, rng, F, B, mesh_triangles=(8, 20)):
             call.put(vec + off, v & 0xffffffff)
             call.put(vec + off + 4, v >> 32)
     case.stub(0x140f0f660, grow_rec)
+
+
+def setup_wheel_world(case, rng, F, B, gears=3, wheel_records=None):
+    """Presets what the native wheel model 0x1411c8690 reads on top of setup_strut_world: the planet, the globals
+    of the surface, the gear and wheel records (`gears` of them; `wheel_records` is a list of
+    (name, offset) places of the wheel records, the default creates a region), the objects those point to and the
+    input-binding query for the idents 0x88 + gear. Returns (G, WRS) with the gear region and the wheel record
+    addresses."""
+    fz = case.fz
+
+    def put(name, off, v):
+        fz.preset(name, off, v & 0xffffffff)
+        fz.preset(name, off + 4, v >> 32)
+    for off in (0xbcc8, 0xbcd0):
+        fz.preset('F', off, 0)
+    fz.preset('F', 0x28, 0)
+    case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.05, 0.2, rng.uniform(0, 0.5)])))
+    case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
+    case.stub(0x140c51370, lambda call, rng: call.ret_int(0))
+    CX = case.region('CX', 0x300)
+    case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
+    case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
+    fz.preset_f64('CX', 0xb0, 6378137.0)
+    fz.preset_f64('CX', 0xb8, rng.uniform(6350000.0, 6378000.0))
+    fz.preset_f64('CX', 0xc8, rng.uniform(0.0, 0.01))
+    fz.preset_f64('CX', 0xd0, rng.uniform(0.0, 0.01))
+    for off in range(0x200, 0x278, 8):
+        fz.preset_f64('CX', off, rng.uniform(-3.0, 3.0))
+    G = case.region('G', 0x88 * gears)
+    put('B', 0x6080, G)
+    for k in range(gears):
+        fz.preset('G', 0x88 * k, rng.choice([0, 1, 2, 3, 3, 4, 4, 5, 6, 7, 8]))
+        fz.preset('G', 0x88 * k + 4, rng.choice([0, 1]))
+        fz.preset('G', 0x88 * k + 0xc, rng.choice([0, 0, 1]))
+        fz.preset_f32('G', 0x88 * k + 0x24, rng.uniform(-20, 20))
+        fz.preset_f32('G', 0x88 * k + 0x28, rng.uniform(1000, 20000))
+        fz.preset_f32('G', 0x88 * k + 0x2c, rng.uniform(0.05, 0.4))
+        fz.preset_f32('G', 0x88 * k + 0x30, rng.uniform(1000, 30000))
+        fz.preset_f32('G', 0x88 * k + 0x34, rng.choice([rng.uniform(0.2, 0.7), 0.0]))
+        fz.preset_f32('G', 0x88 * k + 0x38, rng.uniform(0, 3000))
+        fz.preset_f32('G', 0x88 * k + 0x3c, rng.uniform(0, 100))
+        fz.preset_f32('G', 0x88 * k + 0x50, rng.choice([0.0, rng.uniform(0, 2), 0.005]))
+        fz.preset_f32('G', 0x88 * k + 0x54, rng.choice([0.0, rng.uniform(0, 2), 0.005]))
+        fz.preset_f32('G', 0x88 * k + 0x58, rng.uniform(0.1, 0.8))
+        fz.preset_f32('G', 0x88 * k + 0x60, rng.uniform(0.1, 3))
+        fz.preset_f32('G', 0x88 * k + 0x7c, rng.choice([0.0, 0.3, -0.3]))
+    if wheel_records is None:
+        WRS = [case.region('WR%d' % k, 0x90) for k in range(gears)]
+        names = ['WR%d' % k for k in range(gears)]
+        offs = [0] * gears
+    else:
+        names = [n for n, _ in wheel_records]
+        offs = [o for _, o in wheel_records]
+        WRS = [case.fz.regions[n][0] + o for n, o in wheel_records]
+    for k in range(gears):
+        Q = case.region('Q%d' % k, 0x80)
+        BW = case.region('BW%d' % k, 0x2900)
+        n, o = names[k], offs[k]
+        put(n, o, Q)
+        put(n, o + 8, BW)
+        for off, lo, hi in ((0x10, 0.0, 1.2), (0x14, -30, 30), (0x18, -30, 30), (0x24, -30, 30), (0x28, -30, 30),
+                            (0x40, -3, 3), (0x44, -3, 3), (0x48, -50, 50), (0x50, 0.0, 1.0), (0x54, 0.0, 1.2),
+                            (0x58, 0, 2), (0x5c, 0, 5), (0x60, -1, 3), (0x64, 0, 1), (0x68, 0, 10)):
+            fz.preset_f32(n, o + off, rng.uniform(lo, hi))
+        fz.preset(n, o + 0x4c, rng.choice([0, 0, 1]))
+        fz.preset_f64(n, o + 0x80, rng.uniform(-8, 8))
+        fz.preset_f64(n, o + 0x88, rng.uniform(-8, 8))
+        fz.preset(n, o + 0x7c, rng.choice([0, 1]))
+        for off, lo, hi in ((0x18, 0.3, 1.5), (0x20, 0.0, 0.5), (0x64, -3, 3), (0x70, -3, 3), (0x7c, -3, 3)):
+            fz.preset_f32('Q%d' % k, off, rng.uniform(lo, hi))
+        for off, lo, hi in ((0x2838, 5, 100), (0x2898, 0.5, 20), (0x282c, 0.5, 5)):
+            fz.preset_f32('BW%d' % k, off, rng.uniform(lo, hi))
+    for off, lo, hi in ((0x27cc, 0.1, 0.6), (0x283c, 0.1, 3), (0x65a8, -20, 20)):
+        fz.preset_f32('B', off, rng.uniform(lo, hi))
+    fz.preset_f32('B', 0x27bc, rng.choice([0.0, 0.0, rng.uniform(0.1, 30)]))
+    fz.preset_f32('B', 0x1e90, rng.choice([0.0, rng.uniform(0.5, 5)]))
+    fz.preset('B', 0xe98, rng.choice([0, 1, 1]))
+    for off, lo, hi in ((0x42f50, 0.2, 1.5), (0x358, -30, 30), (0x408, -30, 30), (0x41c, 0, 5),
+                        (0x240, -1, 1), (0x244, -1, 1)):
+        fz.preset_f32('F', off, rng.uniform(lo, hi))
+    for off, choices in ((0x200, [0, 1]), (0x204, [0, 1]), (0x214, [0, 0, 1])):
+        fz.preset('F', off, rng.choice(choices))
+    fz.preset_f32('F', 0x210, rng.choice([0.0, 0.3, 0.8]))
+    fz.preset_f32('F', 0x218, rng.choice([0.0, 0.0, 0.5]))
+    fz.region('TD', 0x142f01910, 8)
+    fz.preset_f64('TD', 0, rng.uniform(0, 1000))
+    ENG = case.region('ENG', 0x68)
+    OBJ = case.region('OBJ', 0x40)
+    ENGL = case.region('ENGL', 0x2cc)
+    put('B', 0x5ff8, ENG)
+    fz.preset('ENG', 0, rng.choice([0, 1, 2, 3, 5]))
+    put('B', 0x1d18, rng.choice([0, OBJ]))
+    put('F', 0x68b0, ENGL)
+    fz.preset_f32('ENGL', 0x218, rng.choice([0.0, 0.3, 1.0, -0.5]))
+    for off in (0x55c, 0x564, 0x5ac, 0x5b0, 0x5b4, 0x5b8, 0x5bc, 0x5c0, 0x5c4, 0x5f0, 0x5f4):
+        fz.preset('F', off, rng.choice([0, 0, 1, 2, 5]))
+    for k in range(6):
+        fz.preset_f32('F', 0xd18 + 4 * k, rng.choice([-1.0, 0.0, rng.uniform(-0.5, 1.5), 1.0]))
+        fz.preset_f32('F', 0xd30 + 4 * k, rng.uniform(-2, 2))
+    fz.preset('B', 0x918, rng.choice([0, 1, 1]))
+    fz.preset('B', 0x91c, rng.choice([0, 1, 1, 2]))
+    fz.preset('B', 0xad8, rng.choice([-1, 0, 3, 12, 13, 40]) & 0xffffffff)
+    fz.preset('B', 0xc90, rng.randrange(0, 8))
+    fz.preset_f32('B', 0x1b7c, rng.choice([0.0, 0.5, 1.0, 0.2]))
+    for gear in range(gears):
+        ident = 0x88 + gear
+        fz.preset('F', 0xdc0 + 4 * ident, rng.choice([0, 0, 0, 6, 1]))
+        byte_at = 0x55f0 + ident
+        fz.preset('F', byte_at & ~3, rng.choice([0, 0, 1]) << (8 * (byte_at & 3)), record=True)
+        mask_at = 0x2998 + ident
+        fz.preset('B', mask_at & ~3, rng.choice([0, 1, 2, 3, 4, 8, 0x10, 0x20, 0x3f, 0x25]) << (8 * (mask_at & 3)), record=True)
+        fz.preset_f32('B', 0x2c9c + 4 * ident, rng.uniform(-2, 2))
+        fz.preset('IT2', 4 * ident, case.emu.read_u32(0x142515560 + 4 * ident))
+    for k in range(13):
+        fz.preset('IT3', 40 * k, case.emu.read_u32(0x142515364 + 40 * k))
+    fz.region('GT', 0x142f01918, 8)
+    fz.preset_f64('GT', 0, rng.choice([0.0, 0.5, 0.9, -1.0]))
+    case.stub(0x14082be10, lambda call, rng: call.ret_int(rng.choice([0, 1])))
+    return G, WRS

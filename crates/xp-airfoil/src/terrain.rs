@@ -207,7 +207,7 @@ fn point(vm: &Vm, address: u64) -> [f32; 3] {
 }
 
 /// `0x140984e50(x, y, seed)` on the process's noise table (see `buffet::NoiseTable::basis2`).
-fn noise2(vm: &Vm, x: f32, y: f32, seed: i32) -> f32 {
+pub fn noise2(vm: &Vm, x: f32, y: f32, seed: i32) -> f32 {
     let (ax, ay) = (x.abs(), y.abs());
     let (ix, iy) = (ax as i64 as u32, ay as i64 as u32);
     let base = (iy << 9)

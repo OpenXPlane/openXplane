@@ -301,7 +301,6 @@ pub fn strut_contact(
         env.call(vm, 0x1405e73d0, args);
     }
     if vm.i32(f + 0x28) == vm.i32(RECORDED_AIRCRAFT) {
-        let cursor = vm.u64(RECORDER + 8);
         let fields = [
             (0x14u64, s.x.to_bits()),
             (0x18, s.a5.to_bits()),
@@ -310,24 +309,7 @@ pub fn strut_contact(
             (0x30, cb.to_bits()),
             (0x34, cc.to_bits()),
         ];
-        if cursor != vm.u64(RECORDER + 16) {
-            for off in (0..0x50).step_by(4) {
-                vm.set_u32(cursor + off, 0);
-            }
-            for (off, w) in fields {
-                vm.set_u32(cursor + off, w);
-            }
-            vm.set_u64(RECORDER + 8, cursor + 0x50);
-        } else {
-            let tmp = FRAME + 0x20;
-            for off in (0..0x50).step_by(4) {
-                vm.set_u32(tmp + off, 0);
-            }
-            for (off, w) in fields {
-                vm.set_u32(tmp + off, w);
-            }
-            env.call(vm, 0x140f0f660, CallArgs::ints(&[RECORDER, cursor, tmp]));
-        }
+        record_contact(vm, env, FRAME + 0x20, fields);
     }
     if vm.i32(f + 0x28) == 0 && vm.f64(0x1_42f0_1920) > 1.0 {
         let code = if vn > 4.0 {
@@ -348,4 +330,35 @@ pub fn strut_contact(
         }
     }
     Ok(depth > 0.0)
+}
+
+/// Appends a 0x50-byte record with the given words to the recorder vector `0x146125768`: written in place while
+/// there is room, otherwise through `0x140f0f660` (replayed) from the scratch record `tmp`.
+pub(crate) fn record_contact(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    tmp: u64,
+    fields: [(u64, u32); 6],
+) {
+    let cursor = vm.u64(RECORDER + 8);
+    if cursor != vm.u64(RECORDER + 16) {
+        for off in (0..0x50).step_by(4) {
+            vm.set_u32(cursor + off, 0);
+        }
+        for (off, w) in fields {
+            vm.set_u32(cursor + off, w);
+        }
+        vm.set_u64(RECORDER + 8, cursor + 0x50);
+    } else {
+        for off in (0..0x50).step_by(4) {
+            vm.set_u32(tmp + off, 0);
+        }
+        for (off, w) in fields {
+            vm.set_u32(tmp + off, w);
+        }
+        let mut args = CallArgs::ints(&[RECORDER, cursor]);
+        args.int[2] = None;
+        env.call(vm, 0x140f0f660, args);
+        let _ = tmp;
+    }
 }

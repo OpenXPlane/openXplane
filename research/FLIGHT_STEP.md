@@ -750,4 +750,48 @@ original in the emulator (`tools/gen_small_vectors.py`, kinds `caster` and `serv
   by their sines and cosines and moved into the aircraft frame (`0x141296750`, no origin shift). Vectors
   `wheel_axis.txt` (200 cases, pole included).
 
-Not yet ported: the wheel model body `0x1411c8690` and the blend contact `0x1411cb1e0`.
+## Wheel contact model `0x1411c8690`
+
+`wheel::wheel_model(wheel, aircraft, gear)` (`wheel_model_in` takes the frame address the vectors use) ports the
+whole function; the vectors (`tools/gen_wheel_vectors.py`, 200 cases, `tests/data/wheel_model.txt`) run the original
+in the emulator with the time source, the engine flag, the debug query, the binding query (`0x14082be10`), the
+planet lookup, the geoid height, the sound trigger, the vector growth and the triangle normal replayed; everything
+else (the binding query, the terrain segment probe, the surface rows, the noise table, the tire motion, the
+plug-in force, the servo and the axis point) runs natively. Stages, with the original's frame slots:
+
+1. Gear record `G = [B+0x6080] + 0x88 gear`. While the binding `(0x88, gear)` is held the wheel size `G+0x58`
+   is reshaped (`sin(1.8 r)`, `sin r` blend, `r = W+0x48` degrees) and the brake terms `rbp-0x7c`/`rbp-0x80` start.
+2. The strut axis `(0, cos p, -sin p)` (`p = B+0x65a8`) is rotated to the world (`rotate_pairs_f64`), the lowest
+   point of the wheel `q + L (sin a cos b, -cos a cos b, -sin b) - axis * size` is built from the record's two
+   angles (`W+0x14`, `W+0x18`) and its object `[W]` (`+0x18 - (1 - W+0x10) +0x20` the leg length, `+0x64/+0x70/
+   +0x7c` the attachment) and moved out of the aircraft frame (`world_point_f64`). `W+0x78` is cleared.
+3. A 3 x 3 grid (step `size / 4`... `size * {-0.25, 0, 0.25}` on both horizontal axes) of vertical segments
+   `y +- (F+0x42f50 + 5 size)` is probed against the terrain mesh `F+0x42e40`. The highest hit is the ground
+   height; the centre hit also gives the surface id (`W+0x78`), the normal and the velocity of the surface.
+   Initial slots: ground `-99999`, normal `(0, 1, 0)`. Without a centre hit `W+0x4c` is cleared.
+4. The ground point is converted to the geoid altitude `W+0x70` (`local_to_geodetic`), moved into the aircraft
+   frame in double precision, the velocity of that point (`F+0x3cc.. 0x3d4` turn rates, `F+0x368..` velocity)
+   is taken relative to the surface and rotated into the aircraft frame; `vn` is the velocity along the normal
+   (`W+0x30`).
+5. Travel limits by gear kind (`B+0x27cc`, kinds 4, 5, 8 half, kind 6 full): with a positive limit the compression
+   `dep` and the force `rbp-0x1f0` are corrected at the limits (`B+0x283c`) and `W+0x20` becomes the angle between
+   the two ends, `asin(dy / (2 limit))` in degrees.
+6. Compression `W+0x2c = max(dep, 0)`; the spring force `s = interpolate(0, G+0x2c -> G+0x28, then G+0x30 at
+   G+0x34) + vn G+0x38`, never below 0 and capped at `2 B+0x2898 * 9.798`, is `rbp+0x1e8`.
+7. The surface row `[0x14611ac88] + 36 id` scales the friction (`B+0x27c0 * +0x18`, `B+0x27c4 * +0x1c`);
+   the wetness/roughness patches (`0x142fe8518..24` against the noise at `0.05 x`, `0.05 z`) clamp both factors
+   by `1 - 0.8 g3`, `1 - 0.6 g2`, `1 - 0.4 g1`, `1 - 0.2 g0` (floors 0.2, 0.4, 0.6, 0.8); above the speed
+   `9 sqrt(G+0x3c) 0.5144` knots in the wet case both become 0.05.
+8. The steering angle `W+0x28` (caster/lock predicate `0x141240d40`, nose-wheel limit `B+0x27bc`, rate limit
+   `B+0x1e90`, or the free angle from the sideslip with the locked caster); the slip direction, the lateral
+   force, the skid state `W+0x54` and the wear terms `W+0x68`, `W+0x60`, `W+0x64`, the rolling force servo on
+   `W+0x44` (`0x1410c9620`).
+9. With a positive spring force the tire motion `0x141182450` (`tire::tire_motion`), the axis point
+   `0x141240fc0` (`wheel_axis_point`), the plug-in force `0x1408e3230` (`add_plugin_force`), the recorder
+   record and the touch-down sound by the sink speed. The result is `W+0x2c > 0`.
+
+Evidence for the constants is the disassembly (`0x1411c8690..0x1411cb1db`); the vectors compare the memory the
+function writes with a relative 1e-4 for floats (the plug-in moments subtract nearly equal libm-derived terms) and
+1e-7 for doubles. The wheel's debug dumps (`F+0xbcc8`, `F+0xbcd0`) are not ported (an error is returned).
+
+Not yet ported: the blend contact `0x1411cb1e0`.

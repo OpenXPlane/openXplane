@@ -1584,7 +1584,7 @@ pub fn gear_state_update(
 /// 10 per second when it is above the target and the latches `B+0xe90` / `F+0x22c` do not both hold; not at all while
 /// both hold and the target is below it or `B+0xe90 >= 2`); `0x1411878f0(F)` runs (replayed) and `F+0x64c8` eases
 /// toward `F+0x64c4` by `2 dt`. Then each of the ten gears with a kind is handed to the contact function (replayed):
-/// the tire function `0x1411c8690(entry, F+0x28, i)` when the gear's kind is not 1 and `|B+0x65a8|`, `|F+0x348|`,
+/// the tire function `0x1411c8690(entry, F+0x28, i)` (`wheel::wheel_model`) when the gear's kind is not 1 and `|B+0x65a8|`, `|F+0x348|`,
 /// `|F+0x350|` are below 45 degrees, otherwise the strut function `0x1411c7a50` with the foot point computed from the
 /// entry's pose. The contact counts add up in `rbp+0x1758`; afterwards `F+0x24c = count > 0`, `F+0x250 = count >= 3`
 /// and `F+0x64cc = pedal * B+0x2808`. Register state: `xmm9 = 0x7fffffff`, `xmm11 = rad`, `xmm12 = 1.0` (double).
@@ -1645,12 +1645,10 @@ pub fn wheel_contact(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Re
             && vm.f32(f + 0x348).abs() < 45.0
             && vm.f32(f + 0x350).abs() < 45.0;
         let result = if kind != 1 && tilt_ok {
-            env.call(
-                vm,
-                0x1411c8690,
-                CallArgs::ints(&[elem, u64::from(vm.u32(f + 0x28)), i]),
-            )
-            .rax as i32
+            let aircraft = vm.i32(f + 0x28);
+            i32::from(crate::wheel::wheel_model(
+                vm, env, elem, aircraft, i as i32,
+            )?)
         } else {
             let a7 = vm.f32(b + 0x65a8) * RAD;
             let drop = -vm.f32(f + 0x42f50) * a7.sin();
