@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Interactive flight now uses the recovered delta coefficient branch for swept wings,
+  with AFL thickness, model time and its existing noise table. Five local Cessna
+  behavioural checks pass, including a 60-degree swept-wing smoke case. Runtime
+  reference fields remain approximate. [Evidence and limits](research/DELTA_WING_LIVE.md).
+
 - Connected explicit delta state through the complete element force API.
   200 original full-function cases validate controls, force scaling and delta integration;
   corrected alternative-panel atan rounding exposed by a nearly cancelling moment.

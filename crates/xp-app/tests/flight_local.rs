@@ -9,8 +9,14 @@ use std::path::Path;
 
 const ACF: &str = "Xplane12/Cessna 172 SP/Cessna_172SP.acf";
 
+fn reference_root() -> std::path::PathBuf {
+    std::env::var_os("OPENXPLANE_REFERENCE_ROOT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Xplane12"))
+}
+
 fn model() -> Option<FlightModel> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Xplane12");
+    let root = reference_root();
     let acf = root.join("Cessna 172 SP/Cessna_172SP.acf");
     if !acf.is_file() {
         eprintln!("skipped: {ACF} not found");
@@ -183,5 +189,74 @@ fn print_slow_pull_up() {
                 t.stalled_elements
             );
         }
+    }
+}
+
+#[test]
+fn swept_wings_run_through_delta_context_in_the_live_model() {
+    let root = reference_root();
+    let source = root.join("Cessna 172 SP/Cessna_172SP.acf");
+    if !source.is_file() {
+        eprintln!("skipped: {ACF} not found");
+        return;
+    }
+    let text = std::fs::read_to_string(source).unwrap();
+    let modified = text
+        .lines()
+        .map(|line| {
+            for wing in 0..4 {
+                let key = format!("P _wing/{wing}/_sweep_design ");
+                if line.starts_with(&key) {
+                    return format!("{key}60.0");
+                }
+            }
+            line.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "openxplane-swept-{}-{nonce}.acf",
+        std::process::id()
+    ));
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .unwrap();
+    file.write_all(modified.as_bytes()).unwrap();
+    drop(file);
+    let install = Install::open(&root).unwrap();
+    let loaded = FlightModel::load(&path, &install, 80.0, 90.0);
+    std::fs::remove_file(path).unwrap();
+    let mut model = loaded.unwrap();
+    assert_eq!(
+        model
+            .wings()
+            .iter()
+            .filter(|w| w.index < 4 && w.sweep_deg == 60.0)
+            .count(),
+        4
+    );
+    model.state.position.y = 600.0;
+    model.state.orientation = glam::Quat::from_rotation_x(10.0_f32.to_radians());
+    model.set_airspeed(45.0);
+    // A downward flight-path component gives the swept surfaces nonzero incidence.
+    model.state.velocity.y -= 5.0;
+    for _ in 0..50 {
+        model.step(1.0 / 200.0, &Controls::default());
+        assert!(model.state.position.is_finite() && model.state.velocity.is_finite());
+    }
+    for wing in 0..4 {
+        let report = model.wing_report.iter().find(|r| r.0 == wing).unwrap();
+        assert!(report.1.is_finite() && report.2.is_finite());
+        assert!(
+            report.1.length() > 1.0,
+            "swept wing {wing} contributes no force"
+        );
     }
 }

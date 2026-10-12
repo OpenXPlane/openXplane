@@ -71,6 +71,12 @@ impl<'a> Reader<'a> {
 }
 
 impl Airfoil {
+    /// AFL 1110's first scalar is stored at original foil+0x58 and read by the
+    /// wing thickness kernel. Preserve the parsed float without unit conversion.
+    pub fn thickness(&self) -> f32 {
+        self.header_scalars[0]
+    }
+
     pub fn parse(text: &str) -> Result<Self, String> {
         let mut reader = Reader {
             lines: text.trim_start_matches('\u{feff}').lines(),

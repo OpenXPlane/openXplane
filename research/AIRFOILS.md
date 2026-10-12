@@ -85,3 +85,10 @@ input. The original AFL files are not copied into the tests.
 The local reports in `research/local/` are excluded from Git: `afl-loader-xrefs.json`,
 `afl-reader-disassembly.txt`, `airfoil-3d-corrections.txt`, `airfoil-path-loading.txt`,
 `airfoil-library-audit.txt`, `airfoil-aircraft-audit.txt`.
+
+## Header thickness field (2026-10-13)
+
+The first AFL 1110 header scalar is stored at foil+0x58 by instruction
+`0x141a42f0b`; the second at +0x5c by `0x141a42f27`. The wing thickness helper
+reads +0x58. `Airfoil::thickness()` preserves this first scalar and the interactive
+model now supplies it to delta context. [Evidence and limits](DELTA_WING_LIVE.md).

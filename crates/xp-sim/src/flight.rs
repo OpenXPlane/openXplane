@@ -94,8 +94,6 @@ struct WingGeom {
     elements: i32,
     ar: f32,
     side: f32,
-    /// A swept wing whose sweep passes 40 degrees would select the unported delta-wing block.
-    swept: bool,
 }
 
 struct ElementData {
@@ -331,7 +329,6 @@ impl FlightModel {
                 elements: n as i32,
                 ar: (*ar).max(0.5),
                 side: w.side,
-                swept: w.sweep_deg.abs() > 35.0,
             });
             let geom = geoms.len() - 1;
             for e in w.elements() {
@@ -617,12 +614,17 @@ impl FlightModel {
                     r163: 1.0,
                     stall_flag: ed.stalled,
                 },
-                skip_delta_block: geom.swept,
+                skip_delta_block: false,
             };
             let airfoils = &self.airfoils;
             let noise = &self.noise;
             let foil_ids = ed.foil_ids;
-            let Ok(out) = wing_element::evaluate(&inputs, |c: &FoilCall| {
+            let delta = wing_element::DeltaContext {
+                noise,
+                running_time_seconds: time.seconds(),
+                foil_thickness: foil_ids.map(|id| Some(airfoils[id].thickness())),
+            };
+            let Ok(out) = wing_element::evaluate_with_delta(&inputs, &delta, |c: &FoilCall| {
                 let o = profile::outer(
                     &airfoils[foil_ids[c.slot]],
                     OuterInputs {
