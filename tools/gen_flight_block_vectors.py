@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from xp_vmcase import setup_strut_world, setup_wheel_world, setup_balance, setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
+from xp_vmcase import setup_strut_world, setup_wheel_world, setup_blend_world, setup_blend_body, setup_balance, setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RBX, UC_X86_REG_RIP, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_XMM10, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
@@ -956,37 +956,24 @@ def main():
                              (UC_X86_REG_RDI, 0), (UC_X86_REG_R11, 0)):
                 case.emu.uc.reg_write(reg, val)
         if BLOCK == 'bblend':
-            def contact(call, rng):
-                call.ret_int(rng.choice([0, 1, 1]))
-                for k in (3, 4, 5):
-                    call.put_f32(call.stack[k], rng.uniform(-2, 2))
-                call.put_f32(call.stack[6], rng.choice([-1.0, 0.0, rng.uniform(0, 5)]))
-                call.put_f32(call.stack[7], rng.choice([0.0, 0.005, rng.uniform(0, 3)]))
-            case.stub(0x1411cb1e0, contact)
-            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([-0.1, 0.1, 0.3, 0.4, 0.6, rng.uniform(0, 0.6)])))
+            setup_strut_world(case, rng, F, B, mesh_triangles=(20, 40), mesh_extent=rng.choice([2.0, 4.0]), mesh_heights=(0.0, 3.0))
+            setup_blend_world(case, rng, F, B)
             D = case.region('D', 0x34c8)
             case.body = D
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
             fz.preset('F', 0x24, B >> 32, record=True)
+            setup_blend_body(case, rng, 'D', 0)
             fz.preset('D', 0x654, rng.choice([0, 1, 2, 3, 3, 4]))
             fz.preset('D', 0x658, rng.choice([-1, 0, 1, 3, 4, 7, 8, 12]))
             fz.preset('D', 0x2c, rng.choice([0, 0, 1]))
             for off in range(0x30, 0x54, 4):
                 fz.preset_f32('D', off, rng.uniform(0, 1))
-            for off in (0x368, 0x370):
-                fz.preset_f32('F', off, rng.choice([0.0, rng.uniform(-10, 10), rng.uniform(-3, 3)]))
             for reg, val in ((UC_X86_REG_RSI, D), (UC_X86_REG_RBX, D + 0x588), (UC_X86_REG_RDI, 0),
                              (UC_X86_REG_R11, 0)):
                 case.emu.uc.reg_write(reg, val)
         if BLOCK == 'bloop':
-            def contact(call, rng):
-                call.ret_int(rng.choice([0, 1, 1]))
-                for k in (3, 4, 5):
-                    call.put_f32(call.stack[k], rng.uniform(-2, 2))
-                call.put_f32(call.stack[6], rng.choice([-1.0, 0.0, rng.uniform(0, 5)]))
-                call.put_f32(call.stack[7], rng.choice([0.0, 0.005, rng.uniform(0, 3)]))
-            case.stub(0x1411cb1e0, contact)
-            setup_strut_world(case, rng, F, B)
+            setup_strut_world(case, rng, F, B, mesh_triangles=(20, 40), mesh_extent=rng.choice([2.0, 4.0]), mesh_heights=(0.0, 3.0))
+            setup_blend_world(case, rng, F, B)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([-0.1, 0.1, 0.3, 0.4, 0.6, rng.uniform(0, 0.6)])))
             D = case.region('D', 0x34c8 * 39)
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
@@ -999,6 +986,7 @@ def main():
                 fz.preset_f32('F', off, rng.choice([0.0, rng.uniform(-10, 10), rng.uniform(-3, 3)]))
             for j in range(39):
                 b = 0x34c8 * j
+                setup_blend_body(case, rng, 'D', b)
                 fz.preset('D', b + 0x5f0, rng.choice([0x27, 0x27, 3, 5, 0x26, 0x10]))
                 fz.preset('D', b + 0x54, rng.choice([0, 0, 0, 1]))
                 fz.preset('D', b + 0x588, rng.choice([0, 1, 1, 1]))

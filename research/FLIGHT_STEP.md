@@ -794,4 +794,19 @@ Evidence for the constants is the disassembly (`0x1411c8690..0x1411cb1db`); the 
 function writes with a relative 1e-4 for floats (the plug-in moments subtract nearly equal libm-derived terms) and
 1e-7 for doubles. The wheel's debug dumps (`F+0xbcc8`, `F+0xbcd0`) are not ported (an error is returned).
 
-Not yet ported: the blend contact `0x1411cb1e0`.
+## Blend contact `0x1411cb1e0`
+
+`blend::blend_contact(F, s, g, base, i0, i1, outs)` (`blend_contact_in` takes the frame address of the vectors,
+`tools/gen_blend_vectors.py`, 160 cases): one quad of a body surface (vertices of 12 bytes in `base`, 18 per row).
+The quad centre goes through the euler offsets of `g` (`0x14120cf60`) and to the world (`0x1407ac020`) and is
+probed against the terrain (`0x141960dc0`); a miss returns 0. The velocity of the point (turn rates `F+0x3cc..`
+rotated by the frame matrices plus `F+0x368..`) moves it 0.01 s ahead for a second probe; its height difference
+gives the vertical rate (`* 100`) and the slope. With the body's contact flag `s+0x2c` the lag term of `s+0x38`/`s+0x44` is applied. A point not below the
+ground (`d <= 0`) returns 0. Otherwise the quad extent (quarter sums of the vertices, euler offsets, no add) and
+the heading of the velocity give the normal force (`pw = 1000/2 hs^1.75`, `signed_pow` terms, sine squared with its
+sign), which is rotated by the heading and by the planet matrix at the position (`0x1419f7e70`,
+`flight_state::local_axes_forward`), moved into the aircraft frame (`0x141296750`) and added as a plug-in force at the
+quad centre. For the recorded aircraft three debug lines go to the vector `0x146125780` (growth `0x141167000`
+replayed). The outputs are the centre (`outs[0..3]`) and two accumulators. NaN diagnostics (log strings) are not
+ported and return an error; a NaN float written to a checked slot becomes zero (`0x1411764a0`, `0x1408e25a0`).
+`flight_state::body_contact_blend` calls it natively.

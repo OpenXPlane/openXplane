@@ -2749,6 +2749,9 @@ fn words_match_tol(case: &VmCaseData, n: usize, doubles: bool, tolerance: f32) {
     };
     for (addr, want) in &case.expected {
         let got = case.vm.u32(*addr);
+        if std::env::var_os("XP_ALL").is_some() && got != *want {
+            eprintln!("case {n}: {addr:#x}: {got:#x} vs {want:#x}");
+        }
         assert!(
             doubles_agree(*addr)
                 || got == *want
@@ -3464,9 +3467,10 @@ fn body_contact_blend_matches_the_original_machine_code() {
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
-        openxplane::flight_state::body_contact_blend(&mut case.vm, &mut env, f, rbp, body);
+        openxplane::flight_state::body_contact_blend(&mut case.vm, &mut env, f, rbp, body)
+            .unwrap_or_else(|e| panic!("case {n}: {e}"));
         assert!(env.calls.is_empty(), "case {n}: unused calls");
-        words_match(&case, n);
+        words_match_tol(&case, n, true, 1e-4);
     }
 }
 
@@ -3482,7 +3486,7 @@ fn body_contact_loop_matches_the_original_machine_code() {
         };
         openxplane::flight_state::body_contact_loop(&mut case.vm, &mut env, f, rbp).unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
-        words_match(&case, n);
+        words_match_tol(&case, n, true, 1e-4);
     }
 }
 
@@ -3847,6 +3851,43 @@ fn wheel_model_matches_the_original_machine_code() {
         words_match_tol(&case, n, true, 1e-4);
     }
     assert!(grounded >= 20, "{grounded}");
+}
+
+#[test]
+fn blend_contact_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("blend_contact.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let mut contacts = 0;
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let outs = [hex(&h[6]), hex(&h[7]), hex(&h[8]), hex(&h[9]), hex(&h[10])];
+        let got = openxplane::blend::blend_contact_in(
+            &mut case.vm,
+            &mut env,
+            hex(&h[0]),
+            hex(&h[1]),
+            hex(&h[2]),
+            hex(&h[3]),
+            hex(&h[4]) as i32,
+            hex(&h[5]) as i32,
+            outs,
+            0x7fef_ffff_ed80,
+        )
+        .unwrap_or_else(|e| panic!("case {n}: {e}"));
+        assert_eq!(u64::from(got), hex(&h[11]), "case {n}: result");
+        assert!(
+            env.calls.is_empty(),
+            "case {n}: {} calls unused",
+            env.calls.len()
+        );
+        contacts += usize::from(got);
+        words_match_tol(&case, n, true, 1e-4);
+    }
+    assert!(contacts >= 5, "{contacts}");
 }
 
 #[test]

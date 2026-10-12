@@ -1922,7 +1922,13 @@ fn blend_to(vm: &mut Vm, env: &mut dyn Callees, at: u64, new: f32) {
 /// outputs; a contact raises `F+0x24c`, `F+0x250`, `rbp-0x78` and the body's `+0x2c`, and tracks the contact with the
 /// lowest and with the highest third output. When the body has a contact (`+0x2c`) its smoothed values `+0x30..+0x50`
 /// are blended toward the new ones with `clamp(2 * frame time)`, otherwise `+0x30..+0x38` are cleared.
-pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, s: u64) {
+pub fn body_contact_blend(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+    s: u64,
+) -> Result<(), String> {
     let slot = |o: i64| (rbp as i64 + o) as u64;
     let g = s + 0x588;
     let r14 = s + 0x630;
@@ -1944,18 +1950,15 @@ pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
                 vm.set_f32(slot(-0x6c), 0.0);
                 vm.set_f32(slot(-0x30), 0.0);
                 vm.set_f32(slot(-0x18), 0.0);
-                let args = CallArgs {
-                    int: [Some(f), Some(s), Some(g), Some(r14)],
-                    xmm: [None; 4],
-                    stack: [
-                        u64::from(j),
-                        edi as u32 as u64,
-                        r12 as u32 as u64,
-                        slot(-0x6c),
-                    ]
-                    .map(Some),
-                };
-                if env.call(vm, 0x1411cb1e0, args).rax as u32 != 0 {
+                let outs = [
+                    slot(-0x6c),
+                    slot(-0x30),
+                    slot(-0x18),
+                    slot(-0x1c),
+                    slot(-0x7c),
+                ];
+                let _ = j;
+                if crate::blend::blend_contact(vm, env, f, s, g, r14, edi, r12, outs)? {
                     vm.set_i32(f + 0x24c, 1);
                     vm.set_i32(f + 0x250, 1);
                     vm.set_i32(slot(-0x78), 1);
@@ -1989,7 +1992,7 @@ pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
         vm.set_u32(s + 0x30, 0);
         vm.set_u32(s + 0x34, 0);
         vm.set_u32(s + 0x38, 0);
-        return;
+        return Ok(());
     }
     blend_to(vm, env, s + 0x30, acc_a);
     blend_to(vm, env, s + 0x34, acc_b);
@@ -2019,6 +2022,7 @@ pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
     ] {
         blend_to(vm, env, s + offset, value);
     }
+    Ok(())
 }
 
 /// `0x14126dd98..0x14126e9a0`: the contact pass over the 39 bodies (`[B+0x6040]`, stride `0x34c8`). A body is
@@ -2048,7 +2052,7 @@ pub fn body_contact_loop(
             continue;
         }
         body_surface_probe(vm, env, f, rbp, at)?;
-        body_contact_blend(vm, env, f, rbp, at);
+        body_contact_blend(vm, env, f, rbp, at)?;
     }
     vm.set_u32(slot(0x1750), 39);
     Ok(())

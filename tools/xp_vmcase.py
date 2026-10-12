@@ -568,3 +568,88 @@ def setup_wheel_world(case, rng, F, B, gears=3, wheel_records=None):
     fz.preset_f64('GT', 0, rng.choice([0.0, 0.5, 0.9, -1.0]))
     case.stub(0x14082be10, lambda call, rng: call.ret_int(rng.choice([0, 1])))
     return G, WRS
+
+
+def setup_blend_world(case, rng, F, B):
+    """Presets what the native blend contact 0x1411cb1e0 reads around the flight object (on top of
+    setup_strut_world): the planet, the geoid, the engine flag, the debug-line vector, the grid global and the
+    replayed callees."""
+    fz = case.fz
+
+    def put(name, off, v):
+        fz.preset(name, off, v & 0xffffffff)
+        fz.preset(name, off + 4, v >> 32)
+
+    def normal(call, rng):
+        v = [rng.uniform(-1, 1) for _ in range(3)]
+        length = sum(c * c for c in v) ** 0.5 or 1.0
+        for k in range(3):
+            call.put_f32(call.ints[3] + 4 * k, v[k] / length)
+    case.stub(0x1406ed6a0, normal)
+    for off in (0xbcc8, 0xbcd0):
+        fz.preset('F', off, 0)
+    fz.preset('F', 0x28, 0)
+    case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.05, 0.2, rng.uniform(0, 0.5)])))
+    case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
+    CX = case.region('CX', 0x300)
+    case.stub(0x14193ae40, lambda call, rng: call.ret_int(CX))
+    case.stub(0x1419f8ff0, lambda call, rng: call.ret_f64(rng.uniform(-60, 60)))
+    fz.preset_f64('CX', 0xb0, 6378137.0)
+    fz.preset_f64('CX', 0xb8, rng.uniform(6350000.0, 6378000.0))
+    fz.preset_f64('CX', 0xc8, rng.uniform(0.0, 0.01))
+    fz.preset_f64('CX', 0xd0, rng.uniform(0.0, 0.01))
+    for base in (0x200, 0x280):
+        for r in range(4):
+            for c in range(4):
+                v = (1.0 if r == c and r < 3 else 0.0) + (rng.uniform(-0.1, 0.1) if r < 3 and c < 3 else (rng.uniform(-5, 5) if r == 3 and c < 3 else 0.0))
+                if r == 3 and c == 3:
+                    v = 1.0
+                fz.preset_f64('CX', base + 0x20 * r + 8 * c, v)
+    fz.preset_f64('F', 0x390, rng.uniform(-80, 80))
+    fz.preset_f64('F', 0x398, rng.uniform(-170, 170))
+    fz.region('GRID', 0x1461179f8, 8)
+    fz.preset('GRID', 0, 0)
+    fz.preset('GRID', 4, 0)
+    fz.region('IDX', 0x1426552ac, 4)
+    fz.preset('IDX', 0, 0)
+    for off in (0x64f4, 0x64f8, 0x64fc):
+        fz.preset_f32('B', off, rng.uniform(-30, 30))
+    fz.preset_f32('F', 0x3e0, rng.uniform(-180, 180))
+    fz.region('LV', 0x146125780, 0x20)
+    LREC = case.region('LREC', 0x28 * 6)
+    m = rng.randrange(0, 3)
+    put('LV', 0, LREC)
+    put('LV', 8, LREC + 0x28 * m)
+    put('LV', 16, LREC + 0x28 * (m + rng.choice([0, 1])))
+    NEWL = case.region('NEWL', 0x28 * 8)
+
+    def grow(call, rng):
+        vec, rec = call.ints[0], call.ints[2]
+        old_begin = case.emu.read_u64(vec)
+        end = case.emu.read_u64(vec + 8)
+        count = (end - old_begin) // 0x28
+        for k in range(count * 10):
+            call.put(NEWL + 4 * k, case.emu.read_u32(old_begin + 4 * k))
+        for k in range(10):
+            call.put(NEWL + 0x28 * count + 4 * k, case.emu.read_u32(rec + 4 * k))
+        for off, v in ((0, NEWL), (8, NEWL + 0x28 * (count + 1)), (16, NEWL + 0x28 * (count + 4))):
+            call.put(vec + off, v & 0xffffffff)
+            call.put(vec + off + 4, v >> 32)
+    case.stub(0x141167000, grow)
+
+
+def setup_blend_body(case, rng, name, base, skip=(0x654, 0x658)):
+    """Presets one body record (at `base` in region `name`) for the blend contact: the smoothed values, the euler
+    offsets and angles of its gear record (`+0x588`) and the vertices of the array at `+0x630`."""
+    fz = case.fz
+    fz.preset(name, base + 0x2c, rng.choice([0, 1]))
+    fz.preset_f32(name, base + 0x38, rng.uniform(0, 3))
+    fz.preset_f32(name, base + 0x44, rng.uniform(-1, 1))
+    for off in (0x588 + 0x90, 0x588 + 0x94, 0x588 + 0x98):
+        fz.preset_f32(name, base + off, rng.uniform(-1, 1))
+    for off in (0x588 + 0x9c, 0x588 + 0xa0, 0x588 + 0xa4):
+        fz.preset_f32(name, base + off, rng.uniform(-40, 40))
+    for k in range(0x630, 0x630 + 12 * 140, 4):
+        if k - 0x630 in skip:
+            continue
+        fz.preset_f32(name, base + k, rng.uniform(-1.5, 1.5))
