@@ -229,3 +229,10 @@ three values by the angles at `+0x9c`, `+0xa0`, `+0xa4` of an object). Larger ca
 The final bounded four-channel blend and ratio-derived stall flag are now verified on
 2228 original-code cases: [DELTA_WING_BLEND.md](DELTA_WING_BLEND.md). The full delta
 branch remains unavailable until the preceding coefficient/noise construction is recovered.
+
+## Initial delta parameters (2026-10-12)
+
+Three pure curve ramps (`0x1411b7efa..0x1411b7fbd`) now match 2027 cases exactly.
+[DELTA_WING_PARAMETERS.md](DELTA_WING_PARAMETERS.md) documents local power rounding and
+the unported intermediate coefficient/noise work. Initial parameters and final blend alone
+do not complete the full delta branch.

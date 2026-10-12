@@ -370,6 +370,33 @@ pub fn delta_wing_weight(b: &Boundary, i: usize, field_18: f32, field_1c: f32) -
     ramp * ratio * tail
 }
 
+/// Initial pure parameter curves of the delta branch (`0x1411b7efa..0x1411b7fbd`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeltaParameters {
+    pub lift_slope: f32,
+    pub peak_alpha_deg: f32,
+    pub peak_lift: f32,
+}
+
+pub fn delta_parameters(sweep_deg: f32) -> DeltaParameters {
+    // These three original curves share bounds and exponent. The original CRT
+    // outputs match a double power rounded to f32; platform powf loses a bit
+    // in five parameter words of the exact corpus. Keep this correction local.
+    let raw = (1.0 / (75.0 - 45.0)) * (sweep_deg - 45.0) + 0.0;
+    let position = if 0.0 > raw { 0.0 } else { sse_min(1.0, raw) };
+    let power = if position > 0.0 {
+        f64::from(position).powf(0.75) as f32
+    } else {
+        0.0
+    };
+    let curve = |start: f32, end: f32| (end - start) * (power - 0.0) + start;
+    DeltaParameters {
+        lift_slope: curve(0.07, 0.035),
+        peak_alpha_deg: curve(25.0, 40.0),
+        peak_lift: curve(0.9, 1.5),
+    }
+}
+
 /// Final delta-wing coefficient blend (`0x1411b8779..0x1411b885a`).
 /// Inputs are the coefficients computed by the earlier straight/delta branches.
 /// This does not supply the unported delta noise/trigonometric inputs.

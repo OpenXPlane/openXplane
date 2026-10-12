@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Ported the three initial delta-wing parameter curves; local double power rounding corrects five
+  one-ULP differences. 2027 original-code cases compare 6081 words exactly in debug and release.
+  [Evidence and limits](research/DELTA_WING_PARAMETERS.md).
+
 - Ported the final bounded delta-wing Cl/Cd/Cm/ratio blend and its stall flag: 2228 original-code
   cases compare five outputs exactly in debug and release. The preceding delta coefficient/noise
   construction is still pending. [Evidence and limits](research/DELTA_WING_BLEND.md).

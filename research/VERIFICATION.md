@@ -98,3 +98,10 @@ Details: [WING_SPAN_EXACT.md](WING_SPAN_EXACT.md).
 original-code cases compare Cl/Cd/Cm/ratio and the recomputed stall flag exactly in debug/release.
 No calls or stubs are used. The preceding delta coefficient construction remains unported.
 [DELTA_WING_BLEND.md](DELTA_WING_BLEND.md) records inputs, coverage and reproduction.
+
+## Initial delta-wing parameter curves (2026-10-12)
+
+`0x1411b7efa..0x1411b7fbd`: three pure curves with 2027 original-code cases and 6081
+bit-exact output words in debug/release. Local double power rounding corrects five one-ULP
+platform powf mismatches. The intermediate delta coefficient/noise construction is still pending.
+[DELTA_WING_PARAMETERS.md](DELTA_WING_PARAMETERS.md) records scope and reproduction.
