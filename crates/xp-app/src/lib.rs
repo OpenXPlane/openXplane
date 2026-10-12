@@ -3,7 +3,7 @@
 pub use xp_acf::{Aircraft, Property, aircraft, reference_candidates, wing};
 pub use xp_airfoil::{
     aero, airflow, airfoil, atmosphere, attitude, binding, blend, body, buffet, callees, controls,
-    element_force, engine, engine_env, engine_small, flight_state, flight_step, forces, fuel,
+    element_force, engine, engine_env, engine_small, flight_state, flight_step, forces, fuel, gear,
     input, mass, matrix, piston, profile, prop, regimes, runtime, scalar, shadow, stall, strut,
     terrain, tire, transform, vm, wash, weather, wheel, wing_element,
 };

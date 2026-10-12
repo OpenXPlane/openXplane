@@ -1619,7 +1619,7 @@ pub fn wheel_contact(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Re
         };
         vm.set_f32(f + 0x224, current + delta);
     }
-    env.call(vm, 0x1411878f0, CallArgs::ints(&[f]));
+    crate::gear::gear_lever_step(vm, env, f);
     let dt = frame_time(vm, env);
     let factor = (dt + dt) as f32;
     vm.set_f32(

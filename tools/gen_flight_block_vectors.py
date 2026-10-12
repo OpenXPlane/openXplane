@@ -872,7 +872,6 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM7, struct.unpack('<Q', struct.pack('<d', 0.01))[0])
             case.emu.uc.reg_write(UC_X86_REG_XMM9, 0x7fffffff)
         if BLOCK == 'wcontact':
-            case.stub(0x1411878f0, lambda call, rng: None)
             setup_strut_world(case, rng, F, B)
             EL = case.region('EL', 0x90 * 10)
             G, WRS = setup_wheel_world(case, rng, F, B, gears=10, wheel_records=[('EL', 0x90 * i) for i in range(10)])
@@ -1302,6 +1301,13 @@ def main():
         case.emu.uc.reg_write(UC_X86_REG_XMM13, 0)
         case.emu.uc.reg_write(UC_X86_REG_XMM14, struct.unpack('<I', struct.pack('<f', 1.0))[0])
         try:
+            import os
+            if os.environ.get('XP_WATCH') == str(done):
+                from unicorn import UC_HOOK_MEM_WRITE
+                def wh(uc, access, address, size, value, user):
+                    if F + 0x230 <= address < F + 0x244:
+                        sys.stderr.write(f'write F+{address - F:#x} = {value:#x} at {uc.reg_read(UC_X86_REG_RIP):#x}\n')
+                case.emu.uc.hook_add(UC_HOOK_MEM_WRITE, wh)
             case.run(start, until=end, max_instructions=3_000_000)
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')

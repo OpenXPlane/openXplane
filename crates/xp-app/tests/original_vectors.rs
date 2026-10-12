@@ -3916,6 +3916,21 @@ fn wind_at_matches_the_original_machine_code() {
 }
 
 #[test]
+fn gear_lever_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("small_gearlever.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::gear::gear_lever_step(&mut case.vm, &mut env, hex(&case.header[0]));
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_exact(&case, n);
+    }
+}
+
+#[test]
 fn input_binding_matches_the_original_machine_code() {
     let cases = parse_vm_cases("binding.txt");
     assert!(cases.len() >= 200);

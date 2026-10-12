@@ -15,11 +15,11 @@ from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_XMM0  # noqa: E402
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
 
 EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-ADDRESS = {'ceiling': 0x1411dd610, 'lever': 0x1411b0a30, 'pilot': 0x1411d9d80, 'wave': 0x1408bd9d0, 'caster': 0x141240d40, 'servo': 0x1410c9620}[KIND]
+ADDRESS = {'ceiling': 0x1411dd610, 'lever': 0x1411b0a30, 'pilot': 0x1411d9d80, 'wave': 0x1408bd9d0, 'caster': 0x141240d40, 'servo': 0x1410c9620, 'gearlever': 0x1411878f0}[KIND]
 
 
 def main():
-    case = VmCase(EXE, SEED, [(0x1411dd000, 0x1411de000), (0x1411b0000, 0x1411b1000), (0x1411d9000, 0x1411da000), (0x141240000, 0x141241000), (0x1410c9000, 0x1410ca000), (0x140c44000, 0x140c45000)])
+    case = VmCase(EXE, SEED, [(0x1411dd000, 0x1411de000), (0x1411b0000, 0x1411b1000), (0x1411d9000, 0x1411da000), (0x141240000, 0x141241000), (0x1410c9000, 0x1410ca000), (0x140c44000, 0x140c45000), (0x141187000, 0x141188000)])
     rng = case.rng
     print(f'# small vectors {KIND} (tools/gen_small_vectors.py)')
     done = 0
@@ -72,6 +72,14 @@ def main():
             fz.preset('F', 0x204, rng.choice([0, 1]))
             fz.preset_f32('F', 0x210, rng.choice([0.0, 0.5, 0.4999, 0.8]))
             run = (F, n)
+        elif KIND == 'gearlever':
+            case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.05, 0.2, rng.uniform(0, 0.5)])))
+            fz.preset('F', 0x228, rng.choice([0, 1, -1, 2]))
+            for off in (0x220, 0x224, 0x238, 0x23c):
+                fz.preset_f32('F', off, rng.choice([0.0, rng.uniform(0, 1), 0.0005, 0.99, 1.0, rng.uniform(0, 3), -0.5]))
+            fz.preset('B', 0xe90, rng.choice([0, 1]))
+            fz.preset('F', 0x22c, rng.choice([0, 1]))
+            run = (F, 0)
         elif KIND == 'servo':
             ST = case.region('ST', 0x10)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([0.05, 0.2, rng.uniform(0, 0.5)])))
@@ -129,7 +137,9 @@ def main():
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue
-        if KIND in ('pilot', 'caster'):
+        if KIND == 'gearlever':
+            result = 0
+        elif KIND in ('pilot', 'caster'):
             result = case.emu.reg(UC_X86_REG_RAX) & 0xff
         else:
             result = case.emu.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff
