@@ -75,3 +75,17 @@ different reader (`0x140f15300`, element count passed in `R8`) and are not cover
 The tool was run on the reference build and its output compared with the hand-read disassembly of
 `0x141aad640` (the first block, with the legacy-key branch, was read in full). The Rust side does not use this
 table yet; `src/aircraft.rs` still holds only the six hand-confirmed values.
+
+## Aircraft object schema derived by running the loader (2026-10)
+
+`tools/run_acf_loader.py` runs the original loader `0x141a972a0` in the emulator on a real `.acf` (the property
+context is built from the file so the original number and string readers run unchanged). `tools/derive_acf_schema.py`
+runs it on the reference aircraft and on randomised copies and writes `crates/xp-acf/data/object_schema.tsv`: for
+each key template (integer path components are `{}`) the destination (region, base offset, stride per index) and
+the transform to the stored word (value, value times a constant, value times a constant minus the centre of
+gravity word, a floor with a default from `tools/extract_acf_floors.py`, per-index variants). The words the loader
+leaves for absent keys (`object_defaults.tsv`) come from a run on an empty property set. `xp_acf::object` applies
+the schema; `crates/xp-acf/tests/object.rs` compares with the words of the original
+(`tools/gen_acf_object_vectors.py`). Not covered yet: strings longer than 15 characters (heap pointers), the
+slat tables, `_cgX_lft/_cgX_rgt`, `_des_AOA_pwr`, `_chord_for_RIB`, `_geo_xyz` of some bodies, and words computed
+by loops after reading.

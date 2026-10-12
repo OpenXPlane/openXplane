@@ -1,0 +1,1668 @@
+_blad/{}/_Croot	coeff	R6010	90	0	raw	3e9c0ebf
+_blad/{}/_Croot	float	R6010	90	0	scale:3e9c0ebf	
+_blad/{}/_Ctip	coeff	R6010	94	0	raw	3e9c0ebf
+_blad/{}/_Ctip	float	R6010	94	0	scale:3e9c0ebf	
+_blad/{}/_afl_file_1	string	R6010	3640	0	string	
+_blad/{}/_afl_file_2	string	R6010	3660	0	string	
+_blad/{}/_afl_file_3	string	R6010	3680	0	string	
+_blad/{}/_ailn1/{}	int	R6010	384	0,4	int	
+_blad/{}/_ailn1_hyd0123	int	R6010	6cc	0	int	
+_blad/{}/_ailn2/{}	int	R6010	3b4	0,4	int	
+_blad/{}/_ailn2_hyd0123	int	R6010	6d0	0	int	
+_blad/{}/_bot_s1	float	R6010	7b0	0	raw	
+_blad/{}/_bot_s2	float	R6010	7c0	0	raw	
+_blad/{}/_bot_t1	float	R6010	7b8	0	raw	
+_blad/{}/_bot_t2	float	R6010	7c8	0	raw	
+_blad/{}/_c_off_for_RIB/{}	float	R6010	124	0,4	raw	
+_blad/{}/_c_rat_for_RIB/{}	float	R6010	150	0,4	raw	
+_blad/{}/_chord_for_RIB/{}	float	R6010	f8	0,4	scale:3e9c0ebf	
+_blad/{}/_dihed_design	float	R6010	a8	0	raw	
+_blad/{}/_dihed_full_up	float	R6010	ac	0	raw	
+_blad/{}/_elev1/{}	int	R6010	3e4	0,4	int	
+_blad/{}/_elev1_hyd0123	int	R6010	6d4	0	int	
+_blad/{}/_elev2/{}	int	R6010	414	0,4	int	
+_blad/{}/_elev2_hyd0123	int	R6010	6d8	0	int	
+_blad/{}/_els	int	R6010	8c	0	int	
+_blad/{}/_engn_for_body	int	R6010	768	0	int	
+_blad/{}/_flap1/{}	int	R6010	594	0,4	int	
+_blad/{}/_flap2/{}	int	R6010	5c4	0,4	int	
+_blad/{}/_foil_rat_mid_inner	float	R6010	e8	0	raw	
+_blad/{}/_foil_rat_mid_outer	float	R6010	ec	0	raw	
+_blad/{}/_foil_rat_rot	float	R6010	e4	0	raw	
+_blad/{}/_foil_rat_tip	float	R6010	f0	0	raw	
+_blad/{}/_gear_for_body	int	R6010	76c	0	int	
+_blad/{}/_geo_xyz/{},{},{}	float	R6010	7d4	0,216,12,4	scale:3e9c0ebf	
+_blad/{}/_inc_ailn1/{}	int	R6010	244	0,4	int	
+_blad/{}/_inc_ailn2/{}	int	R6010	26c	0,4	int	
+_blad/{}/_inc_elev1/{}	int	R6010	294	0,4	int	
+_blad/{}/_inc_elev2/{}	int	R6010	2bc	0,4	int	
+_blad/{}/_inc_rudd1/{}	int	R6010	2e4	0,4	int	
+_blad/{}/_inc_rudd2/{}	int	R6010	30c	0,4	int	
+_blad/{}/_inc_trim/{}	int	R6010	35c	0,4	int	
+_blad/{}/_inc_vect/{}	int	R6010	334	0,4	int	
+_blad/{}/_incid_chrd_inc	float	R6010	d0	0	raw	
+_blad/{}/_incid_full_up	float	R6010	cc	0	raw	
+_blad/{}/_incidence/{}	float	R6010	1f4	0,4	raw	
+_blad/{}/_is_right_mult	float	R6010	88	0	raw	
+_blad/{}/_part_phi	float	R6010	78c	0	raw	
+_blad/{}/_part_psi	float	R6010	784	0	raw	
+_blad/{}/_part_tex	int	R6010	7a8	0	int	
+_blad/{}/_part_the	float	R6010	788	0	raw	
+_blad/{}/_part_x	float	R6010	778	0	scale:3e9c0ebf	
+_blad/{}/_part_y	float	R6010	77c	0	scale_minus_cgy:3e9c0ebf	
+_blad/{}/_part_z	float	R6010	780	0	scale_minus_cgz:3e9c0ebf	
+_blad/{}/_plan_ellipse_frac	float	R6010	f4	0	raw	
+_blad/{}/_r_dim	int	R6010	7d0	0	int	
+_blad/{}/_retract_max	float	R6010	d8	0	raw	
+_blad/{}/_rudd1/{}	int	R6010	444	0,4	int	
+_blad/{}/_rudd1_hyd0123	int	R6010	6dc	0	int	
+_blad/{}/_rudd2/{}	int	R6010	474	0,4	int	
+_blad/{}/_rudd2_hyd0123	int	R6010	6e0	0	int	
+_blad/{}/_s_dim	int	R6010	7cc	0	int	
+_blad/{}/_sbrk1/{}	int	R6010	534	0,4	int	
+_blad/{}/_sbrk1_hyd0123	int	R6010	6f0	0	int	
+_blad/{}/_sbrk2/{}	int	R6010	564	0,4	int	
+_blad/{}/_sbrk2_hyd0123	int	R6010	6f4	0	int	
+_blad/{}/_semilen_SEG	coeff	R6010	98	0	raw	3e9c0ebf
+_blad/{}/_semilen_SEG	float	R6010	98	0	scale:3e9c0ebf	
+_blad/{}/_slat1/{}	int	R6010	5f4	0,4	int	
+_blad/{}/_slat2/{}	int	R6010	61c	0,4	int	
+_blad/{}/_spoi1/{}	int	R6010	4a4	0,4	int	
+_blad/{}/_spoi1_hyd0123	int	R6010	6e4	0	int	
+_blad/{}/_spoi2/{}	int	R6010	4d4	0,4	int	
+_blad/{}/_spoi2_hyd0123	int	R6010	6e8	0	int	
+_blad/{}/_sweep_design	float	R6010	b8	0	raw	
+_blad/{}/_sweep_full_aft	float	R6010	bc	0	raw	
+_blad/{}/_sweep_rotation_span_os	coeff	R6010	c8	0	raw	3e9c0ebf
+_blad/{}/_sweep_rotation_span_os	float	R6010	c8	0	scale:3e9c0ebf	
+_blad/{}/_top_s1	float	R6010	7ac	0	raw	
+_blad/{}/_top_s2	float	R6010	7bc	0	raw	
+_blad/{}/_top_t1	float	R6010	7b4	0	raw	
+_blad/{}/_top_t2	float	R6010	7c4	0	raw	
+_blad/{}/_var_dihed	int	R6010	b4	0	int	
+_blad/{}/_var_incid	int	R6010	d4	0	int	
+_blad/{}/_var_retract	int	R6010	e0	0	int	
+_blad/{}/_var_sweep	int	R6010	c4	0	int	
+_blad/{}/_yawbr/{}	int	R6010	504	0,4	int	
+_blad/{}/_yawbr_hyd0123	int	R6010	6ec	0	int	
+_body/{}/_bot_s1	float	R6040	638	13512	raw	
+_body/{}/_bot_s2	float	R6040	648	13512	raw	
+_body/{}/_bot_t1	float	R6040	640	13512	raw	
+_body/{}/_bot_t2	float	R6040	650	13512	raw	
+_body/{}/_geo_xyz/{},{},{}	float	R6040	65c	13512,216,12,4	?	
+_body/{}/_part_area_rule	float	R6040	8	13512	floor:d:3f50624dd2f1a9fc:3f800000:raw	
+_body/{}/_part_cd	float	R6040	0	13512	?	
+_body/{}/_part_rad	coeff	R6040	c	13512	raw	3e9c0ebf
+_body/{}/_part_rad	float	R6040	c	13512	scale:3e9c0ebf	
+_body/{}/_part_tex	int	R6040	630	13512	int	
+_body/{}/_r_dim	int	R6040	658	13512	int	
+_body/{}/_s_dim	int	R6040	654	13512	int	
+_body/{}/_top_s1	float	R6040	634	13512	raw	
+_body/{}/_top_s2	float	R6040	644	13512	raw	
+_body/{}/_top_t1	float	R6040	63c	13512	raw	
+_body/{}/_top_t2	float	R6040	64c	13512	raw	
+_engn/{}/_RSC_max_pwr_ENGN	coeff	R5ff8	14	0	raw	3dd67751
+_engn/{}/_RSC_max_pwr_ENGN	float	R5ff8	14	0	scale:3dd67751	
+_engn/{}/_RSC_redline_ENGN	coeff	R5ff8	18	0	raw	3dd67751
+_engn/{}/_RSC_redline_ENGN	float	R5ff8	18	0	scale:3dd67751	
+_engn/{}/_burner_inc	coeff	R5ff8	24	0	raw	408e38be
+_engn/{}/_burner_inc	float	R5ff8	24	0	scale:408e38be	
+_engn/{}/_engn_clutch_EQ	int	R5ff8	2c	0	int	
+_engn/{}/_engn_freewheels	int	R5ff8	28	0	int	
+_engn/{}/_engn_health_var	float	R5ff8	64	0	raw	
+_engn/{}/_engn_vector_EQ	int	R5ff8	30	0	int	
+_engn/{}/_exhaust_os_xyz/{}	float	R5ff8	40	0,4	scale:3e9c0ebf	
+_engn/{}/_part_psi	float	R5ff8	58	0	raw	
+_engn/{}/_part_the	float	R5ff8	5c	0	raw	
+_engn/{}/_part_x	float	R5ff8	4c	0	scale:3e9c0ebf	
+_engn/{}/_part_y	float	R5ff8	50	0	scale_minus_cgy:3e9c0ebf	
+_engn/{}/_part_z	float	R5ff8	54	0	scale_minus_cgz:3e9c0ebf	
+_engn/{}/_power_max_limit	coeff	R5ff8	4	0	raw	443a6ccd
+_engn/{}/_power_max_limit	float	R5ff8	4	0	scale:443a6ccd	
+_engn/{}/_thrust_max_limit	coeff	R5ff8	1c	0	raw	408e38be
+_engn/{}/_thrust_max_limit	float	R5ff8	1c	0	scale:408e38be	
+_gear/{}/_axiE	float	R6080	80	136	raw	
+_gear/{}/_axiR	float	R6080	84	136	raw	
+_gear/{}/_cyc_time	float	R6080	1c	136	raw	
+_gear/{}/_damp	coeff	R6080	38	136	raw	41694da0
+_gear/{}/_damp	float	R6080	38	136	scale:41694da0	
+_gear/{}/_eagle_claw_deg	float	R6080	24	136	raw	
+_gear/{}/_gear_brakes	int	R6080	8	136	int	
+_gear/{}/_gear_can_retract	int	R6080	4	136	int	
+_gear/{}/_gear_castors	int	R6080	c	136	int	
+_gear/{}/_gear_renders_geo	int	R6080	10	136	int	
+_gear/{}/_gear_type	int	R6080	0	136	int	
+_gear/{}/_gear_x	float	R6080	64	136	scale:3e9c0ebf	
+_gear/{}/_gear_y	float	R6080	70	136	scale_minus_cgy:3e9c0ebf	
+_gear/{}/_gear_z	float	R6080	7c	136	scale_minus_cgz:3e9c0ebf	
+_gear/{}/_latE	float	R6080	68	136	raw	
+_gear/{}/_latR	float	R6080	6c	136	raw	
+_gear/{}/_leg_len	coeff	R6080	18	136	raw	3e9c0ebf
+_gear/{}/_leg_len	float	R6080	18	136	scale:3e9c0ebf	
+_gear/{}/_lonE	float	R6080	74	136	raw	
+_gear/{}/_lonR	float	R6080	78	136	raw	
+_gear/{}/_steerdeg_hispeed	float	R6080	54	136	raw	
+_gear/{}/_steerdeg_lospeed	float	R6080	50	136	raw	
+_gear/{}/_strut_comp	coeff	R6080	20	136	raw	3e9c0ebf
+_gear/{}/_strut_comp	float	R6080	20	136	scale:3e9c0ebf	
+_gear/{}/_strut_max_wgt_def	coeff	R6080	34	136	raw	3e9c0ebf
+_gear/{}/_strut_max_wgt_def	float	R6080	34	136	scale:3e9c0ebf	
+_gear/{}/_strut_max_wgt_frc	coeff	R6080	30	136	raw	408e38be
+_gear/{}/_strut_max_wgt_frc	float	R6080	30	136	scale:408e38be	
+_gear/{}/_strut_preload_def	coeff	R6080	2c	136	raw	3e9c0ebf
+_gear/{}/_strut_preload_def	float	R6080	2c	136	scale:3e9c0ebf	
+_gear/{}/_strut_preload_frc	coeff	R6080	28	136	raw	408e38be
+_gear/{}/_strut_preload_frc	float	R6080	28	136	scale:408e38be	
+_gear/{}/_strut_s1	float	R6080	40	136	raw	
+_gear/{}/_strut_s2	float	R6080	48	136	raw	
+_gear/{}/_strut_t1	float	R6080	44	136	raw	
+_gear/{}/_strut_t2	float	R6080	4c	136	raw	
+_gear/{}/_tire_psi	float	R6080	3c	136	raw	
+_gear/{}/_tire_radius	coeff	R6080	58	136	raw	3e9c0ebf
+_gear/{}/_tire_radius	float	R6080	58	136	scale:3e9c0ebf	
+_gear/{}/_tire_swidth	coeff	R6080	5c	136	raw	3e9c0ebf
+_gear/{}/_tire_swidth	float	R6080	5c	136	scale:3e9c0ebf	
+_prop/{}/_des_AOA_pwr	float	R6010	40	0	?	
+_prop/{}/_des_AOA_root	float	R6010	38	0	raw	
+_prop/{}/_des_AOA_tip	float	R6010	3c	0	raw	
+_prop/{}/_des_Mach_limit	float	R6010	34	0	raw	
+_prop/{}/_des_kts_acf	float	R6010	30	0	raw	
+_prop/{}/_des_rpm_prp	float	R6010	2c	0	raw	
+_prop/{}/_max_AOA_deg	float	R6010	44	0	floor:d:3f847ae147ae147b:42b40000:raw	
+_prop/{}/_max_pitch	float	R6010	28	0	raw	
+_prop/{}/_min_pitch	float	R6010	24	0	raw	
+_prop/{}/_num_blades	float	R6010	10	0	raw	
+_prop/{}/_prop_clutch_EQ	int	R6010	1c	0	int	
+_prop/{}/_prop_dir	float	R6010	c	0	raw	
+_prop/{}/_prop_ducted	int	R6010	4	0	int	
+_prop/{}/_prop_gear_rat	float	R6010	20	0	raw	
+_prop/{}/_prop_hotel_EQ	int	R6010	8	0	int	
+_prop/{}/_prop_type	int	R6010	0	0	int	
+_prop/{}/_rad_mod	float	R6010	48	0	raw	
+_prop/{}/_vectarmY_engn	coeff	R6010	50	0	raw	3e9c0ebf
+_prop/{}/_vectarmY_engn	float	R6010	50	0	scale:3e9c0ebf	
+_prop/{}/_vectarmZ_engn	coeff	R6010	54	0	raw	3e9c0ebf
+_prop/{}/_vectarmZ_engn	float	R6010	54	0	scale:3e9c0ebf	
+_strut_s1	float	B	27d0		raw	
+_strut_s2	float	B	27d8		raw	
+_strut_t1	float	B	27d4		raw	
+_strut_t2	float	B	27dc		raw	
+_wing/{}/_Croot	coeff	R6028	8	14024	raw	3e9c0ebf
+_wing/{}/_Croot	float	R6028	8	14024	scale:3e9c0ebf	
+_wing/{}/_Ctip	coeff	R6028	c	14024	raw	3e9c0ebf
+_wing/{}/_Ctip	float	R6028	c	14024	scale:3e9c0ebf	
+_wing/{}/_afl_file_1	string	R6028	35b8	14024	string	
+_wing/{}/_afl_file_2	string	R6028	35d8	14024	string	
+_wing/{}/_afl_file_3	string	R6028	35f8	14024	string	
+_wing/{}/_ailn1/{}	int	R6028	2fc	14024,4	int	
+_wing/{}/_ailn1_hyd0123	int	R6028	644	14024	int	
+_wing/{}/_ailn2/{}	int	R6028	32c	14024,4	int	
+_wing/{}/_ailn2_hyd0123	int	R6028	648	14024	int	
+_wing/{}/_bot_s1	float	R6028	728	14024	raw	
+_wing/{}/_bot_s2	float	R6028	738	14024	raw	
+_wing/{}/_bot_t1	float	R6028	730	14024	raw	
+_wing/{}/_bot_t2	float	R6028	740	14024	raw	
+_wing/{}/_c_off_for_RIB/{}	float	R6028	9c	14024,4	raw	
+_wing/{}/_c_rat_for_RIB/{}	float	R6028	c8	14024,4	raw	
+_wing/{}/_chord_for_RIB/{}	float	R6028	70	14024,4	?	
+_wing/{}/_dihed_design	float	R6028	20	14024	raw	
+_wing/{}/_dihed_full_up	float	R6028	24	14024	raw	
+_wing/{}/_elev1/{}	int	R6028	35c	14024,4	int	
+_wing/{}/_elev1_hyd0123	int	R6028	64c	14024	int	
+_wing/{}/_elev2/{}	int	R6028	38c	14024,4	int	
+_wing/{}/_elev2_hyd0123	int	R6028	650	14024	int	
+_wing/{}/_els	int	R6028	4	14024	int	
+_wing/{}/_engn_for_body	int	R6028	6e0	14024	int	
+_wing/{}/_flap1/{}	int	R6028	50c	14024,4	int	
+_wing/{}/_flap2/{}	int	R6028	53c	14024,4	int	
+_wing/{}/_foil_rat_mid_inner	float	R6028	60	14024	raw	
+_wing/{}/_foil_rat_mid_outer	float	R6028	64	14024	raw	
+_wing/{}/_foil_rat_rot	float	R6028	5c	14024	raw	
+_wing/{}/_foil_rat_tip	float	R6028	68	14024	raw	
+_wing/{}/_gear_for_body	int	R6028	6e4	14024	int	
+_wing/{}/_geo_xyz/{},{},{}	float	R6028	74c	14024,216,12,4	scale:3e9c0ebf	
+_wing/{}/_inc_ailn1/{}	int	R6028	1bc	14024,4	int	
+_wing/{}/_inc_ailn2/{}	int	R6028	1e4	14024,4	int	
+_wing/{}/_inc_elev1/{}	int	R6028	20c	14024,4	int	
+_wing/{}/_inc_elev2/{}	int	R6028	234	14024,4	int	
+_wing/{}/_inc_rudd1/{}	int	R6028	25c	14024,4	int	
+_wing/{}/_inc_rudd2/{}	int	R6028	284	14024,4	int	
+_wing/{}/_inc_trim/{}	int	R6028	2d4	14024,4	int	
+_wing/{}/_inc_vect/{}	int	R6028	2ac	14024,4	int	
+_wing/{}/_incid_chrd_inc	float	R6028	48	14024	raw	
+_wing/{}/_incid_full_up	float	R6028	44	14024	raw	
+_wing/{}/_incidence/{}	float	R6028	16c	14024,4	raw	
+_wing/{}/_is_right_mult	float	R6028	0	14024	raw	
+_wing/{}/_part_phi	float	R6028	704	14024	raw	
+_wing/{}/_part_psi	float	R6028	6fc	14024	raw	
+_wing/{}/_part_tex	int	R6028	720	14024	int	
+_wing/{}/_part_the	float	R6028	700	14024	raw	
+_wing/{}/_part_x	float	R6028	6f0	14024	scale:3e9c0ebf	
+_wing/{}/_part_y	float	R6028	6f4	14024	scale_minus_cgy:3e9c0ebf	
+_wing/{}/_part_z	float	R6028	6f8	14024	scale_minus_cgz:3e9c0ebf	
+_wing/{}/_plan_ellipse_frac	float	R6028	6c	14024	raw	
+_wing/{}/_r_dim	int	R6028	748	14024	int	
+_wing/{}/_retract_max	float	R6028	50	14024	raw	
+_wing/{}/_rudd1/{}	int	R6028	3bc	14024,4	int	
+_wing/{}/_rudd1_hyd0123	int	R6028	654	14024	int	
+_wing/{}/_rudd2/{}	int	R6028	3ec	14024,4	int	
+_wing/{}/_rudd2_hyd0123	int	R6028	658	14024	int	
+_wing/{}/_s_dim	int	R6028	744	14024	int	
+_wing/{}/_sbrk1/{}	int	R6028	4ac	14024,4	int	
+_wing/{}/_sbrk1_hyd0123	int	R6028	668	14024	int	
+_wing/{}/_sbrk2/{}	int	R6028	4dc	14024,4	int	
+_wing/{}/_sbrk2_hyd0123	int	R6028	66c	14024	int	
+_wing/{}/_semilen_SEG	coeff	R6028	10	14024	raw	3e9c0ebf
+_wing/{}/_semilen_SEG	float	R6028	10	14024	scale:3e9c0ebf	
+_wing/{}/_slat1/{}	int	R6028	56c	14024,4	int	
+_wing/{}/_slat2/{}	int	R6028	594	14024,4	int	
+_wing/{}/_spoi1/{}	int	R6028	41c	14024,4	int	
+_wing/{}/_spoi1_hyd0123	int	R6028	65c	14024	int	
+_wing/{}/_spoi2/{}	int	R6028	44c	14024,4	int	
+_wing/{}/_spoi2_hyd0123	int	R6028	660	14024	int	
+_wing/{}/_sweep_design	float	R6028	30	14024	raw	
+_wing/{}/_sweep_full_aft	float	R6028	34	14024	raw	
+_wing/{}/_sweep_rotation_span_os	coeff	R6028	40	14024	raw	3e9c0ebf
+_wing/{}/_sweep_rotation_span_os	float	R6028	40	14024	scale:3e9c0ebf	
+_wing/{}/_top_s1	float	R6028	724	14024	raw	
+_wing/{}/_top_s2	float	R6028	734	14024	raw	
+_wing/{}/_top_t1	float	R6028	72c	14024	raw	
+_wing/{}/_top_t2	float	R6028	73c	14024	raw	
+_wing/{}/_var_dihed	int	R6028	2c	14024	int	
+_wing/{}/_var_incid	int	R6028	4c	14024	int	
+_wing/{}/_var_retract	int	R6028	58	14024	int	
+_wing/{}/_var_sweep	int	R6028	3c	14024	int	
+_wing/{}/_yawbr/{}	int	R6028	47c	14024,4	int	
+_wing/{}/_yawbr_hyd0123	int	R6028	664	14024	int	
+acf/_APU_cooldown_time	float	B	c5c		raw	
+acf/_APU_door_time	float	B	c58		raw	
+acf/_APU_ff_kgh	float	B	c68		raw	
+acf/_APU_fuel_src	int	B	c6c		int	
+acf/_APU_spooldn_time	float	B	c64		raw	
+acf/_APU_spoolup_time	float	B	c60		raw	
+acf/_AP_overspeed_prot	int	B	2428		int	
+acf/_AShi_alpha_k	float	B	22c0		raw	
+acf/_AShi_alpha_sec	float	B	22c4		raw	
+acf/_AShi_beta_k	float	B	22cc		raw	
+acf/_AShi_beta_sec	float	B	22d0		raw	
+acf/_AShi_hdng_rat	float	B	2280		raw	
+acf/_AShi_max_G	float	B	22e0		raw	
+acf/_AShi_max_G_init	float	B	22dc		raw	
+acf/_AShi_max_alpha	float	B	22bc		raw	
+acf/_AShi_max_beta	float	B	22c8		raw	
+acf/_AShi_max_phidot	float	B	22d4		raw	
+acf/_AShi_phi_V	float	B	22a0		raw	
+acf/_AShi_phidot_k	float	B	22d8		raw	
+acf/_AShi_psi_V	float	B	229c		raw	
+acf/_AShi_ptch_rat	float	B	2278		raw	
+acf/_AShi_roll_rat	float	B	2288		raw	
+acf/_AShi_the_V	float	B	2298		raw	
+acf/_ASlo_hdng_rat	float	B	227c		raw	
+acf/_ASlo_max_phidot	float	B	22b4		raw	
+acf/_ASlo_max_psidot	float	B	22ac		raw	
+acf/_ASlo_max_thedot	float	B	22a4		raw	
+acf/_ASlo_phi_V	float	B	2294		raw	
+acf/_ASlo_phidot_k	float	B	22b8		raw	
+acf/_ASlo_psi_V	float	B	2290		raw	
+acf/_ASlo_psidot_k	float	B	22b0		raw	
+acf/_ASlo_ptch_rat	float	B	2274		raw	
+acf/_ASlo_roll_rat	float	B	2284		raw	
+acf/_ASlo_the_V	float	B	228c		raw	
+acf/_ASlo_thedot_k	float	B	22a8		raw	
+acf/_CHT_is_C	int	B	1ac4		int	
+acf/_EFIS2_on_avio	int	B	918		int	
+acf/_EFIS_camera_xyz/{}	float	B	81c	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_EGT_is_C	int	B	1aa4		int	
+acf/_ESP_stall_discrete	int	B	2424		int	
+acf/_FBWL	float	B	22e8		raw	
+acf/_FBWVco	float	B	22e4		raw	
+acf/_FBW_apply_P_to_engine/{}	int	B	234c	4	int	
+acf/_FBW_apply_Q_to_engine/{}	int	B	2390	4	int	
+acf/_FBW_apply_R_to_engine/{}	int	B	23d4	4	int	
+acf/_FBWtheD	float	B	22f4		raw	
+acf/_FBWtheI	float	B	22f0		raw	
+acf/_FBWtheP	float	B	22ec		raw	
+acf/_FF_is_lbsph	int	B	19ac		int	
+acf/_Gneg	float	B	7e0		raw	
+acf/_Gpos	float	B	7e4		raw	
+acf/_HUD_del_x	float	B	828		raw	
+acf/_HUD_del_y	float	B	82c		raw	
+acf/_ITT_is_C	int	B	1a84		int	
+acf/_Jxx_unitmass	coeff	B	28ac		raw	3e9c0ebf
+acf/_Jxx_unitmass	float	B	28ac		scale:3e9c0ebf	
+acf/_Jyy_unitmass	coeff	B	28b0		raw	3e9c0ebf
+acf/_Jyy_unitmass	float	B	28b0		scale:3e9c0ebf	
+acf/_Jzz_unitmass	coeff	B	28b4		raw	3e9c0ebf
+acf/_Jzz_unitmass	float	B	28b4		scale:3e9c0ebf	
+acf/_Mmo	float	B	7dc		raw	
+acf/_RSC_idlespeed_ENGN	coeff	B	9f4		raw	3dd67751
+acf/_RSC_idlespeed_ENGN	float	B	9f4		scale:3dd67751	
+acf/_RSC_maxgreen_ENGN	coeff	B	a08		raw	3dd67751
+acf/_RSC_maxgreen_ENGN	float	B	a08		scale:3dd67751	
+acf/_RSC_mingov_ENGN	coeff	B	9f8		raw	3dd67751
+acf/_RSC_mingov_ENGN	float	B	9f8		scale:3dd67751	
+acf/_RSC_mingov_FLT_ENGN	coeff	B	9fc		raw	3dd67751
+acf/_RSC_mingov_FLT_ENGN	float	B	9fc		scale:3dd67751	
+acf/_RSC_mingreen_ENGN	coeff	B	a04		raw	3dd67751
+acf/_RSC_mingreen_ENGN	float	B	a04		scale:3dd67751	
+acf/_SFC_Ng_80_hi_turbo	coeff	B	b2c		raw	34356d02
+acf/_SFC_Ng_80_hi_turbo	float	B	b2c		scale:34356d02	
+acf/_SFC_Ng_80_lo_turbo	coeff	B	b30		raw	34356d02
+acf/_SFC_Ng_80_lo_turbo	float	B	b30		scale:34356d02	
+acf/_SFC_Ng_95_hi_turbo	coeff	B	b24		raw	34356d02
+acf/_SFC_Ng_95_hi_turbo	float	B	b24		scale:34356d02	
+acf/_SFC_Ng_95_lo_turbo	coeff	B	b28		raw	34356d02
+acf/_SFC_Ng_95_lo_turbo	float	B	b28		scale:34356d02	
+acf/_SFC_ROC	coeff	B	b74		raw	37edd068
+acf/_SFC_ROC	float	B	b74		scale:37edd068	
+acf/_SFC_alt_hi_PRP	coeff	B	b00		raw	3e9c0ebf
+acf/_SFC_alt_hi_PRP	float	B	b00		scale:3e9c0ebf	
+acf/_SFC_alt_hi_turbo	coeff	B	b1c		raw	3e9c0ebf
+acf/_SFC_alt_hi_turbo	float	B	b1c		scale:3e9c0ebf	
+acf/_SFC_alt_lo_PRP	coeff	B	b04		raw	3e9c0ebf
+acf/_SFC_alt_lo_PRP	float	B	b04		scale:3e9c0ebf	
+acf/_SFC_alt_lo_turbo	coeff	B	b20		raw	3e9c0ebf
+acf/_SFC_alt_lo_turbo	float	B	b20		scale:3e9c0ebf	
+acf/_SFC_full_hi_PRP	coeff	B	b08		raw	34356d02
+acf/_SFC_full_hi_PRP	float	B	b08		scale:34356d02	
+acf/_SFC_full_lo_PRP	coeff	B	b0c		raw	34356d02
+acf/_SFC_full_lo_PRP	float	B	b0c		scale:34356d02	
+acf/_SFC_half_hi_PRP	coeff	B	b10		raw	34356d02
+acf/_SFC_half_hi_PRP	float	B	b10		scale:34356d02	
+acf/_SFC_half_lo_PRP	coeff	B	b14		raw	34356d02
+acf/_SFC_half_lo_PRP	float	B	b14		scale:34356d02	
+acf/_SFC_recip_rich_ratio	float	B	b6c		raw	
+acf/_TOGA_discos_servos	int	B	2420		int	
+acf/_TRQ_is_pcnt	int	B	19b0		int	
+acf/_Va_kts	coeff	B	7d0		raw	3f800000
+acf/_Va_kts	float	B	7d0		raw	
+acf/_Vbg_kts	coeff	B	7bc		raw	3f800000
+acf/_Vbg_kts	float	B	7bc		raw	
+acf/_Vfe1_kts	coeff	B	7c4		raw	3f800000
+acf/_Vfe1_kts	float	B	7c4		raw	
+acf/_Vfem_kts	coeff	B	7c8		raw	3f800000
+acf/_Vfem_kts	float	B	7c8		raw	
+acf/_Vle_kts	coeff	B	7cc		raw	3f800000
+acf/_Vle_kts	float	B	7cc		raw	
+acf/_Vmca_kts	coeff	B	7a8		raw	3f800000
+acf/_Vmca_kts	float	B	7a8		raw	
+acf/_Vne_kts	coeff	B	7d8		raw	3f800000
+acf/_Vne_kts	float	B	7d8		raw	
+acf/_Vno_kts	coeff	B	7d4		raw	3f800000
+acf/_Vno_kts	float	B	7d4		raw	
+acf/_Vs_kts	coeff	B	7b0		raw	3f800000
+acf/_Vs_kts	float	B	7b0		raw	
+acf/_Vso_kts	coeff	B	7ac		raw	3f800000
+acf/_Vso_kts	float	B	7ac		raw	
+acf/_Vx_kts	coeff	B	7b8		raw	3f800000
+acf/_Vx_kts	float	B	7b8		raw	
+acf/_Vy_kts	coeff	B	7b4		raw	3f800000
+acf/_Vy_kts	float	B	7b4		raw	
+acf/_Vyse_kts	coeff	B	7c0		raw	3f800000
+acf/_Vyse_kts	float	B	7c0		raw	
+acf/_add_def_exceeds_base_def	int	B	2154		int	
+acf/_additonal_gear_flatplate	coeff	B	2834		raw	3dbe43f3
+acf/_additonal_gear_flatplate	float	B	2834		scale:3dbe43f3	
+acf/_ailn1_cratR	float	B	1dfc		raw	
+acf/_ailn1_cratT	float	B	1e00		raw	
+acf/_ailn1_dn	float	B	1df8		raw	
+acf/_ailn1_flaps	float	B	2174		raw	
+acf/_ailn1_max_sweep_rat	float	B	1d48		raw	
+acf/_ailn1_pitch	float	B	216c		raw	
+acf/_ailn1_rat1	float	B	1d40		raw	
+acf/_ailn1_rat2	float	B	1d44		raw	
+acf/_ailn1_sbrk	float	B	21b4		raw	
+acf/_ailn1_sbrk_gnd_only	int	B	21b8		int	
+acf/_ailn1_up	float	B	1df4		raw	
+acf/_ailn1_v1	float	B	1d38		raw	
+acf/_ailn1_v2	float	B	1d3c		raw	
+acf/_ailn2_cratR	float	B	1e0c		raw	
+acf/_ailn2_cratT	float	B	1e10		raw	
+acf/_ailn2_dn	float	B	1e08		raw	
+acf/_ailn2_flaps	float	B	2178		raw	
+acf/_ailn2_max_sweep_rat	float	B	1d5c		raw	
+acf/_ailn2_pitch	float	B	2170		raw	
+acf/_ailn2_rat1	float	B	1d54		raw	
+acf/_ailn2_rat2	float	B	1d58		raw	
+acf/_ailn2_sbrk	float	B	21bc		raw	
+acf/_ailn2_sbrk_gnd_only	int	B	21c0		int	
+acf/_ailn2_up	float	B	1e04		raw	
+acf/_ailn2_v1	float	B	1d4c		raw	
+acf/_ailn2_v2	float	B	1d50		raw	
+acf/_ailn_def_time	float	B	1e68		raw	
+acf/_ailn_tab	float	B	2010		raw	
+acf/_ailn_trim_time	float	B	200c		raw	
+acf/_airbus_FBW	int	B	2270		int	
+acf/_alt_always_armed	int	B	242c		int	
+acf/_alt_hard_locked_on_cws	int	B	2434		int	
+acf/_alta_x_ctr	float	B	1c90		raw	
+acf/_anchor_xyz_acf/{}	float	B	280c	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_ang_offset/{},{}	float	B	804	12,4	raw	
+acf/_ann_triggers_caution/{}	int	B	38a4	4	int	
+acf/_ann_triggers_warning/{}	int	B	3bbc	4	int	
+acf/_ann_wav_file/{}	string	B	4738	32	string	
+acf/_ap_crs_src	int	B	2984		int	
+acf/_apt_req_plane	int	B	297c		int	
+acf/_asi_is_kts	int	B	8f8		int	
+acf/_auto_engage_BC_deg	float	B	2458		raw	
+acf/_auto_omega_fire	coeff	B	a14		raw	3dd67751
+acf/_auto_omega_fire	float	B	a14		scale:3dd67751	
+acf/_auto_omega_idle	coeff	B	a0c		raw	3dd67751
+acf/_auto_omega_idle	float	B	a0c		scale:3dd67751	
+acf/_auto_omega_open	coeff	B	a10		raw	3dd67751
+acf/_auto_omega_open	float	B	a10		scale:3dd67751	
+acf/_auto_pressurization	int	B	ea4		int	
+acf/_auto_psi_for_dir_change	float	B	2454		raw	
+acf/_auto_ptch_axis_defaults_free	int	B	2460		int	
+acf/_auto_roll_axis_defaults_free	int	B	2464		int	
+acf/_auto_rpm_EQ	int	B	adc		int	
+acf/_auto_rpm_with_tvec	int	B	2060		int	
+acf/_auto_sync_EQ	int	B	ae0		int	
+acf/_auto_trim_EQ	int	B	afc		int	
+acf/_autofeather_min_throttle	float	B	a84		raw	
+acf/_average_mac_acf	coeff	B	2878		raw	3e9c0ebf
+acf/_average_mac_acf	float	B	2878		scale:3e9c0ebf	
+acf/_bagg_1/{}	float	B	26b8	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_bagg_2/{}	float	B	26c4	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_bagg_3/{}	float	B	26d0	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_bagg_4/{}	float	B	26dc	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_ball_ang_acc_deg_ss	float	B	28f4		raw	
+acf/_ball_ang_def_deg	float	B	28fc		raw	
+acf/_ball_ang_spd_deg_s	float	B	28f8		raw	
+acf/_batt_power_rat/{}	float	B	d88	4	raw	
+acf/_battery_watt_hr_max	float	B	d84		raw	
+acf/_beacon_EQ	int	B	910		int	
+acf/_beta_pitch	float	B	a58		raw	
+acf/_beta_prop_EQ	int	B	ad0		int	
+acf/_beta_single_gate_EQ	int	B	a90		int	
+acf/_bleed_draw_dice_engn	float	B	c88		raw	
+acf/_bleed_draw_dice_wing	float	B	c84		raw	
+acf/_bleed_draw_pressurization	float	B	c80		raw	
+acf/_bleed_draw_starter	float	B	c7c		raw	
+acf/_bleed_n2_min_deice_wing	float	B	c8c		raw	
+acf/_blown_flap_cl_inc	float	B	21e8		raw	
+acf/_blown_flap_min_engag	float	B	21e4		raw	
+acf/_board_1/{}	float	B	2670	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_board_2/{}	float	B	267c	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_boost_max_seconds	float	B	a34		raw	
+acf/_boost_ratio	float	B	a30		raw	
+acf/_bouncer_can_float/{}	int	B	41f8	4	int	
+acf/_bouncer_damp_k/{},{}	float	B	4310	12,4	raw	
+acf/_bouncer_exists/{}	int	B	41c0	4	int	
+acf/_bouncer_pos_limit/{}	float	B	43b8	4	raw	
+acf/_bouncer_rotor_acc/{}	float	B	4230	4	raw	
+acf/_bouncer_spring_k/{},{}	float	B	4268	12,4	raw	
+acf/_brake_co	float	B	27c4		raw	
+acf/_brake_max_stopping_KTGS	float	B	2838		raw	
+acf/_brake_to_steer_power	float	B	2840		raw	
+acf/_burner_delay_sec	float	B	948		raw	
+acf/_bus_apu_is_on	int	B	ca8		int	
+acf/_bus_bat_is_on/{}	int	B	cf8	4	int	
+acf/_bus_eng_is_on/{}	int	B	d38	4	int	
+acf/_bus_essential	int	B	cac		int	
+acf/_bus_gen_is_on/{}	int	B	d18	4	int	
+acf/_buses_always_tied	int	B	c94		int	
+acf/_bypass_ratio	float	B	940		raw	
+acf/_callsign	string	B	44b8		string	
+acf/_camera_fov_zoom	float	B	1c5c		raw	
+acf/_camera_offset_phi	float	B	1c70		raw	
+acf/_camera_offset_psi	float	B	1c68		raw	
+acf/_camera_offset_the	float	B	1c6c		raw	
+acf/_cdi_auto_crs_gps0	int	B	2988		int	
+acf/_cdi_auto_crs_gps1	int	B	298c		int	
+acf/_cgX_lft	float	B	2860		?	
+acf/_cgX_rgt	float	B	2864		?	
+acf/_cgY	coeff	B	2850		raw	3e9c0ebf
+acf/_cgY	float	B	2850		scale:3e9c0ebf	
+acf/_cgZ	coeff	B	2854		raw	3e9c0ebf
+acf/_cgZ	float	B	2854		scale:3e9c0ebf	
+acf/_cgZ_aft	float	B	285c		scale_minus_cgz:3e9c0ebf	
+acf/_cgZ_fwd	float	B	2858		scale_minus_cgz:3e9c0ebf	
+acf/_cg_in_mac	int	B	41bc		int	
+acf/_chaff_max	int	B	2904		int	
+acf/_chute_line_len/{}	float	B	3f70	4	scale:3e9c0ebf	
+acf/_chute_s/{}	float	B	3f64	4	scale:3dbe43f3	
+acf/_chute_x/{}	float	B	3f40	4	scale:3e9c0ebf	
+acf/_chute_y/{}	float	B	3f4c	4	scale_minus_cgy:3e9c0ebf	
+acf/_chute_z/{}	float	B	3f58	4	scale_minus_cgz:3e9c0ebf	
+acf/_click_step_otto_alt	float	B	8e4		floor:f:3f000000:41200000:raw	
+acf/_click_step_otto_vvi	float	B	8e0		raw	
+acf/_click_step_radio_alt	float	B	8e8		raw	
+acf/_clutch_cycle_time	float	B	c04		raw	
+acf/_cockpit_planned_vanish_y/{}	float	B	864	4	raw	
+acf/_cockpit_type	int	B	8fc		int	
+acf/_collective_EQ	int	B	205c		int	
+acf/_collective_en	int	B	a70		int	
+acf/_con_smooth_ailn	int	B	1d20		int	
+acf/_con_smooth_elev	int	B	1d24		int	
+acf/_con_smooth_rudd	int	B	1d28		int	
+acf/_correlator_interp/{}	float	B	ae8	4	raw	
+acf/_cowl_flaps_EQ	int	B	af8		int	
+acf/_cowl_x_ctr	float	B	1c8c		raw	
+acf/_crew_1/{}	float	B	26e8	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_crew_2/{}	float	B	26f4	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_crit_alt_mtr	coeff	B	938		raw	3e9c0ebf
+acf/_crit_alt_mtr	float	B	938		scale:3e9c0ebf	
+acf/_cus_dig_dec/{}	int	B	18e4	4	int	
+acf/_cus_dig_dig/{}	int	B	181c	4	int	
+acf/_cus_dig_offset/{}	float	B	168c	4	raw	
+acf/_cus_dig_scale/{}	float	B	1754	4	raw	
+acf/_cus_dig_use/{}	int	B	15c4	4	int	
+acf/_cus_doub_val/{}	float	B	1434	4	raw	
+acf/_cus_non_lin/{}	int	B	136c	4	int	
+acf/_cus_rnd_hi_ang/{}	float	B	11dc	4	raw	
+acf/_cus_rnd_hi_val/{}	float	B	104c	4	raw	
+acf/_cus_rnd_label/{}	int	B	14fc	4	int	
+acf/_cus_rnd_lo_ang/{}	float	B	1114	4	raw	
+acf/_cus_rnd_lo_val/{}	float	B	f84	4	raw	
+acf/_cus_rnd_mirror/{}	int	B	12a4	4	int	
+acf/_cus_rnd_use/{}	int	B	ebc	4	int	
+acf/_custom_autopilot	int	B	2418		int	
+acf/_custom_govnr	int	B	251c		int	
+acf/_cyclic_def_elev_aft	float	B	2084		raw	
+acf/_cyclic_def_elev_fwd	float	B	2080		raw	
+acf/_cyclic_def_roll_lft	float	B	2088		raw	
+acf/_cyclic_def_roll_rgt	float	B	208c		raw	
+acf/_cyclic_dn_trim_rat	float	B	20b8		raw	
+acf/_cyclic_lf_trim_rat	float	B	20b0		raw	
+acf/_cyclic_rt_trim_rat	float	B	20b4		raw	
+acf/_cyclic_up_trim_rat	float	B	20bc		raw	
+acf/_default_livery_name	string	B	44d8		string	
+acf/_deg_psi_per_deg_def	float	B	24b8		raw	
+acf/_deg_the_per_deg_def	float	B	24c0		raw	
+acf/_delta3	float	B	2138		raw	
+acf/_diff_coll_with_hdng	float	B	20a8		raw	
+acf/_diff_coll_with_ptch	float	B	20ac		raw	
+acf/_diff_coll_with_roll	float	B	20a4		raw	
+acf/_diff_collective	float	B	2090		raw	
+acf/_diff_cycl_with_hdng_lat	float	B	20a0		raw	
+acf/_diff_cycl_with_hdng_lon	float	B	209c		raw	
+acf/_diff_thro_hdng	float	B	20f4		raw	
+acf/_diff_thro_ptch	float	B	20e4		raw	
+acf/_diff_thro_roll	float	B	20ec		raw	
+acf/_dihed_ptch	float	B	21fc		raw	
+acf/_dihed_roll	float	B	2200		raw	
+acf/_diode_tie	int	B	cb4		int	
+acf/_disp_rat	float	B	28a0		raw	
+acf/_dock_door_selection/{}	int	B	270c	4	int	
+acf/_drone_FBW_P_max_targ_deg_per_sec	float	B	2314		raw	
+acf/_drone_FBW_Q_max_targ_deg_per_sec	float	B	231c		raw	
+acf/_drone_FBW_R_max_targ_deg_per_sec	float	B	2324		raw	
+acf/_drone_FBW_ailn_per_max_rate_error_P	float	B	233c		raw	
+acf/_drone_FBW_elev_per_max_rate_error_Q	float	B	2340		raw	
+acf/_drone_FBW_hdng_future_predict	float	B	2328		raw	
+acf/_drone_FBW_level_ptch_in_sec	float	B	2338		raw	
+acf/_drone_FBW_level_ptch_pred_sec	float	B	2334		raw	
+acf/_drone_FBW_level_roll_in_sec	float	B	2330		raw	
+acf/_drone_FBW_level_roll_pred_sec	float	B	232c		raw	
+acf/_drone_FBW_ptch_future_predict	float	B	2320		raw	
+acf/_drone_FBW_roll_future_predict	float	B	2318		raw	
+acf/_drone_FBW_rudd_per_max_rate_error_R	float	B	2344		raw	
+acf/_drone_FBW_system	int	B	22f8		int	
+acf/_drone_FBW_thro_per_deg_per_sec_error_P	float	B	2348		raw	
+acf/_drone_FBW_thro_per_deg_per_sec_error_Q	float	B	238c		raw	
+acf/_drone_FBW_thro_per_deg_per_sec_error_R	float	B	23d0		raw	
+acf/_drone_FBW_washout_lin_throttle	int	B	230c		int	
+acf/_drone_FBW_washout_lin_throttles	int	B	2300		int	
+acf/_drone_FBW_washout_sqrt_throttle	int	B	2310		int	
+acf/_drone_FBW_washout_sqrt_throttles	int	B	2304		int	
+acf/_drone_FBW_washout_vert_component	int	B	2308		int	
+acf/_drone_FBW_washout_with_KEAS	int	B	22fc		int	
+acf/_drud_sbrk	float	B	1e38		raw	
+acf/_dual_control_split_force_rat	float	B	2054		raw	
+acf/_dual_control_type	int	B	2050		int	
+acf/_dump_altitude	float	B	eb4		raw	
+acf/_dump_press_below_1k	int	B	eac		int	
+acf/_dump_press_wow	int	B	eb0		int	
+acf/_eagle_shock_to_tire_def_rat	float	B	283c		raw	
+acf/_elec_drive_eta	float	B	a38		raw	
+acf/_elec_fuelP	float	B	1b74		raw	
+acf/_elec_regen_eta	float	B	a3c		raw	
+acf/_elec_regen_rat	float	B	a40		raw	
+acf/_elev1_cratR	float	B	1e4c		raw	
+acf/_elev1_cratT	float	B	1e50		raw	
+acf/_elev1_dn	float	B	1e48		raw	
+acf/_elev1_max_sweep_rat	float	B	1d70		raw	
+acf/_elev1_rat1	float	B	1d68		raw	
+acf/_elev1_rat2	float	B	1d6c		raw	
+acf/_elev1_sbrk	float	B	21c4		raw	
+acf/_elev1_sbrk_gnd_only	int	B	21c8		int	
+acf/_elev1_up	float	B	1e44		raw	
+acf/_elev1_v1	float	B	1d60		raw	
+acf/_elev1_v2	float	B	1d64		raw	
+acf/_elev2_cratR	float	B	1e60		raw	
+acf/_elev2_cratT	float	B	1e64		raw	
+acf/_elev2_dn	float	B	1e5c		raw	
+acf/_elev2_max_sweep_rat	float	B	1d84		raw	
+acf/_elev2_rat1	float	B	1d7c		raw	
+acf/_elev2_rat2	float	B	1d80		raw	
+acf/_elev2_sbrk	float	B	21cc		raw	
+acf/_elev2_sbrk_gnd_only	int	B	21d0		int	
+acf/_elev2_up	float	B	1e58		raw	
+acf/_elev2_v1	float	B	1d74		raw	
+acf/_elev2_v2	float	B	1d78		raw	
+acf/_elev_def_time	float	B	1e54		raw	
+acf/_elev_tab	float	B	2000		raw	
+acf/_elev_trim_time	float	B	1ffc		raw	
+acf/_elev_with_flap_rat	float	B	2160		raw	
+acf/_engine_friction_ratio	float	B	9f0		raw	
+acf/_engine_pwr_rat_from_crit_alt	float	B	93c		raw	
+acf/_engine_rev_time_sec	float	B	974		raw	
+acf/_essential_ties	int	B	cb0		int	
+acf/_esys_amperage/rel_AOA	float	B	3088		raw	
+acf/_esys_amperage/rel_HVAC	float	B	2f84		raw	
+acf/_esys_amperage/rel_adc_comp	float	B	3174		raw	
+acf/_esys_amperage/rel_adc_comp2	float	B	3178		raw	
+acf/_esys_amperage/rel_adf1	float	B	30bc		raw	
+acf/_esys_amperage/rel_adf2	float	B	30c0		raw	
+acf/_esys_amperage/rel_ail_trim	float	B	2e3c		raw	
+acf/_esys_amperage/rel_auto_comp	float	B	2db0		raw	
+acf/_esys_amperage/rel_auto_servos	float	B	2db8		raw	
+acf/_esys_amperage/rel_avionics_fan	float	B	3884		raw	
+acf/_esys_amperage/rel_bad_fuel	float	B	304c		raw	
+acf/_esys_amperage/rel_bus0	float	B	2d0c		raw	
+acf/_esys_amperage/rel_bus1	float	B	2d10		raw	
+acf/_esys_amperage/rel_bus2	float	B	2d14		raw	
+acf/_esys_amperage/rel_bus3	float	B	2d18		raw	
+acf/_esys_amperage/rel_bus4	float	B	2d1c		raw	
+acf/_esys_amperage/rel_bus5	float	B	2d20		raw	
+acf/_esys_amperage/rel_clutch	float	B	2fe4		raw	
+acf/_esys_amperage/rel_cop_AOA	float	B	308c		raw	
+acf/_esys_amperage/rel_cop_radalt	float	B	3098		raw	
+acf/_esys_amperage/rel_cop_tsi	float	B	3074		raw	
+acf/_esys_amperage/rel_dice_AOA_heat_0	float	B	2f14		raw	
+acf/_esys_amperage/rel_dice_AOA_heat_1	float	B	2f18		raw	
+acf/_esys_amperage/rel_dice_AOA_heat_2	float	B	2f1c		raw	
+acf/_esys_amperage/rel_dice_TAT_heat_0	float	B	2f20		raw	
+acf/_esys_amperage/rel_dice_TAT_heat_1	float	B	2f24		raw	
+acf/_esys_amperage/rel_dice_TAT_heat_2	float	B	2f28		raw	
+acf/_esys_amperage/rel_dice_brake_heat	float	B	2ef8		raw	
+acf/_esys_amperage/rel_dice_detect	float	B	2ee4		raw	
+acf/_esys_amperage/rel_dice_pitot_heat_0	float	B	2efc		raw	
+acf/_esys_amperage/rel_dice_pitot_heat_1	float	B	2f00		raw	
+acf/_esys_amperage/rel_dice_pitot_heat_2	float	B	2f04		raw	
+acf/_esys_amperage/rel_dice_stat_heat_0	float	B	2f08		raw	
+acf/_esys_amperage/rel_dice_stat_heat_1	float	B	2f0c		raw	
+acf/_esys_amperage/rel_dice_stat_heat_2	float	B	2f10		raw	
+acf/_esys_amperage/rel_dice_tks_pump_0	float	B	2f34		raw	
+acf/_esys_amperage/rel_dice_tks_pump_1	float	B	2f38		raw	
+acf/_esys_amperage/rel_dice_window_heat	float	B	2ee8		raw	
+acf/_esys_amperage/rel_dice_window_heat1	float	B	2eec		raw	
+acf/_esys_amperage/rel_dice_window_heat2	float	B	2ef0		raw	
+acf/_esys_amperage/rel_dice_window_heat3	float	B	2ef4		raw	
+acf/_esys_amperage/rel_dice_wing_heat_0	float	B	2f2c		raw	
+acf/_esys_amperage/rel_dice_wing_heat_1	float	B	2f30		raw	
+acf/_esys_amperage/rel_dme	float	B	30d4		raw	
+acf/_esys_amperage/rel_efis_1	float	B	3080		raw	
+acf/_esys_amperage/rel_efis_2	float	B	3084		raw	
+acf/_esys_amperage/rel_ele_fp0	float	B	32e0		raw	
+acf/_esys_amperage/rel_ele_fp1	float	B	32e4		raw	
+acf/_esys_amperage/rel_ele_fp2	float	B	32e8		raw	
+acf/_esys_amperage/rel_ele_fp3	float	B	32ec		raw	
+acf/_esys_amperage/rel_ele_fp4	float	B	32f0		raw	
+acf/_esys_amperage/rel_ele_fp5	float	B	32f4		raw	
+acf/_esys_amperage/rel_ele_fp6	float	B	32f8		raw	
+acf/_esys_amperage/rel_ele_fp7	float	B	32fc		raw	
+acf/_esys_amperage/rel_elec_gyr0	float	B	3014		raw	
+acf/_esys_amperage/rel_elec_gyr1	float	B	3018		raw	
+acf/_esys_amperage/rel_elv_trim	float	B	2e40		raw	
+acf/_esys_amperage/rel_engn_sync	float	B	2ff4		raw	
+acf/_esys_amperage/rel_fadec_0	float	B	3580		raw	
+acf/_esys_amperage/rel_fadec_1	float	B	3584		raw	
+acf/_esys_amperage/rel_fadec_2	float	B	3588		raw	
+acf/_esys_amperage/rel_fadec_3	float	B	358c		raw	
+acf/_esys_amperage/rel_fadec_4	float	B	3590		raw	
+acf/_esys_amperage/rel_fadec_5	float	B	3594		raw	
+acf/_esys_amperage/rel_fadec_6	float	B	3598		raw	
+acf/_esys_amperage/rel_fadec_7	float	B	359c		raw	
+acf/_esys_amperage/rel_flap_act	float	B	2e58		raw	
+acf/_esys_amperage/rel_g_AHRS	float	B	317c		raw	
+acf/_esys_amperage/rel_g_AHRS2	float	B	3180		raw	
+acf/_esys_amperage/rel_g_gea	float	B	3170		raw	
+acf/_esys_amperage/rel_g_gia1	float	B	3168		raw	
+acf/_esys_amperage/rel_g_gia2	float	B	316c		raw	
+acf/_esys_amperage/rel_g_magmtr	float	B	3184		raw	
+acf/_esys_amperage/rel_gear_act	float	B	2e5c		raw	
+acf/_esys_amperage/rel_gen_esys	float	B	3888		raw	
+acf/_esys_amperage/rel_gp	float	B	30e0		raw	
+acf/_esys_amperage/rel_gps1	float	B	30c4		raw	
+acf/_esys_amperage/rel_gps2	float	B	30c8		raw	
+acf/_esys_amperage/rel_heatIN0	float	B	2f44		raw	
+acf/_esys_amperage/rel_heatIN1	float	B	2f48		raw	
+acf/_esys_amperage/rel_heatIN2	float	B	2f4c		raw	
+acf/_esys_amperage/rel_heatIN3	float	B	2f50		raw	
+acf/_esys_amperage/rel_heatIN4	float	B	2f54		raw	
+acf/_esys_amperage/rel_heatIN5	float	B	2f58		raw	
+acf/_esys_amperage/rel_heatIN6	float	B	2f5c		raw	
+acf/_esys_amperage/rel_heatIN7	float	B	2f60		raw	
+acf/_esys_amperage/rel_heatPR0	float	B	2f64		raw	
+acf/_esys_amperage/rel_heatPR1	float	B	2f68		raw	
+acf/_esys_amperage/rel_heatPR2	float	B	2f6c		raw	
+acf/_esys_amperage/rel_heatPR3	float	B	2f70		raw	
+acf/_esys_amperage/rel_heatPR4	float	B	2f74		raw	
+acf/_esys_amperage/rel_heatPR5	float	B	2f78		raw	
+acf/_esys_amperage/rel_heatPR6	float	B	2f7c		raw	
+acf/_esys_amperage/rel_heatPR7	float	B	2f80		raw	
+acf/_esys_amperage/rel_hyd_pump_el2	float	B	2fa0		raw	
+acf/_esys_amperage/rel_hyd_pump_el3	float	B	2fa4		raw	
+acf/_esys_amperage/rel_hyd_pump_ele	float	B	2f9c		raw	
+acf/_esys_amperage/rel_ignitr0	float	B	33a0		raw	
+acf/_esys_amperage/rel_ignitr1	float	B	33a4		raw	
+acf/_esys_amperage/rel_ignitr2	float	B	33a8		raw	
+acf/_esys_amperage/rel_ignitr3	float	B	33ac		raw	
+acf/_esys_amperage/rel_ignitr4	float	B	33b0		raw	
+acf/_esys_amperage/rel_ignitr5	float	B	33b4		raw	
+acf/_esys_amperage/rel_ignitr6	float	B	33b8		raw	
+acf/_esys_amperage/rel_ignitr7	float	B	33bc		raw	
+acf/_esys_amperage/rel_inverter0	float	B	2d24		raw	
+acf/_esys_amperage/rel_inverter1	float	B	2d28		raw	
+acf/_esys_amperage/rel_lites_beac	float	B	2d94		raw	
+acf/_esys_amperage/rel_lites_hud	float	B	2da8		raw	
+acf/_esys_amperage/rel_lites_ins	float	B	2da0		raw	
+acf/_esys_amperage/rel_lites_land	float	B	2d9c		raw	
+acf/_esys_amperage/rel_lites_nav	float	B	2d8c		raw	
+acf/_esys_amperage/rel_lites_pan	float	B	2da4		raw	
+acf/_esys_amperage/rel_lites_strobe	float	B	2d90		raw	
+acf/_esys_amperage/rel_lites_taxi	float	B	2d98		raw	
+acf/_esys_amperage/rel_marker	float	B	30e8		raw	
+acf/_esys_amperage/rel_navcom1	float	B	30a4		raw	
+acf/_esys_amperage/rel_navcom2	float	B	30a8		raw	
+acf/_esys_amperage/rel_pil_radalt	float	B	3094		raw	
+acf/_esys_amperage/rel_pil_tsi	float	B	305c		raw	
+acf/_esys_amperage/rel_rpm_ind_0	float	B	30f0		raw	
+acf/_esys_amperage/rel_rpm_ind_1	float	B	30f4		raw	
+acf/_esys_amperage/rel_rud_trim	float	B	2e38		raw	
+acf/_esys_amperage/rel_servo_thro	float	B	2dc4		raw	
+acf/_esys_amperage/rel_slats	float	B	2e50		raw	
+acf/_esys_amperage/rel_stab_aug	float	B	2dc8		raw	
+acf/_esys_amperage/rel_stall_warn	float	B	309c		raw	
+acf/_esys_amperage/rel_startr0	float	B	3380		raw	
+acf/_esys_amperage/rel_startr1	float	B	3384		raw	
+acf/_esys_amperage/rel_startr2	float	B	3388		raw	
+acf/_esys_amperage/rel_startr3	float	B	338c		raw	
+acf/_esys_amperage/rel_startr4	float	B	3390		raw	
+acf/_esys_amperage/rel_startr5	float	B	3394		raw	
+acf/_esys_amperage/rel_startr6	float	B	3398		raw	
+acf/_esys_amperage/rel_startr7	float	B	339c		raw	
+acf/_esys_amperage/rel_stby_AOA	float	B	3090		raw	
+acf/_esys_amperage/rel_vac_pump_stby	float	B	3010		raw	
+acf/_esys_amperage/rel_wxr_radar	float	B	30ec		raw	
+acf/_esys_amperage/rel_xpndr	float	B	30e4		raw	
+acf/_esys_amperage/rel_yaw_damp	float	B	2dac		raw	
+acf/_exhaust_hp_to_lb	float	B	970		raw	
+acf/_exhaust_rat	float	B	a68		raw	
+acf/_face_jet	coeff	B	950		raw	3dbe43f3
+acf/_face_jet	float	B	950		scale:3dbe43f3	
+acf/_face_rocket	coeff	B	94c		raw	3dbe43f3
+acf/_face_rocket	float	B	94c		scale:3dbe43f3	
+acf/_fadec_EQ_mixture	int	B	ab0		int	
+acf/_fadec_EQ_rpm_limit	int	B	aac		int	
+acf/_fadec_prevents_overboost	int	B	aa0		int	
+acf/_fadec_prevents_temp_EGT	int	B	aa8		int	
+acf/_fadec_prevents_temp_ITT	int	B	aa4		int	
+acf/_fadec_target/{}	float	B	ac4	4	raw	
+acf/_fadec_tla/{}	float	B	ab8	4	raw	
+acf/_fan_rpm_for_n1_100	float	B	96c		raw	
+acf/_fbrk_on_td_EQ	int	B	2240		int	
+acf/_fbrk_rto_vind	float	B	2244		raw	
+acf/_fdir_needed_to_engage_servo	int	B	241c		int	
+acf/_feather_on_engn_fail_EQ	int	B	a80		int	
+acf/_feather_on_mixt_pull_EQ	int	B	a8c		int	
+acf/_feather_on_prop_pull_EQ	int	B	a88		int	
+acf/_feathered_pitch	float	B	a54		raw	
+acf/_ff_rat_idle_JET	float	B	b68		raw	
+acf/_ff_rat_idle_PRP	float	B	b18		raw	
+acf/_ff_rat_idle_turbo	float	B	b34		raw	
+acf/_file_writer_version	int	B	4		int	
+acf/_fixed_max/{}	coeff	B	412c	4	raw	3ee83d47
+acf/_fixed_max/{}	float	B	412c	4	scale:3ee83d47	
+acf/_fixed_name/{}	string	B	4618	32	string	
+acf/_fixed_ref/{},{}	float	B	4150	12,4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_fixed_role/{}	int	B	4108	4	int	
+acf/_flap1_cd	float	B	1f7c		raw	
+acf/_flap1_cl	float	B	1f78		raw	
+acf/_flap1_cm	float	B	1f80		raw	
+acf/_flap1_cratR	float	B	1e9c		raw	
+acf/_flap1_cratT	float	B	1ea0		raw	
+acf/_flap1_dn/{}	float	B	1f84	4	raw	
+acf/_flap1_max_sweep_rat	float	B	1dec		raw	
+acf/_flap1_ptch	float	B	2198		raw	
+acf/_flap1_ptch_above_50	int	B	21a4		int	
+acf/_flap1_roll	float	B	2194		raw	
+acf/_flap1_roll_above_50	int	B	21ac		int	
+acf/_flap1_type	int	B	1f74		int	
+acf/_flap2_cd	float	B	1fbc		raw	
+acf/_flap2_cl	float	B	1fb8		raw	
+acf/_flap2_cm	float	B	1fc0		raw	
+acf/_flap2_cratR	float	B	1ec4		raw	
+acf/_flap2_cratT	float	B	1ec8		raw	
+acf/_flap2_dn/{}	float	B	1fc4	4	raw	
+acf/_flap2_max_sweep_rat	float	B	1df0		raw	
+acf/_flap2_ptch	float	B	21a0		raw	
+acf/_flap2_ptch_above_50	int	B	21a8		int	
+acf/_flap2_roll	float	B	219c		raw	
+acf/_flap2_roll_above_50	int	B	21b0		int	
+acf/_flap2_type	int	B	1fb4		int	
+acf/_flap_EQ	int	B	2960		int	
+acf/_flap_arm	coeff	B	2134		raw	3e9c0ebf
+acf/_flap_arm	float	B	2134		scale:3e9c0ebf	
+acf/_flap_detents	int	B	1eb0		int	
+acf/_flap_ext_time	float	B	1ea4		raw	
+acf/_flap_extend_protect	int	B	294c		int	
+acf/_flap_pumps	float	B	2940		raw	
+acf/_flap_ret_time	float	B	1ecc		raw	
+acf/_flap_retract_protect	int	B	2950		int	
+acf/_flap_speed_rat_at_0	float	B	1ed8		raw	
+acf/_flaps_are_infinite	int	B	1eb4		int	
+acf/_flaps_dial_a_flap	int	B	1eb8		int	
+acf/_flaps_johnson_bar	int	B	1ebc		int	
+acf/_flaps_with_gear_EQ	int	B	2224		int	
+acf/_flaps_with_stall_rat_0	float	B	2234		raw	
+acf/_flaps_with_stall_rat_1	float	B	2238		raw	
+acf/_flaps_with_vec_EQ	int	B	2228		int	
+acf/_flaps_with_vector	int	B	222c		int	
+acf/_flare_max	int	B	2908		int	
+acf/_flight_idle_EQ	int	B	a98		int	
+acf/_fly_like_a_helo	int	B	2970		int	
+acf/_folding_prop_EQ	int	B	a78		int	
+acf/_food_1/{}	float	B	26a0	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_food_2/{}	float	B	26ac	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_frac_oil_temp_to_fuel	float	B	c00		raw	
+acf/_frc_damp_brak_lb	float	B	278c		raw	
+acf/_frc_damp_hdng_lb	float	B	2780		raw	
+acf/_frc_damp_ptch_lb	float	B	2760		raw	
+acf/_frc_damp_roll_lb	float	B	2770		raw	
+acf/_frc_hdng_ias	float	B	2778		raw	
+acf/_frc_max_brak_lb	float	B	2790		raw	
+acf/_frc_max_hdng_lb	float	B	2784		raw	
+acf/_frc_max_ptch_lb	float	B	2764		raw	
+acf/_frc_max_roll_lb	float	B	2774		raw	
+acf/_frc_ptch_ias	float	B	2758		raw	
+acf/_frc_roll_ias	float	B	2768		raw	
+acf/_frc_spring_brak_lb	float	B	2788		raw	
+acf/_frc_spring_hdng_lb	float	B	277c		raw	
+acf/_frc_spring_ptch_lb	float	B	275c		raw	
+acf/_frc_spring_roll_lb	float	B	276c		raw	
+acf/_frc_stall_freq	float	B	2798		raw	
+acf/_frc_stall_lb	float	B	279c		raw	
+acf/_frc_stickshaker_freq	float	B	27a0		raw	
+acf/_frc_stickshaker_lb	float	B	27a4		raw	
+acf/_free_turb_Ng_pow_sig28	float	B	998		raw	
+acf/_free_turb_Ng_pow_sigSL	float	B	99c		raw	
+acf/_free_turb_Np_pow_sig28	float	B	9a0		raw	
+acf/_free_turb_Np_pow_sigSL	float	B	9a4		raw	
+acf/_free_turb_drag_k	float	B	994		raw	
+acf/_free_turbine_engine_rev	int	B	990		int	
+acf/_fuel_1/{}	float	B	2688	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_fuel_2/{}	float	B	2694	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_fuel_intro_time_jet	float	B	a24		raw	
+acf/_fuel_intro_time_prop	float	B	a18		raw	
+acf/_fuel_sel_cmnd_valid_pos_lft/{}	int	B	1cc8	4	int	
+acf/_fuel_sel_cmnd_valid_pos_rgt/{}	int	B	1ce0	4	int	
+acf/_g1000_keyboard_EQ	int	B	ad8		int	
+acf/_gear_EQ	int	B	295c		int	
+acf/_gear_exposed_when_retracted	float	B	2830		raw	
+acf/_gear_extend_protect	int	B	2948		int	
+acf/_gear_pumps	float	B	293c		raw	
+acf/_gear_retract_protect	int	B	2944		int	
+acf/_gear_warn_above_flap_rat	float	B	284c		raw	
+acf/_gear_warn_below_kias	float	B	2844		raw	
+acf/_gear_warn_below_thro_pct	float	B	2848		raw	
+acf/_generator_design_rpm_rat	float	B	d80		raw	
+acf/_get_tow/{}	float	B	264c	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_get_tow_new/{}	float	B	2640	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_give_tow/{}	float	B	2634	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_go_to_burner_50_above_thro	float	B	a50		raw	
+acf/_go_to_pitch_mode_on_alt_arm	int	B	2430		int	
+acf/_govnr_EQ	int	B	ae4		int	
+acf/_govnr_del	float	B	2520		raw	
+acf/_govnr_dot	float	B	2524		raw	
+acf/_gps_has_429_output0	int	B	2990		int	
+acf/_gps_has_429_output1	int	B	2994		int	
+acf/_green_hi_CHT	float	B	1ab0		raw	
+acf/_green_hi_EGT	float	B	1a90		raw	
+acf/_green_hi_EPR	float	B	19f4		raw	
+acf/_green_hi_FF	float	B	1a0c		raw	
+acf/_green_hi_ITT	float	B	1a70		raw	
+acf/_green_hi_MP	float	B	1a54		raw	
+acf/_green_hi_N1	float	B	19c4		raw	
+acf/_green_hi_N1_apu	float	B	1c4c		raw	
+acf/_green_hi_N2	float	B	19dc		raw	
+acf/_green_hi_TRQ	float	B	1a24		raw	
+acf/_green_hi_bat_amp	float	B	1ba0		raw	
+acf/_green_hi_bat_temp	float	B	1ad0		raw	
+acf/_green_hi_bat_volt	float	B	1b84		raw	
+acf/_green_hi_fuelP	float	B	1b60		raw	
+acf/_green_hi_gen_amp	float	B	1bd8		raw	
+acf/_green_hi_gen_volt	float	B	1bbc		raw	
+acf/_green_hi_inverter	float	B	1aec		raw	
+acf/_green_hi_oilP	float	B	1b44		raw	
+acf/_green_hi_oilT	float	B	1b24		raw	
+acf/_green_hi_pwr	float	B	1a3c		raw	
+acf/_green_hi_stator	float	B	1b08		raw	
+acf/_green_hi_vac	float	B	1c30		raw	
+acf/_green_hi_xmsn_P	float	B	1bf4		raw	
+acf/_green_hi_xmsn_T	float	B	1c10		raw	
+acf/_green_lo_CHT	float	B	1aac		raw	
+acf/_green_lo_EGT	float	B	1a8c		raw	
+acf/_green_lo_EPR	float	B	19f0		raw	
+acf/_green_lo_FF	float	B	1a08		raw	
+acf/_green_lo_ITT	float	B	1a6c		raw	
+acf/_green_lo_MP	float	B	1a50		raw	
+acf/_green_lo_N1	float	B	19c0		raw	
+acf/_green_lo_N1_apu	float	B	1c48		raw	
+acf/_green_lo_N2	float	B	19d8		raw	
+acf/_green_lo_TRQ	float	B	1a20		raw	
+acf/_green_lo_bat_amp	float	B	1b9c		raw	
+acf/_green_lo_bat_temp	float	B	1acc		raw	
+acf/_green_lo_bat_volt	float	B	1b80		raw	
+acf/_green_lo_fuelP	float	B	1b5c		raw	
+acf/_green_lo_gen_amp	float	B	1bd4		raw	
+acf/_green_lo_gen_volt	float	B	1bb8		raw	
+acf/_green_lo_inverter	float	B	1ae8		raw	
+acf/_green_lo_oilP	float	B	1b40		raw	
+acf/_green_lo_oilT	float	B	1b20		raw	
+acf/_green_lo_pwr	float	B	1a38		raw	
+acf/_green_lo_stator	float	B	1b04		raw	
+acf/_green_lo_vac	float	B	1c2c		raw	
+acf/_green_lo_xmsn_P	float	B	1bf0		raw	
+acf/_green_lo_xmsn_T	float	B	1c0c		raw	
+acf/_ground_pwr/{}	float	B	2700	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_gyro_spooldown_time	float	B	1d10		floor:f:3f800000:42700000:raw	
+acf/_gyro_spoolup_time	float	B	1d0c		floor:f:3f800000:40a00000:raw	
+acf/_h_eqlbm	coeff	B	65a4		raw	3e9c0ebf
+acf/_h_eqlbm	float	B	65a4		scale:3e9c0ebf	
+acf/_has_ADG	int	B	c78		int	
+acf/_has_APU_bleed_air	int	B	c70		int	
+acf/_has_APU_generator	int	B	c74		int	
+acf/_has_APU_switch	int	B	c54		int	
+acf/_has_DC_fd	int	B	1ca0		int	
+acf/_has_GLASS_hsi	int	B	1c98		int	
+acf/_has_SC_fd	int	B	1c9c		int	
+acf/_has_TCAS	int	B	1d00		int	
+acf/_has_a_fuel_any	int	B	1cc0		int	
+acf/_has_a_fuel_sel	int	B	1cc4		int	
+acf/_has_bagg_1	int	B	260c		int	
+acf/_has_bagg_2	int	B	2610		int	
+acf/_has_bagg_3	int	B	2614		int	
+acf/_has_bagg_4	int	B	2618		int	
+acf/_has_board_1	int	B	25f4		int	
+acf/_has_board_2	int	B	25f8		int	
+acf/_has_clutch_switch	int	B	1ca4		int	
+acf/_has_com_radios	int	B	1cfc		int	
+acf/_has_crew_1	int	B	261c		int	
+acf/_has_crew_2	int	B	2620		int	
+acf/_has_crossfeed_but	int	B	1cb4		int	
+acf/_has_elec_hyd_switch	int	B	1cb0		int	
+acf/_has_food_1	int	B	2604		int	
+acf/_has_food_2	int	B	2608		int	
+acf/_has_fuel_1	int	B	25fc		int	
+acf/_has_fuel_2	int	B	2600		int	
+acf/_has_fuel_heater	int	B	bfc		int	
+acf/_has_full_bleed_air	int	B	1cf8		int	
+acf/_has_get_tow	int	B	25e8		int	
+acf/_has_get_tow_new	int	B	25e4		int	
+acf/_has_give_tow	int	B	25e0		int	
+acf/_has_ground_pwr	int	B	2624		int	
+acf/_has_hsi	int	B	1c94		int	
+acf/_has_pre_rotate	int	B	1ca8		int	
+acf/_has_push_back	int	B	25dc		int	
+acf/_has_radio_alt_callout	int	B	1cb8		int	
+acf/_has_refuel_rcv	int	B	25f0		int	
+acf/_has_refuel_snd	int	B	25ec		int	
+acf/_has_spot_lite	int	B	1cbc		int	
+acf/_has_vac_cross_tied	int	B	1d04		int	
+acf/_has_vac_venturi	int	B	1d08		int	
+acf/_has_yawdamp_but	int	B	1cac		int	
+acf/_hdng_acft_lf_trim_rat	float	B	2014		raw	
+acf/_hdng_acft_rt_trim_rat	float	B	2018		raw	
+acf/_hdng_acft_trim_mode	int	B	202c		int	
+acf/_hdng_max_full_def_KIAS	float	B	1d34		raw	
+acf/_heat_x_ctr	float	B	1c88		raw	
+acf/_hide_prop_at_00_vect	int	B	2144		int	
+acf/_hide_prop_at_90_vect	int	B	2140		int	
+acf/_hnav_loc_only	int	B	2474		int	
+acf/_hov_c_Kd	float	B	2518		raw	
+acf/_hov_c_Ki	float	B	2514		raw	
+acf/_hov_c_Kp	float	B	2510		raw	
+acf/_hov_h_Kd	float	B	250c		raw	
+acf/_hov_h_Ki	float	B	2508		raw	
+acf/_hov_h_Kp	float	B	2504		raw	
+acf/_hov_p_Kd	float	B	24f4		raw	
+acf/_hov_p_Ki	float	B	24f0		raw	
+acf/_hov_p_Kp	float	B	24ec		raw	
+acf/_hov_r_Kd	float	B	2500		raw	
+acf/_hov_r_Ki	float	B	24fc		raw	
+acf/_hov_r_Kp	float	B	24f8		raw	
+acf/_hud_fov_bottom_rat	float	B	854		raw	
+acf/_hud_fov_left_rat	float	B	850		raw	
+acf/_hud_fov_right_rat	float	B	858		raw	
+acf/_hud_fov_top_rat	float	B	85c		raw	
+acf/_hud_panel_bottom_px	float	B	844		raw	
+acf/_hud_panel_left_px	float	B	840		raw	
+acf/_hud_panel_right_px	float	B	848		raw	
+acf/_hud_panel_top_px	float	B	84c		raw	
+acf/_hud_region_index	int	B	860		int	
+acf/_hud_tapes_track_vector	int	B	8f4		int	
+acf/_hyd_PTU_type	int	B	e58		int	
+acf/_hyd_brakes	int	B	e7c		int	
+acf/_hyd_brakes_abs	int	B	e98		int	
+acf/_hyd_ele_pump_0123/{}	int	B	dc4	4	int	
+acf/_hyd_engn_pump_0123/{}	int	B	e18	4	int	
+acf/_hyd_flaps	int	B	e5c		int	
+acf/_hyd_flightcons	int	B	e8c		int	
+acf/_hyd_gear	int	B	e64		int	
+acf/_hyd_gear_fail_mode	int	B	e68		int	
+acf/_hyd_gear_fail_speed	float	B	e6c		raw	
+acf/_hyd_gear_has_dnlock	int	B	e74		int	
+acf/_hyd_gear_has_off	int	B	e70		int	
+acf/_hyd_max_p	float	B	db4		raw	
+acf/_hyd_max_p_RAT	float	B	e10		raw	
+acf/_hyd_max_p_ele	float	B	dc0		raw	
+acf/_hyd_max_p_eng	float	B	db8		raw	
+acf/_hyd_max_p_rot	float	B	dbc		raw	
+acf/_hyd_nw_steer	int	B	e78		int	
+acf/_hyd_park_brake_toe	int	B	e94		int	
+acf/_hyd_park_brake_trap	int	B	e90		int	
+acf/_hyd_prop_brake	int	B	e80		int	
+acf/_hyd_prop_pump_0123/{}	int	B	dd0	4	int	
+acf/_hyd_rat_pump_0123	int	B	e14		int	
+acf/_hyd_slats	int	B	e60		int	
+acf/_hyd_thrust_rev_L	int	B	e84		int	
+acf/_hyd_thrust_rev_R	int	B	e88		int	
+acf/_idle_rat/{}	float	B	9d8	4	raw	
+acf/_incidence_with_flaps	int	B	2218		int	
+acf/_inlet_compression_efficiency	float	B	980		raw	
+acf/_inlet_max_KEAS	float	B	988		raw	
+acf/_inlet_max_temp_C	float	B	98c		raw	
+acf/_integrated_approach_navigation	int	B	2468		int	
+acf/_inverted_fuel_oil_EQ	int	B	a7c		int	
+acf/_inverter_for_elec_gyros	int	B	c4c		int	
+acf/_inverter_for_ind_trq	int	B	c50		int	
+acf/_inverter_for_otto	int	B	c48		int	
+acf/_is_glossy	int	B	904		int	
+acf/_jato_Y	float	B	2914		scale_minus_cgy:3e9c0ebf	
+acf/_jato_Z	float	B	2918		scale_minus_cgz:3e9c0ebf	
+acf/_jato_dur	float	B	2924		raw	
+acf/_jato_sfc	float	B	2928		raw	
+acf/_jato_theta	float	B	291c		raw	
+acf/_jato_thrust	coeff	B	2920		raw	408e38be
+acf/_jato_thrust	float	B	2920		scale:408e38be	
+acf/_jet_Mach_climb	float	B	b54		raw	
+acf/_jet_Mach_hicrz	float	B	b48		raw	
+acf/_jet_Mach_locrz	float	B	b3c		raw	
+acf/_jet_Mach_takeoff	float	B	b60		raw	
+acf/_jet_N1_climb	float	B	b50		raw	
+acf/_jet_N1_hicrz	float	B	b44		raw	
+acf/_jet_N1_locrz	float	B	b38		raw	
+acf/_jet_N1_takeoff	float	B	b5c		raw	
+acf/_jet_SFC_climb	coeff	B	b58		raw	37edd068
+acf/_jet_SFC_climb	float	B	b58		scale:37edd068	
+acf/_jet_SFC_hicrz	coeff	B	b4c		raw	37edd068
+acf/_jet_SFC_hicrz	float	B	b4c		scale:37edd068	
+acf/_jet_SFC_locrz	coeff	B	b40		raw	37edd068
+acf/_jet_SFC_locrz	float	B	b40		scale:37edd068	
+acf/_jet_SFC_takeoff	coeff	B	b64		raw	37edd068
+acf/_jet_SFC_takeoff	float	B	b64		scale:37edd068	
+acf/_jett_is_pipe	int	B	28d8		int	
+acf/_jett_is_ret	int	B	28e0		int	
+acf/_jett_is_slung	int	B	28d4		int	
+acf/_jett_is_water	int	B	28dc		int	
+acf/_jett_xyz/{}	float	B	28bc	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_load_alt_presel_on_alt_hit	int	B	2448		int	
+acf/_load_presel_on_asi_hit	int	B	2440		int	
+acf/_load_presel_on_vvi_hit	int	B	2444		int	
+acf/_lock_n1	float	B	9b8		raw	
+acf/_lock_n2	float	B	9bc		raw	
+acf/_lock_with_elev_EQ	int	B	27b8		int	
+acf/_m_displaced	coeff	B	2894		raw	3ee83d47
+acf/_m_displaced	float	B	2894		scale:3ee83d47	
+acf/_m_displaced_Y	float	B	289c		scale_minus_cgy:3e9c0ebf	
+acf/_m_empty	coeff	B	288c		raw	3ee83d47
+acf/_m_empty	float	B	288c		scale:3ee83d47	
+acf/_m_fuel_max_tot	coeff	B	2888		raw	3ee83d47
+acf/_m_fuel_max_tot	float	B	2888		scale:3ee83d47	
+acf/_m_fuel_xfer_start	coeff	B	28a4		raw	3ee83d47
+acf/_m_fuel_xfer_start	float	B	28a4		scale:3ee83d47	
+acf/_m_fuel_xfer_stop	coeff	B	28a8		raw	3ee83d47
+acf/_m_fuel_xfer_stop	float	B	28a8		scale:3ee83d47	
+acf/_m_jett	coeff	B	2890		raw	3ee83d47
+acf/_m_jett	float	B	2890		scale:3ee83d47	
+acf/_m_max	coeff	B	2898		raw	3ee83d47
+acf/_m_max	float	B	2898		scale:3ee83d47	
+acf/_m_shift	coeff	B	2264		raw	3ee83d47
+acf/_m_shift	float	B	2264		scale:3ee83d47	
+acf/_m_shift_dx	coeff	B	2268		raw	3e9c0ebf
+acf/_m_shift_dx	float	B	2268		scale:3e9c0ebf	
+acf/_m_shift_dz	coeff	B	226c		raw	3e9c0ebf
+acf/_m_shift_dz	float	B	226c		scale:3e9c0ebf	
+acf/_manual_rad_gyr	int	B	2884		int	
+acf/_manual_reversion_rat	float	B	e9c		raw	
+acf/_mast_bump_cyclic_ailn	float	B	2094		raw	
+acf/_mast_bump_cyclic_roll	float	B	2098		raw	
+acf/_max_CHT	float	B	1ac0		raw	
+acf/_max_EGT	float	B	1aa0		raw	
+acf/_max_ITT	float	B	1a80		raw	
+acf/_max_MP_limit	float	B	1a64		raw	
+acf/_max_atc_alt_ft	float	B	7e8		raw	
+acf/_max_bat_amp	float	B	1bb0		raw	
+acf/_max_bat_temp	float	B	1ae0		raw	
+acf/_max_gen_amp0	float	B	1be8		raw	
+acf/_max_gen_amp_per_gen/{}	float	B	cb8	4	raw	
+acf/_max_inverter	float	B	1afc		raw	
+acf/_max_mach_eff	float	B	984		raw	
+acf/_max_oilT	float	B	1b34		raw	
+acf/_max_press_diff	float	B	ea8		raw	
+acf/_max_stator	float	B	1b18		raw	
+acf/_max_vac	float	B	1c40		raw	
+acf/_max_xmsn_P	float	B	1c04		raw	
+acf/_max_xmsn_T	float	B	1c20		raw	
+acf/_min_N1_turboprop_governor	float	B	9d0		raw	
+acf/_min_N2_jet_governor	float	B	9d4		raw	
+acf/_min_n1	float	B	9c4		raw	
+acf/_min_n2_EGT	float	B	9cc		raw	
+acf/_min_n2_ITT	float	B	9c8		raw	
+acf/_min_rwy_len	coeff	B	2980		raw	3e9c0ebf
+acf/_min_rwy_len	float	B	2980		scale:3e9c0ebf	
+acf/_min_vec_on_ground	float	B	2064		raw	
+acf/_mixt_x_ctr	float	B	1c84		raw	
+acf/_n1_power_curve1	float	B	9b0		floor:d:3fb999999999999a:40000000:raw	
+acf/_n1_power_curve2	float	B	9b4		floor:d:3fb999999999999a:40400000:raw	
+acf/_n1_rated_thrust	float	B	9a8		floor:f:41a00000:42c80000:raw	
+acf/_n2_power_curve	float	B	9ac		raw	
+acf/_new_plot_XP3D_cock/{}	int	B	888	0	int	
+acf/_new_plot_outer_acf/{}	int	B	88c	0	int	
+acf/_no_default_chocks	int	B	44ac		int	
+acf/_no_default_contact_fx	int	B	44a8		int	
+acf/_no_default_engine_fx	int	B	448c		int	
+acf/_no_default_gear_fx	int	B	4490		int	
+acf/_no_default_gun_fx	int	B	449c		int	
+acf/_no_default_jato_fx	int	B	44a0		int	
+acf/_no_default_wash_fx	int	B	4498		int	
+acf/_no_default_water_fx	int	B	44a4		int	
+acf/_no_default_wing_fx	int	B	4494		int	
+acf/_no_hydro_force_mult_brakes	float	B	27ac		raw	
+acf/_no_hydro_force_mult_flcons	float	B	27a8		raw	
+acf/_nom_bat_volt	float	B	1b94		raw	
+acf/_nom_fuelP	float	B	1b70		raw	
+acf/_nom_gen_volt	float	B	1bcc		raw	
+acf/_nom_oilP	float	B	1b54		raw	
+acf/_num_batteries	int	B	c9c		int	
+acf/_num_buses	int	B	c90		int	
+acf/_num_cylinders	int	B	958		int	
+acf/_num_generators	int	B	ca0		int	
+acf/_num_inverters	int	B	ca4		int	
+acf/_num_xmsn	int	B	b78		int	
+acf/_o2_bottle_liter	float	B	eb8		raw	
+acf/_oilT_is_C	int	B	1b38		int	
+acf/_ott_asi_kts_off_for_full_def	float	B	2484		raw	
+acf/_ott_asi_sec_into_future	float	B	2480		raw	
+acf/_ott_asi_thro_per_sec	float	B	247c		raw	
+acf/_ott_atr_Kd	float	B	24dc		raw	
+acf/_ott_atr_Ki	float	B	24d8		raw	
+acf/_ott_atr_Kp	float	B	24d4		raw	
+acf/_ott_flare_begin	float	B	24c4		floor:d:3f847ae147ae147b:41700000:raw	
+acf/_ott_flare_end	float	B	24c8		floor:d:3f847ae147ae147b:40a00000:raw	
+acf/_ott_gls_sec_into_future	float	B	24bc		raw	
+acf/_ott_phi_deg_off_for_full_def	float	B	2494		raw	
+acf/_ott_phi_sec_into_future	float	B	2490		raw	
+acf/_ott_phi_sec_to_tune	float	B	2498		raw	
+acf/_ott_psi_deg_off_for_full_def	float	B	24b0		floor:d:3f847ae147ae147b:41700000:raw	
+acf/_ott_psi_sec_into_future	float	B	24ac		raw	
+acf/_ott_psi_sec_to_tune	float	B	24b4		floor:d:3f847ae147ae147b:41700000:raw	
+acf/_ott_roll_rate	float	B	248c		raw	
+acf/_ott_roll_response	float	B	2488		raw	
+acf/_ott_the_deg_off_for_full_def	float	B	24a0		raw	
+acf/_ott_the_deg_per_kt	float	B	24cc		raw	
+acf/_ott_the_sec_into_future	float	B	249c		raw	
+acf/_ott_the_sec_to_trim	float	B	24a8		raw	
+acf/_ott_the_sec_to_tune	float	B	24a4		raw	
+acf/_otto_ah_source_type	int	B	244c		int	
+acf/_otto_dg_source_type	int	B	2450		int	
+acf/_paraf_dur	float	B	2910		raw	
+acf/_paraf_max	int	B	2900		int	
+acf/_paraf_vvi	float	B	290c		raw	
+acf/_park_non_vect_props_00_below_02	int	B	2150		int	
+acf/_park_non_vect_props_90_below_05	int	B	214c		int	
+acf/_pe_xyz/{}	float	B	7ec	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_pe_xyz_copilot/{}	float	B	7f8	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_phase_hdng_tvect_in_at_00	int	B	210c		int	
+acf/_phase_hdng_tvect_in_at_90	int	B	2108		int	
+acf/_phase_ptch_tvect_in_at_00	int	B	20fc		int	
+acf/_phase_ptch_tvect_in_at_90	int	B	20f8		int	
+acf/_phase_roll_tvect_in_at_00	int	B	2104		int	
+acf/_phase_roll_tvect_in_at_90	int	B	2100		int	
+acf/_pitch_cyc_with_v1_kts	float	B	211c		raw	
+acf/_pitch_cyc_with_v2_deg	float	B	212c		raw	
+acf/_pitch_cyc_with_v2_kts	float	B	2124		raw	
+acf/_pitot_probes/{}	int	B	4480	4	int	
+acf/_prim_is_epr	int	B	19b8		int	
+acf/_prop_inlet_recovery_v12	float	B	934		raw	
+acf/_prop_pitch_deg_per_sec	float	B	a60		raw	
+acf/_prop_pitch_deg_per_sec_unfeather	float	B	a64		raw	
+acf/_prop_x_ctr	float	B	1c80		raw	
+acf/_ptch_acft_dn_trim_rat	float	B	1ff4		raw	
+acf/_ptch_acft_trim_mode	int	B	2024		int	
+acf/_ptch_acft_up_trim_rat	float	B	1ff8		raw	
+acf/_ptch_but_adjusts_alt_hold	int	B	2438		int	
+acf/_ptch_max_full_def_KIAS	float	B	1d30		raw	
+acf/_puff_LMN/{}	float	B	20c8	4	scale:3fad658a	
+acf/_puff_xyz/{}	float	B	20d4	4	scale:408e38be	
+acf/_push_back/{}	float	B	2628	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_pwr_is_pcnt	int	B	19b4		int	
+acf/_rad_alt_offset	coeff	B	4464		raw	3e9c0ebf
+acf/_rad_alt_offset	float	B	4464		scale:3e9c0ebf	
+acf/_rad_alt_sens_xyz/{}	float	B	4458	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_radiator_cd	float	B	c14		raw	
+acf/_radiator_duct_expansion	float	B	c0c		raw	
+acf/_radiator_frontal_area	coeff	B	c10		raw	3dbe43f3
+acf/_radiator_frontal_area	float	B	c10		scale:3dbe43f3	
+acf/_radiator_in_propwash	int	B	c08		int	
+acf/_radio_alt_callout_advance	float	B	8f0		raw	
+acf/_red_hi_CHT	float	B	1ab4		raw	
+acf/_red_hi_EGT	float	B	1a94		raw	
+acf/_red_hi_EPR	float	B	19f8		raw	
+acf/_red_hi_FF	float	B	1a10		raw	
+acf/_red_hi_ITT	float	B	1a74		raw	
+acf/_red_hi_MP	float	B	1a58		raw	
+acf/_red_hi_N1	float	B	19c8		raw	
+acf/_red_hi_N1_apu	float	B	1c50		raw	
+acf/_red_hi_N2	float	B	19e0		raw	
+acf/_red_hi_TRQ	float	B	1a28		raw	
+acf/_red_hi_bat_amp	float	B	1ba4		raw	
+acf/_red_hi_bat_temp	float	B	1ad4		raw	
+acf/_red_hi_bat_volt	float	B	1b88		raw	
+acf/_red_hi_fuelP	float	B	1b64		raw	
+acf/_red_hi_gen_amp	float	B	1bdc		raw	
+acf/_red_hi_gen_volt	float	B	1bc0		raw	
+acf/_red_hi_inverter	float	B	1af0		raw	
+acf/_red_hi_oilP	float	B	1b48		raw	
+acf/_red_hi_oilT	float	B	1b28		raw	
+acf/_red_hi_pwr	float	B	1a40		raw	
+acf/_red_hi_stator	float	B	1b0c		raw	
+acf/_red_hi_vac	float	B	1c34		raw	
+acf/_red_hi_xmsn_P	float	B	1bf8		raw	
+acf/_red_hi_xmsn_T	float	B	1c14		raw	
+acf/_red_lo_CHT	float	B	1aa8		raw	
+acf/_red_lo_EGT	float	B	1a88		raw	
+acf/_red_lo_EPR	float	B	19ec		raw	
+acf/_red_lo_FF	float	B	1a04		raw	
+acf/_red_lo_ITT	float	B	1a68		raw	
+acf/_red_lo_MP	float	B	1a4c		raw	
+acf/_red_lo_N1	float	B	19bc		raw	
+acf/_red_lo_N1_apu	float	B	1c44		raw	
+acf/_red_lo_N2	float	B	19d4		raw	
+acf/_red_lo_TRQ	float	B	1a1c		raw	
+acf/_red_lo_bat_amp	float	B	1b98		raw	
+acf/_red_lo_bat_temp	float	B	1ac8		raw	
+acf/_red_lo_bat_volt	float	B	1b7c		raw	
+acf/_red_lo_fuelP	float	B	1b58		raw	
+acf/_red_lo_gen_amp	float	B	1bd0		raw	
+acf/_red_lo_gen_volt	float	B	1bb4		raw	
+acf/_red_lo_inverter	float	B	1ae4		raw	
+acf/_red_lo_oilP	float	B	1b3c		raw	
+acf/_red_lo_oilT	float	B	1b1c		raw	
+acf/_red_lo_pwr	float	B	1a34		raw	
+acf/_red_lo_stator	float	B	1b00		raw	
+acf/_red_lo_vac	float	B	1c28		raw	
+acf/_red_lo_xmsn_P	float	B	1bec		raw	
+acf/_red_lo_xmsn_T	float	B	1c08		raw	
+acf/_refuel_rcv/{}	float	B	2664	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_refuel_snd/{}	float	B	2658	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_require_gps_capture	int	B	2478		int	
+acf/_rev_thrust_EQ	int	B	ad4		int	
+acf/_reversed_pitch	float	B	a5c		raw	
+acf/_reverser_area	coeff	B	954		raw	3dbe43f3
+acf/_reverser_area	float	B	954		scale:3dbe43f3	
+acf/_revt_on_td_EQ	int	B	2258		int	
+acf/_rgb_lite_front/{}	float	B	25c4	4	raw	
+acf/_rgb_lite_side/{}	float	B	25d0	4	raw	
+acf/_rgb_spot1/{}	float	B	25a0	4	raw	
+acf/_rgb_spot2/{}	float	B	25ac	4	raw	
+acf/_rgb_spot3/{}	float	B	25b8	4	raw	
+acf/_rock_h_opt	coeff	B	930		raw	3e9c0ebf
+acf/_rock_h_opt	float	B	930		scale:3e9c0ebf	
+acf/_rock_max_opt	coeff	B	928		raw	408e38be
+acf/_rock_max_opt	float	B	928		scale:408e38be	
+acf/_rock_max_sl	coeff	B	924		raw	408e38be
+acf/_rock_max_sl	float	B	924		scale:408e38be	
+acf/_rock_max_vac	coeff	B	92c		raw	408e38be
+acf/_rock_max_vac	float	B	92c		scale:408e38be	
+acf/_roll_acft_lf_trim_rat	float	B	2004		raw	
+acf/_roll_acft_rt_trim_rat	float	B	2008		raw	
+acf/_roll_acft_trim_mode	int	B	2028		int	
+acf/_roll_co	float	B	27c0		raw	
+acf/_roll_max_full_def_KIAS	float	B	1d2c		raw	
+acf/_roll_to_eng_spo1	float	B	1e20		raw	
+acf/_roll_to_eng_spo2	float	B	1e30		raw	
+acf/_rotor_mi_rat	float	B	95c		raw	
+acf/_rrpm_trim_rpm_fast	float	B	2114		raw	
+acf/_rrpm_trim_rpm_slow	float	B	2118		raw	
+acf/_rrpm_trim_time	float	B	2110		raw	
+acf/_rudd1_cratR	float	B	1e74		raw	
+acf/_rudd1_cratT	float	B	1e78		raw	
+acf/_rudd1_lf	float	B	1e6c		raw	
+acf/_rudd1_max_sweep_rat	float	B	1d98		raw	
+acf/_rudd1_rat1	float	B	1d90		raw	
+acf/_rudd1_rat2	float	B	1d94		raw	
+acf/_rudd1_rt	float	B	1e70		raw	
+acf/_rudd1_sbrk	float	B	21d4		raw	
+acf/_rudd1_sbrk_gnd_only	int	B	21d8		int	
+acf/_rudd1_v1	float	B	1d88		raw	
+acf/_rudd1_v2	float	B	1d8c		raw	
+acf/_rudd2_cratR	float	B	1e88		raw	
+acf/_rudd2_cratT	float	B	1e8c		raw	
+acf/_rudd2_lf	float	B	1e80		raw	
+acf/_rudd2_max_sweep_rat	float	B	1dac		raw	
+acf/_rudd2_rat1	float	B	1da4		raw	
+acf/_rudd2_rat2	float	B	1da8		raw	
+acf/_rudd2_rt	float	B	1e84		raw	
+acf/_rudd2_sbrk	float	B	21dc		raw	
+acf/_rudd2_sbrk_gnd_only	int	B	21e0		int	
+acf/_rudd2_v1	float	B	1d9c		raw	
+acf/_rudd2_v2	float	B	1da0		raw	
+acf/_rudd_def_time	float	B	1e7c		raw	
+acf/_rudd_tab	float	B	2020		raw	
+acf/_rudd_trim_time	float	B	201c		raw	
+acf/_rudd_with_ailn_rat	float	B	2164		raw	
+acf/_rudd_with_fail	float	B	2168		raw	
+acf/_rwy_req_pave	int	B	2978		int	
+acf/_sbrk1_cratR	float	B	1ee0		raw	
+acf/_sbrk1_cratT	float	B	1ee4		raw	
+acf/_sbrk1_up_flit	float	B	1edc		raw	
+acf/_sbrk1_up_grnd	float	B	1e98		raw	
+acf/_sbrk2_cratR	float	B	1ef0		raw	
+acf/_sbrk2_cratT	float	B	1ef4		raw	
+acf/_sbrk2_up_flit	float	B	1eec		raw	
+acf/_sbrk2_up_grnd	float	B	1ec0		raw	
+acf/_sbrk_EQ	int	B	2968		int	
+acf/_sbrk_on_td_EQ	int	B	223c		int	
+acf/_scrolldef_x	float	B	838		raw	
+acf/_scrolldef_y	float	B	83c		raw	
+acf/_selective_ties	int	B	c98		int	
+acf/_sfc_burner	coeff	B	b70		raw	37edd068
+acf/_sfc_burner	float	B	b70		scale:37edd068	
+acf/_shut_off_fuel_at_min_prop	int	B	a6c		int	
+acf/_single_axis_ap	int	B	245c		int	
+acf/_skid_EQ	int	B	2958		int	
+acf/_slat1_cd	float	B	1f04		raw	
+acf/_slat1_dn/{}	float	B	1f08	4	?	
+acf/_slat1_inc	float	B	1f00		raw	
+acf/_slat1_type	int	B	1efc		int	
+acf/_slat2_cd	float	B	1f40		raw	
+acf/_slat2_dn/{}	float	B	1f44	4	?	
+acf/_slat2_inc	float	B	1f3c		raw	
+acf/_slat2_type	int	B	1f38		int	
+acf/_slat_EQ	int	B	2964		int	
+acf/_slat_ext1_time	float	B	1ea8		raw	
+acf/_slat_ext2_time	float	B	1eac		raw	
+acf/_slat_ret1_time	float	B	1ed0		raw	
+acf/_slat_ret2_time	float	B	1ed4		raw	
+acf/_slat_with_Vind	float	B	2210		raw	
+acf/_slat_with_stall_EQ	int	B	2230		int	
+acf/_slung_len	coeff	B	28b8		raw	3e9c0ebf
+acf/_slung_len	float	B	28b8		scale:3e9c0ebf	
+acf/_smart_tow_chord/{}	coeff	B	3f18	4	raw	3e9c0ebf
+acf/_smart_tow_chord/{}	float	B	3f18	4	scale:3e9c0ebf	
+acf/_smart_tow_gamma	float	B	3f00		raw	
+acf/_smart_tow_len	coeff	B	3ef8		raw	3e9c0ebf
+acf/_smart_tow_len	float	B	3ef8		scale:3e9c0ebf	
+acf/_smart_tow_mass	coeff	B	3f0c		raw	3ee83d47
+acf/_smart_tow_mass	float	B	3f0c		scale:3ee83d47	
+acf/_smart_tow_radius	coeff	B	3f08		raw	3e9c0ebf
+acf/_smart_tow_radius	float	B	3f08		scale:3e9c0ebf	
+acf/_smart_tow_rate	coeff	B	3efc		raw	3e9c0ebf
+acf/_smart_tow_rate	float	B	3efc		scale:3e9c0ebf	
+acf/_smart_tow_seek_dis	coeff	B	3f04		raw	3e9c0ebf
+acf/_smart_tow_seek_dis	float	B	3f04		scale:3e9c0ebf	
+acf/_smart_tow_span/{}	coeff	B	3f10	4	raw	3e9c0ebf
+acf/_smart_tow_span/{}	float	B	3f10	4	scale:3e9c0ebf	
+acf/_snd_N1	float	B	2938		raw	
+acf/_snd_kias	float	B	292c		raw	
+acf/_snd_rpm_eng	float	B	2934		raw	
+acf/_snd_rpm_prp	float	B	2930		raw	
+acf/_solar_cover_part	float	B	d78		raw	
+acf/_solar_eta	float	B	d7c		raw	
+acf/_speedbrake_ext_time	float	B	1ee8		raw	
+acf/_speedbrake_ret_time	float	B	1ef8		raw	
+acf/_speedbrake_size	float	B	27b0		raw	
+acf/_spoi1_cratR	float	B	1e18		raw	
+acf/_spoi1_cratT	float	B	1e1c		raw	
+acf/_spoi1_max_sweep_rat	float	B	1dc0		raw	
+acf/_spoi1_rat1	float	B	1db8		raw	
+acf/_spoi1_rat2	float	B	1dbc		raw	
+acf/_spoi1_up	float	B	1e14		raw	
+acf/_spoi1_v1	float	B	1db0		raw	
+acf/_spoi1_v2	float	B	1db4		raw	
+acf/_spoi1_with_flit_sbrk	float	B	217c		raw	
+acf/_spoi1_with_grnd_pitch	float	B	218c		raw	
+acf/_spoi1_with_grnd_sbrk	float	B	2184		raw	
+acf/_spoi2_cratR	float	B	1e28		raw	
+acf/_spoi2_cratT	float	B	1e2c		raw	
+acf/_spoi2_max_sweep_rat	float	B	1dd4		raw	
+acf/_spoi2_rat1	float	B	1dcc		raw	
+acf/_spoi2_rat2	float	B	1dd0		raw	
+acf/_spoi2_up	float	B	1e24		raw	
+acf/_spoi2_v1	float	B	1dc4		raw	
+acf/_spoi2_v2	float	B	1dc8		raw	
+acf/_spoi2_with_flit_sbrk	float	B	2180		raw	
+acf/_spoi2_with_grnd_pitch	float	B	2190		raw	
+acf/_spoi2_with_grnd_sbrk	float	B	2188		raw	
+acf/_spool_time_compressor_jet	float	B	a2c		raw	
+acf/_spool_time_compressor_prop	float	B	a20		raw	
+acf/_spot1_3d_rgb/{}	float	B	2558	4	raw	
+acf/_spot1_3d_xyz/{}	float	B	2564	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_spot2_3d_rgb/{}	float	B	2570	4	raw	
+acf/_spot2_3d_xyz/{}	float	B	257c	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_spot3_3d_rgb/{}	float	B	2588	4	raw	
+acf/_spot3_3d_xyz/{}	float	B	2594	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_spot_angle/{}	float	B	2528	4	raw	
+acf/_spot_name_3d/{}	string	B	6238	32	string	
+acf/_spot_psi/{}	float	B	2540	4	raw	
+acf/_spot_size/{}	float	B	2534	4	scale:3e9c0ebf	
+acf/_spot_the/{}	float	B	254c	4	raw	
+acf/_sster_def_time	float	B	1e90		raw	
+acf/_stab_hdng	float	B	215c		raw	
+acf/_stab_roll	float	B	2158		raw	
+acf/_stab_trim_dn	float	B	2044		raw	
+acf/_stab_trim_up	float	B	2048		raw	
+acf/_stab_with_Vind	float	B	2208		raw	
+acf/_stab_with_flap	float	B	2204		raw	
+acf/_stall_warn_aoa	float	B	8ec		raw	
+acf/_stall_warn_is_variable	int	B	8c8		int	
+acf/_start_on_water	int	B	2974		int	
+acf/_starter_Ng_jet_cut	float	B	9c0		raw	
+acf/_starter_engages_fuel	int	B	c24		int	
+acf/_starter_engages_igniter_arm	int	B	c2c		int	
+acf/_starter_engages_igniter_on	int	B	c30		int	
+acf/_starter_engages_ignition	int	B	c28		int	
+acf/_starter_is_air_driven	int	B	c20		int	
+acf/_starter_requires_mode_sel	int	B	c34		int	
+acf/_steerdeg_castor	float	B	27bc		raw	
+acf/_ster_hi_speed_use	float	B	1e94		raw	
+acf/_stickshaker	int	B	2794		int	
+acf/_sweep_extend_protect	int	B	2954		int	
+acf/_sweep_m1	float	B	21f4		raw	
+acf/_sweep_m2	float	B	21f8		raw	
+acf/_sweep_with_flaps_EQ	int	B	221c		int	
+acf/_sweep_with_vect_EQ	int	B	2220		int	
+acf/_tail_hook_ang_ext	float	B	4450		raw	
+acf/_tail_hook_ang_ret	float	B	444c		raw	
+acf/_tail_hook_len	coeff	B	4454		raw	3e9c0ebf
+acf/_tail_hook_len	float	B	4454		scale:3e9c0ebf	
+acf/_tail_hook_x	float	B	4440		scale:3e9c0ebf	
+acf/_tail_hook_y	float	B	4444		scale_minus_cgy:3e9c0ebf	
+acf/_tail_hook_z	float	B	4448		scale_minus_cgz:3e9c0ebf	
+acf/_tail_rot_with_v1_kts	float	B	2120		raw	
+acf/_tail_rot_with_v2_deg	float	B	2130		raw	
+acf/_tail_rot_with_v2_kts	float	B	2128		raw	
+acf/_tail_rotor_lf_trim_rat	float	B	20c0		raw	
+acf/_tail_rotor_rt_trim_rat	float	B	20c4		raw	
+acf/_tail_with_coll	float	B	220c		raw	
+acf/_tailrotor_EQ	int	B	2058		int	
+acf/_takeoff_trim_11	float	B	204c		raw	
+acf/_tank_name/{}	string	B	44f8	32	string	
+acf/_tank_part_en/{}	int	B	40e4	4	int	
+acf/_tank_psi/{}	float	B	3fc4	4	raw	
+acf/_tank_rat/{}	float	B	3f7c	4	raw	
+acf/_tank_rat_def/{}	float	B	3fa0	4	raw	
+acf/_tank_role/{}	int	B	3fe8	4	int	
+acf/_tank_xyz/{},{}	float	B	400c	12,4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_tank_xyz_full/{},{}	float	B	4078	12,4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_tat_probe_aspiration/{}	int	B	4474	4	int	
+acf/_tat_probes/{}	int	B	4468	4	int	
+acf/_the_eqlbm	float	B	65a8		raw	
+acf/_thro_non_vect_props_at_sin_vect	int	B	2148		int	
+acf/_thro_x_ctr	float	B	1c7c		raw	
+acf/_throt_max_fwd_emr	float	B	9e4		raw	
+acf/_throt_max_fwd_nrm	float	B	9e0		raw	
+acf/_throt_max_rev	float	B	9e8		raw	
+acf/_throt_time_jet	float	B	a28		raw	
+acf/_throt_time_prop	float	B	a1c		raw	
+acf/_throttle_drives_EPR	int	B	97c		int	
+acf/_throttle_drives_N2	int	B	978		int	
+acf/_thrust_rev_dep_time	float	B	9ec		raw	
+acf/_tip_AOA_des	float	B	a4c		raw	
+acf/_tip_mach_des_100	float	B	a48		raw	
+acf/_tip_mach_des_50	float	B	a44		raw	
+acf/_tip_weight	coeff	B	960		raw	3ee83d47
+acf/_tip_weight	float	B	960		scale:3ee83d47	
+acf/_tire_s1	float	B	27f0		raw	
+acf/_tire_s2	float	B	27f8		raw	
+acf/_tire_t1	float	B	27f4		raw	
+acf/_tire_t2	float	B	27fc		raw	
+acf/_tks_cap_liter	float	B	225c		raw	
+acf/_trans_loss_bearing	float	B	964		raw	
+acf/_trans_loss_gearing	float	B	968		raw	
+acf/_trim_elev_elec_EQ	int	B	2034		int	
+acf/_truck_lat_sep	float	B	27c8		raw	
+acf/_truck_lon_sep	float	B	27cc		raw	
+acf/_tvec_hdng	float	B	20f0		raw	
+acf/_tvec_ptch	float	B	20e0		raw	
+acf/_tvec_roll	float	B	20e8		raw	
+acf/_unfeather_accum_EQ	int	B	a94		int	
+acf/_use_cus_gear_damping	int	B	2824		int	
+acf/_use_cus_gear_defs	int	B	2820		int	
+acf/_use_manual_prop_inc	int	B	a74		int	
+acf/_using_new_v12_flying_stab_trim	int	B	2040		int	
+acf/_vario_type	int	B	900		int	
+acf/_vect_EQ	int	B	296c		int	
+acf/_vect_max_disc	float	B	2074		raw	
+acf/_vect_max_nace	float	B	206c		raw	
+acf/_vect_min_disc	float	B	2070		raw	
+acf/_vect_min_nace	float	B	2068		raw	
+acf/_vect_power_aft	float	B	207c		raw	
+acf/_vect_power_for	float	B	2078		raw	
+acf/_vect_rate	float	B	213c		raw	
+acf/_vnav_descend_auto_arm	int	B	246c		int	
+acf/_vor_mode_has_dead_reckon	int	B	2470		int	
+acf/_vvi_but_adjusts_pitch	int	B	243c		int	
+acf/_warn_airliner	int	B	890		int	
+acf/_warn_alt_app_100	int	B	8b0		int	
+acf/_warn_alt_app_1000	int	B	898		int	
+acf/_warn_alt_app_200	int	B	8a8		int	
+acf/_warn_alt_app_300	int	B	8a0		int	
+acf/_warn_alt_app_mode	int	B	8b8		int	
+acf/_warn_alt_dep_100	int	B	8b4		int	
+acf/_warn_alt_dep_1000	int	B	89c		int	
+acf/_warn_alt_dep_200	int	B	8ac		int	
+acf/_warn_alt_dep_300	int	B	8a4		int	
+acf/_warn_alt_dep_mode	int	B	8bc		int	
+acf/_warn_fighter	int	B	894		int	
+acf/_warn_fire_EQ	int	B	8d4		int	
+acf/_warn_fuelP	float	B	1b78		raw	
+acf/_warn_gear	int	B	8c0		int	
+acf/_warn_hirot_EQ	int	B	8d0		int	
+acf/_warn_lorot_EQ	int	B	8cc		int	
+acf/_warn_stall	int	B	8c4		int	
+acf/_warn_transonic_EQ	int	B	8d8		int	
+acf/_warn_verbal_500_agl	int	B	8dc		int	
+acf/_wate_xyz/{}	float	B	28c8	4	last:0=scale:3e9c0ebf|1=scale_minus_cgy:3e9c0ebf|2=scale_minus_cgz:3e9c0ebf	
+acf/_water_drop_dep_time	float	B	281c		raw	
+acf/_water_rud_Z	float	B	2800		scale_minus_cgz:3e9c0ebf	
+acf/_water_rud_area	coeff	B	2804		raw	3dbe43f3
+acf/_water_rud_area	float	B	2804		scale:3dbe43f3	
+acf/_water_rud_maxdef	float	B	2808		raw	
+acf/_water_scoop_dep_time	float	B	2818		raw	
+acf/_wheel_s1	float	B	27e0		raw	
+acf/_wheel_s2	float	B	27e8		raw	
+acf/_wheel_t1	float	B	27e4		raw	
+acf/_wheel_t2	float	B	27ec		raw	
+acf/_windshield_eff_factor	float	B	2260		raw	
+acf/_wing_damp_rat	float	B	28f0		raw	
+acf/_wing_frac_fuel	float	B	28e4		raw	
+acf/_wing_frac_mass	float	B	28e8		raw	
+acf/_wing_mid_dihed_per_g	float	B	28ec		raw	
+acf/_wing_tilt_ptch	float	B	21ec		raw	
+acf/_wing_tilt_roll	float	B	21f0		raw	
+acf/_wiper_ang1/{}	float	B	3ed4	4	raw	
+acf/_wiper_ang2/{}	float	B	3ee4	4	raw	
+acf/_wiper_max_cycles_second	float	B	3ef4		raw	
+acf/_wxr_radar/_independent_tilt	int	B	c44		int	
+acf/_wxr_radar/_inverter_for_radar	int	B	c40		int	
+acf/_wxr_radar/_radar_installed_copilot	int	B	c3c		int	
+acf/_wxr_radar/_radar_installed_pilot	int	B	c38		int	
+acf/_xmsn_is_C	int	B	1c24		int	
+acf/_xmsn_of_engn/{}	int	B	b7c	4	int	
+acf/_xmsn_of_prop/{}	int	B	bbc	4	int	
+acf/_yaw_crd_Kd	float	B	24e8		raw	
+acf/_yaw_crd_Ki	float	B	24e4		raw	
+acf/_yaw_crd_Kp	float	B	24e0		raw	
+acf/_yawbr_cratR	float	B	1e3c		raw	
+acf/_yawbr_cratT	float	B	1e40		raw	
+acf/_yawbr_max_sweep_rat	float	B	1de8		raw	
+acf/_yawbr_rat1	float	B	1de0		raw	
+acf/_yawbr_rat2	float	B	1de4		raw	
+acf/_yawbr_ud	float	B	1e34		raw	
+acf/_yawbr_v1	float	B	1dd8		raw	
+acf/_yawbr_v2	float	B	1ddc		raw	
+acf/_yawstring_x	float	B	830		raw	
+acf/_yawstring_y	float	B	834		raw	
+acf/_yel_hi_CHT	int	B	1abc		int	
+acf/_yel_hi_EGT	int	B	1a9c		int	
+acf/_yel_hi_EPR	int	B	1a00		int	
+acf/_yel_hi_FF	int	B	1a18		int	
+acf/_yel_hi_ITT	int	B	1a7c		int	
+acf/_yel_hi_MP	int	B	1a60		int	
+acf/_yel_hi_N1	int	B	19d0		int	
+acf/_yel_hi_N1_apu	int	B	1c58		int	
+acf/_yel_hi_N2	int	B	19e8		int	
+acf/_yel_hi_TRQ	int	B	1a30		int	
+acf/_yel_hi_bat_amp	int	B	1bac		int	
+acf/_yel_hi_bat_temp	int	B	1adc		int	
+acf/_yel_hi_bat_volt	int	B	1b90		int	
+acf/_yel_hi_fuelP	int	B	1b6c		int	
+acf/_yel_hi_gen_amp	int	B	1be4		int	
+acf/_yel_hi_gen_volt	int	B	1bc8		int	
+acf/_yel_hi_inverter	int	B	1af8		int	
+acf/_yel_hi_oilP	int	B	1b50		int	
+acf/_yel_hi_oilT	int	B	1b30		int	
+acf/_yel_hi_pwr	int	B	1a48		int	
+acf/_yel_hi_stator	int	B	1b14		int	
+acf/_yel_hi_vac	int	B	1c3c		int	
+acf/_yel_hi_xmsn_P	int	B	1c00		int	
+acf/_yel_hi_xmsn_T	int	B	1c1c		int	
+acf/_yel_lo_CHT	int	B	1ab8		int	
+acf/_yel_lo_EGT	int	B	1a98		int	
+acf/_yel_lo_EPR	int	B	19fc		int	
+acf/_yel_lo_FF	int	B	1a14		int	
+acf/_yel_lo_ITT	int	B	1a78		int	
+acf/_yel_lo_MP	int	B	1a5c		int	
+acf/_yel_lo_N1	int	B	19cc		int	
+acf/_yel_lo_N1_apu	int	B	1c54		int	
+acf/_yel_lo_N2	int	B	19e4		int	
+acf/_yel_lo_TRQ	int	B	1a2c		int	
+acf/_yel_lo_bat_amp	int	B	1ba8		int	
+acf/_yel_lo_bat_temp	int	B	1ad8		int	
+acf/_yel_lo_bat_volt	int	B	1b8c		int	
+acf/_yel_lo_fuelP	int	B	1b68		int	
+acf/_yel_lo_gen_amp	int	B	1be0		int	
+acf/_yel_lo_gen_volt	int	B	1bc4		int	
+acf/_yel_lo_inverter	int	B	1af4		int	
+acf/_yel_lo_oilP	int	B	1b4c		int	
+acf/_yel_lo_oilT	int	B	1b2c		int	
+acf/_yel_lo_pwr	int	B	1a44		int	
+acf/_yel_lo_stator	int	B	1b10		int	
+acf/_yel_lo_vac	int	B	1c38		int	
+acf/_yel_lo_xmsn_P	int	B	1bfc		int	
+acf/_yel_lo_xmsn_T	int	B	1c18		int	
