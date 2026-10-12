@@ -3891,6 +3891,31 @@ fn blend_contact_matches_the_original_machine_code() {
 }
 
 #[test]
+fn wind_at_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("wind_at.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let d = |i: usize| f64::from_bits(hex(&h[i]));
+        openxplane::weather::wind_at(
+            &mut case.vm,
+            &mut env,
+            hex(&h[0]),
+            d(1),
+            d(2),
+            d(3),
+            [hex(&h[4]), hex(&h[5]), hex(&h[6])],
+        );
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_tol(&case, n, false, 1e-4);
+    }
+}
+
+#[test]
 fn input_binding_matches_the_original_machine_code() {
     let cases = parse_vm_cases("binding.txt");
     assert!(cases.len() >= 200);

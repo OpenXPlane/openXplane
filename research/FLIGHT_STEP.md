@@ -810,3 +810,17 @@ quad centre. For the recorded aircraft three debug lines go to the vector `0x146
 replayed). The outputs are the centre (`outs[0..3]`) and two accumulators. NaN diagnostics (log strings) are not
 ported and return an error; a NaN float written to a checked slot becomes zero (`0x1411764a0`, `0x1408e25a0`).
 `flight_state::body_contact_blend` calls it natively.
+
+## Wind at a point `0x141ba80a0`
+
+`weather::wind_at(W, x, y, z, outs)` (vectors `tools/gen_weather_vectors.py`, 200 cases): the three outputs start at
+the base wind `W+0x14..0x1c`. While `W+0x2c` is set and the runtime double `0x142f01898` exceeds 0.99 a rotating gust
+around the point `W+0x30/0x38/0x40` (frame `W+0x48..0x5c`, radius `W+0x60`, strength `W+0x64` and the global
+`0x142fe7be8`) is added. The gust factor `powf(f, 0x14632b820)` is built from `W+4` and the global `0x14632b870`
+(`1.1` and `0.55` constants) and scales two turbulence sets of `0x141244c10` (`0.5 n(2p) + n(p) + 0.25 n(4p)` of the
+3-D noise `0x1411e17a0` on the table `0x14578f1f0`, cells `(z << 12) + (y << 6) + x + 100 seed`), at `0.01` and `0.05`
+times the distance from `W+0x20..0x28`, summed with weights 10 and 5. Inside the time window of the storm cell
+(`0x142fe84e8 .. 0x142fe84f0` around the clock `0x142f01918`) the cell at the geographic point `0x142fe8500..` adds a
+wind of amplitude `sqrt(height factor) * 30.87 * strength * radial factor` along the heading to the cell, tilted
+by `-pi/2 pw` (`pw` from `signed_pow` of the distance blends). The wake sampler `0x141ba80a0` is the weather input
+of the airflow function `0x14121b580`.

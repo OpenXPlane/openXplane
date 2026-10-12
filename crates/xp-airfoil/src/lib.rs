@@ -38,5 +38,6 @@ pub mod tire;
 pub mod transform;
 pub mod vm;
 pub mod wash;
+pub mod weather;
 pub mod wheel;
 pub mod wing_element;
