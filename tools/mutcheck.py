@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation check: python3 tools/mutcheck.py FILE TESTFILTER "old=>new" ... (each mutant must make the test fail)."""
+"""Mutation check: python3 tools/mutcheck.py FILE TESTFILTER "old~>new" ... (each mutant must make the test fail)."""
 import subprocess
 import sys
 
@@ -7,7 +7,7 @@ f, test = sys.argv[1], sys.argv[2]
 orig = open(f).read()
 try:
     for m in sys.argv[3:]:
-        a, b = m.split('=>')
+        a, b = m.split('~>')
         if a not in orig:
             print('MISSING', a)
             continue

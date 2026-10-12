@@ -712,3 +712,4 @@ Per wheel record (`F+0x6958 + 0x90 i`: `+0x4c` attached flag, `+0x7c` gripping f
 * `pilot_active` (`0x1411d9d80(F)`): true unless `F+0x3c == 1`; then true for an enabled binding slot holding the code 3, 0x46, 0x4a or 0x4b, for any of the globals `0x1460e0a1c/a68/a6c`, or (with `F+0x28 == 0`) `F+0x67cc`/`F+0x67fc`. 60 cases (52 true), bit-identical.
 
 The piston update, the engine controls and the pull block now call them natively; their vectors were regenerated without the stubs.
+* `wave_noise` (`0x1408bd9d0(x, seed)`): six octaves (frequencies 1, 2, 4, 8, 16, 32; weights 1, 0.5, 0.25, 0.125, 0.0625, 0.03125 in double precision) of the noise table `0x14578f1f0`, each linearly interpolated at `|x f| + 100 seed` and mapped to -1..1; 100 emulator cases, bit-identical. The wave block (`flight_state::wave_forces`) calls it natively and its vectors were regenerated with a random table.

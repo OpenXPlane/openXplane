@@ -1061,7 +1061,7 @@ pub fn float_drag(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
 /// point; `B+0x3f64`: the area; `B+0x3f70`: the strength) keep a smoothed air velocity at `F+0x6564/0x6570/0x657c`
 /// (three floats each). With the water switch `F+0x650c` clear the stored values follow the points; with it set
 /// `F+0x652c` rises at 0.5 per second to 1 and, for every section with strength, the air velocity at its point
-/// (`0x14121b580` replayed, wash off) is pushed by the neighbouring sections (the wave function `0x1408bd9d0`
+/// (`0x14121b580` replayed, wash off) is pushed by the neighbouring sections (the wave function `engine_small::wave_noise`, `0x1408bd9d0`
 /// replayed, a spacing from the radii `sqrt(area / pi)`), the result is blended into the stored velocity (factor
 /// `dt`) and applied as a drag `1.2 * area * F+0x652c * |v|^2 * F+0x6c / 2` by `0x140f26ef0`. Register state:
 /// `xmm12 = 1.0` (double), `r13 = -1`, `esi = 0`.
@@ -1123,11 +1123,8 @@ pub fn float_waves(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
             }
             let rsum = sqrt(vm.f32(b + 0x3f64 + 4 * k) / PI) + sqrt(area_m / PI);
             let time = vm.f64(0x1_42f0_1918) as f32;
-            let wave = |vm: &mut Vm, env: &mut dyn Callees, index: u64| -> f64 {
-                let mut args = CallArgs::default();
-                args.xmm[0] = Some(time.to_bits());
-                args.int[1] = Some(index);
-                let w = f32::from_bits(env.call(vm, 0x1408bd9d0, args).xmm0 as u32);
+            let wave = |vm: &mut Vm, _env: &mut dyn Callees, index: u64| -> f64 {
+                let w = crate::engine_small::wave_noise(vm, time, index as i32);
                 f64::from(w) * 0.5 + 1.0
             };
             let pk = |vm: &Vm, base: u64, i: u64| vm.f32(f + base + 4 * i);

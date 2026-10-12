@@ -3717,7 +3717,13 @@ fn small_engine_helpers_match_the_original_machine_code() {
             let got = match kind {
                 0 => throttle_ceiling(&case.vm, base, index).to_bits(),
                 1 => engine_lever(&case.vm, base, index).to_bits(),
-                _ => u32::from(pilot_active(&case.vm, base)),
+                2 => u32::from(pilot_active(&case.vm, base)),
+                _ => openxplane::engine_small::wave_noise(
+                    &case.vm,
+                    f32::from_bits(base as u32),
+                    index,
+                )
+                .to_bits(),
             };
             assert_eq!(got, want, "{name} case {n}");
         }

@@ -686,7 +686,7 @@ def main():
                     fz.preset_f32('R', base + off, rng.uniform(lo, hi))
             case.emu.uc.reg_write(UC_X86_REG_RSI, 0)
         if BLOCK == 'waves':
-            case.stub(0x1408bd9d0, lambda call, rng: call.ret_f32(rng.uniform(-1, 1)))
+            fz.region('NZ', 0x14578f1f0, 0x100000)
             fz.preset('F', 0x650c, rng.choice([0, 1, 1, 1]))
             fz.preset_f32('F', 0x652c, rng.uniform(-0.2, 1.2))
             fz.preset_f32('F', 0x6c, rng.uniform(0.3, 1.3))

@@ -3,7 +3,7 @@
 
     python3 tools/gen_small_vectors.py Xplane12/X-Plane.exe KIND TRIALS SEED > crates/xp-app/tests/data/small_KIND.txt
 
-KIND is `ceiling`, `lever` or `pilot`; the header of a case is `F-or-B n result` (a float result as bits).
+KIND is `ceiling`, `lever`, `pilot` or `wave` (header `x-bits seed result`); the header of a case is `F-or-B n result` (a float result as bits).
 """
 import struct
 import sys
@@ -15,7 +15,7 @@ from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_XMM0  # noqa: E402
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
 
 EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-ADDRESS = {'ceiling': 0x1411dd610, 'lever': 0x1411b0a30, 'pilot': 0x1411d9d80}[KIND]
+ADDRESS = {'ceiling': 0x1411dd610, 'lever': 0x1411b0a30, 'pilot': 0x1411d9d80, 'wave': 0x1408bd9d0}[KIND]
 
 
 def main():
@@ -59,6 +59,10 @@ def main():
             for off in (0xb74, 0x928, 0xb70, 0xb64, 0xb08, 0xb24):
                 fz.preset_f32('B', off, rng.uniform(-3, 3))
             run = (B, n)
+        elif KIND == 'wave':
+            fz.region('NZ', 0x14578f1f0, 0x100000)
+            x = rng.choice([rng.uniform(-3, 3), rng.uniform(-300, 300), rng.uniform(0, 5)])
+            run = (struct.unpack('<I', struct.pack('<f', x))[0], rng.randrange(0, 40))
         else:
             fz.region('KT', 0x1460e9708, 4 * 500)
             fz.region('KF', 0x1460e9708 + 0xba44, 4 * 500)
@@ -79,7 +83,10 @@ def main():
             fz.preset('F', 0x67fc, rng.choice([0, 1]))
             run = (F, 0)
         try:
-            case.run(ADDRESS, ints=[run[0], run[1], 0, 0], max_instructions=200000)
+            if KIND == 'wave':
+                case.run(ADDRESS, ints=[0, run[1], 0, 0], floats=[struct.unpack('<f', struct.pack('<I', run[0]))[0]], max_instructions=200000)
+            else:
+                case.run(ADDRESS, ints=[run[0], run[1], 0, 0], max_instructions=200000)
         except RuntimeError as err:
             sys.stderr.write(f'trial failed: {err}\n')
             continue

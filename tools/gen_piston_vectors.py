@@ -37,7 +37,6 @@ def main():
     case.stub(0x1408be0f0, lambda call, rng: call.ret_f32(rng.uniform(-500.0, 12000.0)))
     case.stub(0x1410c9c60, lambda call, rng: call.ret_int(0x6f0000100000))
     case.stub(0x14067b2f0, lambda call, rng: call.ret_f32(rng.uniform(0.0, 1.0)))
-    case.stub(0x1408bd9d0, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
     case.stub(0x140984e50, lambda call, rng: call.ret_f32(rng.uniform(-1.0, 1.0)))
     for addr in (0x14117c380,):
         case.stub(addr, void_stub)

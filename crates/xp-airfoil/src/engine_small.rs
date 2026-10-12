@@ -68,3 +68,37 @@ pub fn pilot_active(vm: &Vm, f: u64) -> bool {
     }
     vm.i32(f + 0x28) == 0 && (vm.i32(f + 0x67cc) != 0 || vm.i32(f + 0x67fc) != 0)
 }
+
+const NOISE: u64 = 0x1_4578_f1f0;
+
+/// `0x1408bd9d0(x, seed)`: the six-octave one-dimensional wave noise: each octave `k` (frequencies 1, 2, 4, 8, 16,
+/// 32) interpolates the noise table at `|x f_k| + 100 seed` linearly, maps it from 0..1 to -1..1 in double
+/// precision (rounded to float32), and the octaves are summed with the weights 1, 0.5, 0.25, 0.125, 0.0625,
+/// 0.03125 in double precision.
+pub fn wave_noise(vm: &Vm, x: f32, seed: i32) -> f32 {
+    let xd = f64::from(x);
+    let base = (seed as u32).wrapping_mul(100);
+    let octave = |value: f32| -> f32 {
+        let a = value.abs();
+        let i = a as i64 as u32;
+        let frac = a - i as f32;
+        let at = |offset: u32| {
+            vm.f32(NOISE + 4 * u64::from(base.wrapping_add(i).wrapping_add(offset) & 0x3ffff))
+        };
+        let v = (1.0 - frac) * at(0) + at(1) * frac;
+        (f64::from(v) * 2.0 - 1.0) as f32
+    };
+    let o1 = octave(x);
+    let o2 = octave((xd + xd) as f32);
+    let o4 = octave((xd * 4.0) as f32);
+    let o8 = octave((xd * 8.0) as f32);
+    let o16 = octave((xd * 16.0) as f32);
+    let o32 = octave((xd * 32.0) as f32);
+    let mut sum = f64::from(o2) * 0.5;
+    sum += f64::from(o1);
+    sum += f64::from(o4) * 0.25;
+    sum += f64::from(o8) * 0.125;
+    sum += f64::from(o16) * 0.0625;
+    sum += f64::from(o32) * 0.03125;
+    sum as f32
+}
