@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Ported the six-octave two-dimensional noise used by delta-wing modulation;
+  1756 original-code cases compare exactly with an explicit synthetic table.
+  [Evidence and limits](research/NOISE2_EXACT.md).
+
 - Ported the three initial delta-wing parameter curves; local double power rounding corrects five
   one-ULP differences. 2027 original-code cases compare 6081 words exactly in debug and release.
   [Evidence and limits](research/DELTA_WING_PARAMETERS.md).

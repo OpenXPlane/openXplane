@@ -105,3 +105,8 @@ No calls or stubs are used. The preceding delta coefficient construction remains
 bit-exact output words in debug/release. Local double power rounding corrects five one-ULP
 platform powf mismatches. The intermediate delta coefficient/noise construction is still pending.
 [DELTA_WING_PARAMETERS.md](DELTA_WING_PARAMETERS.md) records scope and reproduction.
+
+## Delta-wing two-dimensional noise
+
+See [NOISE2_EXACT.md](NOISE2_EXACT.md): 1756 original-code cases compare
+`NoiseTable::fractal2` bit for bit with a reproducible synthetic table and no stubs.
