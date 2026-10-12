@@ -69,8 +69,14 @@ fn int(acf: &Aircraft, key: &str) -> Result<i32, String> {
         .map_err(|_| format!("invalid integer {key} at line {}", p.line))
 }
 
+/// Original enabled-byte predicate (`0x141ab17d0..0x141ab1816`).
+/// Inputs are stored metre values; the threshold is double 0.001, not float32.
+pub fn enabled_meters(span: f32, root_chord: f32, tip_chord: f32) -> bool {
+    f64::from(span) > 0.001 && (f64::from(root_chord) > 0.001 || f64::from(tip_chord) > 0.001)
+}
+
 impl Wing {
-    /// The wings that exist in the ACF: those with a positive span and root chord.
+    /// Wings selected by the original metre-space enabled predicate.
     pub fn all_from_acf(acf: &Aircraft) -> Result<Vec<Wing>, String> {
         let mut wings = Vec::new();
         for index in 0..32 {
@@ -79,7 +85,9 @@ impl Wing {
                 continue;
             };
             let root_chord = float(acf, &key("_Croot"))?;
-            if semilen <= 0.0 || root_chord <= 0.0 {
+            let tip_chord = float(acf, &key("_Ctip"))?;
+            let ft = |v: f32| v * ACF_FT_TO_M;
+            if !enabled_meters(ft(semilen), ft(root_chord), ft(tip_chord)) {
                 continue;
             }
             let elements = int(acf, &key("_els"))?;
@@ -89,7 +97,6 @@ impl Wing {
                 ));
             }
             let elements = elements as usize;
-            let ft = |v: f32| v * ACF_FT_TO_M;
             let mut controls = vec![[0.0f32; 4]; elements];
             for (slot, name) in ["_ailn1", "_elev1", "_rudd1", "_flap1"].iter().enumerate() {
                 for (i, c) in controls.iter_mut().enumerate() {
@@ -112,7 +119,7 @@ impl Wing {
                     ft(float(acf, &key("_part_z"))?),
                 ),
                 root_chord: ft(root_chord),
-                tip_chord: ft(float(acf, &key("_Ctip"))?),
+                tip_chord: ft(tip_chord),
                 semilen: ft(semilen),
                 dihedral_deg: float(acf, &key("_dihed_design"))?,
                 sweep_deg: float(acf, &key("_sweep_design"))?,
@@ -283,6 +290,20 @@ mod tests {
         }
         s += &format!("P _wing/{n}/_part_x {x}\nP _wing/{n}/_is_right_mult {side}\n");
         s
+    }
+
+    #[test]
+    fn enables_tip_only_wings_and_skips_submillimetre_spans() {
+        let source = wing_text(0, 0.0, 1.0, 0.0, 0.0);
+        let tip_only = source.replace("_Croot 5", "_Croot 0");
+        let wing = Wing::all_from_acf(&acf(&tip_only)).unwrap();
+        assert_eq!(wing.len(), 1);
+        assert_eq!(wing[0].root_chord, 0.0);
+        assert!(wing[0].area() > 0.0);
+        let tiny = source.replace("_semilen_SEG 10", "_semilen_SEG 0.003");
+        assert!(Wing::all_from_acf(&acf(&tiny)).unwrap().is_empty());
+        let empty = tip_only.replace("_Ctip 3", "_Ctip 0");
+        assert!(Wing::all_from_acf(&acf(&empty)).unwrap().is_empty());
     }
 
     #[test]

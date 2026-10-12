@@ -140,3 +140,9 @@ Upstream point production and live reference-state wiring remain separate.
 See [WING_GROUP_DIMENSIONS.md](WING_GROUP_DIMENSIONS.md): 635 original writer
 cases without stubs, 4445 exact arithmetic words with recorded cosines. Platform
 trigonometry and upstream grouping are accounted for separately.
+
+## Wing enabled and group join predicates
+
+See [WING_GROUP_PREDICATES.md](WING_GROUP_PREDICATES.md): 2072 enabled-byte
+results and 5872 endpoint predicate results match original instructions exactly,
+without stubs. The enabled gate is applied by the typed ACF wing loader.

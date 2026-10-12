@@ -141,3 +141,85 @@ pub fn wing_dimensions_with_trig(
         length,
     })
 }
+
+#[derive(Clone, Copy, Debug)]
+pub enum CandidateEnd {
+    Root,
+    Tip,
+}
+
+pub struct WingJoinReference {
+    pub point: [f32; 3],
+    pub chord: f32,
+    pub dihedral_deg: f32,
+    /// Original final grouping pass permits an angle mismatch away from the centerline.
+    pub late_pass: bool,
+}
+
+/// Candidate-root predicate `0x141a6beb0`, or candidate-tip `0x141a6bbf0`.
+/// Endpoint extraction executes the same clamped interpolation as the original.
+pub fn can_join_wing(
+    candidate: &Boundary,
+    dihedral_deg: f32,
+    reference: &WingJoinReference,
+    end: CandidateEnd,
+) -> Result<bool, String> {
+    let n = candidate
+        .x
+        .len()
+        .checked_sub(1)
+        .ok_or("empty join candidate")?;
+    if !(1..=10).contains(&n)
+        || candidate.y.len() != n + 1
+        || candidate.z.len() != n + 1
+        || !candidate
+            .x
+            .iter()
+            .chain(candidate.y)
+            .chain(candidate.z)
+            .all(|v| v.is_finite())
+        || !reference.point.iter().all(|v| v.is_finite())
+        || !reference.chord.is_finite()
+        || !reference.dihedral_deg.is_finite()
+        || !dihedral_deg.is_finite()
+    {
+        return Err("invalid wing join operand".into());
+    }
+    let sample = |values: &[f32], index: usize| {
+        let lower = index.min(n - 1);
+        interpolate_clamped(
+            lower as f32,
+            values[lower],
+            (lower + 1) as f32,
+            values[lower + 1],
+            index as f32,
+        )
+    };
+    let root_x = f64::from(sample(candidate.x, 0));
+    let tip_x = f64::from(sample(candidate.x, n));
+    if (root_x < -0.01 && tip_x > 0.01) || (root_x > 0.01 && tip_x < -0.01) {
+        return Ok(false);
+    }
+    let index = match end {
+        CandidateEnd::Root => 0,
+        CandidateEnd::Tip => n,
+    };
+    for (axis, values) in [candidate.x, candidate.y, candidate.z].iter().enumerate() {
+        let delta = (reference.point[axis] - sample(values, index)).abs();
+        let threshold = f64::from(reference.chord) * if axis == 2 { 0.2 } else { 0.01 };
+        if threshold <= f64::from(delta) {
+            return Ok(false);
+        }
+    }
+    let mut angle = dihedral_deg - reference.dihedral_deg;
+    if !angle.is_finite() || angle.abs() > 1_000_000.0 {
+        return Err("wing join angle outside supported domain".into());
+    }
+    while -180.0 > angle {
+        angle += 360.0;
+    }
+    while angle > 180.0 {
+        angle += -360.0;
+    }
+    Ok(angle.abs() <= 45.0 || (f64::from(reference.point[0].abs()) >= 0.01 && reference.late_pass))
+}

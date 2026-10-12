@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Ported the original wing enabled and endpoint-join predicates: 2072 and 5872
+  boolean results match exactly. ACF loading now applies the metre-space 1 mm gate
+  and supports zero-root, positive-tip wings.
+  [Evidence and limits](research/WING_GROUP_PREDICATES.md).
+
 - Recovered original wing leading/trailing-edge point emission for aircraft bounds;
   512 original-code cases match every emitted coordinate exactly, including last-boundary
   interpolation rounding. [Evidence and limits](research/AIRCRAFT_REFERENCE_BOUNDS.md).
