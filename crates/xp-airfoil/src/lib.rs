@@ -7,6 +7,7 @@ pub mod airflow;
 pub mod airfoil;
 pub mod atmosphere;
 pub mod attitude;
+pub mod binding;
 pub mod body;
 pub mod buffet;
 pub mod callees;

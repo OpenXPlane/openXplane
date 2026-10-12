@@ -3732,6 +3732,32 @@ fn small_engine_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn input_binding_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("binding.txt");
+    assert!(cases.len() >= 200);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let got = openxplane::binding::input_active(
+            &mut case.vm,
+            &mut env,
+            hex(&h[0]),
+            hex(&h[1]) as i32,
+            hex(&h[2]) as u32 as i32,
+            hex(&h[3]) as i32,
+            f32::from_bits(hex(&h[4]) as u32),
+        )
+        .unwrap();
+        assert_eq!(u64::from(got), hex(&h[5]), "case {n}: result");
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_exact(&case, n);
+    }
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);
