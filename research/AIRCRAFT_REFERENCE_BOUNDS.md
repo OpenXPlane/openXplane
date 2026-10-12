@@ -28,3 +28,22 @@ is bounded by `0x141a87fd1..0x141a8832d`. These observations do not establish
 all geometry construction or inclusion rules. Renderer vertices are not assumed
 to be the original vector. Accordingly the live flight model's constant reference
 fields have not yet been replaced with guessed mesh bounds.
+
+## Wing point production (2026-10-13)
+
+`wing_bounds_points` reproduces the inclusive boundary loop
+`0x141a88000..0x141a88318`: each boundary index from zero through the element
+count emits a leading and trailing point. X/Y/Z are sampled through the original
+clamped interpolation helper (including the last boundary's rounding), not simply
+copied. Leading z subtracts 0.25 times the boundary chord in double precision;
+trailing z adds 0.75 times chord in double precision. Each narrows to float32.
+The constant at `0x142551ac0` is double 0.75.
+
+`tools/gen_wing_bounds_points_vectors.py` executes the entire loop without stubs.
+It explicitly preallocates vector capacity, so allocator-growth behavior is not
+part of this test. 512 cases cover 1/4/10 elements, zero/rectangular/tapered chords,
+signed zero and randomized nonmonotonic coordinates. Every emitted coordinate
+matches exactly in `wing_bounds_points_exact`; no trig tolerance is involved.
+The caller remains responsible for enabled-wing selection and additional body,
+gear and other point-producing passes. This does not yet replace live reference
+fields with a partial wing-only bounding vector.

@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Recovered original wing leading/trailing-edge point emission for aircraft bounds;
+  512 original-code cases match every emitted coordinate exactly, including last-boundary
+  interpolation rounding. [Evidence and limits](research/AIRCRAFT_REFERENCE_BOUNDS.md).
+
 - Recovered grouped-wing aspect and shape writers. The shape parameter comes from a
   discretized area centroid, rather than raw chord taper. 635 original-code cases
   compare 4445 arithmetic outputs exactly with recorded CRT cosines.

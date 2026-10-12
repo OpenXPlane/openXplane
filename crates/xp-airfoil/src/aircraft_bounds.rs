@@ -43,3 +43,49 @@ pub fn aircraft_bounds(points: &[[f32; 3]]) -> Result<AircraftBounds, String> {
         size,
     })
 }
+
+/// `0x141a88000..0x141a88318`: emit leading/trailing edge points of an enabled wing.
+/// Allocation and outer enabled-wing selection remain the caller's responsibility.
+pub fn wing_bounds_points(
+    boundary: &crate::wing_element::Boundary,
+) -> Result<Vec<[f32; 3]>, String> {
+    let n = boundary
+        .chord
+        .len()
+        .checked_sub(1)
+        .ok_or("empty wing boundary")?;
+    if !(1..=10).contains(&n)
+        || [boundary.x.len(), boundary.y.len(), boundary.z.len()]
+            .iter()
+            .any(|v| *v != n + 1)
+        || !boundary
+            .chord
+            .iter()
+            .chain(boundary.x)
+            .chain(boundary.y)
+            .chain(boundary.z)
+            .all(|v| v.is_finite())
+    {
+        return Err("invalid wing boundary point input".into());
+    }
+    let mut result = Vec::with_capacity((n + 1) * 2);
+    for i in 0..=n {
+        let lower = i.min(n - 1);
+        let sample = |values: &[f32]| {
+            crate::wing_element::interpolate_clamped(
+                lower as f32,
+                values[lower],
+                (lower + 1) as f32,
+                values[lower + 1],
+                i as f32,
+            )
+        };
+        let x = sample(boundary.x);
+        let y = sample(boundary.y);
+        let z = sample(boundary.z);
+        let chord = f64::from(boundary.chord[i]);
+        result.push([x, y, (f64::from(z) - chord * 0.25) as f32]);
+        result.push([x, y, (chord * 0.75 + f64::from(z)) as f32]);
+    }
+    Ok(result)
+}
