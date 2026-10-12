@@ -824,3 +824,12 @@ times the distance from `W+0x20..0x28`, summed with weights 10 and 5. Inside the
 wind of amplitude `sqrt(height factor) * 30.87 * strength * radial factor` along the heading to the cell, tilted
 by `-pi/2 pw` (`pw` from `signed_pow` of the distance blends). The wake sampler `0x141ba80a0` is the weather input
 of the airflow function `0x14121b580`.
+
+## Grid terrain height `0x14194dc20` and the gear lever step `0x1411878f0`
+
+`terrain::grid_height(grid, x, z)` (`0x14194dc20` with `0x14194c070`): the point is taken relative to `+0x30`,
+`+0x38` in units of `+8`, mapped to `0..1` as `(p + 1) / 2`, and scaled to the `N x N` (`N = [grid]`) 16-bit samples
+at `[[[grid + 0x48] + 0x18] + 0x80]` as `N t - 0.5`; the four neighbours (indices wrapped modulo `N`) are divided by
+32767, held to at least -1, multiplied by 10 and blended bilinearly. `terrain::probe` calls it natively; the
+vectors of the probe, the gear drag and the ground blocks were regenerated with a real grid object.
+`gear::gear_lever_step(F)` is `0x1411878f0`: the gear position `F+0x220` follows the lever mode `F+0x228`.

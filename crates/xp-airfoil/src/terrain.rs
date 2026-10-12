@@ -74,6 +74,58 @@ pub fn in_cell(vm: &Vm, grid: u64, x: f32, z: f32) -> bool {
     !outside((x - vm.f32(cell)).abs()) && !outside((z - vm.f32(cell + 4)).abs())
 }
 
+/// `0x14194dc20(grid, x, z)` (with `0x14194c070`): the height of the grid terrain at a point. The point is
+/// taken relative to the origin `+0x30`, `+0x38` in units of `+8`, mapped to `0..1` (`(p + 1) / 2`) and then to
+/// the samples (16-bit, `1 / 32767`, `N = [grid]` per row, at `[[[grid + 0x48] + 0x18] + 0x80]`) at `N t - 0.5`:
+/// the four neighbours (indices wrapped modulo `N`) are held to at least -1 and blended bilinearly, scaled by 10.
+pub fn grid_height(vm: &Vm, grid: u64, x: f32, z: f32) -> f32 {
+    let step = vm.f32(grid + 8);
+    let a = (f64::from((x - vm.f32(grid + 0x30)) / step + 1.0) * 0.5) as f32;
+    let b = (f64::from((z - vm.f32(grid + 0x38)) / step + 1.0) * 0.5) as f32;
+    let n = vm.i32(grid);
+    let cell = vm.u64(grid + 0x48);
+    let holder = vm.u64(cell + 0x18);
+    let data = vm.u64(holder + 0x80);
+    let nf = n as f32;
+    let u = nf * a - 0.5;
+    let v = nf * b - 0.5;
+    let (fu_floor, fv_floor) = (u.floor(), v.floor());
+    let (i, j) = (fu_floor as i32, fv_floor as i32);
+    let (fu, fv) = (u - fu_floor, v - fv_floor);
+    let wrap = |mut k: i32| {
+        while k < 0 {
+            k = k.wrapping_add(n);
+        }
+        k.wrapping_rem(n)
+    };
+    let (i0, i1, j0, j1) = (
+        wrap(i),
+        wrap(i.wrapping_add(1)),
+        wrap(j),
+        wrap(j.wrapping_add(1)),
+    );
+    let sample = |row: i32, col: i32| {
+        let at = data.wrapping_add((i64::from(row.wrapping_mul(n).wrapping_add(col)) * 2) as u64);
+        let word = vm.u32(at & !3) >> (8 * (at & 2));
+        f32::from(word as u16 as i16) / 32767.0
+    };
+    let low = |s: f32| if -1.0 > s { -1.0 } else { s };
+    let s00 = sample(j0, i0);
+    let s01 = sample(j0, i1);
+    let s10 = sample(j1, i0);
+    let s11 = sample(j1, i1);
+    let t01 = f64::from(low(s01) * 10.0 * fu);
+    let one_v = 1.0 - f64::from(fv);
+    let one_u = 1.0 - f64::from(fu);
+    let mut r = t01 * one_v;
+    r += f64::from(low(s00) * 10.0) * one_u * one_v;
+    r += f64::from(low(s10) * 10.0) * one_u * f64::from(fv);
+    let m11 = low(s11);
+    let last = (m11 * 10.0 * fu) * fv;
+    r += f64::from(last);
+    r as f32
+}
+
 /// The vertical ray `(px, py, pz) + t (0, 1, 0)` against a triangle (Moeller-Trumbore, float32): `t` when the
 /// determinant is nonzero and the barycentric coordinates lie in the unit triangle (a NaN coordinate passes).
 fn vertical_t(vm: &Vm, tri: u64, px: f32, py: f32, pz: f32) -> Option<f32> {
@@ -171,10 +223,7 @@ pub fn probe(
         vm.set_f32(out + 8, z);
         let mut y = height;
         if grid != 0 && in_cell(vm, grid, x, z) {
-            let mut args = CallArgs::ints(&[grid]);
-            args.xmm = [None, Some(x.to_bits()), Some(z.to_bits()), None];
-            let reply = env.call(vm, 0x14194dc20, args);
-            y = f32::from_bits(reply.xmm0 as u32) + height;
+            y = grid_height(vm, grid, x, z) + height;
         }
         vm.set_f32(out + 4, y);
         if py > y {

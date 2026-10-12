@@ -157,12 +157,26 @@ def setup_terrain(case, rng, mesh_name='F', mesh_off=0x42e40, triangles=6):
     grid = 0
     if rng.random() < 0.6:
         grid = case.region('GR', 0x80)
-        cell = case.region('GC', 16)
+        cell = case.region('GC', 0x20)
+        holder = case.region('GH', 0x90)
+        n = rng.choice([2, 4, 8])
+        data = case.region('GD', 2 * n * n + 4)
         fz.preset_f32('GC', 0, rng.uniform(-3, 3))
         fz.preset_f32('GC', 4, rng.uniform(-3, 3))
         fz.preset_f32('GR', 8, rng.choice([1.0, 4.0, 20.0]))
+        fz.preset('GR', 0, n)
+        fz.preset_f32('GR', 0x30, rng.uniform(-8, 8))
+        fz.preset_f32('GR', 0x38, rng.uniform(-8, 8))
         fz.preset('GR', 0x48, cell & 0xffffffff)
         fz.preset('GR', 0x4c, cell >> 32)
+        fz.preset('GC', 0x18, holder & 0xffffffff)
+        fz.preset('GC', 0x1c, holder >> 32)
+        fz.preset('GH', 0x80, data & 0xffffffff)
+        fz.preset('GH', 0x84, data >> 32)
+        for k in range(0, 2 * n * n, 4):
+            lo = rng.choice([rng.randrange(-32768, 32768), -32768]) & 0xffff
+            hi = rng.choice([rng.randrange(-32768, 32768), -32768]) & 0xffff
+            fz.preset('GD', k, lo | hi << 16)
     fz.region('GL', GRID_GLOBAL, 8)
     fz.preset('GL', 0, grid & 0xffffffff)
     fz.preset('GL', 4, grid >> 32)
@@ -170,8 +184,6 @@ def setup_terrain(case, rng, mesh_name='F', mesh_off=0x42e40, triangles=6):
 
 def stub_terrain_helpers(case, caller=(0x141960dc0, 0x141961200)):
     """Replaces the helpers of the probe that are not ported: the grid height and the triangle normal."""
-    case.stub(0x14194dc20, lambda call, rng: call.ret_f32(rng.uniform(-3, 3)), caller=caller)
-
     def normal(call, rng):
         for k in range(3):
             call.put_f32(call.ints[3] + 4 * k, rng.uniform(-1, 1))
