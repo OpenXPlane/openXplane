@@ -3660,6 +3660,44 @@ fn tire_motion_matches_the_original_machine_code() {
 }
 
 #[test]
+fn strut_contact_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("strut_contact.txt");
+    assert!(cases.len() >= 40);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    let mut hits = 0;
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let f = hex(&h[0]);
+        let strut = openxplane::strut::Strut {
+            wheel: hex(&h[1]) as u32 as i32,
+            x: float(&h[2]),
+            a4: float(&h[3]),
+            a5: float(&h[4]),
+            a6: float(&h[5]),
+            a7: float(&h[6]),
+            a8: float(&h[7]),
+            a9: float(&h[8]),
+            a10: float(&h[9]),
+            speed_out: hex(&h[10]),
+            force_out: hex(&h[11]),
+        };
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let got = match openxplane::strut::strut_contact(&mut case.vm, &mut env, f, &strut) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        assert_eq!(u64::from(got), hex(&h[12]), "case {n}: result");
+        hits += u64::from(got);
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match(&case, n);
+    }
+    assert!(hits >= 5);
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);

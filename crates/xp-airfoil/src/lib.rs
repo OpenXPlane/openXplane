@@ -29,6 +29,7 @@ pub mod runtime;
 pub mod scalar;
 pub mod shadow;
 pub mod stall;
+pub mod strut;
 pub mod terrain;
 pub mod tire;
 pub mod transform;

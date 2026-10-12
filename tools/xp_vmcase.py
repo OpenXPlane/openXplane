@@ -178,7 +178,7 @@ def stub_terrain_helpers(case, caller=(0x141960dc0, 0x141961200)):
 SURFACES = 0x14611ac88
 
 
-def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26)):
+def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26), heights=(-8.0, 25.0)):
     """Presets a mesh object for 0x14195ffc0 in region `mesh_name`: triangles, flag words, the five range bounds,
     moving cells with their spheres, the surface records and the noise table."""
     fz = case.fz
@@ -189,7 +189,7 @@ def setup_segment_mesh(case, rng, mesh_name='MS', mesh_off=0, triangles=(10, 26)
     tri = case.region('TR', 36 * count)
     for k in range(count):
         for i in range(9):
-            lo, hi = (-8.0, 25.0) if i % 3 == 1 else (-12.0, 12.0)
+            lo, hi = heights if i % 3 == 1 else (-12.0, 12.0)
             fz.preset_f32('TR', 36 * k + 4 * i, rng.uniform(lo, hi))
     flags = case.region('FL', 4 * count)
     for k in range(count):
