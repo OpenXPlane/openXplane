@@ -4,7 +4,7 @@ pub use xp_acf::{Aircraft, Property, aircraft, reference_candidates, wing};
 pub use xp_airfoil::{
     aero, airflow, airfoil, atmosphere, attitude, body, buffet, callees, controls, element_force,
     engine, engine_env, flight_state, flight_step, forces, fuel, input, mass, matrix, piston,
-    profile, prop, regimes, runtime, scalar, shadow, stall, terrain, transform, vm, wash,
+    profile, prop, regimes, runtime, scalar, shadow, stall, terrain, tire, transform, vm, wash,
     wing_element,
 };
 pub use xp_dataref::{commands, dataref, flight_map, keymap};

@@ -3623,6 +3623,43 @@ fn weight_and_balance_matches_the_original_machine_code() {
 }
 
 #[test]
+fn tire_motion_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("tire_motion.txt");
+    assert!(cases.len() >= 60);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let double = |s: &str| f64::from_bits(hex(s));
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let tire = openxplane::tire::Tire {
+            record: hex(&h[0]),
+            aircraft: hex(&h[1]) as i32,
+            heading_offset: double(&h[2]),
+            scale: double(&h[3]),
+            reference_x: double(&h[4]),
+            reference_vx: double(&h[5]),
+            vx: double(&h[6]),
+            force_a: hex(&h[7]),
+            mu: float(&h[8]),
+            limit: float(&h[9]),
+            reference_z: double(&h[10]),
+            reference_vz: double(&h[11]),
+            vz: double(&h[12]),
+            force_b: hex(&h[13]),
+        };
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let result = openxplane::tire::tire_motion(&mut case.vm, &mut env, &tire);
+        if result.is_err() {
+            continue;
+        }
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_with(&case, n, true);
+    }
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);
