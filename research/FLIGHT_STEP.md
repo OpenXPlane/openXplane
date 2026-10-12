@@ -721,3 +721,5 @@ The piston update, the engine controls and the pull block now call them natively
 The flight state blocks (`flight_state`: gear targets, start sequence, ground probes, late state, body contact loop, engine runtime) now call `binding::bound` natively (`0x141238b40(F, 0)`, the engine's lever above the global `0x142f01918`, is inlined); their vectors were regenerated with the static tables registered as random-filled inputs. The callers in `flight_step`, `controls`, `callees` and `engine_env` still replay the query: they hold a shared or scratch `Vm`, and the query writes `F+0x55f0` and `F+0xd30`.
 
 `flight_state::point_drag` now transforms its point with `to_world` (`0x1407ac020`) instead of replaying it; the drag, ground and gear-drag vectors were regenerated with the transform running in the emulator.
+
+`flight_state::gear_drag_and_brake` now sums the masses with `mass::weight_and_balance` natively (the gear-drag vectors were regenerated with the whole weight and balance chain in the emulator).

@@ -2228,15 +2228,16 @@ pub fn gear_drag_and_brake(
     vm.set_u32(slot(0x1758), 0);
     vm.set_u32(slot(0x1750), 0);
     vm.set_u32(slot(-0x78), 0);
-    let mut args = CallArgs::ints(&[f, f + 0x288, f + 0x304, slot(0x1758)]);
-    args.xmm[2] = Some(vm.f32(f + 0x34c).to_bits());
-    args.stack = [
-        Some(f + 0x304),
-        Some(u64::from(vm.f32(f + 0x354).to_bits())),
-        Some(slot(0x1750)),
-        Some(f + 0x31c),
-    ];
-    env.call(vm, 0x1411ddfd0, args);
+    let wb = crate::mass::Balance {
+        sums: crate::mass::Sums {
+            total: f + 0x288,
+            inertia: [slot(0x1758), slot(0x1750), slot(-0x78)],
+            moments: [f + 0x304, f + 0x31c, f + 0x334],
+            weights: [vm.f32(f + 0x34c), vm.f32(f + 0x344), vm.f32(f + 0x354)],
+        },
+        stop: false,
+    };
+    crate::mass::weight_and_balance(vm, env, f, &wb)?;
     Ok(())
 }
 
