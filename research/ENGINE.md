@@ -161,3 +161,16 @@ the barometric formula from the pressure setting `obj+0x98` and that temperature
 reference altitude `obj+0x9c` over 101325, divided by the ratio of the outside temperature to the table's.
 400 and 321 and 400 emulator cases are identical (even the C runtime's `pow` matches Rust's on these inputs). The
 layered path (`obj+0x64` above absolute zero, a blend of `obj+0x44..+0x58`) is not ported.
+
+## Engine update inside the engine controls
+
+`engine_env::engine_update_of` runs the ported update (kinds 5 and 6) from `controls::engine_controls` instead of
+replaying `0x141197b00`. Running it on whole objects found two things the field-by-field vectors had not shown:
+the linear map that gives `+0xc4` takes the summed engine power (`rbp+0x158` before the load term is stored), not
+the drag blend, as its third argument; and the end of the original adds the thrust `-state+0x274`, rotated by the
+part object's euler angles (`part + 0x700`, no offsets), to the flight object's force and moment sums through three
+checked adders (`0x141176e30`: `+0x2e4`, `+0x2f8 += v a794`, `+0x328 -= v a798`; `0x141176be0`: `+0x2d0`,
+`+0x2f8 -= v a790`, `+0x310 -= v a798`; `0x1411767f0`: `+0x2bc`, `+0x310 += v a794`, `+0x328 += v a790`; a
+component that is not finite counts as zero), and records the pass for the recorded aircraft. The vectors of the
+engine controls (`controls_1..4`) and of the piston update (`piston.txt`, wave noise native) were regenerated
+with the update and the noise running natively in the original too.

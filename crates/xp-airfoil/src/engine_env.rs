@@ -139,6 +139,66 @@ pub fn starter_delay(vm: &mut Vm, env: &mut dyn Callees, f: u64, state: u64, sta
     apply_effects(vm, &effects);
 }
 
+/// The end of `0x141197b00`: the thrust `-F+0x274` of the engine's state record, along the part's axis (the part
+/// object `+0x700`, rotated by its euler angles without offsets), is added to the flight object's force and moment
+/// sums through `0x141176e30`, `0x141176be0` and `0x1411767f0` (a component that is not finite counts as zero), and for the
+/// recorded aircraft a 0x50-byte record goes to the recorder vector. The debug dump is not ported.
+fn thrust_force_sink(vm: &mut Vm, env: &mut dyn Callees, f: u64, e: i32) {
+    use crate::transform::rotate_euler_offset;
+    const RECORDED_AIRCRAFT: u64 = 0x1_42f2_e3dc;
+    let b = vm.u64(f + 0x20);
+    let part = vm
+        .u64(b + 0x6010)
+        .wrapping_add((i64::from(e) * 0x3770) as u64);
+    let state = vm.u64(f + 0x68b0) + (i64::from(e) * 0x2cc) as u64;
+    let obj = part + 0x700;
+    let angles = [vm.f32(obj + 0x9c), vm.f32(obj + 0xa0), vm.f32(obj + 0xa4)];
+    let offsets = [vm.f32(obj + 0x90), vm.f32(obj + 0x94), vm.f32(obj + 0x98)];
+    let t = vm.f32(state + 0x274);
+    let [o1, o2, o3] = rotate_euler_offset(angles, offsets, false, 0.0, 0.0, -t);
+    let (a790, a794, a798) = (
+        vm.f32(part + 0x790),
+        vm.f32(part + 0x794),
+        vm.f32(part + 0x798),
+    );
+    let clean = |v: f32| if v.is_finite() { v } else { 0.0 };
+    let add = |vm: &mut Vm, offset: u64, delta: f32| {
+        let sum = vm.f32(f + offset) + delta;
+        vm.set_f32(f + offset, sum);
+    };
+    let sub = |vm: &mut Vm, offset: u64, delta: f32| {
+        let diff = vm.f32(f + offset) - delta;
+        vm.set_f32(f + offset, diff);
+    };
+    let v = clean(o1);
+    add(vm, 0x2e4, v);
+    add(vm, 0x2f8, v * a794);
+    sub(vm, 0x328, v * a798);
+    let v = clean(o2);
+    add(vm, 0x2d0, v);
+    sub(vm, 0x2f8, v * a790);
+    sub(vm, 0x310, v * a798);
+    let v = clean(o3);
+    add(vm, 0x2bc, v);
+    add(vm, 0x310, v * a794);
+    add(vm, 0x328, v * a790);
+    if vm.i32(f + 0x28) == vm.i32(RECORDED_AIRCRAFT) {
+        crate::strut::record_contact(
+            vm,
+            env,
+            0x7e00_0700_0000,
+            [
+                (0x14, a790.to_bits()),
+                (0x18, a794.to_bits()),
+                (0x1c, a798.to_bits()),
+                (0x44, o1.to_bits()),
+                (0x48, o2.to_bits()),
+                (0x4c, o3.to_bits()),
+            ],
+        );
+    }
+}
+
 /// `0x1411a2d90(F, n)`: whether engine `n` can be started; see [`starter_ready`].
 pub fn starter_ready_of(vm: &mut Vm, env: &mut dyn Callees, f: u64, n: i32) -> bool {
     let b = vm.u64(f + 0x20);
@@ -149,4 +209,28 @@ pub fn starter_ready_of(vm: &mut Vm, env: &mut dyn Callees, f: u64, n: i32) -> b
     let effects = callees.effects;
     apply_effects(vm, &effects);
     ready
+}
+
+/// `0x141197b00(state, F, e)`: the engine update of engine `e` (kinds 5 and 6) on the original's objects; see
+/// [`crate::engine::engine_update`].
+pub fn engine_update_of(vm: &mut Vm, env: &mut dyn Callees, f: u64, e: i32) {
+    let b = vm.u64(f + 0x20);
+    let (descs, parts) = (vm.u64(b + 0x5ff8), vm.u64(b + 0x6010));
+    let state = vm.u64(f + 0x68b0) + (i64::from(e) * 0x2cc) as u64;
+    let before = load_record(vm, state);
+    let mut record = before.clone();
+    let mut callees = CalleeEnv::new(env, vm, f);
+    crate::engine::engine_update(
+        &(&*vm, f),
+        &(&*vm, b),
+        &(&*vm, descs),
+        &(&*vm, parts),
+        &mut record,
+        e as usize,
+        &mut callees,
+    );
+    let effects = callees.effects;
+    store_record(vm, state, &before, &record);
+    apply_effects(vm, &effects);
+    thrust_force_sink(vm, env, f, e);
 }

@@ -29,9 +29,10 @@ fn sqrt_f(x: f32) -> f32 {
     if 0.0 > x { f32::NAN } else { x.sqrt() }
 }
 
-/// `0x1411764a0` / `0x1408e25a0`: a NaN at `address` is replaced by zero (the log message is not ported).
+/// `0x1411764a0` / `0x1408e25a0`: a NaN or infinity at `address` is replaced by zero (the log message is not
+/// ported).
 fn repair(vm: &mut Vm, address: u64) {
-    if vm.f32(address).is_nan() {
+    if !vm.f32(address).is_finite() {
         vm.set_f32(address, 0.0);
     }
 }
@@ -148,7 +149,7 @@ pub fn blend_contact_in(
         let denom = maxss(hs, 1.0);
         let k = vm.f32(s + 0x38) / denom;
         let lag = maxss((lc - vm.f32(s + 0x44)) * k, 0.0);
-        if lc.is_nan() {
+        if !lc.is_finite() {
             return Err("NaN diagnostics not ported".into());
         }
         repair(vm, s + 0x44);
@@ -159,7 +160,7 @@ pub fn blend_contact_in(
         repair(vm, hit1 + 4);
         hit1_y = vm.f32(hit1 + 4);
     }
-    if hit1_y.is_nan() || wy.is_nan() {
+    if !hit1_y.is_finite() || !wy.is_finite() {
         return Err("NaN diagnostics not ported".into());
     }
     let d = hit1_y - wy;
@@ -277,7 +278,7 @@ pub fn blend_contact_in(
     let m = lat * fy + t14 * a12;
     x13 *= slide;
     x13 *= pw_speed;
-    if x7.is_nan() || x8.is_nan() {
+    if !x7.is_finite() || !x8.is_finite() {
         return Err("NaN diagnostics not ported".into());
     }
     let slot = |vm: &mut Vm, off: u64, v: f32| {

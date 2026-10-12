@@ -43,7 +43,7 @@ def main():
     for addr in (0x1407ace10, 0x1417f12c0):
         case.stub(addr, bool_stub)
     case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.uniform(0.005, 0.06)))
-    for addr in (0x141197b00, 0x1411bd470, 0x141190ed0, 0x1406307a0, 0x14117c380):
+    for addr in (0x1411bd470, 0x141190ed0, 0x1406307a0, 0x14117c380):
         case.stub(addr, void_stub)
     # the leaf callees of the engine kinds (replayed by the port)
     case.stub(0x141ba6750, lambda call, rng: call.ret_f32(rng.uniform(-40.0, 45.0)))
@@ -110,6 +110,28 @@ def main():
             extra[address + 4] = value >> 32
         for i in range(0x803 * 2):
             case.emu.write_u32(0x14612bd90 + 4 * i, struct.unpack('<I', struct.pack('<f', 0.3 + ((i * 37) % 101) / 100.0))[0])
+        import os
+        if os.environ.get('XP_HOOK'):
+            from unicorn import UC_HOOK_CODE
+            from unicorn.x86_const import (UC_X86_REG_XMM0, UC_X86_REG_XMM1, UC_X86_REG_XMM2, UC_X86_REG_XMM3, UC_X86_REG_RSP, UC_X86_REG_RSI)
+            def ch(uc, address, size, user):
+                if address == 0x141199418:
+                    f = lambda r: struct.unpack('<f', struct.pack('<I', uc.reg_read(r) & 0xffffffff))[0]
+                    from unicorn.x86_const import UC_X86_REG_XMM6, UC_X86_REG_XMM15
+                    sys.stderr.write(f'MAPS a={f(UC_X86_REG_XMM6)} b={f(UC_X86_REG_XMM2)} drag={f(UC_X86_REG_XMM15)}\n')
+                if address == 0x141199792:
+                    f = lambda r: struct.unpack('<f', struct.pack('<I', uc.reg_read(r) & 0xffffffff))[0]
+                    rsp = uc.reg_read(UC_X86_REG_RSP)
+                    st = struct.unpack('<f', bytes(uc.mem_read(rsp + 0x20, 4)))[0]
+                    sys.stderr.write(f'LINEAR x0={f(UC_X86_REG_XMM0)} x1={f(UC_X86_REG_XMM1)} x2={f(UC_X86_REG_XMM2)} x3={f(UC_X86_REG_XMM3)} st={st} rsi={uc.reg_read(UC_X86_REG_RSI):#x}\n')
+            case.emu.uc.hook_add(UC_HOOK_CODE, ch)
+        if os.environ.get('XP_WATCH'):
+            from unicorn import UC_HOOK_MEM_WRITE
+            from unicorn.x86_const import UC_X86_REG_RIP
+            def wh(uc, access, address, size, value, user):
+                if F + 0x2b0 <= address < F + 0x2d0:
+                    sys.stderr.write(f'write F+{address - F:#x} = {value:#x} at {uc.reg_read(UC_X86_REG_RIP):#x}\n')
+            case.emu.uc.hook_add(UC_HOOK_MEM_WRITE, wh)
         try:
             case.run(FUNC, ints=[F], until=UNTIL[STAGE], max_instructions=600000)
         except RuntimeError as err:

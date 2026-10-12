@@ -170,7 +170,7 @@ pub fn engine_controls(
             if kind <= 4 && vm.i32(f + 0x6764) == 0 {
                 crate::piston::update_engine_piston(vm, env, state, f, e, temp);
             } else if kind.wrapping_sub(5) <= 1 {
-                env.call(vm, 0x141197b00, CallArgs::ints(&[state, f, e as u64]));
+                crate::engine_env::engine_update_of(vm, env, f, e);
             } else if kind == 7 {
                 update_engine_kind7(vm, state, f, e);
             }

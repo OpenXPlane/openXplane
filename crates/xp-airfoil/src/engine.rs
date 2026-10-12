@@ -525,7 +525,7 @@ pub fn engine_update(
     rec.set_f32(0x270, thrust_blend);
     let live = f.i32(0x28) != 0 || f.i32(0x6880) == 0;
     if live {
-        let lerp = linear(idle_thrust, q_term, drag_blend, r_term, rec.f32(0x270));
+        let lerp = linear(idle_thrust, q_term, power, r_term, rec.f32(0x270));
         rec.set_f32(0xc4, lerp * rec.i32(0x74) as f32);
     }
     rec.set_f32(0x274, rec.f32(0x270));

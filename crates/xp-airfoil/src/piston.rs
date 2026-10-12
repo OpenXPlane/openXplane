@@ -409,10 +409,7 @@ pub fn update_engine_kind4(
     vm.set_f32(m + 0xb8, b8);
     if bind(env, f, 0x181, n) {
         let t = (vm.f64(0x142f01910) * 2.0) as f32;
-        let mut a = CallArgs::ints(&[0, u64::from(n as u32)]);
-        a.xmm[0] = Some(t.to_bits());
-        a.int[0] = None;
-        let noise = reply_f32(env.call(vm, 0x1408bd9d0, a));
+        let noise = crate::engine_small::wave_noise(vm, t, n);
         let v = ((f64::from(noise) * 0.05 + 0.95) * f64::from(vm.f32(m + 0xb8))) as f32;
         vm.set_f32(m + 0xb8, v);
     }
@@ -557,10 +554,7 @@ pub fn update_engine_kind3(
     }
     if bind(env, f, 0x181, n) {
         let t = (vm.f64(0x142f01910) * 2.0) as f32;
-        let mut a = CallArgs::ints(&[0, u64::from(n as u32)]);
-        a.xmm[0] = Some(t.to_bits());
-        a.int[0] = None;
-        let noise = reply_f32(env.call(vm, 0x1408bd9d0, a));
+        let noise = crate::engine_small::wave_noise(vm, t, n);
         x7 = ((f64::from(noise) * 0.05 + 0.95) * f64::from(x7)) as f32;
     }
     if bind(env, f, 0x171, n) {
@@ -974,10 +968,7 @@ fn kind12_running(
         }
         if bind(env, f, 0x181, n) {
             let t = (vm.f64(0x142f01910) * 2.0) as f32;
-            let mut args = CallArgs::ints(&[0, u64::from(n as u32)]);
-            args.xmm[0] = Some(t.to_bits());
-            args.int[0] = None;
-            let noise = reply_f32(env.call(vm, 0x1408bd9d0, args));
+            let noise = crate::engine_small::wave_noise(vm, t, n);
             x13 = ((f64::from(noise) * 0.05 + 0.95) * f64::from(x13)) as f32;
         }
         let m48 = vm.i32(m + 0x48);
