@@ -122,3 +122,9 @@ Platform trigonometry is tested separately with a documented absolute tolerance.
 See [DELTA_WING_INTEGRATION.md](DELTA_WING_INTEGRATION.md): 350 complete original
 function calls, with only the profile evaluator stubbed. All 508 profile calls
 match exactly; Cl/Cd/Cm account for platform CRT differences separately.
+
+## Delta branch through element force
+
+See [DELTA_WING_FORCE.md](DELTA_WING_FORCE.md): 200 whole-function cases with
+explicit runtime state and disclosed profile/query substitutions; 194 complete
+output sets exact, worst 35 ULP. Local atan correction also passes the old corpus.

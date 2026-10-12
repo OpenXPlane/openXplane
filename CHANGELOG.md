@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Connected explicit delta state through the complete element force API.
+  200 original full-function cases validate controls, force scaling and delta integration;
+  corrected alternative-panel atan rounding exposed by a nearly cancelling moment.
+  [Evidence and limits](research/DELTA_WING_FORCE.md).
+
 - Added explicit delta runtime context to the complete wing-element evaluator.
   350 original whole-function cases verify 508 profile calls, the blend, stall,
   induced drag and ice ordering; 2099/2100 output words match exactly on macOS.

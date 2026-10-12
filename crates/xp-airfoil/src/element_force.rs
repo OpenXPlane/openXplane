@@ -141,7 +141,9 @@ fn supersonic(o: &Objects, call: &Call, terms: [f32; 3]) -> [f32; 4] {
     let alpha = x.f32(0x2c + 4 * e) * RADIANS_PER_DEGREE;
     let position = ((e as f32) as f64 + 0.5) as f32;
     let section = thickness(w, &call.foil_thickness, position);
-    let half_angle = (section * (w.f32(0x38) * RADIANS_PER_DEGREE).cos()).atan();
+    // Original CRT atan(0x3e140f55) returns 0x3e130a75. Platform f32 atan
+    // loses one bit here, amplified by cancellation in the final moment.
+    let half_angle = f64::from(section * (w.f32(0x38) * RADIANS_PER_DEGREE).cos()).atan() as f32;
     let (lower, upper) = (alpha - half_angle, half_angle + alpha);
     let (mut cl, mut cd) = (0.0f32, 0.0f32);
     for a in [lower, upper, upper, lower] {
@@ -168,6 +170,40 @@ fn supersonic(o: &Objects, call: &Call, terms: [f32; 3]) -> [f32; 4] {
 pub fn element_force<F>(
     o: &Objects,
     call: &Call,
+    foil: F,
+    driven: &dyn Fn(u32) -> bool,
+) -> Result<ForceOutput, String>
+where
+    F: FnMut(&FoilCall) -> Result<FoilResult, String>,
+{
+    element_force_internal(o, call, None, foil, driven)
+}
+
+/// Full force calculation with explicit delta-wing noise and double clock state.
+/// Thickness comes from the same foil objects supplied in `call`.
+pub fn element_force_with_delta<F>(
+    o: &Objects,
+    call: &Call,
+    noise: &crate::buffet::NoiseTable,
+    running_time_seconds: f64,
+    foil: F,
+    driven: &dyn Fn(u32) -> bool,
+) -> Result<ForceOutput, String>
+where
+    F: FnMut(&FoilCall) -> Result<FoilResult, String>,
+{
+    let delta = crate::wing_element::DeltaContext {
+        noise,
+        running_time_seconds,
+        foil_thickness: call.foil_thickness,
+    };
+    element_force_internal(o, call, Some(&delta), foil, driven)
+}
+
+fn element_force_internal<F>(
+    o: &Objects,
+    call: &Call,
+    delta: Option<&crate::wing_element::DeltaContext>,
     foil: F,
     driven: &dyn Fn(u32) -> bool,
 ) -> Result<ForceOutput, String>
@@ -296,7 +332,11 @@ where
         },
         skip_delta_block: false,
     };
-    let element = evaluate(&input, foil)?;
+    let element = if let Some(context) = delta {
+        crate::wing_element::evaluate_with_delta(&input, context, foil)?
+    } else {
+        evaluate(&input, foil)?
+    };
 
     // flow separation weight
     let ratio = element.ret / floor.sqrt();
