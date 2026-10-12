@@ -739,5 +739,15 @@ original in the emulator (`tools/gen_small_vectors.py`, kinds `caster` and `serv
   `lo..hi`; the rate `a - value` (limited to the magnitude of the correction unless `free`) divided by `k` is
   integrated into `state` over the frame time.
 
-Not yet ported: `0x141240fc0` (rotation from three angles through `0x140cb9900`), the wheel model body
-`0x1411c8690` and the blend contact `0x1411cb1e0`.
+- `0x140cbaea0(out, angle, x, y, z)` / `0x140cb9900(m, angle, x, y, z)` (`matrix::axis_rotation_f32`,
+  `rotate_by_f32`): the float32 siblings of `0x140cbabc0` / `0x140cb9860` (sine and cosine in double precision,
+  rounded to float32; the same special cases for an axis along one coordinate; an axis shorter than the float
+  `0.0001` leaves the identity). Vectors `matrix_axisf.txt`, `matrix_rotf.txt`.
+- `0x141240fc0(aircraft, p, u, w, angle, dir, out1, out2, out3)` (`wheel_axis_point`): the identity turned by
+  `atan2(dir[2], dir[1])` degrees about `(1, 0, 0)`, by `atan2(dir[0], dir[1])` degrees about `(0, 0, -1)` and by
+  `angle` degrees about `(0, -1, 0)`; three angles are taken from that matrix as in `euler_from_matrix` (a zero
+  third angle at the pole), each is converted degrees -> radians in float32 and the point `(p, u, w)` is rotated
+  by their sines and cosines and moved into the aircraft frame (`0x141296750`, no origin shift). Vectors
+  `wheel_axis.txt` (200 cases, pole included).
+
+Not yet ported: the wheel model body `0x1411c8690` and the blend contact `0x1411cb1e0`.

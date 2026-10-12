@@ -145,6 +145,92 @@ pub fn mul_f32(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
     })
 }
 
+/// The float identity matrix.
+pub fn identity_f32() -> [f32; 16] {
+    let mut m = [0.0f32; 16];
+    for k in 0..4 {
+        m[5 * k] = 1.0;
+    }
+    m
+}
+
+/// `0x140cbaea0(out, angle, x, y, z)`: [`axis_rotation`] on 4 x 4 matrices of floats. The angle is turned into
+/// radians and its sine and cosine taken in double precision, then rounded to float32; an axis shorter than
+/// `0.0001` leaves the identity.
+pub fn axis_rotation_f32(angle: f32, x: f32, y: f32, z: f32) -> [f32; 16] {
+    const RAD: f64 = f64::from_bits(0x3f91_df46_a252_9d39);
+    let r = f64::from(angle) * RAD;
+    let (s, c) = (r.sin() as f32, r.cos() as f32);
+    let mut m = [0.0f32; 16];
+    for k in 0..4 {
+        m[5 * k] = 1.0;
+    }
+    let zero = |v: f32| v == 0.0;
+    if zero(x) {
+        if zero(y) {
+            if !zero(z) {
+                m[0] = c;
+                m[5] = c;
+                if 0.0 <= z || z.is_nan() {
+                    m[1] = s;
+                    m[4] = -s;
+                } else {
+                    m[4] = s;
+                    m[1] = -s;
+                }
+                return m;
+            }
+        } else if zero(z) {
+            m[0] = c;
+            m[10] = c;
+            if 0.0 <= y || y.is_nan() {
+                m[8] = s;
+                m[2] = -s;
+            } else {
+                m[2] = s;
+                m[8] = -s;
+            }
+            return m;
+        }
+    } else if zero(y) && zero(z) {
+        m[5] = c;
+        m[10] = c;
+        if 0.0 <= x || x.is_nan() {
+            m[6] = s;
+            m[9] = -s;
+        } else {
+            m[9] = s;
+            m[6] = -s;
+        }
+        return m;
+    }
+    let len = ((x * x + y * y) + z * z).sqrt();
+    if f32::from_bits(0x38d1_b717) >= len {
+        return m;
+    }
+    let (z, x, y) = (z / len, x / len, y / len);
+    let t = 1.0 - c;
+    let xyt = (x * y) * t;
+    let xzt = (x * z) * t;
+    let yzt = (y * z) * t;
+    let (xs, sz, sy) = (s * x, s * z, s * y);
+    m[0] = (x * x) * t + c;
+    m[4] = xyt - sz;
+    m[8] = xzt + sy;
+    m[1] = xyt + sz;
+    m[2] = xzt - sy;
+    m[5] = (y * y) * t + c;
+    m[10] = (z * z) * t + c;
+    m[6] = yzt + xs;
+    m[9] = yzt - xs;
+    m
+}
+
+/// `0x140cb9900(m, angle, x, y, z)`: `m` becomes the float rotation of [`axis_rotation_f32`] times `m`.
+pub fn rotate_by_f32(m: &[f32; 16], angle: f32, x: f32, y: f32, z: f32) -> [f32; 16] {
+    mul_f32(m, &axis_rotation_f32(angle, x, y, z))
+}
+
 /// `0x1419f6fd0(m, a1, a2, a3)`: the three angles (degrees) the rotation `T * m` has, where `T` is the rotation built
 /// from the seed angles `a1`, `a2`, `a3` (their sines and cosines `s1 c1 s2 c2 s3 c3`: the rows of `T` are
 /// `(s3 s2 s1 + c3 c1, -s3 c2, c3 s1 - s3 s2 c1)`, `(s3 c1 - c3 s2 s1, c3 c2, c3 s2 c1 + s3 s1)`, `(-c2 s1, -s2,

@@ -44,7 +44,7 @@ pub struct Tire {
     pub force_b: u64,
 }
 
-fn aircraft_object(vm: &Vm, index: i32) -> u64 {
+pub(crate) fn aircraft_object(vm: &Vm, index: i32) -> u64 {
     vm.u64(FLIGHT_TABLE)
         .wrapping_add((i64::from(index) * 0x433c0) as u64)
 }

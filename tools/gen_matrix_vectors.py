@@ -70,6 +70,16 @@ def main():
         elif KIND == 'axis':
             run = (0x140cbabc0, [R], [dbits(axis[2])])
             header_args = f'{R:x} {dbits(angle):016x} {dbits(axis[0]):016x} {dbits(axis[1]):016x} {dbits(axis[2]):016x}'
+        elif KIND in ('axisf', 'rotf'):
+            f32 = lambda v: struct.unpack('<f', struct.pack('<f', v))[0]
+            fb = lambda v: struct.unpack('<I', struct.pack('<f', v))[0]
+            angle = f32(angle)
+            axis = [f32(v) for v in axis]
+            for k in range(16):
+                fz.preset_f32('M', 4 * k, rng.uniform(-3, 3))
+            run = (0x140cbaea0 if KIND == 'axisf' else 0x140cb9900, [R if KIND == 'axisf' else M], [fb(axis[2])])
+            header_args = f'{run[1][0]:x} {fb(angle):08x} {fb(axis[0]):08x} {fb(axis[1]):08x} {fb(axis[2]):08x}'
+            f32mode = True
         elif KIND == 'euler':
             P = case.region('P', 0x10)
             seeds = [rng.uniform(-180, 180) for _ in range(3)]
@@ -120,7 +130,10 @@ def main():
             fz.preset('S', off, value & 0xffffffff)
             fz.preset('S', off + 4, value >> 32)
         for reg, value in ((UC_X86_REG_XMM1, angle), (UC_X86_REG_XMM2, axis[0] if KIND != 'axes' else lat), (UC_X86_REG_XMM3, axis[1] if KIND != 'axes' else lon)):
-            case.emu.uc.reg_write(reg, dbits(value))
+            if KIND in ('axisf', 'rotf'):
+                case.emu.uc.reg_write(reg, struct.unpack('<I', struct.pack('<f', value))[0])
+            else:
+                case.emu.uc.reg_write(reg, dbits(value))
         try:
             case.run(run[0], ints=run[1], floats=[], stack=run[2], max_instructions=20000)
         except RuntimeError as err:

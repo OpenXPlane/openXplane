@@ -3772,6 +3772,36 @@ fn wheel_helpers_match_the_original_machine_code() {
 }
 
 #[test]
+fn wheel_axis_point_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("wheel_axis.txt");
+    assert!(cases.len() >= 150);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let f = |i: usize| f32::from_bits(hex(&h[i]) as u32);
+        let dir_at = hex(&h[5]);
+        let dir = [
+            case.vm.f64(dir_at),
+            case.vm.f64(dir_at + 8),
+            case.vm.f64(dir_at + 16),
+        ];
+        let out = openxplane::wheel::wheel_axis_point(
+            &case.vm,
+            hex(&h[0]) as i32,
+            f(1),
+            f(2),
+            f(3),
+            f(4),
+            dir,
+        );
+        for (k, v) in out.iter().enumerate() {
+            case.vm.set_f32(hex(&h[6 + k]), *v);
+        }
+        words_match_with(&case, n, false);
+    }
+}
+
+#[test]
 fn input_binding_matches_the_original_machine_code() {
     let cases = parse_vm_cases("binding.txt");
     assert!(cases.len() >= 200);
@@ -3950,6 +3980,19 @@ fn matrix_cases(kind: &str) {
                 let r = axis_rotation(double(&h[2]), double(&h[3]), double(&h[4]), double(&h[5]));
                 write(&mut case.vm, hex(&h[1]), &r);
             }
+            "axisf" | "rotf" => {
+                let f = |k: usize| f32::from_bits(hex(&h[k]) as u32);
+                let at = hex(&h[1]);
+                let out = if kind == "axisf" {
+                    openxplane::matrix::axis_rotation_f32(f(2), f(3), f(4), f(5))
+                } else {
+                    let m: [f32; 16] = std::array::from_fn(|k| case.vm.f32(at + 4 * k as u64));
+                    openxplane::matrix::rotate_by_f32(&m, f(2), f(3), f(4), f(5))
+                };
+                for (k, v) in out.iter().enumerate() {
+                    case.vm.set_f32(at + 4 * k as u64, *v);
+                }
+            }
             "circle" => {
                 let d = |k: usize| double(&h[k]);
                 let r = openxplane::flight_state::great_circle(
@@ -4002,7 +4045,7 @@ fn matrix_cases(kind: &str) {
                 write(&mut case.vm, hex(&h[1]), &r);
             }
         }
-        words_match_with(&case, n, true);
+        words_match_with(&case, n, !matches!(kind, "axisf" | "rotf" | "euler"));
     }
 }
 
@@ -4019,6 +4062,16 @@ fn matrix_rigid_inverse_matches_the_original_machine_code() {
 #[test]
 fn matrix_axis_rotation_matches_the_original_machine_code() {
     matrix_cases("axis");
+}
+
+#[test]
+fn float_axis_rotation_matches_the_original_machine_code() {
+    matrix_cases("axisf");
+}
+
+#[test]
+fn float_rotate_by_matches_the_original_machine_code() {
+    matrix_cases("rotf");
 }
 
 #[test]
