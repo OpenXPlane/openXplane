@@ -370,6 +370,43 @@ pub fn delta_wing_weight(b: &Boundary, i: usize, field_18: f32, field_1c: f32) -
     ramp * ratio * tail
 }
 
+/// Final delta-wing coefficient blend (`0x1411b8779..0x1411b885a`).
+/// Inputs are the coefficients computed by the earlier straight/delta branches.
+/// This does not supply the unported delta noise/trigonometric inputs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeltaBlend {
+    pub cl: f32,
+    pub cd: f32,
+    pub cm: f32,
+    pub ratio: f32,
+    pub stalled: bool,
+}
+
+pub fn blend_delta_coefficients(straight: [f32; 4], delta: [f32; 4], weight: f32) -> DeltaBlend {
+    let blend = |base: f32, target: f32| {
+        let difference = target - base;
+        let scaled = difference * weight;
+        let moved = scaled + base;
+        let low = sse_min(base, target);
+        if low > moved {
+            low
+        } else {
+            sse_min(sse_max(base, target), moved)
+        }
+    };
+    let cl = blend(straight[0], delta[0]);
+    let cd = blend(straight[1], delta[1]);
+    let cm = blend(straight[2], delta[2]);
+    let ratio = blend(straight[3], delta[3]);
+    DeltaBlend {
+        cl,
+        cd,
+        cm,
+        ratio,
+        stalled: ratio.abs() > 1.0,
+    }
+}
+
 use crate::regimes::blend;
 
 const PI: f32 = std::f32::consts::PI;

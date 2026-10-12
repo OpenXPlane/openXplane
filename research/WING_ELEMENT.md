@@ -3,7 +3,7 @@
 Date: 2026-10-06. The reference and SHA256 are in [BASELINE.md](BASELINE.md). Static analysis of the function at
 `0x1411b6630 .. 0x1411b8df7` (10183 bytes), the caller of the profile function
 [`0x141a44350`](AFL_REGIMES.md). It is **partly ported**: the straight-wing path is in `src/wing_element.rs` and verified bit for bit against the original
-([VERIFICATION.md](VERIFICATION.md)); the delta-wing block (step 9) is not ported. This note records what is
+([VERIFICATION.md](VERIFICATION.md)); the delta-wing block (step 9) is partially ported: its final blend is verified, while coefficient construction remains pending. This note records what is
 established.
 
 About 1400 of its 2284 instructions are diagnostic logging (stream calls), guarded by two flags at
@@ -45,14 +45,14 @@ the induced-drag term). It returns a float in `XMM0`: the weighted normalised an
    `1.4638e-05` (-50), `1.7231e-05` (0) and `1.9608e-05` (+50) against a temperature-like field
    (`+0x5c(%rdi)`), using the interpolation helper `0x1406ea0b0`; `Re_meg` is the chord Reynolds number divided by
    `1e6`. This `Re_meg` is the regime parameter passed to the profile function.
-3. **Position inputs.** The corner coordinates interpolated at the element centre and divided by the three
+3. **Position inputs.** The corner coordinates interpolated at the integer element index and divided by the three
    aircraft reference values (`+0x64f4`, `+0x64f8`, `+0x64fc`) give normalised x, y and z of the element. They are
    passed on as the `x`, `y`, `phase` noise coordinates of the stall perturbation
    ([BUFFET.md](BUFFET.md)). Confirmed in `0x141a44350`: its second and third float arguments are forwarded as the
    noise `x` and `y`, and the stack float as `phase`. The earlier note that those two arguments were an angle
    multiplier and divisor was wrong; the multiplier and divisor come from step 4.
 4. **Angle and the angle correction factors.** An element angle is wrapped into -180..180 degrees (`xmm9`).
-   Two factors are faded towards 1 as the absolute angle grows from 20 to 70 degrees
+   Two factors are faded towards 1 as the absolute angle grows from 20 to 90 degrees
    (`x' = clamp(x + (1 - x) / 70 * (|angle| - 20))`, kept between `x` and 1): the flow factor `y` of step 2 and a
    flap/slat factor built from the per-element flags `+0x56c`, `+0x594` and the fields `+0x1a0`, `+0x1a4`. The
    faded values (`xmm14`, `xmm15`) are passed to the profile function together with the angle, so they are, as far
@@ -223,3 +223,9 @@ three values by the angles at `+0x9c`, `+0xa0`, `+0xa4` of an object). Larger ca
 - Small leaf helpers seen: `max`, `max3`, `clamp` and lerp utilities (`0x14081dfa0`, `0x1411b4a20`,
   `0x1411b03f0`, `0x140819240`), a 2-D table noise (`0x140984e50`, table of 0x40000 floats), element array
   accessors (`0x1411b4730`, `0x1408154c0`, `0x141170d20`).
+
+## Final delta stage (2026-10-12)
+
+The final bounded four-channel blend and ratio-derived stall flag are now verified on
+2228 original-code cases: [DELTA_WING_BLEND.md](DELTA_WING_BLEND.md). The full delta
+branch remains unavailable until the preceding coefficient/noise construction is recovered.

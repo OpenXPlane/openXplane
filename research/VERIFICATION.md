@@ -91,3 +91,10 @@ The full evaluator uses this recovered stage. Emulator calls now reject instruct
 exhaustion, premature external stops and a zero budget, and enforce exact cached-block checkpoints.
 The original 400-case straight-wing fixture regenerates unchanged.
 Details: [WING_SPAN_EXACT.md](WING_SPAN_EXACT.md).
+
+## Final delta-wing blending (2026-10-12)
+
+`0x1411b8779..0x1411b885a` is ported as `wing_element::blend_delta_coefficients`: 2228
+original-code cases compare Cl/Cd/Cm/ratio and the recomputed stall flag exactly in debug/release.
+No calls or stubs are used. The preceding delta coefficient construction remains unported.
+[DELTA_WING_BLEND.md](DELTA_WING_BLEND.md) records inputs, coverage and reproduction.

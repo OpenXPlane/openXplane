@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Ported the final bounded delta-wing Cl/Cd/Cm/ratio blend and its stall flag: 2228 original-code
+  cases compare five outputs exactly in debug and release. The preceding delta coefficient/noise
+  construction is still pending. [Evidence and limits](research/DELTA_WING_BLEND.md).
+
 - Extracted the original profile weight stage used by the full wing evaluator and preserve its +0 ramp
   result in optimized builds; 2440 original-code cases compare all three weights exactly.
   Original-code emulation now rejects incomplete execution instead of accepting stale registers.
