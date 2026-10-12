@@ -3,7 +3,7 @@
 
     python3 tools/gen_init_callee_vectors.py Xplane12/X-Plane.exe KIND TRIALS SEED > crates/xp-app/tests/data/init_KIND.txt
 
-KIND: `throttle` (0x14122cbc0, header `F engine a-bits b-bits`), `resetb` (0x1411dd2c0, header `this`), `flags`
+KIND: `tankcond` (0x14123d190, header `this tank mode result`), `throttle` (0x14122cbc0, header `F engine a-bits b-bits`), `resetb` (0x1411dd2c0, header `this`), `flags`
 (0x14121a690, header `this flag`), `clear` (0x14087e590, header `object`).
 """
 import random
@@ -14,10 +14,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from emulate_xp import RET_ADDR  # noqa: E402
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
+from unicorn.x86_const import UC_X86_REG_RAX  # noqa: E402
 
 EXE, KIND, TRIALS, SEED = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-ENTRY = {'throttle': 0x14122cbc0, 'resetb': 0x1411dd2c0, 'flags': 0x14121a690, 'clear': 0x14087e590}[KIND]
-STUBS = [0x14122c470, 0x140b0c6d0, 0x141a6ba30, 0x14123d190]
+ENTRY = {'tankcond': 0x14123d190, 'throttle': 0x14122cbc0, 'resetb': 0x1411dd2c0, 'flags': 0x14121a690, 'clear': 0x14087e590}[KIND]
+STUBS = [0x14122c470, 0x140b0c6d0]
 
 
 def pages(addresses):
@@ -60,8 +61,6 @@ def main():
             p1, p3 = rng.choice([0.0, 0.1, 0.5, 0.95]), rng.choice([0.0, 0.1, 0.5, 0.95])
             case.stub(0x14122c470, lambda call, rng: None)
             case.stub(0x140b0c6d0, lambda call, rng: None)
-            case.stub(0x14123d190, lambda call, rng: call.ret_int(rng.choice([1, 7]) if rng.random() < (p1 if call.ints[2] == 1 else p3) else 0))
-            case.stub(0x141a6ba30, lambda call, rng: call.put_f32(call.ints[2] + 8, rng.uniform(-2, 2)))
             floats = []
             if KIND == 'throttle':
                 fz.preset('B', 0xa90, rng.choice([0, 1]))
@@ -79,6 +78,25 @@ def main():
                     b = 0.0
                 header = f'{F:x} {engine:x} {f32(a):x} {f32(b):x}'
                 run = dict(ints=[F, engine, 0, 0], floats=[0.0, 0.0, a, b])
+            elif KIND == 'tankcond':
+                this = F + 0xbb30
+                put('F', 0xbb30, F)
+                put('F', 0xbb38, B)
+                fz.preset('B', 0x61f8, F & 0xffffffff)
+                fz.preset('B', 0x61fc, F >> 32)
+                fz.preset_f32('B', 0x2888, rng.uniform(0.5, 2.0))
+                for k in range(9):
+                    fz.preset_f32('B', 0x3f7c + 4 * k, rng.uniform(0.5, 2.0))
+                    fz.preset('B', 0x40e4 + 4 * k, 0xffffffff)
+                    fz.preset_f32('F', 0xbbb4 + 4 * k, rng.choice([0.0, 1.0, rng.uniform(0.1, 3.0)]))
+                    for j in range(3):
+                        fz.preset_f32('B', 0x400c + 12 * k + 4 * j, rng.choice([0.0, rng.uniform(-5, 5)]))
+                        fz.preset_f32('B', 0x4078 + 12 * k + 4 * j, rng.choice([0.0, rng.uniform(-5, 5)]))
+                fz.preset_f32('B', 0x64fc, rng.uniform(0, 30))
+                fz.preset_f32('F', 0xbb30 + 0x54, rng.uniform(-2, 2))
+                tank, mode = rng.randrange(0, 9), rng.randrange(0, 7)
+                header = f'{this:x} {tank:x} {mode:x}'
+                run = dict(ints=[this, tank, mode, 0])
             elif KIND == 'resetb':
                 this = F + 0xb580
                 put('F', 0xb580, F)
@@ -109,9 +127,17 @@ def main():
                     fz.preset('B', off, rng.choice([0, 1]) if rng.random() > density else 0)
                 for k in range(6):
                     fz.preset('B', 0x1cc8 + 4 * k, rng.choice([0, 1, 4, 5]))
+                fz.preset('B', 0x61f8, F & 0xffffffff)
+                fz.preset('B', 0x61fc, F >> 32)
+                fz.preset_f32('B', 0x2888, rng.uniform(0.5, 2.0))
                 for k in range(9):
                     fz.preset_f32('B', 0x3f7c + 4 * k, rng.uniform(-2, 2))
+                    fz.preset('B', 0x40e4 + 4 * k, 0xffffffff)
+                    fz.preset_f32('F', 0xbbb4 + 4 * k, rng.choice([0.0, rng.uniform(0.1, 3.0)]))
                     fz.preset_f32('F', 0xbb30 + 0x84 + 4 * k, rng.uniform(-2, 2))
+                    for j in range(3):
+                        fz.preset_f32('B', 0x400c + 12 * k + 4 * j, rng.uniform(-5, 5))
+                        fz.preset_f32('B', 0x4078 + 12 * k + 4 * j, rng.uniform(-5, 5))
                 fz.preset_f32('B', 0x28a4, rng.choice([0.0, 0.1, 0.0999, 0.11, rng.uniform(0, 1)]))
                 flag = rng.choice([0, 1, 5])
                 header = f'{this:x} {flag:x}'
@@ -150,6 +176,8 @@ def main():
             if attempt == 0:
                 dry = {n: sorted(o) for n, o in case.fz.written().items()}
                 continue
+            if KIND == 'tankcond':
+                header += f' {case.emu.reg(UC_X86_REG_RAX) & 0xff:x}'
             text = case.dump(header)
             lines = text.split('\n')
             lines[-1] = 'O ' + ' '.join(t for t in lines[-1].split()[1:] if not sp - 0x800 <= int(t.split('=')[0], 16) < sp + 0x100)

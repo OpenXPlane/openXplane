@@ -5,8 +5,6 @@
 use crate::vm::{CallArgs, Callees, Vm};
 
 const TABLE: u64 = 0x1_4612_43b0;
-/// The locals of the original whose addresses go to callees.
-const SCRATCH: u64 = 0x7e00_0800_0000;
 const INDEX: u64 = 0x1_4265_52ac;
 const FLAG_ARG: u64 = 0x1_424f_5648;
 const METRES_TO_FEET: f32 = f32::from_bits(0x4051_f948);
@@ -788,19 +786,17 @@ pub fn reset_balance_state(vm: &mut Vm, env: &mut dyn Callees, this: u64) {
 }
 
 /// `0x14121a690(this, flag)`: resets the control-state object at `F+0xbb30`: the sum `+0x54` of the nine
-/// `0x141a6ba30` values times `B+0x3f7c..` (replayed), the nine ones at `+0x60..0x80`, the modes `+0x168/+0x16c`
+/// tank heights (`0x141a6ba30`, `mass::tank_position`) times `B+0x3f7c..`, the nine ones at `+0x60..0x80`, the modes `+0x168/+0x16c`
 /// (1 or 3 by the input binding queries `0x14123d190`, replayed, the slots' signs `+0x4c` and `B+0x1cb4`,
 /// `B+0x1cc0/0x1cc4` and the six words `B+0x1cc8..`), the flag `+0x17c/+0x180` (`flag` unless `B+0x28a4 > 0.1`),
 /// the sum `+0x160` of `+0x84..+0xa4` and the engine records' `+0x1d4`.
-pub fn reset_flags(vm: &mut Vm, env: &mut dyn Callees, this: u64, flag: u32) {
+pub fn reset_flags(vm: &mut Vm, _env: &mut dyn Callees, this: u64, flag: u32) {
     vm.set_u32(this + 0x54, 0);
     let mut b = vm.u64(this + 8);
     for i in 0..9u64 {
-        vm.set_u64(SCRATCH, 0);
-        vm.set_u32(SCRATCH + 8, 0);
-        env.call(vm, 0x141a6ba30, CallArgs::ints(&[b, i, SCRATCH]));
+        let z = crate::mass::tank_position(vm, b, i as i32)[2];
         b = vm.u64(this + 8);
-        let product = vm.f32(SCRATCH + 8) * vm.f32(b + 0x3f7c + 4 * i);
+        let product = z * vm.f32(b + 0x3f7c + 4 * i);
         let sum = product + vm.f32(this + 0x54);
         vm.set_f32(this + 0x54, sum);
     }
@@ -839,8 +835,8 @@ pub fn reset_flags(vm: &mut Vm, env: &mut dyn Callees, this: u64, flag: u32) {
     }
     let (mut first, mut third) = (false, false);
     for i in 0..9u64 {
-        first |= env.call(vm, 0x14123d190, CallArgs::ints(&[this, i, 1])).rax as u32 != 0;
-        third |= env.call(vm, 0x14123d190, CallArgs::ints(&[this, i, 3])).rax as u32 != 0;
+        first |= tank_condition(vm, this, i as u32, 1).unwrap_or(false);
+        third |= tank_condition(vm, this, i as u32, 3).unwrap_or(false);
     }
     if negative && positive && first && third {
         let b = vm.u64(this + 8);
@@ -953,4 +949,27 @@ pub fn reset_flight_object(vm: &mut Vm, f: u64) -> Result<(), String> {
 pub fn aircraft_by_index(vm: &Vm, index: i32) -> u64 {
     vm.u64(0x1_4612_4398)
         .wrapping_add((i64::from(index) * 0x6668) as u64)
+}
+
+/// `0x14123d190(this, tank, mode)`: a test of the position of fuel tank `tank` (`mass::tank_position` of
+/// `[this+8]`): mode 0 never, 1 the `x` below zero, 2 it is zero, 3 it is above zero, 4 always, 5 the height `z`
+/// above `0.1 * B+0x64fc + this+0x54`, others never. A tank above 8 or a mode above 6 is the original's
+/// fatal-error call (an `Err` here).
+pub fn tank_condition(vm: &mut Vm, this: u64, tank: u32, mode: u32) -> Result<bool, String> {
+    if tank > 8 || mode > 6 {
+        return Err("tank condition argument out of range".into());
+    }
+    let b = vm.u64(this + 8);
+    let [x, _, z] = crate::mass::tank_position(vm, b, tank as i32);
+    Ok(match mode {
+        1 => 0.0 > x,
+        2 => x == 0.0,
+        3 => x > 0.0,
+        4 => true,
+        5 => {
+            let limit = f64::from(vm.f32(b + 0x64fc)) * 0.1 + f64::from(vm.f32(this + 0x54));
+            f64::from(z) > limit
+        }
+        _ => false,
+    })
 }

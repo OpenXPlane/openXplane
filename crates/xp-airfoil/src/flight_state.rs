@@ -319,7 +319,10 @@ pub fn force_coefficients(
                 vm.set_u32(rbp + 0x50, 0);
                 vm.set_u32(rbp + 0x54, 0);
                 vm.set_u32(rbp + 0x58, 0);
-                env.call(vm, 0x141a6ba30, CallArgs::ints(&[b, i, rbp + 0x50]));
+                let p = crate::mass::tank_position(vm, b, i as i32);
+                for (k, v) in p.iter().enumerate() {
+                    vm.set_f32(rbp + 0x50 + 4 * k as u64, *v);
+                }
                 let x = vm.f32(rbp + 0x50).abs();
                 if x > 0.0 {
                     x7 += w;

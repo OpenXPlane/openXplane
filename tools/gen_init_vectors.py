@@ -17,7 +17,7 @@ from xp_vmcase import VmCase, entry_rsp  # noqa: E402
 
 EXE, TRIALS, SEED = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 
-STUBBED = [0x14120ad10, 0x1417f12c0, 0x141ba6750, 0x1411ddfd0, 0x1411b0420, 0x141a6ba30, 0x14123d190,
+STUBBED = [0x14120ad10, 0x1417f12c0, 0x141ba6750, 0x1411ddfd0, 0x1411b0420,
            0x140b0c6d0]
 # ported natively: their machine code runs in the emulator
 NATIVE = [0x1411aedb0, 0x140f5dd10, 0x14087e590, 0x1411dd2c0, 0x141a64250, 0x14121a690, 0x14122cbc0, 0x14082be10, 0x1423c0920]
@@ -115,9 +115,17 @@ def main():
             for off in (0xb580, 0xbb30):
                 put('F', off, F)
                 put('F', off + 8, B)
+            fz.preset('B', 0x61f8, F & 0xffffffff)
+            fz.preset('B', 0x61fc, F >> 32)
+            fz.preset_f32('B', 0x2888, rng.uniform(0.5, 2.0))
             for k in range(9):
                 fz.preset_f32('B', 0x3f7c + 4 * k, rng.uniform(-2, 2))
+                fz.preset('B', 0x40e4 + 4 * k, 0xffffffff)
+                fz.preset_f32('F', 0xbbb4 + 4 * k, rng.choice([0.0, rng.uniform(0.1, 3.0)]))
                 fz.preset_f32('F', 0xbb30 + 0x84 + 4 * k, rng.uniform(-2, 2))
+                for j in range(3):
+                    fz.preset_f32('B', 0x400c + 12 * k + 4 * j, rng.uniform(-5, 5))
+                    fz.preset_f32('B', 0x4078 + 12 * k + 4 * j, rng.uniform(-5, 5))
             fz.preset_f32('B', 0x225c, rng.choice([0.0, 30.0, 29.99, rng.uniform(0, 100)]))
             fz.preset_f32('B', 0x2260, rng.uniform(-5, 5))
             fz.preset_f32('B', 0x28a4, rng.choice([0.0, 0.1, 0.0999, 0.11, rng.uniform(0, 1)]))
@@ -169,8 +177,6 @@ def main():
                 return handler
 
             case.stub(0x14120ad10, with_effect(lambda c: c.ints[0] + 0x10))
-            case.stub(0x141a6ba30, lambda call, rng: call.put_f32(call.ints[2] + 8, rng.uniform(-2, 2)))
-            case.stub(0x14123d190, lambda call, rng: call.ret_int(rng.choice([0, 1])))
             case.stub(0x140b0c6d0, lambda call, rng: None)
             case.stub(0x1417f12c0, lambda call, rng: call.ret_int(rng.choice([0, 0, 1])))
             case.stub(0x141ba6750, lambda call, rng: call.ret_f32(rng.uniform(-60, 60)))

@@ -3974,9 +3974,11 @@ fn flight_init_matches_the_original_machine_code() {
 
 #[test]
 fn init_callees_match_the_original_machine_code() {
-    use openxplane::flight_init::{clear_arrays, reset_balance_state, reset_flags, throttle_step};
+    use openxplane::flight_init::{
+        clear_arrays, reset_balance_state, reset_flags, tank_condition, throttle_step,
+    };
     let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
-    for kind in ["throttle", "resetb", "flags", "clear"] {
+    for kind in ["throttle", "resetb", "flags", "clear", "tankcond"] {
         let cases = parse_vm_cases(&format!("init_{kind}.txt"));
         assert!(cases.len() >= 100, "{kind}");
         for (n, mut case) in cases.into_iter().enumerate() {
@@ -3995,6 +3997,10 @@ fn init_callees_match_the_original_machine_code() {
                 ),
                 "resetb" => reset_balance_state(&mut case.vm, &mut env, h[0]),
                 "flags" => reset_flags(&mut case.vm, &mut env, h[0], h[1] as u32),
+                "tankcond" => {
+                    let got = tank_condition(&mut case.vm, h[0], h[1] as u32, h[2] as u32).unwrap();
+                    assert_eq!(u64::from(got), h[3], "case {n}");
+                }
                 _ => clear_arrays(&mut case.vm, h[0]),
             }
             assert!(env.calls.is_empty(), "{kind} case {n}: unused calls");

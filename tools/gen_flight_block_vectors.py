@@ -453,7 +453,15 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_XMM8, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
             case.emu.uc.reg_write(UC_X86_REG_XMM11, 0)
         if BLOCK == 'coeff':
-            case.stub(0x141a6ba30, lambda call, rng: [call.put_f32(call.ints[2] + 4 * k, rng.choice([rng.uniform(-2, 2), 0.0])) for k in range(3)] and None)
+            # the tank position runs natively in the port: its inputs are preset (tanks on no part)
+            fz.preset('B', 0x61f8, F & 0xffffffff)
+            fz.preset('B', 0x61fc, F >> 32)
+            for k in range(9):
+                fz.preset_f32('B', 0x3f7c + 4 * k, rng.uniform(0.5, 3.0))
+                fz.preset('B', 0x40e4 + 4 * k, 0xffffffff)
+                for j in range(3):
+                    fz.preset_f32('B', 0x400c + 12 * k + 4 * j, rng.uniform(-5, 5))
+                    fz.preset_f32('B', 0x4078 + 12 * k + 4 * j, rng.uniform(-5, 5))
             fz.preset('F', 0x42f84, rng.randrange(0, 9))
             fz.preset('F', 0x24c, rng.choice([0, 1]))
             for off in (0x460, 0x464, 0x468, 0x46c):

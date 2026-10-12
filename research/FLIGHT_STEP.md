@@ -883,3 +883,9 @@ by `end / -56.6`. `isa_offset` is `0x141ba6290` (feet = metres * 3.28084; thirte
 `obj+0xa0+4k`). The pressure and density accessors follow because they call the temperature. The table index now
 emulates `cvttss2si` (NaN and out-of-range values go to 0x80000000, then 0). Not distinguished by the vectors:
 equality edges of the layer comparisons.
+
+`mass::tank_position` (`0x141a6ba30`) now runs natively in the force-coefficient block and in the control-state reset
+(vectors regenerated with the real function). `flight_init::tank_condition` is `0x14123d190(this, tank, mode)`: with
+the tank centre `(x, y, z)` of `[this+8]`, mode 1 is `x < 0`, 2 `x == 0`, 3 `x > 0`, 4 always, 5
+`z > 0.1 * B+0x64fc + this+0x54` (double), 0 and 6 never; a tank above 8 or a mode above 6 is the fatal-error call
+(200 cases, the five modes mutation-checked).
