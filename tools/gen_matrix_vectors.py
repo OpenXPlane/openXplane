@@ -115,8 +115,8 @@ def main():
             run = (0x1406e2be0, [CX], [dbits(pts[3]), bear, dist])
             angle, axis = pts[0], [pts[1], pts[2], 0.0]
             header_args = f'{P:x} {bear:x} {dist:x} {dbits(pts[0]):016x} {dbits(pts[1]):016x} {dbits(pts[2]):016x} {dbits(pts[3]):016x}'
-        elif KIND == 'axes':
-            run = (0x1419f7ee0, [CX, R], [])
+        elif KIND in ('axes', 'axesf'):
+            run = (0x1419f7ee0 if KIND == 'axes' else 0x1419f7e70, [CX, R], [])
             header_args = f'{CX:x} {R:x} {dbits(lat):016x} {dbits(lon):016x}'
         else:
             run = (0x140cb9860, [M], [dbits(axis[2])])
@@ -129,7 +129,7 @@ def main():
             off = sp + 0x28 + 8 * k - (sp - 0x800)
             fz.preset('S', off, value & 0xffffffff)
             fz.preset('S', off + 4, value >> 32)
-        for reg, value in ((UC_X86_REG_XMM1, angle), (UC_X86_REG_XMM2, axis[0] if KIND != 'axes' else lat), (UC_X86_REG_XMM3, axis[1] if KIND != 'axes' else lon)):
+        for reg, value in ((UC_X86_REG_XMM1, angle), (UC_X86_REG_XMM2, axis[0] if KIND not in ('axes', 'axesf') else lat), (UC_X86_REG_XMM3, axis[1] if KIND not in ('axes', 'axesf') else lon)):
             if KIND in ('axisf', 'rotf'):
                 case.emu.uc.reg_write(reg, struct.unpack('<I', struct.pack('<f', value))[0])
             else:

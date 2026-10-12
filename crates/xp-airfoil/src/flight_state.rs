@@ -706,7 +706,7 @@ fn world_frame(vm: &Vm, f: u64) -> crate::transform::Frame {
 
 /// `0x1407ac020(F, point, ..., shift = 1)`: the point rotated out of the aircraft frame, then each component moved by
 /// the position double (three engine-flag queries, x, y, z).
-fn to_world(vm: &mut Vm, env: &mut dyn Callees, f: u64, point: [f32; 3]) -> [f32; 3] {
+pub(crate) fn to_world(vm: &mut Vm, env: &mut dyn Callees, f: u64, point: [f32; 3]) -> [f32; 3] {
     let frame = world_frame(vm, f);
     let mut out = crate::transform::from_aircraft_frame(&frame, point, false, false);
     for (k, offset) in [0x378u64, 0x380, 0x388].into_iter().enumerate() {
@@ -2798,7 +2798,47 @@ pub fn local_to_geodetic(
 /// origin of the point at altitude zero as translation); `0x1419f8af0` turns it by 90 degrees about the x axis and
 /// inverts it; the planet's inverse matrix (`planet + 0x200`) is multiplied on and the result narrowed to floats.
 pub fn local_axes(vm: &mut Vm, env: &mut dyn Callees, planet: u64, out: u64, lat: f64, lon: f64) {
-    use crate::matrix::{identity, mul, read, rigid_inverse, rotate_by};
+    use crate::matrix::{mul, read, rigid_inverse};
+    let enu_turned = enu_frame_turned(vm, env, planet, lat, lon);
+    let inverse = rigid_inverse(&enu_turned);
+    let planet_inverse = read(vm, planet + 0x200);
+    let product = mul(&inverse, &planet_inverse);
+    crate::matrix::write(vm, out + 0x40, &product);
+    for (k, v) in product.iter().enumerate() {
+        vm.set_f32(out + 4 * k as u64, *v as f32);
+    }
+}
+
+/// `0x1419f7e70(planet, out, lat, lon)`: [`local_axes`] the other way round: the frame of the point on the ellipsoid
+/// (turned by 90 degrees about the x axis) multiplied by the planet's matrix at `planet + 0x280`, not inverted.
+pub fn local_axes_forward(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    planet: u64,
+    out: u64,
+    lat: f64,
+    lon: f64,
+) {
+    use crate::matrix::{mul, read};
+    let enu_turned = enu_frame_turned(vm, env, planet, lat, lon);
+    let planet_forward = read(vm, planet + 0x280);
+    let product = mul(&planet_forward, &enu_turned);
+    crate::matrix::write(vm, out + 0x40, &product);
+    for (k, v) in product.iter().enumerate() {
+        vm.set_f32(out + 4 * k as u64, *v as f32);
+    }
+}
+
+/// The east-north-up frame of a geographic point (`0x1419f8960`) multiplied by the 90 degree turn about the x axis
+/// (`0x1419f8af0` before its inversion).
+fn enu_frame_turned(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    planet: u64,
+    lat: f64,
+    lon: f64,
+) -> crate::matrix::Mat4 {
+    use crate::matrix::{identity, mul, rotate_by};
     const RAD: f64 = f64::from_bits(0x3f91_df46_a252_9d39);
     let origin = geodetic_to_ecef(vm, env, planet + 0xb0, [lat, lon, 0.0]);
     let r_lat = lat * RAD;
@@ -2825,13 +2865,7 @@ pub fn local_axes(vm: &mut Vm, env: &mut dyn Callees, planet: u64, out: u64, lat
         1.0,
     ];
     let turned = rotate_by(&identity(), 90.0, 1.0, 0.0, 0.0);
-    let inverse = rigid_inverse(&mul(&enu, &turned));
-    let planet_inverse = read(vm, planet + 0x200);
-    let product = mul(&inverse, &planet_inverse);
-    crate::matrix::write(vm, out + 0x40, &product);
-    for (k, v) in product.iter().enumerate() {
-        vm.set_f32(out + 4 * k as u64, *v as f32);
-    }
+    mul(&enu, &turned)
 }
 
 /// `0x1406e2be0(planet, a1, b1, a2, b2, bearing_out, distance_out)`: the great-circle distance in metres between

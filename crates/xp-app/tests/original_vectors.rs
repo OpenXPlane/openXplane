@@ -4067,11 +4067,16 @@ fn matrix_cases(kind: &str) {
                     case.vm.set_f32(p + 4 * k as u64, *a);
                 }
             }
-            "axes" => {
+            "axes" | "axesf" => {
                 let mut env = VmReplay {
                     calls: std::mem::take(&mut case.calls),
                 };
-                openxplane::flight_state::local_axes(
+                let axes = if kind == "axes" {
+                    openxplane::flight_state::local_axes
+                } else {
+                    openxplane::flight_state::local_axes_forward
+                };
+                axes(
                     &mut case.vm,
                     &mut env,
                     hex(&h[1]),
@@ -4125,6 +4130,11 @@ fn float_rotate_by_matches_the_original_machine_code() {
 #[test]
 fn local_axes_match_the_original_machine_code() {
     matrix_cases("axes");
+}
+
+#[test]
+fn forward_local_axes_match_the_original_machine_code() {
+    matrix_cases("axesf");
 }
 
 #[test]
