@@ -3406,7 +3406,8 @@ fn wing_ground_probe_matches_the_original_machine_code() {
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
-        let entered = openxplane::flight_state::wing_ground_probe(&mut case.vm, &mut env, f, rbp);
+        let entered =
+            openxplane::flight_state::wing_ground_probe(&mut case.vm, &mut env, f, rbp).unwrap();
         assert_eq!(
             u64::from(entered),
             hex(&case.header[2]),
@@ -3431,7 +3432,7 @@ fn body_surface_probe_matches_the_original_machine_code() {
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
-        openxplane::flight_state::body_surface_probe(&mut case.vm, &mut env, f, rbp, body);
+        openxplane::flight_state::body_surface_probe(&mut case.vm, &mut env, f, rbp, body).unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }
@@ -3467,7 +3468,7 @@ fn body_contact_loop_matches_the_original_machine_code() {
         let mut env = VmReplay {
             calls: std::mem::take(&mut case.calls),
         };
-        openxplane::flight_state::body_contact_loop(&mut case.vm, &mut env, f, rbp);
+        openxplane::flight_state::body_contact_loop(&mut case.vm, &mut env, f, rbp).unwrap();
         assert!(env.calls.is_empty(), "case {n}: unused calls");
         words_match(&case, n);
     }

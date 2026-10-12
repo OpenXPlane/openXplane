@@ -354,4 +354,98 @@ def setup_balance(case, rng, F, B):
         fz.preset('SH', off, v)
     case.stub(0x140f5c540, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
     case.stub(0x140f42620, lambda call, rng: call.ret_int(ENT))
-    case.stub(0x1407ace10, lambda call, rng: call.ret_int(rng.choice([0, 1, 1])))
+
+
+def setup_strut_world(case, rng, F, B, mesh_triangles=(8, 20)):
+    """Presets what 0x1411c7a50 needs around a flight object whose blocks already set the wheel vector, the
+    matrices and the position: the terrain mesh, the weight and balance, the aircraft tables, the surface table
+    with the wetness, the contact and recorder vectors and the replayed callees."""
+    import math
+    fz = case.fz
+
+    def put(name, off, v):
+        fz.preset(name, off, v & 0xffffffff)
+        fz.preset(name, off + 4, v >> 32)
+    setup_segment_mesh(case, rng, 'F', 0x42e40, triangles=mesh_triangles, heights=(-3.0, 3.0))
+    setup_balance(case, rng, F, B)
+    fz.region('TB', 0x1461243b0, 8)
+    put('TB', 0, F)
+    fz.region('TA', 0x146124398, 8)
+    put('TA', 0, B)
+    VEC = case.region('VEC', 0x18 * 6)
+    n = rng.randrange(0, 3)
+    put('F', 0x430d8, VEC)
+    put('F', 0x430e0, VEC + 0x18 * n)
+    put('F', 0x430e8, VEC + 0x18 * (n + rng.choice([0, 1, 2])))
+    fz.region('RV', 0x146125768, 0x20)
+    RCD = case.region('RCD', 0x50 * 4)
+    m = rng.randrange(0, 3)
+    put('RV', 0, RCD)
+    put('RV', 8, RCD + 0x50 * m)
+    put('RV', 16, RCD + 0x50 * (m + rng.choice([0, 1])))
+    fz.region('RID', 0x142f2e3dc, 4)
+    fz.preset('RID', 0, rng.choice([0, 1]))
+    fz.region('SND', 0x142f01920, 8)
+    fz.preset_f64('SND', 0, rng.choice([0.0, 2.0]))
+    fz.region('WET', 0x142fe8518, 16)
+    for off in (0, 4, 8, 12):
+        fz.preset_f32('WET', off, rng.choice([0.0, rng.uniform(0, 1.2)]))
+    ST = case.region('ST', 36 * 4)
+    fz.region('SU', 0x14611ac80, 0x10)
+    put('SU', 8, ST)
+    for k in range(4):
+        for off in (0x18, 0x1c, 0x20):
+            fz.preset_f32('ST', 36 * k + off, rng.uniform(0.2, 2))
+    for sn, cs in ((0x430, 0x434), (0x440, 0x444), (0x450, 0x454)):
+        angle = rng.uniform(-0.6, 0.6)
+        fz.preset_f32('F', sn, math.sin(angle))
+        fz.preset_f32('F', cs, math.cos(angle))
+    for off in (0x3cc, 0x3d0, 0x3d4):
+        fz.preset_f32('F', off, rng.uniform(-1, 1))
+    for off in (0x368, 0x36c, 0x370, 0x35c, 0x360, 0x364):
+        fz.preset_f32('F', off, rng.uniform(-3, 3))
+    for off in (0x378, 0x380, 0x388):
+        fz.preset_f64('F', off, rng.uniform(-3, 3))
+    for off in (0x3e0, 0x3dc, 0x3d8):
+        fz.preset_f32('F', off, rng.uniform(-30, 30))
+    fz.preset_f32('F', 0x288, rng.uniform(50, 1000))
+    for off, lo, hi in ((0x2898, 0.5, 20), (0x27c0, 0.2, 2), (0x27c4, 0.2, 2), (0x64d8, 0.5, 5), (0x2828, 10, 500)):
+        fz.preset_f32('B', off, rng.uniform(lo, hi))
+    case.stub(0x140c51370, lambda call, rng: call.ret_int(0))
+    case.stub(0x141a21200, lambda call, rng: None)
+
+    def normal(call, rng):
+        v = [rng.uniform(-1, 1) for _ in range(3)]
+        length = sum(c * c for c in v) ** 0.5 or 1.0
+        for k in range(3):
+            call.put_f32(call.ints[3] + 4 * k, v[k] / length)
+    case.stub(0x1406ed6a0, normal, caller=(0x14195ffc0, 0x141960dc0))
+    NEW = case.region('NEW', 0x18 * 8)
+
+    def grow(call, rng):
+        vec, end, rec = call.ints[0], call.ints[1], call.ints[2]
+        old_begin = case.emu.read_u64(vec)
+        count = (end - old_begin) // 0x18
+        for k in range(count * 6):
+            call.put(NEW + 4 * k, case.emu.read_u32(old_begin + 4 * k))
+        for k in range(6):
+            call.put(NEW + 0x18 * count + 4 * k, case.emu.read_u32(rec + 4 * k))
+        for off, v in ((0, NEW), (8, NEW + 0x18 * (count + 1)), (16, NEW + 0x18 * (count + 4))):
+            call.put(vec + off, v & 0xffffffff)
+            call.put(vec + off + 4, v >> 32)
+    case.stub(0x1405e73d0, grow)
+    NEWR = case.region('NEWR', 0x50 * 8)
+
+    def grow_rec(call, rng):
+        vec, rec = call.ints[0], call.ints[2]
+        old_begin = case.emu.read_u64(vec)
+        end = case.emu.read_u64(vec + 8)
+        count = (end - old_begin) // 0x50
+        for k in range(count * 20):
+            call.put(NEWR + 4 * k, case.emu.read_u32(old_begin + 4 * k))
+        for k in range(20):
+            call.put(NEWR + 0x50 * count + 4 * k, case.emu.read_u32(rec + 4 * k))
+        for off, v in ((0, NEWR), (8, NEWR + 0x50 * (count + 1)), (16, NEWR + 0x50 * (count + 4))):
+            call.put(vec + off, v & 0xffffffff)
+            call.put(vec + off + 4, v >> 32)
+    case.stub(0x140f0f660, grow_rec)

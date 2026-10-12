@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from xp_vmcase import setup_balance, setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
+from xp_vmcase import setup_strut_world, setup_balance, setup_segment_mesh, setup_terrain, stub_terrain_helpers, VmCase, entry_rsp  # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_R12, UC_X86_REG_R13, UC_X86_REG_R11, UC_X86_REG_R14, UC_X86_REG_R15, UC_X86_REG_RBP, UC_X86_REG_RBX, UC_X86_REG_RIP, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_XMM10, UC_X86_REG_XMM6, UC_X86_REG_XMM7, UC_X86_REG_XMM8, UC_X86_REG_XMM9, UC_X86_REG_XMM11,  # noqa: E402
                                UC_X86_REG_XMM12, UC_X86_REG_XMM13, UC_X86_REG_XMM14, UC_X86_REG_XMM15)
 
@@ -871,7 +871,7 @@ def main():
         if BLOCK == 'wcontact':
             case.stub(0x1411878f0, lambda call, rng: None)
             case.stub(0x1411c8690, lambda call, rng: call.ret_int(rng.choice([0, 1, 1, 2])))
-            case.stub(0x1411c7a50, lambda call, rng: call.ret_int(rng.choice([0, 1, 2])))
+            setup_strut_world(case, rng, F, B)
             G = case.region('G', 0x88 * 10)
             EL = case.region('EL', 0x90 * 10)
             PP = case.region('PP', 0x100 * 10)
@@ -905,7 +905,7 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_RCX, B)
             case.emu.uc.reg_write(UC_X86_REG_XMM9, 0x7fffffff)
         if BLOCK == 'wprobe':
-            case.stub(0x1411c7a50, lambda call, rng: call.ret_int(rng.choice([0, 1, 2])))
+            setup_strut_world(case, rng, F, B)
             from unicorn import UC_HOOK_CODE
             def stop_at_skip(uc, address, size, user):
                 if address == 0x14126ef6b:
@@ -938,7 +938,7 @@ def main():
             case.emu.uc.reg_write(UC_X86_REG_RDI, 0)
             case.emu.uc.reg_write(UC_X86_REG_RSI, 1)
         if BLOCK == 'bsurf':
-            case.stub(0x1411c7a50, lambda call, rng: call.ret_int(rng.choice([0, 1])))
+            setup_strut_world(case, rng, F, B)
             D = case.region('D', 0x34c8)
             fz.preset('F', 0x20, B & 0xffffffff, record=True)
             fz.preset('F', 0x24, B >> 32, record=True)
@@ -1000,7 +1000,7 @@ def main():
                 call.put_f32(call.stack[6], rng.choice([-1.0, 0.0, rng.uniform(0, 5)]))
                 call.put_f32(call.stack[7], rng.choice([0.0, 0.005, rng.uniform(0, 3)]))
             case.stub(0x1411cb1e0, contact)
-            case.stub(0x1411c7a50, lambda call, rng: call.ret_int(rng.choice([0, 1])))
+            setup_strut_world(case, rng, F, B)
             case.stub(0x140c448c0, lambda call, rng: call.ret_f64(rng.choice([-0.1, 0.1, 0.3, 0.4, 0.6, rng.uniform(0, 0.6)])))
             D = case.region('D', 0x34c8 * 39)
             fz.preset('F', 0x20, B & 0xffffffff, record=True)

@@ -233,9 +233,8 @@ pub fn weight_and_balance(
     }
     let mut i = 0u64;
     while (i as i64) < i64::from(vm.i32(b + 0x91c)) {
-        let mut args = CallArgs::ints(&[f, 0, 0x179, i]);
-        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
-        if env.call(vm, 0x1407ace10, args).rax as u32 != 0 {
+        // `0x1407ace10(F, 0, 0x179, i, 1.0)`: mode 0 only answers yes for a slot held at 6
+        if crate::binding::bound(vm, env, f, 0, 0x179, i as i32) {
             let item = vm.u64(b + 0x5ff8) + 0x68 * i;
             let at = vm.u64(b + 0x6010) + 0x3770 * i;
             let v = -vm.f32(item + 0x38);

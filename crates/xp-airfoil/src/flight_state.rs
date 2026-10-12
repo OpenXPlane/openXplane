@@ -1667,17 +1667,21 @@ pub fn wheel_contact(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Re
             let cos8 = f64::from(a8.cos());
             let x6 = (f64::from(vm.f32(p0 + 0x70)) - f64::from(a14.cos()) * lever * cos8) as f32;
             let x2 = (f64::from(a14.sin()) * lever * cos8 + f64::from(vm.f32(p0 + 0x64))) as f32;
-            let mut args = CallArgs::default();
-            args.int = [Some(f), Some(i), None, None];
-            args.xmm = [None, None, Some(x2.to_bits()), Some(0)];
-            args.stack = [
-                Some(u64::from(x6.to_bits())),
-                Some(u64::from(x9.to_bits())),
-                Some(u64::from(x10.to_bits())),
-                Some(u64::from(x11.to_bits())),
-            ];
-            let _ = drop;
-            env.call(vm, 0x1411c7a50, args).rax as i32
+            vm.set_f32(slot(-0x78), drop);
+            let strut = crate::strut::Strut {
+                wheel: i as i32,
+                x: x2,
+                a4: 0.0,
+                a5: x6,
+                a6: x9,
+                a7: x10,
+                a8: x11,
+                a9: drop,
+                a10: vm.f32(g + 0x38),
+                speed_out: 0,
+                force_out: 0,
+            };
+            i32::from(crate::strut::strut_contact(vm, env, f, &strut)?)
         };
         contacts = vm.i32(slot(0x1758)).wrapping_add(result);
         vm.set_i32(slot(0x1758), contacts);
@@ -1698,7 +1702,12 @@ pub fn wheel_contact(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> Re
 /// the wing's accumulators `X+0x2d0/0x2d4`. The settings of the original are `B+0x2898 * 9.798 / (0.15 * B+0x64ac)`
 /// (`rbp-0x10`) and a tenth of it (`rbp-0x8`).
 #[allow(clippy::field_reassign_with_default)]
-pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -> bool {
+pub fn wing_ground_probe(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+) -> Result<bool, String> {
     use crate::wing_element::boundary_at;
     let slot = |off: i64| rbp.wrapping_add(off as u64);
     let sqrt = |v: f32| if 0.0 > v { f32::NAN } else { v.sqrt() };
@@ -1710,7 +1719,7 @@ pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -
     let limit = f64::from(vm.f32(f + 0x42ec8));
     let height = altitude - f64::from(wind);
     if limit.partial_cmp(&height) != Some(std::cmp::Ordering::Greater) {
-        return false;
+        return Ok(false);
     }
     let x1 = (f64::from(vm.f32(b + 0x64ac)) * 0.15) as f32;
     let drag = vm.f32(b + 0x2898) * f32::from_bits(0x411c_c5c1) / x1;
@@ -1743,36 +1752,54 @@ pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -
         let (d9, d8, d11) = (d9 / len, d8 / len, d11 / len);
         let reach = vm.f32(f + 0x42f50);
         let (drag, tenth) = (vm.f32(slot(-0x10)), vm.f32(slot(-0x8)));
-        let ptrs = [Some(xrec + 0x2d0), Some(xrec + 0x2d4)];
-        let call = |vm: &mut Vm, env: &mut dyn Callees, a: f32, b3: f32, s: [f32; 4]| {
-            let mut args = CallArgs::default();
-            args.int = [Some(f), Some(0xffff_ffff), None, None];
-            args.xmm = [None, None, Some(a.to_bits()), Some(b3.to_bits())];
-            args.stack = s.map(|v| Some(u64::from(v.to_bits())));
-            let _ = ptrs;
-            let _ = tenth;
-            env.call(vm, 0x1411c7a50, args);
+        let call = |vm: &mut Vm,
+                    env: &mut dyn Callees,
+                    a: f32,
+                    b3: f32,
+                    s: [f32; 4],
+                    a9: f32|
+         -> Result<(), String> {
+            let strut = crate::strut::Strut {
+                wheel: -1,
+                x: a,
+                a4: b3,
+                a5: s[0],
+                a6: s[1],
+                a7: s[2],
+                a8: s[3],
+                a9,
+                a10: tenth,
+                speed_out: xrec + 0x2d0,
+                force_out: xrec + 0x2d4,
+            };
+            crate::strut::strut_contact(vm, env, f, &strut).map(|_| ())
         };
         // first point
         let tz = boundary_at(&az, n, nf);
         let ty = boundary_at(&ay, n, nf);
         let tx = boundary_at(&ax, n, nf);
         let m_reach = -reach;
-        call(vm, env, tx, m_reach * d9, [ty, m_reach * d8, drag, tz]);
+        call(
+            vm,
+            env,
+            tx,
+            m_reach * d9,
+            [ty, m_reach * d8, drag, tz],
+            m_reach * d11,
+        )?;
         // second point
         let tz = boundary_at(&az, n, nf);
         let ty = boundary_at(&ay, n, nf);
         let tx = boundary_at(&ax, n, nf);
-        call(vm, env, tx, m_reach * d8, [ty, reach * d9, drag, tz]);
+        call(vm, env, tx, m_reach * d8, [ty, reach * d9, drag, tz], 0.0)?;
         // third point
         let tz = boundary_at(&az, n, nf);
         let ty = boundary_at(&ay, n, nf);
         let tx = boundary_at(&ax, n, nf);
-        call(vm, env, tx, d8 * reach, [ty, m_reach * d9, drag, tz]);
-        let _ = (tenth, d11);
+        call(vm, env, tx, d8 * reach, [ty, m_reach * d9, drag, tz], 0.0)?;
     }
     vm.set_i32(slot(0x1750), 48);
-    true
+    Ok(true)
 }
 
 /// `0x14126de36..0x14126e4c8`: the contact points of one body's surface. For a body whose `+0x5f4` is -1 and whose
@@ -1782,13 +1809,19 @@ pub fn wing_ground_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) -
 /// (`+0xc`; a point at the centroid uses the height above the body's middle `(+0x24 + +0x28) / 2` instead). A nonzero
 /// answer raises `F+0x24c`. The body's `+0x2c` is cleared first. The drag and its tenth come from the frame slots
 /// `rbp-0x10` and `rbp-0x8`.
-pub fn body_surface_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, s: u64) {
+pub fn body_surface_probe(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+    s: u64,
+) -> Result<(), String> {
     use crate::transform::rotate_pairs;
     const RAD: f32 = f32::from_bits(0x3c8e_fa36);
     let slot = |o: i64| (rbp as i64 + o) as u64;
     vm.set_i32(s + 0x2c, 0);
     if vm.i32(s + 0x5f4) != -1 {
-        return;
+        return Ok(());
     }
     let rows = vm.i32(s + 0x654);
     let last = (s as i64 + 0x58c + i64::from(rows) * 0xd8) as u64;
@@ -1796,12 +1829,12 @@ pub fn body_surface_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
     let b = vm.u64(f + 0x20);
     let limit = f64::from(vm.f32(b + 0x64fc)) * 0.05;
     if rise.partial_cmp(&limit) != Some(std::cmp::Ordering::Greater) {
-        return;
+        return Ok(());
     }
     let middle = (f64::from(vm.f32(s + 0x28) + vm.f32(s + 0x24)) * 0.5) as f32;
     let half = (f64::from(vm.f32(s + 0xc)) * 0.5) as f32;
     if rows <= 0 {
-        return;
+        return Ok(());
     }
     let (drag, tenth) = (vm.f32(slot(-0x10)), vm.f32(slot(-0x8)));
     let _ = tenth;
@@ -1852,16 +1885,25 @@ pub fn body_surface_probe(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
                 (-dx * half / len2, -dy * half / len2, -dz2 * half / len2)
             };
             let out = rotate_pairs(ux, uy, uz, p);
-            let args = CallArgs {
-                int: [Some(f), Some(0xffff_ffff), None, None],
-                xmm: [None, None, Some(at[0].to_bits()), Some(out[0].to_bits())],
-                stack: [at[1], out[1], drag, at[2]].map(|v| Some(u64::from(v.to_bits()))),
+            let strut = crate::strut::Strut {
+                wheel: -1,
+                x: at[0],
+                a4: out[0],
+                a5: at[1],
+                a6: out[1],
+                a7: drag,
+                a8: at[2],
+                a9: out[2],
+                a10: vm.f32(slot(-0x8)),
+                speed_out: s,
+                force_out: s,
             };
-            if env.call(vm, 0x1411c7a50, args).rax as u32 != 0 {
+            if crate::strut::strut_contact(vm, env, f, &strut)? {
                 vm.set_i32(f + 0x24c, 1);
             }
         }
     }
+    Ok(())
 }
 
 fn unit_clamp(v: f32) -> f32 {
@@ -1985,7 +2027,12 @@ pub fn body_contact_blend(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64, 
 /// skipped when its model index `+0x5f0` (up to 0x26) is bound by `0x1407ace10(F, 1, 0x179, index)`, when `+0x54` is
 /// nonzero or when its byte `+0x588` is clear; the others run [`body_surface_probe`] and [`body_contact_blend`]. The
 /// body counter lives in the frame slot `rbp+0x1750`.
-pub fn body_contact_loop(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
+pub fn body_contact_loop(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    rbp: u64,
+) -> Result<(), String> {
     let slot = |o: i64| (rbp as i64 + o) as u64;
     for j in 0..39u64 {
         vm.set_u32(slot(0x1750), j as u32);
@@ -2002,10 +2049,11 @@ pub fn body_contact_loop(vm: &mut Vm, env: &mut dyn Callees, f: u64, rbp: u64) {
         if vm.u8(bodies + j * 0x34c8 + 0x588) == 0 {
             continue;
         }
-        body_surface_probe(vm, env, f, rbp, at);
+        body_surface_probe(vm, env, f, rbp, at)?;
         body_contact_blend(vm, env, f, rbp, at);
     }
     vm.set_u32(slot(0x1750), 39);
+    Ok(())
 }
 
 /// `0x14126e9a0..0x14126ef74`: the ground forces after a body contact (`rbp-0x78` set). With the weights `B+0x2804`

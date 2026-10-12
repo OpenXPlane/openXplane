@@ -723,3 +723,5 @@ The flight state blocks (`flight_state`: gear targets, start sequence, ground pr
 `flight_state::point_drag` now transforms its point with `to_world` (`0x1407ac020`) instead of replaying it; the drag, ground and gear-drag vectors were regenerated with the transform running in the emulator.
 
 `flight_state::gear_drag_and_brake` now sums the masses with `mass::weight_and_balance` natively (the gear-drag vectors were regenerated with the whole weight and balance chain in the emulator).
+
+The three strut call sites of the ground contact blocks (gear wheels, wing strips, body points) now call `strut::strut_contact` natively (the outputs of `wing_ground_probe`, `body_surface_probe` and `body_contact_loop` became `Result`); `weight_and_balance` answers its removed-item query with `binding::bound`. The vectors of `wcontact`, `wprobe`, `bsurf`, `bloop`, `gdrag`, the balance, tire and strut functions were regenerated with the whole chain in the emulator (mesh, tire, balance, vectors; the sound trigger and the vector growth are replayed). The wheel contact variant `0x1411c8690` and the blend contact `0x1411cb1e0` are still replayed.
