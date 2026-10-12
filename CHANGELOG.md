@@ -16,7 +16,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
   attitude quaternion, the aircraft-axes velocities, the geographic state and the flight angles, and now the whole
   ground contact chain: the landing gear and steering, the wing strip and body surface probes, the body contact
   response, the ground side force and the gear drag with the brake energy. Each is compared with the original
-  machine code in an emulator.
+  machine code in an emulator. The terrain mesh probes (vertical ray and segment with moving cells and surface
+  roughness), the strut and tire contact, the weight and balance sums and the input binding query are ported too,
+  and the contact blocks now run them natively instead of replaying them.
 
 ![Takeoff from Seattle-Tacoma with the approximate flight model](site/assets/anim/takeoff.gif)
 
