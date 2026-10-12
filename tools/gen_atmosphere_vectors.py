@@ -56,6 +56,54 @@ def main():
         except RuntimeError:
             pass
 
+    # the layered path (object+0x64 above absolute zero): 13 layer altitudes at +0x30, offsets at +0x64, the target
+    # +0x24c, the end value +0x250 and the isa curve at +0xa0
+    def put_layers(layers, q, target, end, isa):
+        for k in range(13):
+            emu.write_f32(obj + 0x30 + 4 * k, layers[k])
+            emu.write_f32(obj + 0x64 + 4 * k, q[k])
+            emu.write_f32(obj + 0xa0 + 4 * k, isa[k])
+        emu.write_f32(obj + 0x24c, target)
+        emu.write_f32(obj + 0x250, end)
+
+    def fields(*offsets):
+        return ' '.join(f'{o:x}={hx(emu.read_f32(obj + o))}' for o in offsets)
+    layer_offsets = [0x30 + 4 * k for k in range(13)] + [0x64 + 4 * k for k in range(13)] + [0x24c, 0x250, 0x98, 0x9c] + [0xa0 + 4 * k for k in range(13)]
+    for _ in range(600):
+        heights = sorted(rng.uniform(0, 20000) for _ in range(13))
+        layers = [h if rng.random() > 0.2 else rng.choice([0.0, -50.0]) for h in heights]
+        if rng.random() < 0.3:
+            layers[rng.randrange(0, 13)] = layers[0]
+        q = [rng.uniform(-60, 40) for _ in range(13)]
+        q[0] = rng.choice([q[0], -100.0, 0.0])
+        top = max([v for v in layers[1:] if v > 0] or [0.0])
+        target = rng.choice([0.0, rng.uniform(0, top + 1000), rng.uniform(0, 30000), rng.uniform(-100, 100), top])
+        end = rng.uniform(-70, 40)
+        isa = [rng.uniform(-30, 30) for _ in range(13)]
+        put_layers(layers, q, target, end, isa)
+        emu.write_f32(obj + 0x98, rng.uniform(90000, 105000))
+        emu.write_f32(obj + 0x9c, rng.uniform(-100, 3000))
+        alt = rng.choice([rng.uniform(-1000, 25000), rng.uniform(0, 3000), rng.uniform(-100000, 100000), rng.choice(layers)])
+        try:
+            emu.call(0x141ba6750, ints=[obj], floats=[0, alt])
+            print('LT', hx(alt), fields(*layer_offsets), '|', hx(emu.xmm0_f32()))
+        except RuntimeError:
+            continue
+        v = rng.choice([rng.uniform(0, 20000), rng.choice(layers), rng.uniform(-100, 100)])
+        emu.call(0x141ba6290, ints=[obj], floats=[0, v])
+        print('LI', hx(v), fields(*layer_offsets), '|', hx(emu.xmm0_f32()))
+        try:
+            emu.call(0x141baf820, ints=[obj], floats=[0, alt])
+            print('LP', hx(alt), fields(*layer_offsets), '|', hx(emu.xmm0_f32()))
+        except RuntimeError:
+            pass
+        celsius = rng.uniform(-60, 45)
+        try:
+            emu.call(0x141ba64e0, ints=[obj], floats=[0, alt, celsius])
+            print('LD', hx(alt), hx(celsius), fields(*layer_offsets), '|', hx(emu.xmm0_f32()))
+        except RuntimeError:
+            pass
+
 
 if __name__ == '__main__':
     main()

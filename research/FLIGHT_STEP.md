@@ -867,3 +867,19 @@ pre-set every word the function writes to a nonzero value (a dry run finds them)
 shows. Still replayed in the initialisation: `0x14120ad10` (a switch on `B+0x2414` that allocates the flight
 model controller object, vtable pointers `0x14265fee0` ...), `0x1411b0420`, `0x1411ddfd0` (ported as
 `mass::weight_and_balance`, not wired) and the atmosphere accessor `0x141ba6750`.
+
+## The layered atmosphere path `0x141ba6750` (and `0x1409e7540`, `0x141ba6290`)
+
+`atmosphere::Atmosphere::temperature` now covers the path taken when `obj+0x64` is above absolute zero (vectors
+`tools/gen_atmosphere_vectors.py`, records `LT`/`LI`/`LP`/`LD`, 600 cases each, temperature bit-identical). The 13
+layer altitudes are `obj+0x30+4k`, the offsets `obj+0x64+4k` (the first of them is also the path selector), the
+target `obj+0x24c` and the end value `obj+0x250`. The top layer is the highest of `+0x34..+0x60` that is positive;
+a zero target, or an altitude the blend does not reach, gives the table temperature plus the offset curve
+`0x1409e7540` (`layer_offset`: the first layer altitude at or above the value and the last one below it, linear
+between them, held to the two offsets, the mean when both are the same layer, `+0x64` when there is none). Inside
+the blend the value is interpolated (`0x1406ea0b0`) between that sum at the layer altitude and the end value at the
+target; above the top layer with the altitude below the target the table is read at `alt / (x / 11019)` and scaled
+by `end / -56.6`. `isa_offset` is `0x141ba6290` (feet = metres * 3.28084; thirteen fixed altitudes 0..53082 against
+`obj+0xa0+4k`). The pressure and density accessors follow because they call the temperature. The table index now
+emulates `cvttss2si` (NaN and out-of-range values go to 0x80000000, then 0). Not distinguished by the vectors:
+equality edges of the layer comparisons.

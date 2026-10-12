@@ -885,7 +885,7 @@ fn atmosphere_accessors_match_the_original_machine_code() {
         t.chunks(2).map(|c| (c[0], c[1])).collect()
     };
     assert_eq!(table.len(), 0x803);
-    let (mut counts, mut worst) = ([0usize; 3], [0u32; 3]);
+    let (mut counts, mut worst) = ([0usize; 7], [0u32; 7]);
     for line in lines {
         let t: Vec<&str> = line.split_whitespace().filter(|x| *x != "|").collect();
         let (kind, got, want) = match t[0] {
@@ -917,9 +917,32 @@ fn atmosphere_accessors_match_the_original_machine_code() {
                 };
                 (2, a.density_ratio(f(t[1]), f(t[2])), f(t[5]))
             }
+            "LT" | "LP" | "LD" | "LI" => {
+                // the layered path: `kind alt [celsius] off=bits ...`
+                let skip = if t[0] == "LD" { 3 } else { 2 };
+                let object = Fields(
+                    t[skip..t.len() - 1]
+                        .iter()
+                        .map(|w| {
+                            let (o, v) = w.split_once('=').unwrap();
+                            (usize::from_str_radix(o, 16).unwrap(), f(v))
+                        })
+                        .collect(),
+                );
+                let a = Atmosphere {
+                    object: &object,
+                    table: &table,
+                };
+                let want = f(t[t.len() - 1]);
+                match t[0] {
+                    "LT" => (3, a.temperature(f(t[1])), want),
+                    "LI" => (4, Some(a.isa_offset(f(t[1]))), want),
+                    "LP" => (5, a.pressure(f(t[1])), want),
+                    _ => (6, a.density_ratio(f(t[1]), f(t[2])), want),
+                }
+            }
             other => panic!("unknown record {other}"),
         };
-        // the layered path (object+0x64 above absolute zero) is not ported
         let Some(got) = got else { continue };
         counts[kind] += 1;
         let both_nan = got.is_nan() && want.is_nan();
@@ -928,8 +951,10 @@ fn atmosphere_accessors_match_the_original_machine_code() {
     println!("cases {counts:?}, worst ulp {worst:?}");
     assert!(counts.iter().all(|c| *c >= 150));
     assert_eq!(worst[0], 0);
+    assert_eq!((worst[3], worst[4]), (0, 0), "{worst:?}");
     // the power function comes from the platform's libm here and from the C runtime in the original
     assert!(worst[1] <= 64 && worst[2] <= 64, "{worst:?}");
+    assert!(worst[5] <= 64 && worst[6] <= 64, "{worst:?}");
 }
 
 #[test]
