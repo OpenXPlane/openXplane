@@ -102,18 +102,12 @@ fn sse_max(a: f32, b: f32) -> f32 {
 /// middle airfoils up to the ratio at `W+0x60`, the middle airfoil's value up to `W+0x64`, then between
 /// the middle and tip airfoils.
 fn thickness(w: &dyn Mem, foils: &[Option<f32>; 3], x: f32) -> f32 {
-    let u = x / (w.i32(4) as f32);
-    if w.f32(0x60) > u
-        && let (Some(root), Some(mid)) = (foils[0], foils[1])
-    {
-        return interpolate_clamped(w.f32(0x5c), root, w.f32(0x60), mid, u);
-    }
-    if u > w.f32(0x64)
-        && let (Some(mid), Some(tip)) = (foils[1], foils[2])
-    {
-        return interpolate_clamped(w.f32(0x64), mid, w.f32(0x68), tip, u);
-    }
-    foils[1].unwrap_or(0.0)
+    crate::wing_element::profile_thickness(
+        w.i32(4),
+        [w.f32(0x5c), w.f32(0x60), w.f32(0x64), w.f32(0x68)],
+        *foils,
+        x,
+    )
 }
 
 /// `0x141239050`: adds one supersonic panel term for the angle `a` (radians) to the two sums.

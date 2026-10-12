@@ -1,9 +1,11 @@
-# The wing element aerodynamics function (partial)
+# The wing element aerodynamics function
 
 Date: 2026-10-06. The reference and SHA256 are in [BASELINE.md](BASELINE.md). Static analysis of the function at
 `0x1411b6630 .. 0x1411b8df7` (10183 bytes), the caller of the profile function
-[`0x141a44350`](AFL_REGIMES.md). It is **partly ported**: the straight-wing path is in `src/wing_element.rs` and verified bit for bit against the original
-([VERIFICATION.md](VERIFICATION.md)); the delta-wing block (step 9) is partially ported: its final blend is verified, while coefficient construction remains pending. This note records what is
+[`0x141a44350`](AFL_REGIMES.md). The numerical straight and delta paths are ported in `crates/xp-airfoil/src/wing_element.rs`.
+The straight path is verified bit for bit; the positive-delta integration is checked with
+explicit runtime state and documented platform trig tolerance
+([DELTA_WING_INTEGRATION.md](DELTA_WING_INTEGRATION.md)). This note records what is
 established.
 
 About 1400 of its 2284 instructions are diagnostic logging (stream calls), guarded by two flags at
@@ -109,7 +111,12 @@ The meaning of the objects' fields beyond what the diagnostics name; the sources
 the caller's per-element flow computation); the behaviour of helpers `0x14082b800`, `0x14121bfd0`, `0x1411e1940`,
 `0x1408bd9d0`, `0x1411a0230`, `0x1411a00f0` and of the C runtime functions `0x14230b380`, `0x14230be80`,
 `0x14230c1d0`; the exact formulas of steps 2, 4 and 9; and whether the temperature field is in degrees Celsius.
-Steps 1 to 8 and 10 are ported and verified; step 9 (the delta-wing block, which runs only for sweeps above 40 degrees) is read at the level of the constants and data flow above.
+Update 2026-10-12: all numerical steps including step 9 are ported.
+See [DELTA_WING_TARGET.md](DELTA_WING_TARGET.md) for the recovered coefficient formulas,
+[NOISE2_EXACT.md](NOISE2_EXACT.md) for noise and
+[DELTA_WING_INTEGRATION.md](DELTA_WING_INTEGRATION.md) for complete-function replay.
+The uncertainty list above records the initial reading; runtime initialization and
+diagnostic logging remain outside this numerical port.
 
 ## Plan
 

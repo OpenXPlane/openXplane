@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Added explicit delta runtime context to the complete wing-element evaluator.
+  350 original whole-function cases verify 508 profile calls, the blend, stall,
+  induced drag and ice ordering; 2099/2100 output words match exactly on macOS.
+  [Evidence and limits](research/DELTA_WING_INTEGRATION.md).
+
 - Ported the complete delta-wing target coefficient construction, including both
   noise factors and their intermediate rounding. All 7584 coefficient words match
   original-code replay with recorded CRT results; platform trigonometry is checked

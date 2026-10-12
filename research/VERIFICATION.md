@@ -116,3 +116,9 @@ See [NOISE2_EXACT.md](NOISE2_EXACT.md): 1756 original-code cases compare
 See [DELTA_WING_TARGET.md](DELTA_WING_TARGET.md): 1896 full-range original-code
 cases without stubs; 7584 coefficient words exact with recorded CRT endpoints.
 Platform trigonometry is tested separately with a documented absolute tolerance.
+
+## Positive-delta whole-element integration
+
+See [DELTA_WING_INTEGRATION.md](DELTA_WING_INTEGRATION.md): 350 complete original
+function calls, with only the profile evaluator stubbed. All 508 profile calls
+match exactly; Cl/Cd/Cm account for platform CRT differences separately.

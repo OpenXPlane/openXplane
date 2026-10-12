@@ -661,8 +661,8 @@ pub struct ElementInputs<'a> {
     pub g10: f32,
     pub wing: WingFields<'a>,
     pub state: ElementState,
-    /// Continue on the straight-wing path when the delta-wing weight is positive instead of failing
-    /// (the delta-wing block is not ported; the result then ignores that effect).
+    /// Continue on the straight-wing path without delta context when its weight is positive.
+    /// `evaluate_with_delta` instead computes the original delta branch.
     pub skip_delta_block: bool,
 }
 
@@ -758,10 +758,56 @@ fn fade(x: f32, abs_angle_minus_20: f32) -> f32 {
     }
 }
 
-/// The straight-wing path of `0x1411b6630`. `profile` stands for `0x141a44350`: it receives what the
-/// original passes and returns what it writes. A positive delta-wing weight selects a block that is
-/// not ported yet and is an error.
-pub fn evaluate<F>(inp: &ElementInputs, mut profile: F) -> Result<ElementOutput, String>
+/// Runtime operands needed only when the original selects the delta-wing branch.
+pub struct DeltaContext<'a> {
+    pub noise: &'a crate::buffet::NoiseTable,
+    pub running_time_seconds: f64,
+    pub foil_thickness: [Option<f32>; 3],
+}
+
+/// `0x14121bfd0`: interpolate profile thickness at a span position in elements.
+pub fn profile_thickness(elements: i32, ratios: [f32; 4], foils: [Option<f32>; 3], x: f32) -> f32 {
+    let u = x / elements as f32;
+    if ratios[1] > u
+        && let (Some(root), Some(mid)) = (foils[0], foils[1])
+    {
+        return interpolate_clamped(ratios[0], root, ratios[1], mid, u);
+    }
+    if u > ratios[2]
+        && let (Some(mid), Some(tip)) = (foils[1], foils[2])
+    {
+        return interpolate_clamped(ratios[2], mid, ratios[3], tip, u);
+    }
+    foils[1].unwrap_or(0.0)
+}
+
+/// Evaluate without runtime delta state. Positive delta weight requires explicit
+/// `skip_delta_block`, or [`evaluate_with_delta`] with a table and clock.
+pub fn evaluate<F>(inp: &ElementInputs, profile: F) -> Result<ElementOutput, String>
+where
+    F: FnMut(&FoilCall) -> Result<FoilResult, String>,
+{
+    evaluate_internal(inp, None, profile)
+}
+
+/// Both straight and delta paths of `0x1411b6630`. Explicit delta context takes
+/// precedence over the legacy `skip_delta_block` flag.
+pub fn evaluate_with_delta<F>(
+    inp: &ElementInputs,
+    delta: &DeltaContext,
+    profile: F,
+) -> Result<ElementOutput, String>
+where
+    F: FnMut(&FoilCall) -> Result<FoilResult, String>,
+{
+    evaluate_internal(inp, Some(delta), profile)
+}
+
+fn evaluate_internal<F>(
+    inp: &ElementInputs,
+    delta: Option<&DeltaContext>,
+    mut profile: F,
+) -> Result<ElementOutput, String>
 where
     F: FnMut(&FoilCall) -> Result<FoilResult, String>,
 {
@@ -770,7 +816,7 @@ where
     let v = inp.state.v;
 
     let sweep = sweep_degrees(&w.boundary, e);
-    let _lateral_sweep = sweep + inp.flow.f408 * w.is_right;
+    let lateral_sweep = sweep + inp.flow.f408 * w.is_right;
     let slope = SLOPE_OVER_TEN / ((w.f14 * PI) * v);
     let flow_factor = (1.0f64 / (f64::from(slope) + 1.0)) as f32;
     let root = f64::from(flow_factor) * 8.0 + 1.0;
@@ -894,13 +940,46 @@ where
     cm += inp.extra[2];
     cl *= k;
 
-    if delta_weight > 0.0 && !inp.skip_delta_block {
-        return Err("the delta-wing block of the wing element function is not ported yet".into());
-    }
-
     let induced = (cl * cl) / ((w.f14 * PI) * v);
     let induced = induced * inp.state.r163;
     cd += induced;
+
+    if delta_weight > 0.0 {
+        if let Some(context) = delta {
+            let midpoint = (f64::from(e as f32) + 0.5) as f32;
+            let target = delta_coefficients(
+                &DeltaInputs {
+                    alpha_deg: alpha,
+                    sweep_deg: lateral_sweep,
+                    v,
+                    lift_scale: k,
+                    thickness: profile_thickness(
+                        w.elements,
+                        w.ratios,
+                        context.foil_thickness,
+                        midpoint,
+                    ),
+                    extra: inp.extra,
+                    x: w.boundary.x[e],
+                    z: w.boundary.z[e],
+                    span: inp.aircraft.f64f4,
+                    z_reference: inp.aircraft.f64fc,
+                    running_time_seconds: context.running_time_seconds,
+                },
+                context.noise,
+            )?;
+            let blended = blend_delta_coefficients([cl, cd, cm, ratio_acc], target, delta_weight);
+            cl = blended.cl;
+            cd = blended.cd;
+            cm = blended.cm;
+            ratio_acc = blended.ratio;
+            stall_flag = blended.stalled;
+        } else if !inp.skip_delta_block {
+            return Err(
+                "delta-wing branch requires explicit noise table, clock and foil thickness".into(),
+            );
+        }
+    }
 
     if inp.ice > 0.0 {
         cl *= ice_cl;
