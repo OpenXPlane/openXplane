@@ -17,6 +17,7 @@ pub mod element_force;
 pub mod engine;
 pub mod engine_env;
 pub mod engine_small;
+pub mod flight_init;
 pub mod flight_state;
 pub mod flight_step;
 pub mod forces;

@@ -833,3 +833,23 @@ at `[[[grid + 0x48] + 0x18] + 0x80]` as `N t - 0.5`; the four neighbours (indice
 32767, held to at least -1, multiplied by 10 and blended bilinearly. `terrain::probe` calls it natively; the
 vectors of the probe, the gear drag and the ground blocks were regenerated with a real grid object.
 `gear::gear_lever_step(F)` is `0x1411878f0`: the gear position `F+0x220` follows the lever mode `F+0x228`.
+
+## Flight object initialisation `0x1411ce9c0`
+
+`flight_init::flight_init(ctx, scale)` (vectors `tools/gen_init_vectors.py`, 300 cases, bit-identical): `ctx` holds
+the flight object `F` at `+0` and the aircraft `B` at `+8`; the float in `xmm3` is the ceiling scale. It resets the
+state of `F` in this order: the vectors and the callees `0x14087e590`, `0x1411aedb0`, `0x1411dd2c0` (`F+0xb580`),
+`0x14120ad10` (primary object, through the table lookup `0x141a64250` with the index `0x1426552ac`); the per-engine
+doubles `F+0xd68`, the `B+0x1b94` copies `F+0x7a4` and the atmosphere temperatures `F+0x7e4` (`0x141ba6750`); the
+engine records at `[F+0x68b0]` (stride `0x2cc`: constants, `0x14122cbc0`, the pressure ratio
+`B+0x1c.. * B+0x9e0 / B+0x950 / 101325 + 1` at `+0xac`, the mode `+0x298` by engine kind 3/4 and `B+0xa9c`) and the
+part records at `[F+0x68c8]` (stride `0x388`: the ratio of the slot weight to the part value `+0x20`); then
+`0x14121a690`, the weight sum `0x1411ddfd0` (replayed), the controls objects `F+0xbd00`, `F+0xbd50` (ceiling
+`scale * 3.28084` held to `0..7500` when `B+0xea8 > 0`), `F+0xbda8`, `F+0xbdd8`, the long list of flag and
+constant stores up to `F+0x630`, and, only on the primary object (`F+0x28 == 0`), the wheel/brake block
+`F+0xaf30..0xb234` with the three `0x1411b0420` resets, the virtual calls and the table object fields
+`+0x7c48`, `+0x7c5c`, `+0x7018`, `+0x73d0`, `+0x7c68`, `+0x7bbc`. The gear presence `F+0x210` is cleared when any of
+the ten gear records has both `+0` and `+0xc` set; the ten gear animation entries (`[F+0x6958]`, `0x90` bytes, bound
+checked: out of range is the original's fatal-error call, an `Err` here) take `1.0`/`0.0` at `+0x10` and the
+retract/extend values at `+0x14/+0x18/+0x1c` from the gear records. Not established: the semantics of most of the
+flag fields (named only by offset) and the callees' own effects.

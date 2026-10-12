@@ -3931,6 +3931,23 @@ fn gear_lever_matches_the_original_machine_code() {
 }
 
 #[test]
+fn flight_init_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("flight_init.txt");
+    assert!(cases.len() >= 100);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        let scale = f32::from_bits(hex(&case.header[1]) as u32);
+        openxplane::flight_init::flight_init(&mut case.vm, &mut env, hex(&case.header[0]), scale)
+            .unwrap();
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        words_match_exact(&case, n);
+    }
+}
+
+#[test]
 fn engine_limit_queries_match_the_original_machine_code() {
     use openxplane::limits::{blend_factor, engine_ratio, limit_a, limit_b};
     let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
