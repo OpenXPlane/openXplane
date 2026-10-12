@@ -3705,6 +3705,7 @@ fn small_engine_helpers_match_the_original_machine_code() {
         ("small_ceiling.txt", 0),
         ("small_lever.txt", 1),
         ("small_pilot.txt", 2),
+        ("small_wave.txt", 3),
     ] {
         let cases = parse_vm_cases(name);
         assert!(cases.len() >= 50, "{name}");

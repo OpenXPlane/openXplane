@@ -62,7 +62,15 @@ def main():
         elif KIND == 'wave':
             fz.region('NZ', 0x14578f1f0, 0x100000)
             x = rng.choice([rng.uniform(-3, 3), rng.uniform(-300, 300), rng.uniform(0, 5)])
-            run = (struct.unpack('<I', struct.pack('<f', x))[0], rng.randrange(0, 40))
+            x = struct.unpack('<f', struct.pack('<f', x))[0]
+            seed = rng.randrange(0, 40)
+            run = (struct.unpack('<I', struct.pack('<f', x))[0], seed)
+            for scale in (1, 2, 4, 8, 16, 32):
+                v = struct.unpack('<f', struct.pack('<f', abs(x) * scale))[0]
+                i = int(v) & 0xffffffff
+                for offset in (0, 1):
+                    index = ((seed * 100 + i + offset) & 0xffffffff) & 0x3ffff
+                    fz.preset_f32('NZ', 4 * index, rng.uniform(0.0, 1.0))
         else:
             fz.region('KT', 0x1460e9708, 4 * 500)
             fz.region('KF', 0x1460e9708 + 0xba44, 4 * 500)
