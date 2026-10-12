@@ -149,11 +149,27 @@ class Emulator:
         self.write_u64(sp, RET_ADDR)
         uc.reg_write(UC_X86_REG_RSP, sp)
         uc.reg_write(UC_X86_REG_RIP, addr)
-        try:
-            uc.emu_start(addr, RET_ADDR if until is None else until, count=max_instructions)
-        except UcError as error:
-            raise RuntimeError(f'emulation failed in {addr:#x} at {uc.reg_read(UC_X86_REG_RIP):#x}: {error}')
+        self.run_range(addr, RET_ADDR if until is None else until, max_instructions)
         return uc.reg_read(UC_X86_REG_RAX)
+
+    def run_range(self, begin, end, max_instructions=10000):
+        """Run prepared registers/memory to an exact exclusive boundary, or reject incomplete execution."""
+        if max_instructions <= 0:
+            raise ValueError('instruction budget must be positive')
+
+        def stop(uc, address, size, user):
+            uc.emu_stop()
+
+        # The exact hook also enforces an end inside an already cached translation block.
+        hook = self.uc.hook_add(UC_HOOK_CODE, stop, begin=end, end=end)
+        try:
+            self.uc.emu_start(begin, end, count=max_instructions)
+        except UcError as error:
+            raise RuntimeError(f'emulation failed in {begin:#x} at {self.uc.reg_read(UC_X86_REG_RIP):#x}: {error}') from error
+        finally:
+            self.uc.hook_del(hook)
+        if self.uc.reg_read(UC_X86_REG_RIP) != end:
+            raise RuntimeError(f'emulation from {begin:#x} did not reach {end:#x}: instruction budget exhausted or external stop')
 
     def xmm0_f32(self):
         return struct.unpack('<f', (self.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff).to_bytes(4, 'little'))[0]

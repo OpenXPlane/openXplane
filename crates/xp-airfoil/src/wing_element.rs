@@ -514,8 +514,31 @@ fn ramp(from: f32, to: f32, t: f32) -> f32 {
     if from == to {
         0.5
     } else {
-        clamp_zero_one((1.0 / (to - from)) * (t - from) + 0.0)
+        let value = (1.0 / (to - from)) * (t - from) + 0.0;
+        // Original ADDSS +0 must remain +0 after optimized lowering too.
+        if value == 0.0 {
+            0.0
+        } else {
+            clamp_zero_one(value)
+        }
     }
+}
+
+/// `0x1411b6d3b..0x1411b6e8f`: weights of the root, middle and tip profiles.
+/// Preserve ratio order and byte-exact names; overlapping ratios may yield a negative middle.
+pub fn profile_weights(fraction: f32, ratios: [f32; 4], names: [&str; 3]) -> [f32; 3] {
+    let root = if names[0] == names[1] {
+        0.0
+    } else {
+        ramp(ratios[1], ratios[0], fraction)
+    };
+    let tip = if names[1] == names[2] {
+        0.0
+    } else {
+        ramp(ratios[2], ratios[3], fraction)
+    };
+    let middle = (1.0_f64 - f64::from(root) - f64::from(tip)) as f32;
+    [root, middle, tip]
 }
 
 /// The angle factor fade of the caller: moves `x` towards 1 as the absolute angle grows past 20
@@ -625,17 +648,7 @@ where
     let y_norm = at(w.boundary.y)? / inp.aircraft.f64f8;
     let z_norm = at(w.boundary.z)? / inp.aircraft.f64fc;
 
-    // weights of the root, middle and tip airfoils
-    let mut w_root = ramp(w.ratios[1], w.ratios[0], t_span);
-    if w.names[0] == w.names[1] {
-        w_root = 0.0;
-    }
-    let mut w_tip = ramp(w.ratios[2], w.ratios[3], t_span);
-    if w.names[1] == w.names[2] {
-        w_tip = 0.0;
-    }
-    let w_mid = (1.0f64 - f64::from(w_root) - f64::from(w_tip)) as f32;
-    let weights = [w_root, w_mid, w_tip];
+    let weights = profile_weights(t_span, w.ratios, w.names);
 
     let (mut cl, mut cd, mut cm, mut ratio_acc, mut ret_acc) =
         (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);

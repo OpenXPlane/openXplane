@@ -83,3 +83,11 @@ fixture requires bit equality for both helpers and exposed a 3-ULP delta-wing we
 Rounding a double tangent to float32 corrects that case on the tested macOS host; the new test
 passes in debug/release. [WING_GEOMETRY_EXACT.md](WING_GEOMETRY_EXACT.md) records evidence,
 reproduction and the remaining cross-platform transcendental limitations.
+
+## Exact span cases and execution completion (2026-10-12)
+
+A new 2440-case span corpus verifies all three weight words and the +0 result in debug/release.
+The full evaluator uses this recovered stage. Emulator calls now reject instruction-budget
+exhaustion, premature external stops and a zero budget, and enforce exact cached-block checkpoints.
+The original 400-case straight-wing fixture regenerates unchanged.
+Details: [WING_SPAN_EXACT.md](WING_SPAN_EXACT.md).

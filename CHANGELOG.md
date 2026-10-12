@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Extracted the original profile weight stage used by the full wing evaluator and preserve its +0 ramp
+  result in optimized builds; 2440 original-code cases compare all three weights exactly.
+  Original-code emulation now rejects incomplete execution instead of accepting stale registers.
+  [Evidence and limits](research/WING_SPAN_EXACT.md).
+
 - Delta-wing weight now evaluates tangent in double precision and rounds once to float32, correcting
   a 3-ULP mismatch exposed by an expanded original-code corpus. New strict geometry checks compare
   4062 cases / 8124 outputs bit for bit in debug and release on the tested macOS host.
