@@ -3595,6 +3595,34 @@ fn tank_position_matches_the_original_machine_code() {
 }
 
 #[test]
+fn weight_and_balance_matches_the_original_machine_code() {
+    let cases = parse_vm_cases("balance.txt");
+    assert!(cases.len() >= 60);
+    let hex = |s: &str| u64::from_str_radix(s, 16).unwrap();
+    let float = |s: &str| f32::from_bits(hex(s) as u32);
+    for (n, mut case) in cases.into_iter().enumerate() {
+        let h = case.header.clone();
+        let (f, acc) = (hex(&h[0]), hex(&h[1]));
+        let wb = openxplane::mass::Balance {
+            sums: openxplane::mass::Sums {
+                total: acc,
+                inertia: [acc + 4, acc + 8, acc + 12],
+                moments: [acc + 16, acc + 20, acc + 24],
+                weights: [float(&h[2]), float(&h[4]), float(&h[3])],
+            },
+            stop: hex(&h[5]) != 0,
+        };
+        let mut env = VmReplay {
+            calls: std::mem::take(&mut case.calls),
+        };
+        openxplane::mass::weight_and_balance(&mut case.vm, &mut env, f, &wb).unwrap();
+        assert!(env.calls.is_empty(), "case {n}: unused calls");
+        // the tank positions go through sin and cos
+        words_match(&case, n);
+    }
+}
+
+#[test]
 fn point_drag_matches_the_original_machine_code() {
     let cases = parse_vm_cases("gear_drag.txt");
     assert!(cases.len() >= 60);

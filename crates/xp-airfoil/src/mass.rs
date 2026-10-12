@@ -140,3 +140,160 @@ pub fn tank_position(vm: &mut Vm, b: u64, tank: i32) -> [f32; 3] {
     }
     [x, y, z]
 }
+
+use crate::vm::{CallArgs, Callees};
+
+/// The accumulators and weights of `0x1411ddfd0`.
+#[derive(Clone, Copy, Debug)]
+pub struct Balance {
+    pub sums: Sums,
+    /// The original's byte argument: when set, only the aircraft's own mass and the payload stations are summed.
+    pub stop: bool,
+}
+
+const REGISTRY: u64 = 0x1_4578_b780;
+const NULL_KEY: u64 = 0x1_42f0_3778;
+
+fn sqrt_or_nan(v: f32) -> f32 {
+    if 0.0 > v { f32::NAN } else { v.sqrt() }
+}
+
+/// `0x1411ddfd0(F, ...)`: sums the mass, the inertia and the moments of the weight. The total mass and the base
+/// inertia come from the dynamic-pressure part (`F+0xb588` velocity, the four sums at `F+0xb798..0xb7a4`,
+/// `F+0xb838`) and the aircraft's `B+0x288c`; then the point masses are added with [`mass_point`]: the nine
+/// payload stations (`B+0x412c`), the jet fuel (`F+0x28c`), JATO (`F+0x6534`), the mass `F+0x284`, the nine fuel
+/// tanks (`F+0xbbb4`, at [`tank_position`]), the removed items (`B+0x91c` of them, bound by `0x1407ace10`) and
+/// the attached objects of the registry at `F+0x69b8` (lookups `0x140f5c540`/`0x140f42620` replayed, the
+/// reference counting and the label strings skipped).
+pub fn weight_and_balance(
+    vm: &mut Vm,
+    env: &mut dyn Callees,
+    f: u64,
+    wb: &Balance,
+) -> Result<(), String> {
+    let s = &wb.sums;
+    let b = vm.u64(f + 0x20);
+    let log = vm.i32(f + 0xbcd0) != 0 || vm.i32(f + 0xbcc8) != 0;
+    // the aircraft's own mass
+    let flow = vm.u64(f + 0xb588);
+    let (vx, vy, vz) = (
+        vm.f32(flow + 0x64f4),
+        vm.f32(flow + 0x64f8),
+        vm.f32(flow + 0x64fc),
+    );
+    let speed = sqrt_or_nan((vx * vx + vy * vy) + vz * vz);
+    let sum4 =
+        ((vm.f32(f + 0xb79c) + vm.f32(f + 0xb798)) + vm.f32(f + 0xb7a0)) + vm.f32(f + 0xb7a4);
+    let pressure = f64::from(speed * speed) * 1000.0 * 0.025 * 0.25;
+    let part = ((f64::from(sum4) * pressure) * 0.25) as f32 + vm.f32(b + 0x288c);
+    let total = (f64::from(part) + f64::from(vm.f32(f + 0xb838)) * 1.1) as f32;
+    vm.set_f32(s.total, total);
+    vm.set_f32(s.inertia[0], total * vm.f32(b + 0x28ac));
+    vm.set_f32(s.inertia[1], vm.f32(b + 0x28b0) * total);
+    vm.set_f32(s.inertia[2], vm.f32(b + 0x28b4) * total);
+    let add =
+        |vm: &mut Vm, v: f32, p: (f32, f32, f32), mode: i32| mass_point(vm, s, v, p, mode, log);
+    for k in 0..9u64 {
+        if vm.f32(b + 0x412c + 4 * k) > 0.0 {
+            let mode = vm.i32(b + 0x4108 + 4 * k);
+            let p = (
+                vm.f32(b + 0x4150 + 12 * k),
+                vm.f32(b + 0x4154 + 12 * k),
+                vm.f32(b + 0x4158 + 12 * k),
+            );
+            add(vm, vm.f32(f + 0x260 + 4 * k), p, mode)?;
+        }
+    }
+    if wb.stop {
+        return Ok(());
+    }
+    if vm.i32(b + 0x28d4) == 0 && vm.i32(b + 0x28d8) == 0 && vm.f32(f + 0x28c) > 0.0 {
+        let p = (vm.f32(b + 0x28c8), vm.f32(b + 0x28cc), vm.f32(b + 0x28d0));
+        add(vm, vm.f32(f + 0x28c), p, 1)?;
+    }
+    if vm.f32(f + 0x6534) > 0.0 {
+        let flow = vm.f32(f + 0x6534) * vm.f32(b + 0x2920) * vm.f32(b + 0x2928);
+        let v = (f64::from(flow) / 3600.0 / f64::from(f32::from_bits(0x411c_c5c1))) as f32;
+        add(vm, v, (0.0, vm.f32(b + 0x2914), vm.f32(b + 0x2918)), 1)?;
+    }
+    if vm.f32(f + 0x284) > 0.0 {
+        let p = (
+            vm.f32(b + 0x2268) * vm.f32(f + 0x11c),
+            0.0,
+            vm.f32(b + 0x226c) * vm.f32(f + 0x118),
+        );
+        add(vm, vm.f32(f + 0x284), p, 1)?;
+    }
+    for k in 0..9u64 {
+        let level = vm.f32(f + 0xbbb4 + 4 * k);
+        if level > 0.0 {
+            let [x, y, z] = tank_position(vm, b, k as i32);
+            add(vm, level, (x, y, z), 1)?;
+        }
+    }
+    let mut i = 0u64;
+    while (i as i64) < i64::from(vm.i32(b + 0x91c)) {
+        let mut args = CallArgs::ints(&[f, 0, 0x179, i]);
+        args.stack[0] = Some(u64::from(1.0f32.to_bits()));
+        if env.call(vm, 0x1407ace10, args).rax as u32 != 0 {
+            let item = vm.u64(b + 0x5ff8) + 0x68 * i;
+            let at = vm.u64(b + 0x6010) + 0x3770 * i;
+            let v = -vm.f32(item + 0x38);
+            let p = (vm.f32(at + 0x790), vm.f32(at + 0x794), vm.f32(at + 0x798));
+            add(vm, v, p, 1)?;
+        }
+        i += 1;
+    }
+    // the attached objects
+    let mut n = 0u64;
+    loop {
+        let begin = vm.u64(f + 0x69b8);
+        let count = (vm.u64(f + 0x69c0).wrapping_sub(begin) as i64) >> 4;
+        if n as i64 >= count {
+            break;
+        }
+        let key = begin + 16 * n;
+        let present = if vm.u32(key) == vm.u32(NULL_KEY) && vm.u64(key + 8) == vm.u64(NULL_KEY + 8)
+        {
+            false
+        } else {
+            let args = CallArgs::ints(&[REGISTRY, key]);
+            env.call(vm, 0x140f5c540, args).rax as u8 != 0
+        };
+        if present {
+            let lookup = |vm: &mut Vm, env: &mut dyn Callees| -> u64 {
+                env.call(vm, 0x140f42620, CallArgs::ints(&[REGISTRY, key]))
+                    .rax
+            };
+            let rec = vm.u64(b + 0x60c8) + 0x90 * n;
+            // the first lookup only supplies the label string
+            lookup(vm, env);
+            let e2 = lookup(vm, env);
+            let z = vm.f32(rec + 0x7c) - vm.f32(vm.u64(e2 + 0x178) + 0x790);
+            let e3 = lookup(vm, env);
+            let y = vm.f32(rec + 0x74) - vm.f32(vm.u64(e3 + 0x178) + 0x78c);
+            let e4 = lookup(vm, env);
+            let x = vm.f32(rec + 0x6c) - vm.f32(vm.u64(e4 + 0x178) + 0x788);
+            let e5 = lookup(vm, env);
+            add(vm, vm.f32(e5 + 0xbc), (x, y, z), 1)?;
+        }
+        let rec = vm.u64(b + 0x60c8) + 0x90 * n;
+        if vm.u64(rec + 0x30) != 0 && vm.u64(rec + 0x88) != 0 {
+            let obj = vm.u64(rec + 0x88);
+            let mut v = vm.f32(obj + 0x37d8);
+            let kind = vm.i32(obj + 0x36e8);
+            if (kind.wrapping_sub(5) as u32) > 1 && matches!(kind, 1 | 4 | 7 | 8 | 9) {
+                let count = vm.i32(vm.u64(f + 0x69a0) + 16 * n) as f32;
+                v += count * vm.f32(obj + 0xa8);
+            }
+            let p = (
+                vm.f32(rec + 0x6c) - vm.f32(obj + 0x3e08),
+                vm.f32(rec + 0x74) - vm.f32(obj + 0x3e0c),
+                vm.f32(rec + 0x7c) - vm.f32(obj + 0x3e10),
+            );
+            add(vm, v, p, 1)?;
+        }
+        n += 1;
+    }
+    Ok(())
+}
