@@ -89,3 +89,83 @@ pub fn wing_bounds_points(
     }
     Ok(result)
 }
+
+/// Input to the original body point-list pass. Grid values are the already
+/// transformed runtime coordinates, with the original fixed eighteen-point stride.
+pub struct BodyBoundary<'a> {
+    pub enabled: bool,
+    pub origin: [f32; 3],
+    pub rings: usize,
+    pub stations: &'a [[[f32; 3]; 18]],
+}
+
+/// Original 0x141a88340..0x141a88735 body emission (one body).
+/// Each quad contributes all four vertices, including duplicates and ring wrap.
+/// Raw ACF grid conversion and runtime body transforms remain caller work.
+pub fn body_bounds_points(body: &BodyBoundary<'_>) -> Result<Vec<[f32; 3]>, String> {
+    if !body.enabled || body.stations.len() < 2 || body.rings == 0 {
+        return Ok(Vec::new());
+    }
+    if body.rings > 18
+        || body.stations.len() > 20
+        || !body.origin.iter().all(|v| v.is_finite())
+        || !body
+            .stations
+            .iter()
+            .flat_map(|s| s[..body.rings].iter())
+            .flatten()
+            .all(|v| v.is_finite())
+    {
+        return Err(
+            "body bounds require finite coordinates, <=20 stations and <=18 ring points".into(),
+        );
+    }
+    let mut points = Vec::with_capacity((body.stations.len() - 1) * body.rings * 4);
+    for station in 0..body.stations.len() - 1 {
+        for ring in 0..body.rings {
+            let next = (ring + 1) % body.rings;
+            for (s, r) in [
+                (station, ring),
+                (station + 1, ring),
+                (station + 1, next),
+                (station, next),
+            ] {
+                points.push(std::array::from_fn(|axis| {
+                    body.stations[s][r][axis] + body.origin[axis]
+                }));
+            }
+        }
+    }
+    Ok(points)
+}
+
+/// Stored gear fields used by the original reference point-list producer.
+pub struct GearBoundary {
+    pub kind: i32,
+    pub leg_length: f32,
+    pub tire_radius: f32,
+    /// Gear+0x64/+0x70/+0x7c, already in the CG-relative frame.
+    pub center: [f32; 3],
+}
+
+/// `0x141a87e30..0x141a87fb2`: ten gear slots, nonzero kind enabled.
+/// Emits two opposite corners with extent leg_length+tire_radius.
+pub fn gear_bounds_points(gears: &[GearBoundary]) -> Result<Vec<[f32; 3]>, String> {
+    if gears.len() > 10 {
+        return Err("original gear bounds have ten slots".into());
+    }
+    let mut points = Vec::with_capacity(gears.len() * 2);
+    for gear in gears.iter().filter(|g| g.kind != 0) {
+        if ![gear.leg_length, gear.tire_radius]
+            .iter()
+            .chain(&gear.center)
+            .all(|v| v.is_finite())
+        {
+            return Err("gear bounds require finite active fields".into());
+        }
+        let extent = gear.tire_radius + gear.leg_length;
+        points.push(gear.center.map(|v| v - extent));
+        points.push(gear.center.map(|v| extent + v));
+    }
+    Ok(points)
+}

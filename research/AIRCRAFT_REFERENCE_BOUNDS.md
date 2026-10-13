@@ -47,3 +47,12 @@ matches exactly in `wing_bounds_points_exact`; no trig tolerance is involved.
 The caller remains responsible for enabled-wing selection and additional body,
 gear and other point-producing passes. This does not yet replace live reference
 fields with a partial wing-only bounding vector.
+
+
+## Body and gear point production (2026-10-13)
+
+The complete one-body quad-emission pass and ten-slot gear-corner pass are now
+ported with exact local original-code comparisons. See
+[BODY_GEAR_REFERENCE_POINTS.md](BODY_GEAR_REFERENCE_POINTS.md) for input layouts,
+word counts, local reproduction and limitations. The complete runtime vector is
+still not assembled; body grid preparation and propeller points remain work.
