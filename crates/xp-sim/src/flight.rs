@@ -297,18 +297,49 @@ impl FlightModel {
                 .polars
                 .first()
                 .map_or(1.0, |p| p.parameters[4]);
-            // boundary points of the span elements; z carries a quarter chord so that z - chord/4 is the
-            // quarter-chord line the sweep is measured on
+            // Original boundary arithmetic for supported rib counts; live state is static.
+            // Chord offsets enter the writer directly; no synthetic quarter chord is added.
             let n = w.elements;
             let u = w.span_direction();
             let (mut x, mut y, mut z, mut chord) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
             for i in 0..=n {
                 let t = i as f32 / n as f32;
                 let c = w.boundary_chord(i);
-                let p = w.root + u * (w.semilen * t);
+                let p = if n <= 10 {
+                    // Original boundary and point transform with the model's static state.
+                    // Dynamic sweep/retraction and aircraft curvature state are not connected yet.
+                    let transform = xp_airfoil::wing_boundary::Transform {
+                        span: w.semilen,
+                        design_dihedral: w.dihedral_deg,
+                        design_sweep: w.sweep_deg,
+                        rotation: 0.0,
+                        dihedral_delta: 0.0,
+                        side: w.side,
+                        variable_sweep: 0,
+                        rotation_offset: 0.0,
+                        retract: 0.0,
+                        origin: [
+                            w.root.x,
+                            w.root.y - params.cg_y_acf_m,
+                            w.root.z - params.cg_z_acf_m,
+                        ],
+                    };
+                    let curvature = xp_airfoil::wing_boundary::Curvature {
+                        angle: 0.0,
+                        amplitude: 0.0,
+                        scale: 1.0,
+                    };
+                    let offset = w.rib_offsets.as_ref().map_or(0.0, |v| v[i]);
+                    Vec3::from_array(xp_airfoil::wing_boundary::boundary_point(
+                        &transform, curvature, n, i, c, offset,
+                    ))
+                } else {
+                    // Larger counts lie outside the recovered eleven-rib geometry domain.
+                    w.root + u * (w.semilen * t) + Vec3::Z * (0.25 * c)
+                };
                 x.push(p.x);
                 y.push(p.y);
-                z.push(p.z + 0.25 * c);
+                z.push(p.z);
                 chord.push(c);
             }
             let mut flap_flags = vec![0i32; n + 1];
@@ -354,7 +385,7 @@ impl FlightModel {
         }
 
         // Recovered grouping/writer arithmetic on the model's current boundary geometry.
-        // Boundary construction itself still follows the approximate ACF geometry model.
+        // Boundary arithmetic is recovered for <=10 elements; dynamic caller state remains static.
         let dimension_fields: Vec<(f32, f32)> = {
             use xp_airfoil::wing_dimensions::{
                 GroupingWing, WingGroupMember, group_wings, wing_dimensions,

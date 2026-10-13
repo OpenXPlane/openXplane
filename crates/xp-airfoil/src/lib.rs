@@ -47,3 +47,5 @@ pub mod wing_element;
 
 pub mod aircraft_bounds;
 pub mod wing_dimensions;
+
+pub mod wing_boundary;

@@ -27,6 +27,8 @@ pub struct Wing {
     pub tip_chord: f32,
     /// Active rib chords from ACF, metres. None uses the approximate linear fallback.
     pub rib_chords: Option<Vec<f32>>,
+    /// Dimensionless per-rib chord offset used by the original boundary writer.
+    pub rib_offsets: Option<Vec<f32>>,
     pub semilen: f32,
     pub dihedral_deg: f32,
     pub sweep_deg: f32,
@@ -118,6 +120,25 @@ impl Wing {
             } else {
                 None
             };
+            let offset_prefix = key("_c_off_for_RIB/");
+            let rib_offsets = if acf
+                .properties
+                .iter()
+                .any(|p| p.key.starts_with(&offset_prefix))
+            {
+                if elements > 10 {
+                    return Err(format!(
+                        "wing {index}: rib offsets require at most ten elements"
+                    ));
+                }
+                Some(
+                    (0..=elements)
+                        .map(|rib| float(acf, &key(&format!("_c_off_for_RIB/{rib}"))))
+                        .collect::<Result<Vec<_>, _>>()?,
+                )
+            } else {
+                None
+            };
             let mut controls = vec![[0.0f32; 4]; elements];
             for (slot, name) in ["_ailn1", "_elev1", "_rudd1", "_flap1"].iter().enumerate() {
                 for (i, c) in controls.iter_mut().enumerate() {
@@ -142,6 +163,7 @@ impl Wing {
                 root_chord: ft(root_chord),
                 tip_chord: ft(tip_chord),
                 rib_chords,
+                rib_offsets,
                 semilen: ft(semilen),
                 dihedral_deg: float(acf, &key("_dihed_design"))?,
                 sweep_deg: float(acf, &key("_sweep_design"))?,
@@ -331,11 +353,16 @@ mod tests {
         let mut source = wing_text(47, 0.0, 1.0, 0.0, 0.0);
         for (rib, value) in [5.0f32, 7.0, 2.0, 4.0, 3.0].into_iter().enumerate() {
             source += &format!("P _wing/47/_chord_for_RIB/{rib} {value}\n");
+            source += &format!("P _wing/47/_c_off_for_RIB/{rib} {}\n", rib as f32 * 0.1);
         }
         let wings = Wing::all_from_acf(&acf(&source)).unwrap();
         assert_eq!(wings.len(), 1);
         let wing = &wings[0];
         assert_eq!(wing.index, 47);
+        assert_eq!(
+            wing.rib_offsets.as_ref().unwrap()[2].to_bits(),
+            0.2f32.to_bits()
+        );
         assert_eq!(
             wing.boundary_chord(1).to_bits(),
             (7.0 * ACF_FT_TO_M).to_bits()
