@@ -12,3 +12,5 @@ pub use xp_discord as discord;
 pub use xp_obj as obj8;
 pub use xp_scenery::{apt, install, world};
 pub use xp_sim::{flight, pilot};
+
+pub mod ui_resources;

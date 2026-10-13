@@ -103,7 +103,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 | Datarefs and commands | 8 | 34% | 20% | Registries and catalogs of 5503 datarefs and 3012 commands from the original, its default keyboard map (71 keys), values for 6 datarefs; 30 key commands act in the flight viewer; 2388 datarefs mapped to the field of the flight object or the simulation object that their getter reads (decoded from the getter code). |
 | Scenery and world | 14 | 10% | 0% | Airport ground from apt.dat (runways, taxiways, aprons). No DSF, terrain, objects, lights or weather. |
 | Cockpit, instruments, Lua systems | 10 | 0% | 0% | Not started. |
-| Rendering | 6 | 20% | 0% | wgpu viewer with lighting and glass. No PBR, shadows, sky, clouds or instrument screens. Original Alt/Esc UI is not ported in the active viewer: Esc exits, and its HUD uses Roboto Mono. No paired reference visual or motion comparison establishes UI/graphics fidelity. |
+| Rendering | 6 | 20% | 0% | wgpu viewer with lighting and glass. No PBR, shadows, sky, clouds or instrument screens. Original Alt/Esc UI is not ported in the active viewer: Esc exits, and its HUD uses Roboto Mono. No paired reference visual or motion comparison establishes UI/graphics fidelity. Original local UI resources now decode through ui-resources: 25 PNG/DXT5 DDS textures at their stored dimensions and 12 intact font files. The viewer is not yet connected to them; local decoding is not visual parity. |
 | Audio, weather, multiplayer, plugins | 7 | 0% | 0% | Not started. |
 | Platforms and distribution | 6 | 50% | 0% | CI on Linux, macOS and Windows, nightly builds, standard folder layout. No launcher or settings UI. |
 
@@ -114,7 +114,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 3. **Flight model** (in progress): Recovered profile, delta-wing, engine, propeller, contact and flight-step kernels exist with original-code comparisons. The approximate viewer now uses the delta branch and ordered wing grouping. The complete boundary coordinate loop and point transform now have original-code comparisons and run with static live inputs. Next: recover dynamic geometry state and full reference bounds, then connect the recovered curvature setup, original noise initialization and per-strip airflow; connect the remaining recovered force, propulsion and contact blocks into the runtime, then compare complete trajectories. Active rib chord values now come from ACF using the recovered conversion, and all 48 wing slots are scanned; dynamic geometry updates and force-arm/normal construction remain incomplete. Recovered body/gear point-list passes narrow the reference-bounds gap; propeller point production is now recovered too. The ordered main point vector and bounds reducer now match a single original-code pass on synthetic state. Next recover runtime body-grid and propeller field preparation, auxiliary outputs and the live geometry update schedule. Body-grid unit conversion now has exact checks on three real aircraft; runtime inclusion, normal generation and geometry scheduling remain work.
 4. **World** (started): Airport ground from apt.dat. Left: DSF terrain, library objects, lights, start locations, weather.
 5. **Cockpit and systems** (planned): Instruments, panels, the stock Cessna's Lua scripts and controls.
-6. **Original UI and graphics fidelity** (planned): Reproduce Alt/Esc menus, fonts, layout, icons, transitions, animation, lighting and materials. Current viewer menus do not match the original. Require paired screenshots and GIF/video at identical resolution, settings and scene; obtain reference resources/captures and recover original handlers before claiming 1:1.
+6. **Original UI and graphics fidelity** (started): Original local resources load: 25 PNG/DXT5 DDS menu textures and 12 font files. Recover Alt/Esc handler state, font roles, layout, transitions and renderer behavior. Current viewer menus do not match the original. Require paired screenshots and GIF/video at identical resolution, settings and scene before claiming 1:1.
 7. **Audio, multiplayer, plugins** (planned): Sound, networking and the plugin interface.
 8. **Platforms and distribution** (started): CI and nightly builds exist. Left: a launcher, settings, tagged releases.
 
@@ -126,7 +126,7 @@ Next up:
 - Compare complete live trajectories against the original after runtime integration
 - Fill datarefs from aircraft state and implement remaining command handlers
 - Read DSF scenery tiles and implement cockpit instruments and the stock Cessna Lua systems
-- Recover original Alt/Esc UI handlers and resources; establish paired screenshots and motion evidence under identical reference conditions
+- Recover native Alt/Esc handler state, menu layout and font roles using the available original UI resources; wire the renderer and compare matched original screenshots and motion captures. Local resource decoding alone does not establish parity.
 
 Details and the target crate layout: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 <!-- compat:end -->

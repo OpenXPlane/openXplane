@@ -19,6 +19,26 @@ fn frame_size() -> (u32, u32) {
 
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 2 && args[0] == "ui-resources" {
+        let resources = openxplane::ui_resources::UiResources::load(Path::new(&args[1]))?;
+        for font in &resources.fonts {
+            println!("FONT {} {} bytes", font.name, font.bytes.len());
+        }
+        for texture in &resources.textures {
+            println!(
+                "TEXTURE {} {}x{} RGBA8",
+                texture.relative_path,
+                texture.pixels.width(),
+                texture.pixels.height()
+            );
+        }
+        println!(
+            "Loaded {} fonts and {} menu textures. Scope: local file loading and decoding; menu layout, handlers, text rasterization and visual parity remain unverified.",
+            resources.fonts.len(),
+            resources.textures.len()
+        );
+        return Ok(true);
+    }
     if args.len() == 5 && args[0] == "airfoil-replay" {
         let airfoil = openxplane::airfoil::Airfoil::parse(&fs::read_to_string(&args[1])?)?;
         let inputs = openxplane::profile::parse_replay(&fs::read_to_string(&args[2])?)?;
@@ -559,7 +579,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         return Ok(true);
     }
     if args.len() != 2 || args[0] != "inspect" {
-        return Err("Usage: openxplane airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png>".into());
+        return Err("Usage: openxplane ui-resources <content-root> | airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png>".into());
     }
     let root = fs::canonicalize(&args[1])?;
     let install = openxplane::install::Install::open(&root)?;

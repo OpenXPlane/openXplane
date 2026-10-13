@@ -54,3 +54,7 @@ app only. Set `OPENXPLANE_DISCORD_APP_ID` to an empty value to turn it off ([det
   third-party aircraft use features that are not read yet. `openxplane inspect <X-Plane>` lists what is missing.
 - *No window or a black window*: update your graphics driver; run with `--smoke` to test the renderer.
 - Anything else: open an [issue](https://github.com/OpenXPlane/openXplane/issues) with the command and its output.
+
+## Check local original menu assets
+
+Run `cargo run --offline -p xp-app -- ui-resources /path/to/Xplane12` after copying the original `Resources/fonts` and `Resources/bitmaps/interface11` directories into that installation. This validates local loading of the menu texture catalog and font headers. It does not open the original menus or establish visual parity.

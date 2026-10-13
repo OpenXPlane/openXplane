@@ -8,7 +8,7 @@ The active workspace viewer exits on Escape (`crates/xp-app/src/viewer.rs`); its
 
 The preserved `codex/verified-wing-legacy` source has an independent Alt/Esc menu prototype. Its own `research/UI.md` states that layout, dimensions, colors and system font were implementation choices, without original pixel comparisons. It is not a verified visual port and should not be copied into the active viewer as evidence of 1:1 fidelity.
 
-No original font/menu resources or paired original screenshot corpus were found in the supplied reference directory during this audit. Wine/Wine64 were not found on PATH; this does not prove the absence of another installation or another machine. A usable reference UI runtime/capture source remains to be established. Existing openXplane gallery images are not reference screenshots.
+Original font/menu resources are now present in the supplied reference directory. The local menu-resource loader decodes 25 PNG/DDS textures and retains 12 original sfnt fonts. No paired original screenshot corpus has been established. Wine/Wine64 were not found on PATH; this does not prove the absence of another installation or another machine. A usable reference UI runtime/capture source remains to be established. Existing openXplane gallery images are not reference screenshots.
 
 ## Required visual evidence
 
@@ -16,7 +16,7 @@ For each substantial UI/graphics change, capture the original and openXplane at 
 
 Capture both Alt and Esc flows, hover/open/close transitions, keyboard/mouse selection and focus behavior in GIFs or short videos at matched timing/frame rate. Screenshots alone cannot prove animation or input behavior. Verify fonts and assets from original resources or original runtime evidence before treating a visual approximation as recovered behavior.
 
-Next work: recover original handlers and resource paths, obtain usable original menu/font resources and matched captures, port their state/layout/rendering and compare both stationary and moving results. UI/graphics verified coverage stays zero until that evidence exists. Physics/kernel verification continues independently and does not count as UI fidelity evidence.
+Next work: recover original handlers and layout/style parameters, connect the now-available original menu/font resources, obtain matched captures, port their state/layout/rendering and compare both stationary and moving results. UI/graphics verified coverage stays zero until that evidence exists. Physics/kernel verification continues independently and does not count as UI fidelity evidence.
 
 
 ## Confirmed original resource paths
@@ -33,4 +33,6 @@ Static ASCII strings in the supplied baseline EXE contain these paths:
 - `Resources/fonts/tahomabd.ttf`
 - `Resources/bitmaps/interface11/ins_loading_background.png`
 
-The menu-specific font/style and texture assignments still require handler/resource analysis. The supplied local directory contains none of these resources. For the next visual-port stage, copy the original `Resources/fonts` and `Resources/bitmaps/interface11` directories into the local `Xplane12/Resources` tree; keep them as local reference assets. Matched reference screenshots and motion captures are also still required. An independently downloaded font with the same family name would not establish that its version or metrics match this reference build.
+The menu-specific font/style and texture assignments still require handler/resource analysis. The original `Resources/fonts` and `Resources/bitmaps/interface11` directories are now available in the local `Xplane12/Resources` tree. They remain local reference assets. Run `cargo run -p xp-app -- ui-resources /path/to/Xplane12` to check the original menu files. The viewer does not yet use these textures or fonts. Matched reference screenshots and motion captures are also still required. An independently downloaded font with the same family name would not establish that its version or metrics match this reference build.
+
+See [../research/UI_RESOURCES.md](../research/UI_RESOURCES.md) for the local codec check and native main-menu resource references.

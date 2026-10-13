@@ -66,3 +66,7 @@ Exit: the aircraft sits on a real runway in real terrain, with taxiways, lights 
 4. Require identical bits (a few ulps only for libm functions) in `original_vectors.rs`.
 5. Record the evidence and what is not established in `research/`.
 6. Update `docs/compat.json` and the roadmap numbers.
+
+## UI fidelity work in progress (2026-10-13)
+
+Original fonts and interface11 resources are available locally. The new `ui-resources` command loads 12 fonts and decodes 25 menu textures; native main-menu texture references are recorded in `research/UI_RESOURCES.md`. Next: recover Alt/Esc handlers, layout and font-role selection, connect these assets to the renderer, then obtain matched stationary and motion comparisons. No visual or input parity has been established; the active viewer still exits on Escape.
