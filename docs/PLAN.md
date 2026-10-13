@@ -86,3 +86,7 @@ The controller map, window registry and parent opacity now supply menu query res
 ## Focused UI input (2026-10-13)
 
 The base child-first dispatcher and complete acceptance-mask filter now match 7120 local original-code cases with two virtual handler loggers. Child mask mutation is covered; real focus and widget callback implementations are not. Next: their mask assignments and concrete Alt/Esc actions, followed by live graph/rendering and paired captures. Sources and limits: `research/UI_FOCUSED_INPUT.md`.
+
+## UI selection and focus transition (2026-10-13)
+
+The complete selection/focus transition now matches 2024 local native replays, including callback-visible state and notification mutations. Notification service bodies and graph construction remain unported. The main-menu button's own key callback declines input, so follow its actual children rather than inventing Enter/Esc behavior. Next: helper effects, selection callers and concrete child callbacks; then renderer integration and paired captures. Evidence: `research/UI_FOCUS_TRANSITION.md`.

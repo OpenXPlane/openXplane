@@ -42,3 +42,5 @@ The 2026-10-13 input correction recovers Shift/Alt/Ctrl masks and all 182 defaul
 Native window membership and cumulative opacity are now recovered as explicit state services (`research/UI_WINDOW_STATE.md`). The stronger replay removes query stubs but retains four effect loggers; it is not a live window or pixel comparison.
 
 The focused UI dispatcher/filter is now recovered (`research/UI_FOCUSED_INPUT.md`), including Esc acceptance bit 0x8 and child-first ordering. This does not establish the Esc callback action or Alt menu activation. Original/openXplane paired screenshots and motion captures remain required once the actual menu renderer is connected.
+
+Selection/focus transition ordering now has 2024 local native comparisons (`research/UI_FOCUS_TRANSITION.md`), including callback mutations. Notification bodies, hit-testing and widget construction are still missing. The observed main-menu button's own key callback returns false; concrete menu actions must be recovered from its children and other command handlers. This adds no pixel/motion evidence.
