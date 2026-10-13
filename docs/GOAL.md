@@ -1,6 +1,6 @@
 # Active goal and completion requirements
 
-Continue recovering behaviour from the supplied X-Plane 12 reference and implementing the independent openXplane engine. Compare recovered behaviour against original code, commit and push verified changes, and distinguish confirmed behaviour from approximations. Whole-game compatibility remains the goal; individual recovered kernels do not establish it.
+Continue recovering behaviour from the supplied X-Plane 12 reference and implementing the independent openXplane engine. Compare recovered behaviour against original code, commit and push verified changes, and distinguish confirmed behaviour from approximations. The completion target is openXplane reproducing X-Plane 12 as a whole 1:1, including simulation, content behaviour, UI and graphics. Individual recovered kernels, an approximate flying viewer or weighted progress estimates do not establish completion. See [PARITY_ACCEPTANCE.md](PARITY_ACCEPTANCE.md) for the required evidence.
 
 ## Required maintenance after substantial confirmed progress
 
