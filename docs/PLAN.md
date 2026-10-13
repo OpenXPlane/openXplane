@@ -74,3 +74,7 @@ Original fonts and interface11 resources are available locally. The new `ui-reso
 ## Native input continuation (2026-10-13)
 
 The binding-vector loop now has exact local transition/trace evidence across 2728 cases. Its Begin/End callback bodies are logged, not executed. Recover command continuation, input interception and Show Menu callback registration, then wire this stateful loop to the viewer. The current viewer still uses an independent lifecycle and declines conflicting chords. See `research/KEY_EVENT_LOOP.md`; no UI/whole-input parity is claimed.
+
+## Native menu commands (2026-10-13)
+
+Main-menu/settings registration and conditional helper request order are recovered (`research/MENU_COMMAND_ROUTING.md`). Eight local traces cover every boolean combination with all six service bodies replaced. Recover those services and the separate Esc/Alt entry paths before wiring the request planner into the viewer. This is not a working original menu or a visual comparison.

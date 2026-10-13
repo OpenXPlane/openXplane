@@ -30,6 +30,6 @@ The original-output corpus stays local. Ordinary CI ignores its comparison; dete
 
 ## Next connection to menus
 
-The native Begin function at `0x140c7fac0` increments per-command counters at owner+0x80, consults overrides, then can dispatch the object pointer at owner+0x68 indexed by command ID (call at `0x140c7fc07`). The callback-object registration and the actual Show Menu implementation still need recovery. Native catalogue IDs are 3 for show_menu, 29 for toggle_main_menu and 30 for toggle_settings_window; these IDs are not stable across builds.
+The native Begin function at `0x140c7fac0` increments per-command counters at owner+0x80, consults overrides, then can dispatch the object pointer at owner+0x68 indexed by command ID (call at `0x140c7fc07`). The main-menu/settings callback registration is now traced in [MENU_COMMAND_ROUTING.md](MENU_COMMAND_ROUTING.md); the actual Show Menu callback still needs recovery. Native catalogue IDs are 3 for show_menu, 29 for toggle_main_menu and 30 for toggle_settings_window; these IDs are not stable across builds.
 
 The viewer currently retains its independently implemented key lifecycle and declines ambiguous chords. The recovered stateful loop is not yet wired to it. Before connecting it, reproduce active-command continuation, interception gates and callback ordering; a first-match shortcut would discard the observed duplicate behavior. Alt/Esc menu rendering, paired captures and whole-game fidelity remain unverified.
