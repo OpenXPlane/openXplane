@@ -124,3 +124,52 @@ pub fn boundary_point(
     }
     boundary_point_with_trig(t, c, elements, rib, chord, offset, trig)
 }
+
+/// Original aircraft curvature setup (0x14124df67..0x14124e036).
+/// `degrees` is aircraft+0x28fc (`acf/_ball_ang_def_deg`); halfspan is
+/// aircraft+0x64f4 from the complete reference bounds writer.
+/// The inactive branch clears angle/amplitude and preserves the previous scale.
+pub fn curvature_parameters(degrees: f32, halfspan: f32, previous_scale: f32) -> Curvature {
+    if f64::from(degrees.abs()) <= 0.001 || degrees.is_nan() {
+        return Curvature {
+            angle: 0.0,
+            amplitude: 0.0,
+            scale: previous_scale,
+        };
+    }
+    let radians = degrees * RAD;
+    let doubled = f64::from(radians) + f64::from(radians);
+    let numerator = doubled.sin() + f64::from(sin(radians));
+    let denominator = f64::from(cos(radians)) + doubled.cos();
+    let angle = numerator.atan2(denominator) as f32;
+    let angle = (f64::from(angle) + f64::from(angle)) as f32;
+    Curvature {
+        angle,
+        amplitude: halfspan / angle,
+        scale: halfspan,
+    }
+}
+
+#[cfg(test)]
+mod curvature_tests {
+    use super::*;
+    #[test]
+    fn disabled_setup_preserves_scale_and_clears_outputs() {
+        for degrees in [
+            0.0f32,
+            -0.0,
+            f32::from_bits(0.001f32.to_bits() - 1),
+            -f32::from_bits(0.001f32.to_bits() - 1),
+        ] {
+            let got = curvature_parameters(degrees, 50.0, -0.0);
+            assert_eq!(got.angle.to_bits(), 0);
+            assert_eq!(got.amplitude.to_bits(), 0);
+            assert_eq!(got.scale.to_bits(), (-0.0f32).to_bits());
+        }
+        // Float32 .001 is above the original double .001 threshold.
+        let active = curvature_parameters(0.001, 50.0, -0.0);
+        assert!(active.angle > 0.0);
+        assert!(active.amplitude > 0.0);
+        assert_eq!(active.scale, 50.0);
+    }
+}
