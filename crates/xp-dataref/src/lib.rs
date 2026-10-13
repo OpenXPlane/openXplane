@@ -7,3 +7,5 @@ pub mod keymap;
 pub mod key_event;
 
 pub mod command_gate;
+
+pub mod command_dispatch;

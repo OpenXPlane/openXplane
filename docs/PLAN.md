@@ -106,3 +106,7 @@ Both native interceptor layers now match 1864 local cases, including signed resu
 ## Native command block-mask query (2026-10-13)
 
 The complete per-command mask query now matches 6418 local original-code cases without stubs, including all 3138 catalogue IDs. Esc/main-menu/settings commands are exempt from this query but remain subject to other gates. The show_menu opening action is still unidentified; reconstruct complete Begin/End routing and its ID-3 callback path next. Evidence: `research/COMMAND_BLOCK_MASK.md`.
+
+## Complete Begin/End command executor (2026-10-13)
+
+Both native dispatchers now match 1768 local original-code cases, including counters/time, override priority, real observer snapshot/iteration, removals/additions and post-plugin primary changes. Allocator and callback/plugin endpoints are controlled. Trace ID-3 observer/override/primary construction to the actual window action, then integrate with the viewer. Evidence: `research/COMMAND_BEGIN_END.md`.

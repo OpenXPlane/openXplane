@@ -52,3 +52,5 @@ The keyboard capture query now uses recovered classification/list/opacity behavi
 The native interceptor wrapper and registered adapter now have 1864 exact local comparisons and execute inside the strengthened 2152-case full keyboard replay (`research/KEY_INTERCEPT_WRAPPER.md`). Actual external export/context effects and runtime registration remain unverified. The live viewer is unchanged; this supplies no menu pixels or motion evidence.
 
 The command block-mask query confirms exemptions for show_menu/main-menu/settings in 6418 local native cases (`research/COMMAND_BLOCK_MASK.md`). Exemptions do not bypass other input gates and do not prove opening behavior. Actual ID-3 actions, viewer UI and paired visual evidence remain unfinished.
+
+The complete command Begin/End executor now has 1768 original-code comparisons (`research/COMMAND_BEGIN_END.md`). Dispatches include menu IDs, but their callbacks still supply controlled effects. Live ID-3 registration and window actions remain unidentified; there is no Alt/Esc renderer or paired visual evidence yet.
