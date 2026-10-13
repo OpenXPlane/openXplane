@@ -23,7 +23,7 @@ The local generator executes the complete pass with no stubs and exact end-range
 
 Debug and optimized release local comparisons are run explicitly with the corpus environment variables. Ordinary CI checks quad order/fixed row stride/ring closure and gear inclusion/signed extent, but explicitly ignores the original-code comparisons because their corpora are not distributed. No original executable bytes or aircraft files are added to the repository.
 
-Runtime body grid preparation and inclusion state, complete original gear field population, propeller point production, the complete aircraft point-vector caller and full geometry-update scheduling remain unfinished. No live reference bounds, curvature integration or full trajectory parity is claimed. Compatibility estimates remain unchanged.
+Runtime body grid preparation and inclusion state, complete original gear field population, runtime propeller radius/center preparation (the point producer is now separately recovered), the complete aircraft point-vector caller and full geometry-update scheduling remain unfinished. No live reference bounds, curvature integration or full trajectory parity is claimed. Compatibility estimates remain unchanged.
 
 Reproduction requires Unicorn and the supplied baseline EXE:
 

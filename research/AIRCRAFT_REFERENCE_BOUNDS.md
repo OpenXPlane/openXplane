@@ -55,4 +55,4 @@ The complete one-body quad-emission pass and ten-slot gear-corner pass are now
 ported with exact local original-code comparisons. See
 [BODY_GEAR_REFERENCE_POINTS.md](BODY_GEAR_REFERENCE_POINTS.md) for input layouts,
 word counts, local reproduction and limitations. The complete runtime vector is
-still not assembled; body grid preparation and propeller points remain work.
+still not assembled; body grid preparation and runtime propeller fields remain work. The propeller point pass itself is now recovered; see [PROPELLER_REFERENCE_POINTS.md](PROPELLER_REFERENCE_POINTS.md).

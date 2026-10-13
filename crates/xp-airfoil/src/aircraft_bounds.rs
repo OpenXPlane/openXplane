@@ -169,3 +169,53 @@ pub fn gear_bounds_points(gears: &[GearBoundary]) -> Result<Vec<[f32; 3]>, Strin
     }
     Ok(points)
 }
+
+/// Stored part/propeller fields for the reference point producer.
+pub struct PropellerBoundary {
+    pub kind: i32,
+    pub elements: usize,
+    /// Part+0x644 float array, including the extra upper sample at index 11.
+    pub radii: [f32; 12],
+    /// Part+0x778/+0x77c/+0x780 in the stored CG-relative frame.
+    pub center: [f32; 3],
+}
+
+/// Original propeller point pass `0x141a8879b..0x141a88dc6`.
+/// Kind 9 is skipped. The query is always 10, using the original value-clamped
+/// interpolation at lower index min(elements-1, 10), not a radius maximum.
+pub fn propeller_bounds_points(parts: &[PropellerBoundary]) -> Result<Vec<[f32; 3]>, String> {
+    if parts.len() > 8 {
+        return Err("original part point pass supports eight propeller slots".into());
+    }
+    let mut points = Vec::with_capacity(parts.len() * 8);
+    for part in parts.iter().filter(|p| p.kind != 9) {
+        if part.elements == 0
+            || part.elements > 100
+            || !part.center.iter().chain(&part.radii).all(|v| v.is_finite())
+        {
+            return Err("propeller bounds require finite fields and element count 1..100".into());
+        }
+        let lower = (part.elements - 1).min(10);
+        let radius = crate::wing_element::interpolate_clamped(
+            lower as f32,
+            part.radii[lower],
+            (lower + 1) as f32,
+            part.radii[lower + 1],
+            10.0,
+        );
+        for x in [false, true] {
+            for y in [false, true] {
+                for z in [false, true] {
+                    points.push(std::array::from_fn(|axis| {
+                        if [x, y, z][axis] {
+                            radius + part.center[axis]
+                        } else {
+                            part.center[axis] - radius
+                        }
+                    }));
+                }
+            }
+        }
+    }
+    Ok(points)
+}
