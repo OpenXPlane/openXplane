@@ -18,3 +18,5 @@ pub mod ui_resources;
 pub mod menu_commands;
 
 pub mod ui_state;
+
+pub mod ui_input;

@@ -82,3 +82,7 @@ Main-menu/settings registration and conditional helper request order are recover
 ## Native window query services (2026-10-13)
 
 The controller map, window registry and parent opacity now supply menu query results. Combined original-code replay covers 1033 contexts and 2066 command executions; only four action bodies are logged. Recover those effects and real state construction before connecting the renderer. Limits and sources: `research/UI_WINDOW_STATE.md`.
+
+## Focused UI input (2026-10-13)
+
+The base child-first dispatcher and complete acceptance-mask filter now match 7120 local original-code cases with two virtual handler loggers. Child mask mutation is covered; real focus and widget callback implementations are not. Next: their mask assignments and concrete Alt/Esc actions, followed by live graph/rendering and paired captures. Sources and limits: `research/UI_FOCUSED_INPUT.md`.
