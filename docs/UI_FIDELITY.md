@@ -17,3 +17,20 @@ For each substantial UI/graphics change, capture the original and openXplane at 
 Capture both Alt and Esc flows, hover/open/close transitions, keyboard/mouse selection and focus behavior in GIFs or short videos at matched timing/frame rate. Screenshots alone cannot prove animation or input behavior. Verify fonts and assets from original resources or original runtime evidence before treating a visual approximation as recovered behavior.
 
 Next work: recover original handlers and resource paths, obtain usable original menu/font resources and matched captures, port their state/layout/rendering and compare both stationary and moving results. UI/graphics verified coverage stays zero until that evidence exists. Physics/kernel verification continues independently and does not count as UI fidelity evidence.
+
+
+## Confirmed original resource paths
+
+Static ASCII strings in the supplied baseline EXE contain these paths:
+
+- `Resources/fonts/Roboto-Regular.ttf`
+- `Resources/fonts/Roboto-Light.ttf`
+- `Resources/fonts/Roboto-Bold.ttf`
+- `Resources/fonts/RobotoCondensed-Regular.ttf`
+- `Resources/fonts/DejaVuSans.ttf`
+- `Resources/fonts/DejaVuSansMono.ttf`
+- `Resources/fonts/NotoSansCJK-SC-Regular.otf`
+- `Resources/fonts/tahomabd.ttf`
+- `Resources/bitmaps/interface11/ins_loading_background.png`
+
+The menu-specific font/style and texture assignments still require handler/resource analysis. The supplied local directory contains none of these resources. For the next visual-port stage, copy the original `Resources/fonts` and `Resources/bitmaps/interface11` directories into the local `Xplane12/Resources` tree; keep them as local reference assets. Matched reference screenshots and motion captures are also still required. An independently downloaded font with the same family name would not establish that its version or metrics match this reference build.
