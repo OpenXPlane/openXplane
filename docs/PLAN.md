@@ -90,3 +90,7 @@ The base child-first dispatcher and complete acceptance-mask filter now match 71
 ## UI selection and focus transition (2026-10-13)
 
 The complete selection/focus transition now matches 2024 local native replays, including callback-visible state and notification mutations. Notification service bodies and graph construction remain unported. The main-menu button's own key callback declines input, so follow its actual children rather than inventing Enter/Esc behavior. Next: helper effects, selection callers and concrete child callbacks; then renderer integration and paired captures. Evidence: `research/UI_FOCUS_TRANSITION.md`.
+
+## Complete keyboard entry and UI gates (2026-10-13)
+
+The whole native keyboard entry now joins focused UI and the binding-vector loop, with 2152 combined local comparisons. Query/interceptor/own-key/Begin/End endpoints are logged. Recover the query collection and interceptor effects, then actual focus graph and menu callbacks before wiring the viewer. The current viewer still exits on Esc. Evidence and input-domain limits: `research/KEYBOARD_ENTRY_DISPATCH.md`.
