@@ -146,3 +146,9 @@ trigonometry and upstream grouping are accounted for separately.
 See [WING_GROUP_PREDICATES.md](WING_GROUP_PREDICATES.md): 2072 enabled-byte
 results and 5872 endpoint predicate results match original instructions exactly,
 without stubs. The enabled gate is applied by the typed ACF wing loader.
+
+## Ordered wing group scan
+
+See [WING_GROUP_SCAN.md](WING_GROUP_SCAN.md): 125 complete inner-scan cases
+with outputstream-only stubs, exact membership and 1375 exact float words.
+Root initialization and allocator/stream side effects remain explicit exclusions.

@@ -93,6 +93,8 @@ struct WingGeom {
     ratios: [f32; 4],
     elements: i32,
     ar: f32,
+    aspect_parameter: f32,
+    shape_parameter: f32,
     side: f32,
 }
 
@@ -328,6 +330,8 @@ impl FlightModel {
                 ratios: w.foil_ratios,
                 elements: n as i32,
                 ar: (*ar).max(0.5),
+                aspect_parameter: 0.0,
+                shape_parameter: 0.0,
                 side: w.side,
             });
             let geom = geoms.len() - 1;
@@ -347,6 +351,63 @@ impl FlightModel {
                     stalled: false,
                 });
             }
+        }
+
+        // Recovered grouping/writer arithmetic on the model's current boundary geometry.
+        // Boundary construction itself still follows the approximate ACF geometry model.
+        let dimension_fields: Vec<(f32, f32)> = {
+            use xp_airfoil::wing_dimensions::{
+                GroupingWing, WingGroupMember, group_wings, wing_dimensions,
+            };
+            let group_inputs: Vec<_> = wings
+                .iter()
+                .zip(&geoms)
+                .map(|(wing, geom)| GroupingWing {
+                    id: wing.index,
+                    enabled: true, // all_from_acf has already applied the original enabled-byte gate.
+                    root_chord: wing.root_chord,
+                    tip_chord: wing.tip_chord,
+                    dihedral_deg: wing.dihedral_deg,
+                    member: WingGroupMember {
+                        span: wing.semilen,
+                        sweep_deg: wing.sweep_deg,
+                        boundary: wing_element::Boundary {
+                            x: &geom.x,
+                            y: &geom.y,
+                            z: &geom.z,
+                            chord: &geom.chord,
+                        },
+                    },
+                })
+                .collect();
+            group_inputs
+                .iter()
+                .map(|root| {
+                    let group = group_wings(&group_inputs, root.id)?;
+                    let members: Vec<_> = group
+                        .members
+                        .iter()
+                        .map(|id| {
+                            let wing = &group_inputs
+                                .iter()
+                                .find(|w| w.id == *id)
+                                .expect("validated group slot")
+                                .member;
+                            WingGroupMember {
+                                span: wing.span,
+                                sweep_deg: wing.sweep_deg,
+                                boundary: wing.boundary,
+                            }
+                        })
+                        .collect();
+                    let dimensions = wing_dimensions(&members, group.endpoints, group.area)?;
+                    Ok((dimensions.aspect_parameter, dimensions.shape_parameter))
+                })
+                .collect::<Result<Vec<_>, String>>()?
+        };
+        for (geom, (aspect, shape)) in geoms.iter_mut().zip(dimension_fields) {
+            geom.aspect_parameter = aspect;
+            geom.shape_parameter = shape;
         }
 
         let mut gears = Vec::new();
@@ -594,8 +655,8 @@ impl FlightModel {
                     is_right: geom.side,
                     elements: geom.elements,
                     f14: geom.ar,
-                    f18: 0.0,
-                    f1c: 0.0,
+                    f18: geom.aspect_parameter,
+                    f1c: geom.shape_parameter,
                     ratios: geom.ratios,
                     boundary: wing_element::Boundary {
                         x: &geom.x,

@@ -41,3 +41,6 @@ endpoint length. Original malformed/degenerate inputs are not established. Group
 selection via `0x141a6beb0`, endpoint propagation and the upstream group-area pass
 remain separate recovery tasks. Live fields are kept explicit until that evidence
 exists; no adjacency or symmetry grouping is silently assumed.
+
+Update: grouping is now covered by [WING_GROUP_SCAN.md](WING_GROUP_SCAN.md).
+The live model supplies recovered aspect/shape values computed on its approximate boundaries.

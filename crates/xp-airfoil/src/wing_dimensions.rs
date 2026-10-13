@@ -223,3 +223,167 @@ pub fn can_join_wing(
     }
     Ok(angle.abs() <= 45.0 || (f64::from(reference.point[0].abs()) >= 0.01 && reference.late_pass))
 }
+
+/// One explicitly enabled/disabled slot of the original 48-wing geometry array.
+pub struct GroupingWing<'a> {
+    pub id: usize,
+    pub enabled: bool,
+    pub root_chord: f32,
+    pub tip_chord: f32,
+    pub dihedral_deg: f32,
+    pub member: WingGroupMember<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WingGroup {
+    /// Discovery order; the original may append a candidate twice in one iteration.
+    pub members: Vec<usize>,
+    pub endpoints: [[f32; 3]; 2],
+    pub area: f32,
+    pub reference_chords: [f32; 2],
+    pub reference_dihedrals: [f32; 2],
+}
+
+fn group_endpoint(boundary: &Boundary, tip: bool) -> [f32; 3] {
+    let n = boundary.x.len() - 1;
+    let index = if tip { n } else { 0 };
+    let lower = index.min(n - 1);
+    std::array::from_fn(|axis| {
+        let values = [boundary.x, boundary.y, boundary.z][axis];
+        interpolate_clamped(
+            lower as f32,
+            values[lower],
+            (lower + 1) as f32,
+            values[lower + 1],
+            index as f32,
+        )
+    })
+}
+
+/// Evaluate the original element-area helper before performing ordered grouping.
+pub fn group_wings(wings: &[GroupingWing], root_id: usize) -> Result<WingGroup, String> {
+    let areas: Vec<Vec<f32>> = wings
+        .iter()
+        .map(|wing| {
+            let b = &wing.member.boundary;
+            let n = b.chord.len().saturating_sub(1);
+            (0..n)
+                .map(|i| {
+                    crate::wing_element::element_area(
+                        wing.member.sweep_deg,
+                        wing.member.span,
+                        b.chord,
+                        i,
+                        n as i32,
+                    )
+                })
+                .collect()
+        })
+        .collect();
+    group_wings_with_areas(wings, root_id, &areas)
+}
+
+/// Ordered 49-pass group scan of `0x141170d40`, with explicit per-element areas.
+/// Numerical predicates are native-code verified; full scan evidence is tracked separately.
+pub fn group_wings_with_areas(
+    wings: &[GroupingWing],
+    root_id: usize,
+    element_areas: &[Vec<f32>],
+) -> Result<WingGroup, String> {
+    if wings.len() != element_areas.len() || root_id >= 48 {
+        return Err("invalid wing grouping input".into());
+    }
+    let mut slots: [Option<usize>; 48] = [None; 48];
+    for (index, wing) in wings.iter().enumerate() {
+        if wing.id >= 48 || slots[wing.id].replace(index).is_some() {
+            return Err("duplicate or invalid wing slot".into());
+        }
+        if !wing.enabled {
+            continue;
+        }
+        let b = &wing.member.boundary;
+        let n = b.chord.len().saturating_sub(1);
+        if !(1..=10).contains(&n)
+            || [b.x.len(), b.y.len(), b.z.len()]
+                .iter()
+                .any(|v| *v != n + 1)
+            || element_areas[index].len() != n
+            || !element_areas[index].iter().all(|v| v.is_finite())
+            || !b
+                .x
+                .iter()
+                .chain(b.y)
+                .chain(b.z)
+                .chain(b.chord)
+                .all(|v| v.is_finite())
+            || ![wing.root_chord, wing.tip_chord, wing.dihedral_deg]
+                .iter()
+                .all(|v| v.is_finite())
+        {
+            return Err("invalid enabled wing grouping geometry".into());
+        }
+    }
+    let root_index = slots[root_id].ok_or("missing grouping root")?;
+    let root = &wings[root_index];
+    if !root.enabled {
+        return Err("disabled grouping root".into());
+    }
+    let mut result = WingGroup {
+        members: vec![root_id],
+        endpoints: [
+            group_endpoint(&root.member.boundary, false),
+            group_endpoint(&root.member.boundary, true),
+        ],
+        area: element_areas[root_index].iter().fold(0.0, |sum, v| sum + v),
+        reference_chords: [root.root_chord, root.tip_chord],
+        reference_dihedrals: [root.dihedral_deg; 2],
+    };
+    let mut visited = [false; 48];
+    for pass in 0..49 {
+        for (id, slot) in slots.iter().enumerate() {
+            let Some(index) = slot else {
+                continue;
+            };
+            let wing = &wings[*index];
+            if id == root_id || !wing.enabled || visited[id] {
+                continue;
+            }
+            // No visited recheck between these two tests: they share one candidate iteration.
+            for side in 0..2 {
+                let reference = WingJoinReference {
+                    point: result.endpoints[side],
+                    chord: result.reference_chords[side],
+                    dihedral_deg: result.reference_dihedrals[side],
+                    late_pass: pass == 48,
+                };
+                let selected = if side == 0 {
+                    CandidateEnd::Tip
+                } else {
+                    CandidateEnd::Root
+                };
+                if !can_join_wing(
+                    &wing.member.boundary,
+                    wing.dihedral_deg,
+                    &reference,
+                    selected,
+                )? {
+                    continue;
+                }
+                let subtotal = element_areas[*index]
+                    .iter()
+                    .fold(0.0, |sum, area| sum + area);
+                result.area += subtotal;
+                result.endpoints[side] = group_endpoint(&wing.member.boundary, side == 1);
+                result.reference_chords[side] = if side == 0 {
+                    wing.root_chord
+                } else {
+                    wing.tip_chord
+                };
+                result.reference_dihedrals[side] = wing.dihedral_deg;
+                visited[id] = true;
+                result.members.push(id);
+            }
+        }
+    }
+    Ok(result)
+}

@@ -38,3 +38,6 @@ only on pass 48, endpoint/chord/angle propagation and area accumulation. The ful
 caller loop has not yet been compared dynamically, including its allocation and
 logging paths. Live grouping is not inferred from simple adjacency or symmetry.
 These predicates are necessary building blocks for that remaining port.
+
+Update: the complete inner ordered scan has now been replayed with outputstream-only
+stubs and explicit root/vector initialization; see [WING_GROUP_SCAN.md](WING_GROUP_SCAN.md).

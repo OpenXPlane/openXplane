@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Flight model
 
+- Ported the original 49-pass wing grouping scan and connected its aspect/centroid
+  parameters to the live model. 125 original-scan cases match membership, endpoints,
+  accumulated area and reference fields exactly; all five local flight checks pass.
+  [Evidence and limits](research/WING_GROUP_SCAN.md).
+
 - Ported the original wing enabled and endpoint-join predicates: 2072 and 5872
   boolean results match exactly. ACF loading now applies the metre-space 1 mm gate
   and supports zero-root, positive-tip wings.
