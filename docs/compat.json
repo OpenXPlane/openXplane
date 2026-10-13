@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-12",
-  "method": "A self-assessed rubric, not a measurement. Each subsystem has a weight (weights sum to 100). 'implemented' is the share of that subsystem's work that exists in any form, including approximations. 'verified' is the share whose behaviour has been confirmed identical to the original (bit for bit against its machine code, or exact by the loader/table layout in its code). The overall numbers are the weighted sums. The weights and shares are judgement calls and will change as work and understanding grow.",
+  "updated": "2026-10-13",
+  "method": "A self-assessed rubric, not a measurement. Each subsystem has a weight (weights sum to 100). 'implemented' is the share of that subsystem's work that exists in any form, including approximations. 'verified' is the share whose behaviour has been confirmed identical to the original (bit for bit against its machine code, or exact by the loader/table layout in its code). The overall numbers are the weighted sums. The weights and shares are judgement calls and will change as work and understanding grow. The 2026-10-13 review raises the flight-model estimate from 76%/67% to 80%/71% for the recovered delta branch, full-element force composition, wing predicates, bounds writers and ordered grouping. These four-point changes are conservative judgement calls, not percentages derived from test counts. Kernel comparisons with controlled inputs, recorded CRT results or tolerances do not establish whole-simulator equivalence.",
   "subsystems": [
     {
       "name": "Aircraft files (ACF)",
@@ -26,9 +26,9 @@
     {
       "name": "Flight model",
       "weight": 28,
-      "implemented": 0.76,
-      "verified": 0.67,
-      "note": "An approximate rigid-body model that takes off and flies. Verified against the original machine code in an emulator: the airfoil and per-element aerodynamics, the whole engine update and the propeller force function, the engine controls for every engine kind, the airflow wash, the terrain mesh probes (vertical ray and segment with moving cells), the strut, tire, wheel and body blend contact models, the weight and balance, the input binding query, and the whole flight step block by block: the wing, body and part loops, the landing gear (targets, steering, brakes, drag, strut contact), the wing and body ground contact chain, the hook, tow, float and wave forces, the plug-in force sink, the equations of motion and the integration, the position setter, the attitude, the geographic state, the 4 x 4 matrices and the Euler angles, the flight angles and the end of the step. Still replayed instead of ported: the terrain height queries of the scenery, the geoid height, wind, the shared-pointer object lookups, the per-strip airflow (`0x14121a9b0`), the radiator update, the airflow wash call and the input bindings of the callers that hold a scratch memory; and the ported blocks are not yet connected into a running model (the viewer still flies the approximate one)."
+      "implemented": 0.8,
+      "verified": 0.71,
+      "note": "An approximate rigid-body model that takes off and flies. Verified against the original machine code in an emulator: the airfoil and per-element aerodynamics, the whole engine update and the propeller force function, the engine controls for every engine kind, the airflow wash, the terrain mesh probes (vertical ray and segment with moving cells), the strut, tire, wheel and body blend contact models, the weight and balance, the input binding query, and the whole flight step block by block: the wing, body and part loops, the landing gear (targets, steering, brakes, drag, strut contact), the wing and body ground contact chain, the hook, tow, float and wave forces, the plug-in force sink, the equations of motion and the integration, the position setter, the attitude, the geographic state, the 4 x 4 matrices and the Euler angles, the flight angles and the end of the step. Remaining recovery and integration work includes scenery-backed terrain and geoid queries, shared-pointer object lookups, per-strip airflow (`0x14121a9b0`), radiator update and runtime caller state; many ported blocks are not yet connected into a running model. The viewer still flies an approximate model, but now runs the recovered positive-delta coefficient branch and ordered wing grouping with recovered aspect/centroid parameters. Since the previous review, controlled original-code comparisons cover delta parameter curves, noise, target coefficients, full-element and force composition, aircraft bounds point emission, wing enable/join predicates and the 49-pass group scan. Full-element delta output matches 2099/2100 words exactly on macOS, with one platform-trigonometry difference checked by tolerance; some corpora use recorded CRT results or synthetic noise. Live wing boundaries, reference state, noise initialization and much of the remaining flight model are approximate. No whole-model parity is established."
     },
     {
       "name": "Datarefs and commands",
@@ -87,7 +87,7 @@
     {
       "title": "Flight model",
       "state": "in progress",
-      "detail": "Approximate model flies. Next: port the original wing element function piece by piece, verified in the emulator, then the force loop, engine and gear."
+      "detail": "Recovered profile, delta-wing, engine, propeller, contact and flight-step kernels exist with original-code comparisons. The approximate viewer now uses the delta branch and ordered wing grouping. Next: recover exact wing boundaries and reference state, original noise initialization and per-strip airflow; connect the remaining recovered force, propulsion and contact blocks into the runtime, then compare complete trajectories."
     },
     {
       "title": "World",
@@ -111,10 +111,11 @@
     }
   ],
   "next": [
-    "Port the wing element aerodynamics function (0x1411b6630) in verified pieces",
-    "Fill datarefs from the aircraft state and drive them from the flight model",
-    "Read DSF scenery tiles for terrain under the airport",
-    "Recover the engine and propeller model",
-    "Instruments and the stock Cessna's Lua scripts"
+    "Recover original wing boundary construction and full 48-slot population for live grouping",
+    "Recover and connect aircraft reference bounds, runtime reference state and noise initialization",
+    "Port per-strip airflow (0x14121a9b0) and connect recovered propulsion and contact blocks to the live model",
+    "Compare complete live trajectories against the original after runtime integration",
+    "Fill datarefs from aircraft state and implement remaining command handlers",
+    "Read DSF scenery tiles and implement cockpit instruments and the stock Cessna Lua systems"
   ]
 }

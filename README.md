@@ -84,7 +84,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURIT
 <!-- compat:start -->
 ## How close to the original is it?
 
-**About 40% implemented, about 27% verified identical to the original.** Early stage: it loads
+**About 41% implemented, about 28% verified identical to the original.** Early stage: it loads
 the original content, draws it, and flies an approximation; it does not yet behave like X-Plane.
 
 - *Implemented* counts work that exists in any form, including approximations (the flight model is one).
@@ -99,7 +99,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 | Aircraft files (ACF) | 8 | 30% | 10% | All properties are preserved; typed: mass, CG, wings, gear, engine and controls subset. Loader schema of 1117 properties extracted; six values confirmed in code. |
 | 3D models (OBJ8) | 7 | 35% | 5% | Geometry, nested transforms, rotation/translation animation, textures. No normal/lit maps, instruments, panels or most dynamic animation. |
 | Airfoil evaluation (AFL) | 6 | 90% | 85% | All 34 airfoils; the whole profile function (selection, stall, buffet, blending, Mach factor) matches the original bit for bit on 1800 emulator cases. |
-| Flight model | 28 | 76% | 67% | An approximate rigid-body model that takes off and flies. Verified against the original machine code in an emulator: the airfoil and per-element aerodynamics, the whole engine update and the propeller force function, the engine controls for every engine kind, the airflow wash, the terrain mesh probes (vertical ray and segment with moving cells), the strut, tire, wheel and body blend contact models, the weight and balance, the input binding query, and the whole flight step block by block: the wing, body and part loops, the landing gear (targets, steering, brakes, drag, strut contact), the wing and body ground contact chain, the hook, tow, float and wave forces, the plug-in force sink, the equations of motion and the integration, the position setter, the attitude, the geographic state, the 4 x 4 matrices and the Euler angles, the flight angles and the end of the step. Still replayed instead of ported: the terrain height queries of the scenery, the geoid height, wind, the shared-pointer object lookups, the per-strip airflow (`0x14121a9b0`), the radiator update, the airflow wash call and the input bindings of the callers that hold a scratch memory; and the ported blocks are not yet connected into a running model (the viewer still flies the approximate one). |
+| Flight model | 28 | 80% | 71% | An approximate rigid-body model that takes off and flies. Verified against the original machine code in an emulator: the airfoil and per-element aerodynamics, the whole engine update and the propeller force function, the engine controls for every engine kind, the airflow wash, the terrain mesh probes (vertical ray and segment with moving cells), the strut, tire, wheel and body blend contact models, the weight and balance, the input binding query, and the whole flight step block by block: the wing, body and part loops, the landing gear (targets, steering, brakes, drag, strut contact), the wing and body ground contact chain, the hook, tow, float and wave forces, the plug-in force sink, the equations of motion and the integration, the position setter, the attitude, the geographic state, the 4 x 4 matrices and the Euler angles, the flight angles and the end of the step. Remaining recovery and integration work includes scenery-backed terrain and geoid queries, shared-pointer object lookups, per-strip airflow (`0x14121a9b0`), radiator update and runtime caller state; many ported blocks are not yet connected into a running model. The viewer still flies an approximate model, but now runs the recovered positive-delta coefficient branch and ordered wing grouping with recovered aspect/centroid parameters. Since the previous review, controlled original-code comparisons cover delta parameter curves, noise, target coefficients, full-element and force composition, aircraft bounds point emission, wing enable/join predicates and the 49-pass group scan. Full-element delta output matches 2099/2100 words exactly on macOS, with one platform-trigonometry difference checked by tolerance; some corpora use recorded CRT results or synthetic noise. Live wing boundaries, reference state, noise initialization and much of the remaining flight model are approximate. No whole-model parity is established. |
 | Datarefs and commands | 8 | 34% | 20% | Registries and catalogs of 5503 datarefs and 3012 commands from the original, its default keyboard map (71 keys), values for 6 datarefs; 30 key commands act in the flight viewer; 2388 datarefs mapped to the field of the flight object or the simulation object that their getter reads (decoded from the getter code). |
 | Scenery and world | 14 | 10% | 0% | Airport ground from apt.dat (runways, taxiways, aprons). No DSF, terrain, objects, lights or weather. |
 | Cockpit, instruments, Lua systems | 10 | 0% | 0% | Not started. |
@@ -111,7 +111,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 
 1. **Content without simulation** (mostly done): ACF, OBJ8, AFL, apt.dat and the viewer work. Left: PANEL_3D, normal/lit maps, instruments, an apt.dat index.
 2. **Datarefs and commands** (in progress): Registries and original catalogs exist. Left: values for the other 5497 datarefs, command handlers, wiring to the aircraft state.
-3. **Flight model** (in progress): Approximate model flies. Next: port the original wing element function piece by piece, verified in the emulator, then the force loop, engine and gear.
+3. **Flight model** (in progress): Recovered profile, delta-wing, engine, propeller, contact and flight-step kernels exist with original-code comparisons. The approximate viewer now uses the delta branch and ordered wing grouping. Next: recover exact wing boundaries and reference state, original noise initialization and per-strip airflow; connect the remaining recovered force, propulsion and contact blocks into the runtime, then compare complete trajectories.
 4. **World** (started): Airport ground from apt.dat. Left: DSF terrain, library objects, lights, start locations, weather.
 5. **Cockpit and systems** (planned): Instruments, panels, the stock Cessna's Lua scripts and controls.
 6. **Audio, multiplayer, plugins** (planned): Sound, networking and the plugin interface.
@@ -119,11 +119,12 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 
 Next up:
 
-- Port the wing element aerodynamics function (0x1411b6630) in verified pieces
-- Fill datarefs from the aircraft state and drive them from the flight model
-- Read DSF scenery tiles for terrain under the airport
-- Recover the engine and propeller model
-- Instruments and the stock Cessna's Lua scripts
+- Recover original wing boundary construction and full 48-slot population for live grouping
+- Recover and connect aircraft reference bounds, runtime reference state and noise initialization
+- Port per-strip airflow (0x14121a9b0) and connect recovered propulsion and contact blocks to the live model
+- Compare complete live trajectories against the original after runtime integration
+- Fill datarefs from aircraft state and implement remaining command handlers
+- Read DSF scenery tiles and implement cockpit instruments and the stock Cessna Lua systems
 
 Details and the target crate layout: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 <!-- compat:end -->
