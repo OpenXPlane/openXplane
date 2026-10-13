@@ -114,3 +114,7 @@ Both native dispatchers now match 1768 local original-code cases, including coun
 ## Held-command Continue (2026-10-14)
 
 The third native command phase now joins full Begin/End with 2152 combined original-code cases: zero-count nested Begin, float32 elapsed/ramp arithmetic and live dt callback reads are recovered. Scheduling and actual menu callback registration/effects remain unported. Next: the real ID-3 observer/override/primary chain, held scheduling, then live UI integration and paired captures. Evidence: `research/COMMAND_CONTINUE.md`.
+
+## External keyboard module boundary (2026-10-14)
+
+The next actual keyboard-hook endpoint needs `Resources/plugins/XPLM_64.dll` from the same original Windows installation. The executable names that path/export, but the supplied reference tree has no module. Per the user's instruction, pause for this specific file after publishing the investigation. Menu callback registration and candidate runtime vtables remain unproven; see `research/UI_REGISTRATION_NEXT_INPUT.md`. Resume with DLL identity/exports and actual hook/context behavior, retaining the full 1:1 acceptance scope.

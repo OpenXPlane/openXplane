@@ -56,3 +56,5 @@ The command block-mask query confirms exemptions for show_menu/main-menu/setting
 The complete command Begin/End executor now has 1768 original-code comparisons (`research/COMMAND_BEGIN_END.md`). Dispatches include menu IDs, but their callbacks still supply controlled effects. Live ID-3 registration and window actions remain unidentified; there is no Alt/Esc renderer or paired visual evidence yet.
 
 The command lifecycle now includes native Continue, verified in 2152 combined cases (`research/COMMAND_CONTINUE.md`). Real held scheduling and ID-3 window actions are still missing; this adds no screenshot/motion evidence and does not change the viewer's Esc exit behavior.
+
+The current external-hook investigation now requires the original Windows `Resources/plugins/XPLM_64.dll`, absent from the supplied tree (`research/UI_REGISTRATION_NEXT_INPUT.md`). Existing keyboard comparisons replace its exported callback; they do not verify that module or the real menu action. Candidate manager tables containing on-disk zeros are not runtime callback evidence. The requested paired screenshot/motion comparisons remain outstanding.
