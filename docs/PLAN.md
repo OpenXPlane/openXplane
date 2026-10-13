@@ -78,3 +78,7 @@ The binding-vector loop now has exact local transition/trace evidence across 272
 ## Native menu commands (2026-10-13)
 
 Main-menu/settings registration and conditional helper request order are recovered (`research/MENU_COMMAND_ROUTING.md`). Eight local traces cover every boolean combination with all six service bodies replaced. Recover those services and the separate Esc/Alt entry paths before wiring the request planner into the viewer. This is not a working original menu or a visual comparison.
+
+## Native window query services (2026-10-13)
+
+The controller map, window registry and parent opacity now supply menu query results. Combined original-code replay covers 1033 contexts and 2066 command executions; only four action bodies are logged. Recover those effects and real state construction before connecting the renderer. Limits and sources: `research/UI_WINDOW_STATE.md`.

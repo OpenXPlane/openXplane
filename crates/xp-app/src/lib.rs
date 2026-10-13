@@ -16,3 +16,5 @@ pub use xp_sim::{flight, pilot};
 pub mod ui_resources;
 
 pub mod menu_commands;
+
+pub mod ui_state;

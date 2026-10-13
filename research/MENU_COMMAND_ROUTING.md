@@ -41,3 +41,7 @@ Ordinary CI ignores that local trace check. This verifies conditional routing wi
 Catalogue ID 3 (show_menu, Esc) is distinct from ID 29 (toggle_main_menu). This investigation has not identified its callback. Alt-only handling is also unresolved. A large candidate at `0x140fb7af0` compares numbers 3/29/30 but emits groups of other IDs; those number matches alone do not identify it as the menu command handler.
 
 Next: recover the six service bodies needed for these menu routes, original continuation/interception, Show Menu and Alt entry paths; connect their state and the original resource renderer, then compare matched original screenshots and motion captures. UI verified coverage remains zero.
+
+## State-service continuation
+
+The stronger replay in [UI_WINDOW_STATE.md](UI_WINDOW_STATE.md) now executes both queried services and their window-registry/parent-opacity dependencies without replacements. It covers 1033 state contexts and both menu commands; only the four action bodies are logged. `WindowState::menu_requests` computes the query values from those explicit states. The engine-state byte's lifecycle, real window creation and live integration remain unresolved.

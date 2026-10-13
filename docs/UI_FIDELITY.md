@@ -38,3 +38,5 @@ The menu-specific font/style and texture assignments still require handler/resou
 See [../research/UI_RESOURCES.md](../research/UI_RESOURCES.md) for the local codec check and native main-menu resource references.
 
 The 2026-10-13 input correction recovers Shift/Alt/Ctrl masks and all 182 default chords. Esc remains show_menu; Ctrl+backtick is toggle_settings_window. Alt alone has no command-table binding, so menu-bar behavior is not established by the modifier recovery. See [../research/KEYMAP.md](../research/KEYMAP.md).
+
+Native window membership and cumulative opacity are now recovered as explicit state services (`research/UI_WINDOW_STATE.md`). The stronger replay removes query stubs but retains four effect loggers; it is not a live window or pixel comparison.
