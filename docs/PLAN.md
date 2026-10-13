@@ -98,3 +98,7 @@ The whole native keyboard entry now joins focused UI and the binding-vector loop
 ## Window classification and keyboard capture query (2026-10-13)
 
 The native ordered classification collection and visible-window query now match 1054 local contexts with only allocation/free replaced. The 2152-case keyboard replay removes its query stub and the Rust side uses the real recovered window-state query. Recover class assignments, registry lifecycle and the interceptor next; actual menu actions and viewer integration remain unfinished. Evidence: `research/UI_CLASSIFICATION_QUERY.md`.
+
+## Keyboard interceptor wrapper/adapter (2026-10-13)
+
+Both native interceptor layers now match 1864 local cases, including signed results/context tokens, phases 0/2, timing arithmetic and callback mutations. The 2152-case combined keyboard replay executes them unchanged; only their external clock/scope/context/export endpoints are controlled. Recover actual module/registration lifecycle and endpoint effects, plus menu widget actions, before live integration. Evidence: `research/KEY_INTERCEPT_WRAPPER.md`.

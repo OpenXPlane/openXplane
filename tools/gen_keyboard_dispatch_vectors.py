@@ -8,7 +8,7 @@ from emulate_xp import Emulator, RET_ADDR
 from extract_commands import detailed_records, REFERENCE_SHA256
 from gen_ui_capture_vectors import install_allocator, build_registry
 from unicorn import UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9
+from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_XMM0
 
 
 def cases():
@@ -46,7 +46,6 @@ def main(path):
     def intercept(emu):
         char, flags, key, phase = [emu.reg(r) & 0xffffffff for r in [UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9]]
         assert char <= 255 and key <= 255 and phase in [0, 2]
-        log.append(f'P:{char}:{key}:{flags}:{phase}')
         mutation()
         emu.uc.reg_write(UC_X86_REG_RAX, values[1 if phase == 0 else 2] & 0xffffffff)
 
@@ -69,12 +68,24 @@ def main(path):
 
     e.uc.hook_add(UC_HOOK_CODE, ui_trace, begin=0x1412c6300, end=0x1412c6300)
     e.uc.hook_add(UC_HOOK_CODE, lambda uc, addr, size, user: log.append('Q'), begin=0x1412e3470, end=0x1412e3470)
-    e.stubs[0x141913800] = intercept
+    def intercept_trace(uc, addr, size, user):
+        char, flags, key, phase = [e.reg(r) & 0xffffffff for r in [UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9]]
+        log.append(f'P:{char}:{key}:{flags}:{phase}')
+    e.uc.hook_add(UC_HOOK_CODE, intercept_trace, begin=0x141913800, end=0x141913800)
+    e.write_u64(0x146104f88, 0x141917f20)
+    e.write_u64(0x146106038, RET_ADDR + 0x400)
+    e.write_u64(0x146105010, RET_ADDR + 0x500)
+    e.write_u64(0x146105018, RET_ADDR + 0x600)
+    e.write_u32(0x14610551c, 0)
+    e.stubs[RET_ADDR + 0x400] = intercept
+    e.stubs[RET_ADDR + 0x500] = lambda emu: emu.uc.reg_write(UC_X86_REG_RAX, 0)
+    e.stubs[RET_ADDR + 0x600] = lambda emu: None
+    e.stubs[0x1413fa080] = lambda emu: emu.uc.reg_write(UC_X86_REG_XMM0, 0)
     e.stubs[RET_ADDR + 0x100] = own
     e.stubs[0x140c7fac0] = command('B')
     e.stubs[0x140c7fc40] = command('E')
     print('# reference_sha256', REFERENCE_SHA256)
-    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; four service endpoints logged plus allocator/free; native capture collection/query unchanged')
+    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; native capture and interceptor wrapper/adapter unchanged; export/UI-own/Begin/End and clock/context/allocator endpoints stubbed')
     print('# K capture first second own mode block char key mask flags focus suppression update_mode update_block -> suppression active* mode block trace*')
     count = 0
     for case in cases():

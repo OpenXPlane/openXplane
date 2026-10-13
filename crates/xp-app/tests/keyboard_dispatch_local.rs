@@ -1,3 +1,4 @@
+use openxplane::key_intercept::{self, State as InterceptorState};
 use openxplane::ui_state::{RegisteredWindow, WindowState};
 use openxplane::{
     keyboard_dispatch::{self, InterceptInput, Services},
@@ -32,8 +33,13 @@ impl Services for Replay {
             "P:{}:{}:{}:{}",
             i.character, i.virtual_key, i.flags, i.phase
         ));
-        self.mutate();
-        self.v[if i.phase == 0 { 1 } else { 2 }] as i32
+        let mut state = InterceptorState {
+            registered: true,
+            export_present: true,
+            mode: self.mode,
+            ..InterceptorState::default()
+        };
+        key_intercept::intercept(&mut state, i, 0, &mut HookReplay(self))
     }
     fn focused(&mut self, i: KeyInput) -> u8 {
         self.trace.push(format!(
@@ -56,6 +62,28 @@ impl Services for Replay {
     }
     fn command_gate(&mut self) -> (i32, u8) {
         (self.mode, self.block)
+    }
+}
+
+struct HookReplay<'a>(&'a mut Replay);
+impl key_intercept::Services for HookReplay<'_> {
+    fn clock(&mut self, _: &mut InterceptorState) -> f64 {
+        0.0
+    }
+    fn enter_scope(&mut self, _: &mut InterceptorState, _: u64) -> u64 {
+        panic!("scope disabled in combined replay")
+    }
+    fn leave_scope(&mut self, _: &mut InterceptorState, _: u64, _: u64) {
+        panic!("scope disabled in combined replay")
+    }
+    fn enter_hook(&mut self, _: &mut InterceptorState) -> i32 {
+        0
+    }
+    fn leave_hook(&mut self, _: &mut InterceptorState, _: i32) {}
+    fn call_hook(&mut self, _: &mut InterceptorState, i: InterceptInput, refcon: u64) -> i32 {
+        assert_eq!(refcon, 0);
+        self.0.mutate();
+        self.0.v[if i.phase == 0 { 1 } else { 2 }] as i32
     }
 }
 
