@@ -3,3 +3,5 @@ pub mod commands;
 pub mod dataref;
 pub mod flight_map;
 pub mod keymap;
+
+pub mod key_event;

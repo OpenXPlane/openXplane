@@ -4,7 +4,7 @@ openXplane uses the original X-Plane 12 default keyboard map. It is read from th
 reference build (182 commands have a default key; see [research/KEYMAP.md](../research/KEYMAP.md)), so the keys
 below preserve the original table, including Shift/Alt/Ctrl masks. Of them, 30 act in the approximate flight
 viewer today. Most other commands report "not simulated"; four ambiguous chords are listed but not dispatched
-until original conflict resolution is recovered. Many command handlers, instruments and maps remain unfinished.
+until the recovered stateful native loop is connected to the viewer. Many command handlers, instruments and maps remain unfinished.
 
 ```sh
 cargo run --release --offline -- fly Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf"

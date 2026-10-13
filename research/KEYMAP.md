@@ -27,7 +27,7 @@ This establishes Shift=1, Alt=2, Ctrl=4 for the supplied Windows baseline. Super
 | Ctrl+- | com1_standy_flip; zoom_out_slow |
 | Ctrl+= | com2_standy_flip; zoom_in_slow |
 
-Native conflict dispatch is not yet recovered. `bindings_for_chord` preserves both records; `command_for_chord` returns a binding only when unique. The viewer does not guess which conflicting command should run.
+The native binding-vector loop is now recovered separately; duplicate activation depends on active state and down/up flags ([KEY_EVENT_LOOP.md](KEY_EVENT_LOOP.md)). Complete input interception and callback behavior are not recovered. `bindings_for_chord` preserves both records; `command_for_chord` returns a binding only when unique. The viewer does not guess which conflicting command should run.
 
 ## Port and checks
 
@@ -40,3 +40,5 @@ The viewer reads winit modifier state and the logical key without modifiers. It 
 Rust checks cover modified versus unmodified lookup, conflicts, mask validation, retained press chords on modifier changes and unsupported Super-key input. None is a UI screenshot or native event comparison.
 
 Esc remains bound to `sim/operation/show_menu`; Ctrl+backtick maps to `sim/operation/toggle_settings_window`. The active viewer still exits on Esc and does not implement those original menu handlers. Alt alone has no entry here, so its native menu-bar behavior must be recovered elsewhere. Matched original screenshots and motion evidence remain outstanding. Full key rebinding and layout/platform-specific parity are not claimed.
+
+The local 2728-case comparison of the new binding-vector loop checks active/suppression transitions and ordered Begin/End requests with callback bodies logged. Its complete viewer integration remains pending; see [KEY_EVENT_LOOP.md](KEY_EVENT_LOOP.md).

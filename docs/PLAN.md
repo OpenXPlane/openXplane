@@ -70,3 +70,7 @@ Exit: the aircraft sits on a real runway in real terrain, with taxiways, lights 
 ## UI fidelity work in progress (2026-10-13)
 
 Original fonts and interface11 resources are available locally. The new `ui-resources` command loads 12 fonts and decodes 25 menu textures; native main-menu texture references are recorded in `research/UI_RESOURCES.md`. Next: recover Alt/Esc handlers, layout and font-role selection, connect these assets to the renderer, then obtain matched stationary and motion comparisons. No visual or input parity has been established; the active viewer still exits on Escape.
+
+## Native input continuation (2026-10-13)
+
+The binding-vector loop now has exact local transition/trace evidence across 2728 cases. Its Begin/End callback bodies are logged, not executed. Recover command continuation, input interception and Show Menu callback registration, then wire this stateful loop to the viewer. The current viewer still uses an independent lifecycle and declines conflicting chords. See `research/KEY_EVENT_LOOP.md`; no UI/whole-input parity is claimed.
