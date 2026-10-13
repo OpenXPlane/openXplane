@@ -1,3 +1,4 @@
+use openxplane::ui_state::{RegisteredWindow, WindowState};
 use openxplane::{
     keyboard_dispatch::{self, InterceptInput, Services},
     ui_input::{self, KeyInput},
@@ -9,6 +10,7 @@ struct Replay {
     mode: i32,
     block: u8,
     trace: Vec<String>,
+    windows: WindowState,
 }
 impl Replay {
     fn mutate(&mut self) {
@@ -23,7 +25,7 @@ impl Replay {
 impl Services for Replay {
     fn has_visible_capture(&mut self) -> bool {
         self.trace.push("Q".into());
-        self.v[0] != 0
+        self.windows.visible_classification(2).unwrap()
     }
     fn intercept(&mut self, i: InterceptInput) -> i32 {
         self.trace.push(format!(
@@ -89,7 +91,23 @@ fn native_keyboard_gates_ui_and_binding_transitions_match() {
                 command,
             })
             .collect::<Vec<_>>();
+        let window = |token, classification, opacity| {
+            Some(RegisteredWindow {
+                token,
+                classification,
+                opacity_root_to_leaf: vec![opacity],
+            })
+        };
+        let windows = WindowState {
+            registered: if v[0] != 0 {
+                vec![None, window(9, 2, 1.0)]
+            } else {
+                vec![window(9, 1, 1.0), window(10, 2, 0.0)]
+            },
+            ..WindowState::default()
+        };
         let mut r = Replay {
+            windows,
             mode: v[4] as i32,
             block: v[5] as u8,
             v,

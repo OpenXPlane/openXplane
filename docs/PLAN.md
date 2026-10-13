@@ -94,3 +94,7 @@ The complete selection/focus transition now matches 2024 local native replays, i
 ## Complete keyboard entry and UI gates (2026-10-13)
 
 The whole native keyboard entry now joins focused UI and the binding-vector loop, with 2152 combined local comparisons. Query/interceptor/own-key/Begin/End endpoints are logged. Recover the query collection and interceptor effects, then actual focus graph and menu callbacks before wiring the viewer. The current viewer still exits on Esc. Evidence and input-domain limits: `research/KEYBOARD_ENTRY_DISPATCH.md`.
+
+## Window classification and keyboard capture query (2026-10-13)
+
+The native ordered classification collection and visible-window query now match 1054 local contexts with only allocation/free replaced. The 2152-case keyboard replay removes its query stub and the Rust side uses the real recovered window-state query. Recover class assignments, registry lifecycle and the interceptor next; actual menu actions and viewer integration remain unfinished. Evidence: `research/UI_CLASSIFICATION_QUERY.md`.

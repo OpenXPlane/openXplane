@@ -52,6 +52,7 @@ fn native_queries_opacity_and_menu_routing_match() {
                     })
                     .collect();
                 state.registered.push(Some(RegisteredWindow {
+                    classification: 0,
                     token,
                     opacity_root_to_leaf: path,
                 }));

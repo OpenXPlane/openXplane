@@ -10,8 +10,9 @@ pub struct InterceptInput {
     pub phase: u32,
 }
 
-/// Native service boundaries. The capture query and interceptor implementations
-/// still require recovery; focused input can use `ui_input::dispatch_focused`.
+/// Native service boundaries. Window state can supply the capture query through
+/// `ui_state::WindowState::visible_classification(2)`. The interceptor implementation
+/// still requires recovery; focused input can use `ui_input::dispatch_focused`.
 pub trait Services {
     fn has_visible_capture(&mut self) -> bool;
     fn intercept(&mut self, input: InterceptInput) -> i32;

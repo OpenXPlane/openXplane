@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 pub struct RegisteredWindow {
     /// Opaque window token; models the native pointer identity without storing host pointers.
     pub token: u64,
+    /// Raw signed field at native registered entry +0x170. Its lifecycle is unported.
+    pub classification: i32,
     /// Opacities at native node +0x58, root first, then descendants down to the window.
     pub opacity_root_to_leaf: Vec<f32>,
 }
@@ -41,6 +43,41 @@ impl WindowState {
             return Ok(false);
         };
         Ok(cumulative_opacity(&window.opacity_root_to_leaf)? > 0.0)
+    }
+
+    /// Native collection producer 0x1412dc3c0, expressed as stable registry indices.
+    /// Null entries are skipped; equal tokens are retained as distinct entries.
+    pub fn classified_indices(&self, classification: i32) -> Vec<usize> {
+        self.registered
+            .iter()
+            .enumerate()
+            .filter_map(|(index, window)| {
+                window
+                    .as_ref()
+                    .filter(|w| w.classification == classification)
+                    .map(|_| index)
+            })
+            .collect()
+    }
+
+    /// Collection 0x1412dc3c0 followed by query 0x1412e3470.
+    /// Candidates preserve list order and exact classification equality. Each candidate
+    /// is resolved again by token: with duplicates, the first registered match wins,
+    /// even when that match has another classification. The keyboard entry requests 2.
+    pub fn visible_classification(&self, classification: i32) -> Result<bool, &'static str> {
+        for index in self.classified_indices(classification) {
+            let candidate = self.registered[index].as_ref().expect("classified window");
+            let window = self
+                .registered
+                .iter()
+                .flatten()
+                .find(|w| w.token == candidate.token)
+                .ok_or("unregistered native classification candidate")?;
+            if cumulative_opacity(&window.opacity_root_to_leaf)? > 0.0 {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// The recovered command routing now takes window state rather than fabricated query results.

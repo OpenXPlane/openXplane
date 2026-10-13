@@ -6,6 +6,7 @@ import struct
 import sys
 from emulate_xp import Emulator, RET_ADDR
 from extract_commands import detailed_records, REFERENCE_SHA256
+from gen_ui_capture_vectors import install_allocator, build_registry
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9
 
@@ -29,6 +30,10 @@ def main(path):
     e.write_u64(0x142f01eb0, mode_ptr)
     e.write_u64(owner + 8, vector)
     e.write_u64(owner + 16, vector + 48)
+    manager, implementation = e.alloc(0x180), e.alloc(0x180)
+    e.write_u64(0x145a0e308, manager)
+    install_allocator(e)
+    persistent_top = e.heap_top
     log = []
     values = []
 
@@ -37,10 +42,6 @@ def main(path):
             e.write_u32(mode_ptr, values[12])
         if values[13] >= 0:
             e.write(0x145a0df02, bytes([values[13]]))
-
-    def capture(emu):
-        log.append('Q')
-        emu.uc.reg_write(UC_X86_REG_RAX, values[0])
 
     def intercept(emu):
         char, flags, key, phase = [emu.reg(r) & 0xffffffff for r in [UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9]]
@@ -67,13 +68,13 @@ def main(path):
         return run
 
     e.uc.hook_add(UC_HOOK_CODE, ui_trace, begin=0x1412c6300, end=0x1412c6300)
-    e.stubs[0x1412e3470] = capture
+    e.uc.hook_add(UC_HOOK_CODE, lambda uc, addr, size, user: log.append('Q'), begin=0x1412e3470, end=0x1412e3470)
     e.stubs[0x141913800] = intercept
     e.stubs[RET_ADDR + 0x100] = own
     e.stubs[0x140c7fac0] = command('B')
     e.stubs[0x140c7fc40] = command('E')
     print('# reference_sha256', REFERENCE_SHA256)
-    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; five service endpoints logged')
+    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; four service endpoints logged plus allocator/free; native capture collection/query unchanged')
     print('# K capture first second own mode block char key mask flags focus suppression update_mode update_block -> suppression active* mode block trace*')
     count = 0
     for case in cases():
@@ -82,6 +83,9 @@ def main(path):
         if case[6] < -1 and case[7] != 27:
             case = (*case[:10], 0, *case[11:])
         values[:] = case
+        e.heap_top = persistent_top
+        registry = [None, (9, 2, [1.])] if case[0] else [(9, 1, [1.]), (10, 2, [0.])]
+        build_registry(e, manager, implementation, registry)
         capture_value, first, second, own_value, mode, block, char, key, mask, flags, focus, suppression, _, _ = case
         entries = [(key, flags & 7, 3, 0), (key, flags & 7, 29, 1), (key, flags & 7, 30, -1)]
         e.write(vector, b''.join(struct.pack('<IIii', *v) for v in entries))
