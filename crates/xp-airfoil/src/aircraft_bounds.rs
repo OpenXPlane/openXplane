@@ -219,3 +219,27 @@ pub fn propeller_bounds_points(parts: &[PropellerBoundary]) -> Result<Vec<[f32; 
     }
     Ok(points)
 }
+
+/// Assemble the original main reference vector in source order, then reduce it.
+/// Every input must already contain the stored runtime geometry. This API does
+/// not populate grids, update articulated geometry or substitute renderer bounds.
+pub fn reference_geometry_bounds(
+    gears: &[GearBoundary],
+    wings: &[Option<crate::wing_element::Boundary<'_>>],
+    bodies: &[BodyBoundary<'_>],
+    propellers: &[PropellerBoundary],
+) -> Result<(Vec<[f32; 3]>, AircraftBounds), String> {
+    if wings.len() > 48 || bodies.len() > 39 {
+        return Err("original reference geometry has 48 wing and 39 body slots".into());
+    }
+    let mut points = gear_bounds_points(gears)?;
+    for wing in wings.iter().flatten() {
+        points.extend(wing_bounds_points(wing)?);
+    }
+    for body in bodies {
+        points.extend(body_bounds_points(body)?);
+    }
+    points.extend(propeller_bounds_points(propellers)?);
+    let bounds = aircraft_bounds(&points)?;
+    Ok((points, bounds))
+}

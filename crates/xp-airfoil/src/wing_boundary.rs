@@ -126,10 +126,11 @@ pub fn boundary_point(
 }
 
 /// Original aircraft curvature setup (0x14124df67..0x14124e036).
-/// `degrees` is aircraft+0x28fc (`acf/_ball_ang_def_deg`); halfspan is
-/// aircraft+0x64f4 from the complete reference bounds writer.
+/// `degrees` is aircraft+0x28fc (`acf/_ball_ang_def_deg`); reference_x_size is
+/// aircraft+0x64f4 (1.01 times the largest absolute X extent), not the
+/// planar halfspan at +0x64d8. It comes from the complete bounds writer.
 /// The inactive branch clears angle/amplitude and preserves the previous scale.
-pub fn curvature_parameters(degrees: f32, halfspan: f32, previous_scale: f32) -> Curvature {
+pub fn curvature_parameters(degrees: f32, reference_x_size: f32, previous_scale: f32) -> Curvature {
     if f64::from(degrees.abs()) <= 0.001 || degrees.is_nan() {
         return Curvature {
             angle: 0.0,
@@ -145,8 +146,8 @@ pub fn curvature_parameters(degrees: f32, halfspan: f32, previous_scale: f32) ->
     let angle = (f64::from(angle) + f64::from(angle)) as f32;
     Curvature {
         angle,
-        amplitude: halfspan / angle,
-        scale: halfspan,
+        amplitude: reference_x_size / angle,
+        scale: reference_x_size,
     }
 }
 

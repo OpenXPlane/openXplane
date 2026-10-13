@@ -56,3 +56,11 @@ ported with exact local original-code comparisons. See
 [BODY_GEAR_REFERENCE_POINTS.md](BODY_GEAR_REFERENCE_POINTS.md) for input layouts,
 word counts, local reproduction and limitations. The complete runtime vector is
 still not assembled; body grid preparation and runtime propeller fields remain work. The propeller point pass itself is now recovered; see [PROPELLER_REFERENCE_POINTS.md](PROPELLER_REFERENCE_POINTS.md).
+
+
+## Combined main-vector verification (2026-10-13)
+
+The gear/wing/body/propeller main vector and final bounds now match a single
+original-code pass on explicit synthetic runtime state. See
+[REFERENCE_GEOMETRY_PIPELINE.md](REFERENCE_GEOMETRY_PIPELINE.md) for exact counts,
+allocator substitutions, empty auxiliary-vector scope and remaining live inputs.
