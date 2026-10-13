@@ -152,7 +152,7 @@ async function renderStatus() {
   view.querySelector("#status-summary").innerHTML =
     `<b>About ${t.implemented.toFixed(0)}% implemented, about ${Math.round(t.verified)}% verified identical to the original.</b> ` +
     "<i>Implemented</i> counts work that exists in any form, including approximations; <i>verified identical</i> counts only what " +
-    "has been confirmed against the original's own code. This is a self-assessed rubric, not a measurement.";
+    "is supported by comparisons with the original code. Evidence distinguishes exact matches, controlled inputs and platform tolerances; whole-game equivalence is not established. This is a self-assessed rubric, not a measurement.";
   view.querySelector("#status-method").textContent = c.method;
   const rows = view.querySelector("#status-rows");
   for (const s of c.subsystems) {

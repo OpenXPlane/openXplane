@@ -169,7 +169,7 @@ class Emulator:
         finally:
             self.uc.hook_del(hook)
         if self.uc.reg_read(UC_X86_REG_RIP) != end:
-            raise RuntimeError(f'emulation from {begin:#x} did not reach {end:#x}: instruction budget exhausted or external stop')
+            raise RuntimeError(f'emulation from {begin:#x} did not reach {end:#x}: instruction budget exhausted or external stop at {self.uc.reg_read(UC_X86_REG_RIP):#x}')
 
     def xmm0_f32(self):
         return struct.unpack('<f', (self.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff).to_bytes(4, 'little'))[0]

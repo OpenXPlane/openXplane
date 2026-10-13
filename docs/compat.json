@@ -1,13 +1,13 @@
 {
   "updated": "2026-10-13",
-  "method": "A self-assessed rubric, not a measurement. Each subsystem has a weight (weights sum to 100). 'implemented' is the share of that subsystem's work that exists in any form, including approximations. 'verified' is the share whose behaviour has been confirmed identical to the original (bit for bit against its machine code, or exact by the loader/table layout in its code). The overall numbers are the weighted sums. The weights and shares are judgement calls and will change as work and understanding grow. The 2026-10-13 review raises the flight-model estimate from 76%/67% to 80%/71% for the recovered delta branch, full-element force composition, wing predicates, bounds writers and ordered grouping. These four-point changes are conservative judgement calls, not percentages derived from test counts. Kernel comparisons with controlled inputs, recorded CRT results or tolerances do not establish whole-simulator equivalence.",
+  "method": "A self-assessed rubric, not a measurement. Each subsystem has a weight (weights sum to 100). 'implemented' is the share of that subsystem's work that exists in any form, including approximations. 'verified' is the share whose behaviour has been confirmed identical to the original (bit for bit against its machine code, or exact by the loader/table layout in its code). The overall numbers are the weighted sums. The weights and shares are judgement calls and will change as work and understanding grow. The 2026-10-13 review raises the flight-model estimate from 76%/67% to 80%/71% for the recovered delta branch, full-element force composition, wing predicates, bounds writers and ordered grouping. These four-point changes are conservative judgement calls, not percentages derived from test counts. Kernel comparisons with controlled inputs, recorded CRT results or tolerances do not establish whole-simulator equivalence. The subsequent loader-fixture review keeps estimates unchanged: completed original-loader runs replace partial snapshots, but the current ACF object comparison is diagnostic, does not assert parity, and skips when reference aircraft are absent.",
   "subsystems": [
     {
       "name": "Aircraft files (ACF)",
       "weight": 8,
       "implemented": 0.3,
       "verified": 0.1,
-      "note": "All properties are preserved; typed: mass, CG, wings, gear, engine and controls subset. Loader schema of 1117 properties extracted; six values confirmed in code."
+      "note": "All properties are preserved; typed: mass, CG, wings, gear, engine and controls subset. Loader schema of 1117 properties extracted; six values confirmed in code. Three original-loader replays now reach the return sentinel (13690, 13718 and 15525 tracked words). Previous fixtures were partial; two contain 424 corrected words each. These are reference results, not a count of matching ported fields. The current object test only reports differences and skips without local reference files."
     },
     {
       "name": "3D models (OBJ8)",
@@ -77,7 +77,7 @@
     {
       "title": "Content without simulation",
       "state": "mostly done",
-      "detail": "ACF, OBJ8, AFL, apt.dat and the viewer work. Left: PANEL_3D, normal/lit maps, instruments, an apt.dat index."
+      "detail": "ACF, OBJ8, AFL, apt.dat and the viewer work. Left: PANEL_3D, normal/lit maps, instruments, an apt.dat index. Verification work: turn the diagnostic ACF object comparison into enforced checks over explicitly supported fields, expose skipped reference checks, and resolve differences against completed loader fixtures."
     },
     {
       "title": "Datarefs and commands",
@@ -117,5 +117,10 @@
     "Compare complete live trajectories against the original after runtime integration",
     "Fill datarefs from aircraft state and implement remaining command handlers",
     "Read DSF scenery tiles and implement cockpit instruments and the stock Cessna Lua systems"
-  ]
+  ],
+  "maintenance": {
+    "goal": "After substantial confirmed progress, review compatibility percentages against evidence, update this file and the roadmap, regenerate README.md and docs/COMPATIBILITY.md with python3 tools/compat_score.py --write, and push the site update. Always state verification limitations.",
+    "percentage_policy": "Keep estimates unchanged when new evidence improves verification quality without establishing broader behaviour coverage.",
+    "publication": "A push to main changing docs or README triggers the Pages workflow; check deployment outcome before claiming the live site is updated."
+  }
 }

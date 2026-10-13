@@ -70,7 +70,7 @@ def build_context(emu, entries):
     return ctx
 
 
-def run(exe, entries, trace_reads=False, emu=None, trace_writes=None):
+def run(exe, entries, trace_reads=False, emu=None, trace_writes=None, max_instructions=200_000_000):
     emu = emu or Emulator(exe)
     emu.stubs[0x1422e8180] = lambda e: None  # the stack probe reads the TEB
 
@@ -115,7 +115,7 @@ def run(exe, entries, trace_reads=False, emu=None, trace_writes=None):
         trace_writes['base'] = (b, regions)
     error = None
     try:
-        emu.call(0x141a972a0, ints=[b, ctx], max_instructions=60_000_000)
+        emu.call(0x141a972a0, ints=[b, ctx], max_instructions=max_instructions)
     except RuntimeError as err:
         error = str(err)
     for h in handles:

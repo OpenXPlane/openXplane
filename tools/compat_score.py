@@ -53,7 +53,7 @@ def readme_block(data):
 the original content, draws it, and flies an approximation; it does not yet behave like X-Plane.
 
 - *Implemented* counts work that exists in any form, including approximations (the flight model is one).
-- *Verified identical* counts only what has been confirmed to match the original's own code, bit for bit.
+- *Verified identical* is an estimate of recovered behaviour supported by comparisons with the original code. Evidence distinguishes exact matches from controlled inputs and platform tolerances; it does not establish whole-game equivalence.
 
 This is a self-assessed, weighted rubric, not a measurement (method and per-subsystem numbers in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md); data in [docs/compat.json](docs/compat.json), updated with

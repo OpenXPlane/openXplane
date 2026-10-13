@@ -1,26 +1,56 @@
 #!/usr/bin/env python3
-"""The words the original ACF loader leaves in the aircraft object for each reference aircraft.
+"""Generate ACF object fixtures only after every original loader call completes.
 
-    python3 tools/gen_acf_object_vectors.py Xplane12/X-Plane.exe crates/xp-acf/tests/data
-
-Writes `acf_object_<file stem>.txt` with `REGION OFFSET=WORD` lines (see run_acf_loader.py).
+Usage: python tools/gen_acf_object_vectors.py reference.exe output_dir [--acf file.acf ...]
+Without --acf, use Xplane12/*/*.acf. No partial emulator state is published.
 """
+import argparse
 import glob
-import sys
+import hashlib
 from pathlib import Path
+from run_acf_loader import parse_acf, run
 
-sys.path.insert(0, str(Path(__file__).parent))
-from run_acf_loader import parse_acf, run  # noqa: E402
+REFERENCE_SHA = '2ca099b7c6b218e78d02bdbe298be2aebf670b67c5adff827449b065e1107936'
 
-exe, out = sys.argv[1], Path(sys.argv[2])
-out.mkdir(parents=True, exist_ok=True)
-for path in sorted(glob.glob('Xplane12/*/*.acf')):
-    words, _, error = run(exe, parse_acf(path))
-    if error:
-        sys.stderr.write(f'{path}: loader stopped: {error}\n')
-    name = Path(path).stem
-    with open(out / f'acf_object_{name}.txt', 'w') as f:
-        f.write(f'# words left by the original loader for {Path(path).name} (tools/gen_acf_object_vectors.py)\n')
-        for (region, off), w in sorted(words.items()):
-            f.write(f'{region} {off:x}={w:08x}\n')
-    print(name, len(words))
+
+def generate(exe, out, acfs):
+    exe, out = Path(exe), Path(out)
+    if hashlib.sha256(exe.read_bytes()).hexdigest() != REFERENCE_SHA:
+        raise ValueError('Reference executable SHA256 mismatch')
+    if not acfs:
+        raise ValueError('No ACF inputs found; specify --acf or run from the reference workspace')
+    pending = []
+    names = set()
+    for path in acfs:
+        path = Path(path)
+        if path.stem in names:
+            raise ValueError(f'Duplicate fixture stem: {path.stem}')
+        names.add(path.stem)
+        words, _, error = run(str(exe), parse_acf(path))
+        if error:
+            raise RuntimeError(f'{path}: original loader did not complete: {error}')
+        text = (f'# words left by the original loader for {path.name} (tools/gen_acf_object_vectors.py)\n'
+                f'# reference_sha256 {REFERENCE_SHA}; original return reached; budget 200000000\n')
+        text += ''.join(f'{region} {off:x}={word:08x}\n' for (region, off), word in sorted(words.items()))
+        pending.append((path.stem, text, len(words)))
+    # Finish and validate all replays before replacing any existing fixture.
+    out.mkdir(parents=True, exist_ok=True)
+    for stem, text, count in pending:
+        target = out / f'acf_object_{stem}.txt'
+        temporary = target.with_suffix('.txt.tmp')
+        temporary.write_text(text)
+        temporary.replace(target)
+        print(stem, count)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('binary', type=Path)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('--acf', type=Path, action='append')
+    args = parser.parse_args()
+    generate(args.binary, args.output, args.acf or sorted(glob.glob('Xplane12/*/*.acf')))
+
+
+if __name__ == '__main__':
+    main()
