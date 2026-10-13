@@ -1,5 +1,5 @@
 //! Command registry: named commands with begin/continue/end phases and handler chains.
-//! The catalog (names, descriptions) comes from tools/extract_commands.py output; this crate
+//! The catalog (names, descriptions) comes from tools/extract_commands.py output; this module
 //! carries no original names. Handler order and double-begin handling are openXplane policy,
 //! not behaviour confirmed in the reference build (see research/COMMANDS.md).
 use std::collections::BTreeMap;
@@ -16,7 +16,7 @@ pub type Handler = Box<dyn FnMut(Phase) -> bool>;
 
 struct Command {
     description: String,
-    /// High dword of the catalog's flag word; looks like a default key code, not established.
+    /// Legacy field name for the native default-key code; modifiers belong to keymap.
     flag_hint: u32,
     active: bool,
     handlers: Vec<Handler>,

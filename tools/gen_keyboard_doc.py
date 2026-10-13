@@ -40,17 +40,22 @@ ACTS = {
 }
 rows = []
 for line in (ROOT / 'assets/keymap/default_keys.tsv').read_text().splitlines():
-    cmd, key, code, desc = line.split('\t')
-    rows.append((key, code, cmd, desc))
-rows.sort(key=lambda r: int(r[1], 16))
+    cmd, key, code, desc, raw_mask = line.split('\t')
+    mask = int(raw_mask, 16)
+    prefix = '+'.join(name for bit, name in [(1, 'Shift'), (2, 'Alt'), (4, 'Ctrl')] if mask & bit)
+    chord = f'{prefix}+{key}' if prefix else key
+    rows.append((chord, code, cmd, desc, mask))
+rows.sort(key=lambda r: (int(r[1], 16), r[4]))
+from collections import Counter
+counts = Counter((code, mask) for _, code, _, _, mask in rows)
 acts = sum(1 for r in rows if r[2] in ACTS)
 print(f'''# Keyboard
 
 openXplane uses the original X-Plane 12 default keyboard map. It is read from the command table of the
-reference build ({len(rows)} commands have a default key; see [research/KEYMAP.md](research/KEYMAP.md)), so the keys
-below are the original's, not guesses. Of them, {acts} act in the flight viewer today; the rest are recognised and
-reported in the window title as "not simulated" because the engine has no engine controls, magnetos,
-instruments or maps yet.
+reference build ({len(rows)} commands have a default key; see [research/KEYMAP.md](../research/KEYMAP.md)), so the keys
+below preserve the original table, including Shift/Alt/Ctrl masks. Of them, {acts} act in the approximate flight
+viewer today. Most other commands report "not simulated"; four ambiguous chords are listed but not dispatched
+until original conflict resolution is recovered. Many command handlers, instruments and maps remain unfinished.
 
 ```sh
 cargo run --release --offline -- fly Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
@@ -75,9 +80,12 @@ are additions, not part of the ported map:
 
 | Key | Command | Effect here |
 |---|---|---|''')
-for key, code, cmd, desc in rows:
-    effect = ACTS.get(cmd, 'not simulated')
+for key, code, cmd, desc, mask in rows:
+    effect = 'ambiguous original chord; not dispatched' if counts[(code, mask)] > 1 else ACTS.get(cmd, 'not simulated')
     print(f'| {key} | `{cmd}` — {desc} | {effect} |')
 print('''
-Notes: the original's default modifiers (if any) are not stored in the table and are not reproduced; the step
-sizes of "a bit" commands are openXplane's choice; the gear is fixed, so the gear key does nothing.''')
+Notes: Shift=1, Alt=2 and Ctrl=4 come from the original modifier parser. The viewer uses exact chord matching
+and retains the press chord through repeat/release, even if modifiers change while a key is held. This lifecycle
+and focus-loss release policy have not been compared with the native dispatcher. Super/Command is not mapped
+to Ctrl. Alt by itself has no command-table binding; native menu-bar handling remains unresolved.
+Step sizes of "a bit" commands are openXplane's choice; the gear is fixed, so the gear key does nothing.''')

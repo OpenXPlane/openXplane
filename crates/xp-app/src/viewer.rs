@@ -7,15 +7,17 @@ use glam::Vec3;
 use openxplane::{
     commands::Phase,
     flight::{Controls, FlightModel},
+    keymap::Modifiers,
     pilot::{Effect, ViewAction},
 };
-use std::{sync::Arc, time::Instant};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
-    keyboard::{Key, KeyLocation, NamedKey},
+    keyboard::{Key, KeyLocation, ModifiersState, NamedKey, PhysicalKey},
+    platform::modifier_supplement::KeyEventExtModifierSupplement,
     window::{Window, WindowId},
 };
 
@@ -177,7 +179,7 @@ fn approach(value: f32, target: f32, rate: f32, dt: f32) -> f32 {
 
 /// The key name used by the keymap table for a keyboard event.
 fn key_name(event: &KeyEvent) -> Option<String> {
-    match &event.logical_key {
+    match &event.key_without_modifiers() {
         Key::Named(named) => {
             let name = format!("{named:?}");
             Some(match name.as_str() {
@@ -224,11 +226,11 @@ impl Flight {
     }
 
     /// Handles a key. Returns a view action for the caller to apply to the camera.
-    fn handle_key(&mut self, name: &str, phase: Phase) -> Option<ViewAction> {
+    fn handle_key(&mut self, name: &str, modifiers: Modifiers, phase: Phase) -> Option<ViewAction> {
         let pressed = phase != Phase::End;
         // openXplane's own keys (not in the original's default map)
         match name {
-            "Tab" if phase == Phase::Begin => {
+            "Tab" if modifiers == Modifiers::NONE && phase == Phase::Begin => {
                 self.stick_keys = !self.stick_keys;
                 self.keys = Keys::default();
                 self.say(if self.stick_keys {
@@ -238,7 +240,7 @@ impl Flight {
                 });
                 return None;
             }
-            "Delete" if phase == Phase::Begin => {
+            "Delete" if modifiers == Modifiers::NONE && phase == Phase::Begin => {
                 self.model.reset();
                 self.controls = Controls::default();
                 self.camera_yaw = 0.0;
@@ -248,7 +250,7 @@ impl Flight {
             }
             _ => {}
         }
-        if self.stick_keys {
+        if self.stick_keys && modifiers == Modifiers::NONE {
             let k = &mut self.keys;
             let consumed = match name {
                 "Down" => Some(&mut k.pitch_back),
@@ -264,7 +266,7 @@ impl Flight {
                 return None;
             }
         }
-        let binding = openxplane::keymap::command_for_key(name)?;
+        let binding = openxplane::keymap::command_for_chord(name, modifiers)?;
         let short = binding.command.trim_start_matches("sim/");
         match openxplane::pilot::apply_command(&mut self.controls, &binding.command, phase) {
             Effect::Controls => {}
@@ -340,6 +342,43 @@ impl Flight {
     }
 }
 
+/// Keep the press chord for repeat/release even if modifier keys change while held.
+/// This lifecycle policy is not yet compared with the original event dispatcher.
+#[derive(Default)]
+struct KeyRoutes {
+    modifiers: ModifiersState,
+    held: HashMap<PhysicalKey, (String, Modifiers)>,
+}
+
+impl KeyRoutes {
+    fn route(
+        &mut self,
+        physical: PhysicalKey,
+        name: Option<String>,
+        phase: Phase,
+    ) -> Option<(String, Modifiers)> {
+        match phase {
+            Phase::Begin => {
+                if self.modifiers.super_key() {
+                    return None;
+                }
+                let chord = (
+                    name?,
+                    Modifiers::from_keys(
+                        self.modifiers.shift_key(),
+                        self.modifiers.alt_key(),
+                        self.modifiers.control_key(),
+                    ),
+                );
+                self.held.insert(physical, chord.clone());
+                Some(chord)
+            }
+            Phase::Continue => self.held.get(&physical).cloned(),
+            Phase::End => self.held.remove(&physical),
+        }
+    }
+}
+
 struct App {
     flight: Option<Flight>,
     scene: Scene,
@@ -349,6 +388,7 @@ struct App {
     error: Option<String>,
     smoke: bool,
     frames: u32,
+    key_routes: KeyRoutes,
 }
 
 impl ApplicationHandler for App {
@@ -457,7 +497,21 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => self.dragging = button_state == ElementState::Pressed,
-            WindowEvent::Focused(false) | WindowEvent::CursorLeft { .. } => {
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.key_routes.modifiers = modifiers.state()
+            }
+            WindowEvent::Focused(false) => {
+                if let Some(flight) = &mut self.flight {
+                    for (_, (name, modifiers)) in self.key_routes.held.drain() {
+                        flight.handle_key(&name, modifiers, Phase::End);
+                    }
+                    flight.keys = Keys::default();
+                }
+                self.key_routes = KeyRoutes::default();
+                self.dragging = false;
+                self.cursor = None;
+            }
+            WindowEvent::CursorLeft { .. } => {
                 self.dragging = false;
                 self.cursor = None;
             }
@@ -496,10 +550,12 @@ impl ApplicationHandler for App {
                     event_loop.exit();
                     return;
                 }
-                let name = key_name(&event);
-                match (&mut self.flight, name) {
-                    (Some(flight), Some(name)) => {
-                        if let Some(action) = flight.handle_key(&name, phase) {
+                let chord = self
+                    .key_routes
+                    .route(event.physical_key, key_name(&event), phase);
+                match (&mut self.flight, chord) {
+                    (Some(flight), Some((name, modifiers))) => {
+                        if let Some(action) = flight.handle_key(&name, modifiers, phase) {
                             let camera = &mut state.camera;
                             match action {
                                 ViewAction::Default => {
@@ -530,7 +586,9 @@ impl ApplicationHandler for App {
                             }
                         }
                     }
-                    (None, Some(name)) if pressed && name == "R" => {
+                    (None, Some((name, modifiers)))
+                        if pressed && modifiers == Modifiers::NONE && name == "R" =>
+                    {
                         state.camera = Camera::new(&self.scene);
                         state.window.request_redraw();
                     }
@@ -590,10 +648,67 @@ fn run_app(
         error: None,
         smoke,
         frames: 0,
+        key_routes: KeyRoutes::default(),
     };
     event_loop.run_app(&mut app)?;
     if let Some(error) = app.error {
         return Err(error.into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod input_tests {
+    use super::*;
+    use winit::keyboard::KeyCode;
+
+    #[test]
+    fn repeats_and_release_use_press_modifiers() {
+        let physical = PhysicalKey::Code(KeyCode::KeyB);
+        let mut routes = KeyRoutes::default();
+        let press = routes
+            .route(physical, Some("B".into()), Phase::Begin)
+            .unwrap();
+        routes.modifiers = ModifiersState::CONTROL;
+        assert_eq!(
+            routes.route(physical, Some("B".into()), Phase::Continue),
+            Some(press.clone())
+        );
+        assert_eq!(
+            routes.route(physical, Some("B".into()), Phase::End),
+            Some(press)
+        );
+        assert!(routes.held.is_empty());
+    }
+
+    #[test]
+    fn modified_keys_do_not_fall_back_to_unmodified_commands() {
+        let mut routes = KeyRoutes {
+            modifiers: ModifiersState::CONTROL,
+            ..Default::default()
+        };
+        let (_, mask) = routes
+            .route(
+                PhysicalKey::Code(KeyCode::KeyP),
+                Some("P".into()),
+                Phase::Begin,
+            )
+            .unwrap();
+        assert_eq!(
+            openxplane::keymap::command_for_chord("P", mask)
+                .unwrap()
+                .command,
+            "sim/view/3d_path_toggle"
+        );
+        routes.modifiers = ModifiersState::SUPER;
+        assert!(
+            routes
+                .route(
+                    PhysicalKey::Code(KeyCode::KeyP),
+                    Some("P".into()),
+                    Phase::Begin
+                )
+                .is_none()
+        );
+    }
 }

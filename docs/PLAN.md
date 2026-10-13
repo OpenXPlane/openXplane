@@ -19,7 +19,7 @@ Exit: recorded trajectories of the stock Cessna 172 (takeoff, cruise, stall, lan
 ## Phase 2: Datarefs and commands (weight 8)
 
 1. Backing values for the 5503 datarefs, grouped by owner (flight, engine, controls, view, weather).
-2. Command handlers for the 3012 commands, wired to the simulation state.
+2. Command handlers for the 3138 commands, wired to the simulation state.
 3. Input: keyboard (done), mouse, joystick and yoke axes, button assignments.
 
 Exit: every dataref the stock Cessna reads has a value; every default key binding does what the manual says.

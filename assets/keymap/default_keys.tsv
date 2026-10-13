@@ -1,71 +1,182 @@
-sim/operation/show_menu	Escape	0x1b	Show the in-sim menu.
-sim/map/show_current	M	0x4d	Toggle the sectional map window.
-sim/map/show_instructor_operator_station	I	0x49	Toggle the instructor operator station (IOS) window.
-sim/operation/toggle_flight_config	`	0xba	Toggle the Flight Configuration window.
-sim/engines/throttle_down	F1	0x70	Throttle down a bit.
-sim/engines/throttle_up	F2	0x71	Throttle up a bit.
-sim/engines/throttle_full	F3	0x72	Throttle to wide open!
-sim/engines/throttle_horizontal_down	F4	0x73	Throttle horizontal down a bit.
-sim/engines/throttle_horizontal_up	F5	0x74	Throttle horizontal up a bit.
-sim/engines/prop_down	F6	0x75	Prop coarse a bit.
-sim/engines/prop_up	F7	0x76	Prop fine a bit.
-sim/engines/mixture_min	F8	0x77	Mixture to cut off.
-sim/engines/mixture_down	F9	0x78	Mixture lean a bit.
-sim/engines/mixture_up	F10	0x79	Mixture rich a bit.
-sim/engines/mixture_max	F11	0x7a	Mixture to full rich.
-sim/engines/carb_heat_off	F12	0x7b	Carb heat off.
-sim/engines/carb_heat_on	F13	0x7c	Carb heat on.
-sim/engines/carb_heat_toggle	F14	0x7d	Carb heat toggle.
-sim/flight_controls/cowl_flaps_open	F15	0x7e	Move cowl flaps open a bit.
-sim/flight_controls/cowl_flaps_closed	F16	0x7f	Move cowl flaps to closed a bit.
-sim/magnetos/magnetos_off	F17	0x80	Magnetos off.
-sim/magnetos/magnetos_both	F18	0x81	Magnetos both.
-sim/engines/engage_starters	F19	0x82	Engage starters.
-sim/engines/beta_toggle	/	0xb8	Toggle Beta prop.
-sim/flight_controls/flaps_up	1	0x31	Flaps up a notch.
-sim/flight_controls/flaps_down	2	0x32	Flaps down a notch.
-sim/flight_controls/speed_brakes_down_one	4	0x34	Speedbrakes extend one.
-sim/flight_controls/speed_brakes_up_one	3	0x33	Speedbrakes retract one.
-sim/flight_controls/landing_gear_toggle	G	0x47	Landing gear toggle.
-sim/flight_controls/brakes_toggle_max	V	0x56	Toggle brakes max effort.
-sim/flight_controls/brakes_regular	B	0x42	Hold brakes regular.
-sim/flight_controls/smoke_toggle	X	0x58	Toggle smoke puffing.
-sim/general/action	Space	0x20	General action command.
-sim/instruments/DG_sync_mag	D	0x44	vacuum DG sync to magnetic north.
-sim/flight_controls/pitch_trim_up	]	0xb2	Pitch trim up.
-sim/flight_controls/pitch_trim_down	[	0xb3	Pitch trim down.
-sim/flight_controls/aileron_trim_left	8	0x38	Roll trim left.
-sim/flight_controls/aileron_trim_right	0	0x30	Roll trim right.
-sim/flight_controls/rudder_trim_left	5	0x35	Yaw trim left.
-sim/flight_controls/rudder_trim_right	7	0x37	Yaw trim right.
-sim/flight_controls/aileron_trim_center	9	0x39	Aileron trim center.
-sim/flight_controls/rudder_trim_center	6	0x36	Rudder trim center.
-sim/operation/time_down	K	0x4b	Time: a little earlier.
-sim/operation/time_up	L	0x4c	Time: a little later.
-sim/operation/pause_toggle	P	0x50	Toggle simulation paused state.
-sim/operation/contact_atc	Return	0x0d	Contact ATC.
-sim/operation/toggle_yoke	Y	0x59	Toggle yoke visibility.
-sim/view/free_camera	C	0x43	Free camera.
-sim/view/default_view	W	0x57	Default view.
-sim/view/quick_look_0	Numpad0	0x60	Go to save 3-D cockpit location #1.
-sim/view/quick_look_1	Numpad1	0x61	Go to save 3-D cockpit location #2.
-sim/view/quick_look_2	Numpad2	0x62	Go to save 3-D cockpit location #3.
-sim/view/quick_look_3	Numpad3	0x63	Go to save 3-D cockpit location #4.
-sim/view/quick_look_4	Numpad4	0x64	Go to save 3-D cockpit location #5.
-sim/view/quick_look_5	Numpad5	0x65	Go to save 3-D cockpit location #6.
-sim/view/quick_look_6	Numpad6	0x66	Go to save 3-D cockpit location #7.
-sim/view/quick_look_7	Numpad7	0x67	Go to save 3-D cockpit location #8.
-sim/view/quick_look_8	Numpad8	0x68	Go to save 3-D cockpit location #9.
-sim/view/quick_look_9	Numpad9	0x69	Go to save 3-D cockpit location #10.
-sim/general/left	Left	0x25	Move view left.
-sim/general/right	Right	0x27	Move view right.
-sim/general/up	Up	0x26	Move view up.
-sim/general/down	Down	0x28	Move view down.
-sim/general/forward	.	0xb9	Move view forward.
-sim/general/backward	,	0xb7	Move view backward.
-sim/general/zoom_in	=	0xb0	Zoom in.
-sim/general/zoom_out	-	0xb1	Zoom out.
-sim/general/rot_up	R	0x52	Rotate view: tilt up.
-sim/general/rot_down	F	0x46	Rotate view: tilt down.
-sim/general/rot_left	Q	0x51	Rotate view: pan left.
-sim/general/rot_right	E	0x45	Rotate view: pan right.
+sim/operation/quit	F4	0x73	Quit X-Plane.	0x2
+sim/operation/screenshot	Space	0x20	Take a screenshot.	0x1
+sim/operation/show_menu	Escape	0x1b	Show the in-sim menu.	0x0
+sim/operation/cycle_dump	M	0x4d	Print out a cycle dump for this frame.	0x1
+sim/operation/test_data_ref	,	0xb7	Test dataref: Run from 0 to 1 and back.	0x4
+sim/operation/show_fps	F	0x46	Toggle on-screen frame-rate display.	0x5
+sim/operation/fail_system	F	0x46	Fail selected in failures screen.	0x4
+sim/operation/make_panel_previews	Space	0x20	Make screenshots of your panels.	0x7
+sim/map/show_current	M	0x4d	Toggle the sectional map window.	0x0
+sim/map/show_instructor_operator_station	I	0x49	Toggle the instructor operator station (IOS) window.	0x0
+sim/operation/toggle_flight_config	`	0xba	Toggle the Flight Configuration window.	0x0
+sim/operation/toggle_settings_window	`	0xba	Toggle the Settings window.	0x4
+sim/operation/toggle_data_output_graph	G	0x47	Toggle display of the data output graph.	0x4
+sim/operation/toggle_weather_map	M	0x4d	Toggle display of the weather map.	0x2
+sim/operation/slider_01	F1	0x70	Slider #1 On/Off control.	0x1
+sim/operation/slider_02	F2	0x71	Slider #2 On/Off control.	0x1
+sim/operation/slider_03	F3	0x72	Slider #3 On/Off control.	0x1
+sim/operation/slider_04	F4	0x73	Slider #4 On/Off control.	0x1
+sim/operation/slider_05	F5	0x74	Slider #5 On/Off control.	0x1
+sim/operation/slider_06	F6	0x75	Slider #6 On/Off control.	0x1
+sim/operation/slider_07	F7	0x76	Slider #7 On/Off control.	0x1
+sim/operation/slider_08	F8	0x77	Slider #8 On/Off control.	0x1
+sim/operation/slider_09	F9	0x78	Slider #9 On/Off control.	0x1
+sim/operation/slider_10	F10	0x79	Slider #10 On/Off control.	0x1
+sim/operation/slider_11	F11	0x7a	Slider #11 On/Off control.	0x1
+sim/operation/slider_12	F12	0x7b	Slider #12 On/Off control.	0x1
+sim/operation/slider_13	F13	0x7c	Slider #13 On/Off control.	0x1
+sim/operation/slider_14	F14	0x7d	Slider #14 On/Off control.	0x1
+sim/operation/slider_15	F15	0x7e	Slider #15 On/Off control.	0x1
+sim/operation/slider_16	F16	0x7f	Slider #16 On/Off control.	0x1
+sim/operation/auto_start	E	0x45	Auto-start engines to running, real-time.	0x5
+sim/engines/throttle_down	F1	0x70	Throttle down a bit.	0x0
+sim/engines/throttle_up	F2	0x71	Throttle up a bit.	0x0
+sim/engines/throttle_full	F3	0x72	Throttle to wide open!	0x0
+sim/engines/throttle_horizontal_down	F4	0x73	Throttle horizontal down a bit.	0x0
+sim/engines/throttle_horizontal_up	F5	0x74	Throttle horizontal up a bit.	0x0
+sim/engines/prop_down	F6	0x75	Prop coarse a bit.	0x0
+sim/engines/prop_up	F7	0x76	Prop fine a bit.	0x0
+sim/engines/mixture_min	F8	0x77	Mixture to cut off.	0x0
+sim/engines/mixture_down	F9	0x78	Mixture lean a bit.	0x0
+sim/engines/mixture_up	F10	0x79	Mixture rich a bit.	0x0
+sim/engines/mixture_max	F11	0x7a	Mixture to full rich.	0x0
+sim/engines/carb_heat_off	F12	0x7b	Carb heat off.	0x0
+sim/engines/carb_heat_on	F13	0x7c	Carb heat on.	0x0
+sim/engines/carb_heat_toggle	F14	0x7d	Carb heat toggle.	0x0
+sim/flight_controls/cowl_flaps_open	F15	0x7e	Move cowl flaps open a bit.	0x0
+sim/flight_controls/cowl_flaps_closed	F16	0x7f	Move cowl flaps to closed a bit.	0x0
+sim/magnetos/magnetos_off	F17	0x80	Magnetos off.	0x0
+sim/magnetos/magnetos_both	F18	0x81	Magnetos both.	0x0
+sim/engines/engage_starters	F19	0x82	Engage starters.	0x0
+sim/engines/beta_toggle	/	0xb8	Toggle Beta prop.	0x0
+sim/engines/thrust_reverse_toggle	/	0xb8	Toggle thrust reversers.	0x1
+sim/starters/engage_starter_1	1	0x31	Engage starter #1.	0x4
+sim/starters/engage_starter_2	2	0x32	Engage starter #2.	0x4
+sim/starters/engage_starter_3	3	0x33	Engage starter #3.	0x4
+sim/starters/engage_starter_4	4	0x34	Engage starter #4.	0x4
+sim/starters/engage_starter_5	5	0x35	Engage starter #5.	0x4
+sim/starters/engage_starter_6	6	0x36	Engage starter #6.	0x4
+sim/starters/engage_starter_7	7	0x37	Engage starter #7.	0x4
+sim/starters/engage_starter_8	8	0x38	Engage starter #8.	0x4
+sim/flight_controls/flaps_up	1	0x31	Flaps up a notch.	0x0
+sim/flight_controls/flaps_down	2	0x32	Flaps down a notch.	0x0
+sim/flight_controls/speed_brakes_down_one	4	0x34	Speedbrakes extend one.	0x0
+sim/flight_controls/speed_brakes_up_one	3	0x33	Speedbrakes retract one.	0x0
+sim/flight_controls/landing_gear_down	D	0x44	Landing gear down.	0x4
+sim/flight_controls/landing_gear_up	U	0x55	Landing gear up.	0x4
+sim/flight_controls/landing_gear_toggle	G	0x47	Landing gear toggle.	0x0
+sim/flight_controls/brakes_toggle_max	V	0x56	Toggle brakes max effort.	0x0
+sim/flight_controls/brakes_regular	B	0x42	Hold brakes regular.	0x0
+sim/flight_controls/tailhook_down	Q	0x51	Tailhook down.	0x3
+sim/flight_controls/tailhook_up	W	0x57	Tailhook up.	0x3
+sim/flight_controls/smoke_toggle	X	0x58	Toggle smoke puffing.	0x0
+sim/flight_controls/drop_tank	;	0xb5	Drop all drop tanks.	0x1
+sim/weapons/weapon_target_down	[	0xb3	Target select down.	0x1
+sim/weapons/weapon_target_up	]	0xb2	Target select up.	0x1
+sim/general/action	Space	0x20	General action command.	0x0
+sim/ground_ops/service_plane	S	0x53	Service the airplane with ground trucks.	0x4
+sim/radios/nav1_standy_flip	9	0x39	NAV 1 flip standby.	0x4
+sim/radios/nav2_standy_flip	0	0x30	NAV 2 flip standby.	0x4
+sim/radios/com1_standy_flip	-	0xb1	COM 1 flip standby.	0x4
+sim/radios/com2_standy_flip	=	0xb0	COM 2 flip standby.	0x4
+sim/instruments/DG_sync_mag	D	0x44	vacuum DG sync to magnetic north.	0x0
+sim/instruments/panel_bright_down	,	0xb7	Panel brightness down a bit.	0x5
+sim/instruments/panel_bright_up	.	0xb9	Panel brightness up a bit.	0x5
+sim/flight_controls/pitch_trim_up	]	0xb2	Pitch trim up.	0x0
+sim/flight_controls/pitch_trim_down	[	0xb3	Pitch trim down.	0x0
+sim/flight_controls/aileron_trim_left	8	0x38	Roll trim left.	0x0
+sim/flight_controls/aileron_trim_right	0	0x30	Roll trim right.	0x0
+sim/flight_controls/rudder_trim_left	5	0x35	Yaw trim left.	0x0
+sim/flight_controls/rudder_trim_right	7	0x37	Yaw trim right.	0x0
+sim/flight_controls/aileron_trim_center	9	0x39	Aileron trim center.	0x0
+sim/flight_controls/rudder_trim_center	6	0x36	Rudder trim center.	0x0
+sim/operation/time_down	K	0x4b	Time: a little earlier.	0x0
+sim/operation/time_up	L	0x4c	Time: a little later.	0x0
+sim/operation/time_down_lots	K	0x4b	Time: a lot earlier.	0x1
+sim/operation/time_up_lots	L	0x4c	Time: a lot later.	0x1
+sim/operation/pause_toggle	P	0x50	Toggle simulation paused state.	0x0
+sim/operation/flightmodel_speed_change	T	0x54	Sim 1x 2x 4x sim speed.	0x4
+sim/operation/ground_speed_change	T	0x54	Sim 1x 2x 4x ground speed.	0x2
+sim/operation/video_record_toggle	Space	0x20	Toggle AVI movie recording.	0x4
+sim/replay/replay_toggle	R	0x52	Toggle replay mode on/off.	0x2
+sim/operation/contact_atc	Return	0x0d	Contact ATC.	0x0
+sim/operation/toggle_yoke	Y	0x59	Toggle yoke visibility.	0x0
+sim/operation/reset_flight	;	0xb5	Reset flight to most recent start.	0x4
+sim/view/free_camera	C	0x43	Free camera.	0x0
+sim/view/default_view	W	0x57	Default view.	0x0
+sim/view/forward_with_2d_panel	W	0x57	Forward with 2-D panel.	0x2
+sim/view/forward_with_hud	W	0x57	Forward with HUD.	0x1
+sim/view/forward_with_nothing	W	0x57	Forward with nothing.	0x4
+sim/view/linear_spot	1	0x31	Linear spot.	0x1
+sim/view/still_spot	2	0x32	Still spot.	0x1
+sim/view/runway	3	0x33	Runway.	0x1
+sim/view/circle	4	0x34	Circle.	0x1
+sim/view/tower	5	0x35	Tower.	0x1
+sim/view/ridealong	6	0x36	Ride-along.	0x1
+sim/view/track_weapon	7	0x37	Track weapon.	0x1
+sim/view/chase	8	0x38	Chase.	0x1
+sim/view/wingman	9	0x39	Wingman.	0x1
+sim/view/3d_cockpit_cmnd_look	0	0x30	3-D cockpit.	0x1
+sim/view/g_loaded_camera	C	0x43	G-loaded camera (internal views).	0x1
+sim/view/cinema_verite	H	0x48	Hand-held camera (external views).	0x1
+sim/view/sunglasses	S	0x53	Sunglasses.	0x1
+sim/view/night_vision	N	0x4e	Night vision.	0x1
+sim/view/3d_path_toggle	P	0x50	3-D path toggle.	0x4
+sim/view/3d_path_reset	P	0x50	3-D path reset.	0x1
+sim/view/show_physics_model	M	0x4d	Toggle physics model visualization.	0x4
+sim/view/quick_look_0	Numpad0	0x60	Go to save 3-D cockpit location #1.	0x0
+sim/view/quick_look_1	Numpad1	0x61	Go to save 3-D cockpit location #2.	0x0
+sim/view/quick_look_2	Numpad2	0x62	Go to save 3-D cockpit location #3.	0x0
+sim/view/quick_look_3	Numpad3	0x63	Go to save 3-D cockpit location #4.	0x0
+sim/view/quick_look_4	Numpad4	0x64	Go to save 3-D cockpit location #5.	0x0
+sim/view/quick_look_5	Numpad5	0x65	Go to save 3-D cockpit location #6.	0x0
+sim/view/quick_look_6	Numpad6	0x66	Go to save 3-D cockpit location #7.	0x0
+sim/view/quick_look_7	Numpad7	0x67	Go to save 3-D cockpit location #8.	0x0
+sim/view/quick_look_8	Numpad8	0x68	Go to save 3-D cockpit location #9.	0x0
+sim/view/quick_look_9	Numpad9	0x69	Go to save 3-D cockpit location #10.	0x0
+sim/view/quick_look_0_mem	Numpad0	0x60	Memorize 3-D cockpit location #1.	0x4
+sim/view/quick_look_1_mem	Numpad1	0x61	Memorize 3-D cockpit location #2.	0x4
+sim/view/quick_look_2_mem	Numpad2	0x62	Memorize 3-D cockpit location #3.	0x4
+sim/view/quick_look_3_mem	Numpad3	0x63	Memorize 3-D cockpit location #4.	0x4
+sim/view/quick_look_4_mem	Numpad4	0x64	Memorize 3-D cockpit location #5.	0x4
+sim/view/quick_look_5_mem	Numpad5	0x65	Memorize 3-D cockpit location #6.	0x4
+sim/view/quick_look_6_mem	Numpad6	0x66	Memorize 3-D cockpit location #7.	0x4
+sim/view/quick_look_7_mem	Numpad7	0x67	Memorize 3-D cockpit location #8.	0x4
+sim/view/quick_look_8_mem	Numpad8	0x68	Memorize 3-D cockpit location #9.	0x4
+sim/view/quick_look_9_mem	Numpad9	0x69	Memorize 3-D cockpit location #10.	0x4
+sim/general/left	Left	0x25	Move view left.	0x0
+sim/general/right	Right	0x27	Move view right.	0x0
+sim/general/up	Up	0x26	Move view up.	0x0
+sim/general/down	Down	0x28	Move view down.	0x0
+sim/general/forward	.	0xb9	Move view forward.	0x0
+sim/general/backward	,	0xb7	Move view backward.	0x0
+sim/general/zoom_in	=	0xb0	Zoom in.	0x0
+sim/general/zoom_out	-	0xb1	Zoom out.	0x0
+sim/general/left_fast	Left	0x25	Move view left fast.	0x1
+sim/general/right_fast	Right	0x27	Move view right fast.	0x1
+sim/general/up_fast	Up	0x26	Move view up fast.	0x1
+sim/general/down_fast	Down	0x28	Move view down fast.	0x1
+sim/general/forward_fast	.	0xb9	Move view forward fast.	0x1
+sim/general/backward_fast	,	0xb7	Move view backward fast.	0x1
+sim/general/zoom_in_fast	=	0xb0	Zoom in fast.	0x1
+sim/general/zoom_out_fast	-	0xb1	Zoom out fast.	0x1
+sim/general/left_slow	Left	0x25	Move view left slow.	0x4
+sim/general/right_slow	Right	0x27	Move view right slow.	0x4
+sim/general/up_slow	Up	0x26	Move view up slow.	0x4
+sim/general/down_slow	Down	0x28	Move view down slow.	0x4
+sim/general/forward_slow	.	0xb9	Move view forward slow.	0x4
+sim/general/backward_slow	,	0xb7	Move view backward slow.	0x4
+sim/general/zoom_in_slow	=	0xb0	Zoom in slow.	0x4
+sim/general/zoom_out_slow	-	0xb1	Zoom out slow.	0x4
+sim/general/rot_up	R	0x52	Rotate view: tilt up.	0x0
+sim/general/rot_down	F	0x46	Rotate view: tilt down.	0x0
+sim/general/rot_left	Q	0x51	Rotate view: pan left.	0x0
+sim/general/rot_right	E	0x45	Rotate view: pan right.	0x0
+sim/general/rot_up_fast	R	0x52	Rotate view: tilt up fast.	0x1
+sim/general/rot_down_fast	F	0x46	Rotate view: tilt down fast.	0x1
+sim/general/rot_left_fast	Q	0x51	Rotate view: pan left fast.	0x1
+sim/general/rot_right_fast	E	0x45	Rotate view: pan right fast.	0x1
+sim/general/rot_up_slow	R	0x52	Rotate view: tilt up slow.	0x4
+sim/general/rot_down_slow	F	0x46	Rotate view: tilt down slow.	0x4
+sim/general/rot_left_slow	Q	0x51	Rotate view: pan left slow.	0x4
+sim/general/rot_right_slow	E	0x45	Rotate view: pan right slow.	0x4

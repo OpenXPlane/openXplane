@@ -5,7 +5,8 @@ The built-in command table (tools/extract_commands.py, research/COMMANDS.md) sto
 of each record's flag word, the default key of the command (0 = none). The codes are the XPLM virtual
 key codes: they follow Windows virtual keys (F1-F24 0x70-0x87, digits 0x30-0x39, letters as upper case
 ASCII, arrows 0x25-0x28, Esc 0x1B, Enter 0x0D, space 0x20) plus a block of punctuation keys at 0xB0-0xBD.
-The default modifiers, if any, are not stored in this record and are not reproduced.
+Qword 4 stores modifier bits: Shift=1, Alt=2, Ctrl=4. Output appends this mask as column five.
+All original bindings are retained, including four conflicting chords; conflict dispatch is unresolved.
 
     python3 tools/extract_keymap.py Xplane12/X-Plane.exe > assets/keymap/default_keys.tsv
 """
@@ -13,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from extract_commands import records  # noqa: E402
+from extract_commands import detailed_records  # noqa: E402
 
 PUNCTUATION = {0xB0: '=', 0xB1: '-', 0xB2: ']', 0xB3: '[', 0xB4: "'", 0xB5: ';', 0xB6: '\\',
                0xB7: ',', 0xB8: '/', 0xB9: '.', 0xBA: '`', 0xBB: 'Enter', 0xBC: 'NumpadEnter', 0xBD: 'Numpad='}
@@ -36,14 +37,9 @@ def key_name(code):
 
 
 def main():
-    seen = {}
-    for name, _internal, code, desc in records(sys.argv[1]):
+    for name, _internal, code, desc, modifiers in detailed_records(sys.argv[1]):
         if code:
-            seen.setdefault(code, []).append(name)
-            print(f'{name}\t{key_name(code)}\t0x{code:02x}\t{desc}')
-    clashes = {c: n for c, n in seen.items() if len(n) > 1}
-    if clashes:
-        print(f'# note: codes shared by several commands: {clashes}', file=sys.stderr)
+            print(f'{name}\t{key_name(code)}\t0x{code:02x}\t{desc}\t0x{modifiers:x}')
 
 
 if __name__ == '__main__':

@@ -1,57 +1,42 @@
-# The default keyboard map
+# Native default keyboard map
 
-Date: 2026-10-06. The reference and SHA256 are in [BASELINE.md](BASELINE.md). Static analysis of the EXE only.
+Updated: 2026-10-13. Exact baseline identity is in [BASELINE.md](BASELINE.md).
 
-## Where it is
+## Corrected table bounds and modifiers
 
-The default keys are part of the command table ([COMMANDS.md](COMMANDS.md)). Each 40-byte record has a flag
-word; its low dword is `3` in every record, and its high dword is **the default key of the command** (0 = no
-default key). 71 of the 3012 records have one, and no key is used twice.
+The previous extractor incorrectly required qword 4 to be zero and internal names to start with `cmnd_`, and required low flags to equal 3. That produced an incomplete 3012-command catalogue and only the 71 unmodified bindings. Its claim that modifiers were absent from the record was wrong.
 
-## The key codes
+The native initializer at `0x140c6478d..0x140c64827` walks from `0x142ee141c` (record 0 + 28) to exclusive `0x142effe6c`, stepping 40 bytes. The catalogue starts at `0x142ee1400` and has 3138 records. The earlier catalogue-copy loop at `0x140c3c981..0x140c3ca1d` independently uses the same base + 8, stride 40 and count `0xc42` (3138). Three reserved VR commands have low flag 2. Some internal names use `xmnd_` or `rep_`; they are valid native table members.
 
-The codes are the XPLM virtual key codes, which follow the Windows virtual-key numbering, plus a block of
-punctuation keys:
+Each record contains internal-name/name/description pointers (qwords 0..2), low flags and high default key (qword 3), and a modifier mask (low dword of qword 4). The initializer copies the key to vector entry +0 and the mask to +4, then resolves the command name and stores its result at +8. Vector entries are 16 bytes. A subsequent native loop removes entries whose key is zero.
 
-| Codes | Keys |
+There are 182 bound commands: 71 unmodified, 52 Shift, 47 Ctrl, 5 Alt, 4 Shift+Ctrl, 2 Shift+Alt and 1 Shift+Alt+Ctrl. They use 178 distinct chords. Names, descriptions, key codes and masks now preserve native catalogue order.
+
+## Modifier-bit evidence
+
+Native helper `0x140c816e0` parses modifier text. It recognizes `SHIFT` and `MAJ` as bit 1; `CTRL` and `STRG` as bit 4. The second mask bit uses the string object at `0x145777648`: initializer `0x140559d00` builds it from the literal string object at `0x142f021e0`, which contains `Alt` (length 3, inline capacity 15), via normalization helper `0x141622e00`. Parsing a matching normalized Alt string ORs bit 2 at `0x140c8185c`. Formatting helper `0x140c60300` tests the same bits 1/2/4.
+
+This establishes Shift=1, Alt=2, Ctrl=4 for the supplied Windows baseline. Super/Command mappings of another original platform are not established.
+
+## Conflicting original chords
+
+| Chord | Commands in native order |
 |---|---|
-| `0x08 0x09 0x0D 0x1B 0x20` | Backspace, Tab, Return, Escape, Space |
-| `0x21..0x28`, `0x2D 0x2E` | Page Up/Down, End, Home, the arrows, Insert, Delete |
-| `0x30..0x39`, `0x41..0x5A` | digits and upper-case letters |
-| `0x60..0x69`, `0x6A..0x6F` | numpad digits and operators |
-| `0x70..0x87` | F1..F24 |
-| `0xB0..0xBD` | `=` `-` `]` `[` `'` `;` `\\` `,` `/` `.` `` ` `` Enter NumpadEnter Numpad= |
+| Ctrl+, | test_data_ref; backward_slow |
+| Ctrl+F | fail_system; rot_down_slow |
+| Ctrl+- | com1_standy_flip; zoom_out_slow |
+| Ctrl+= | com2_standy_flip; zoom_in_slow |
 
-The reading is supported by the data itself: F1..F19 are bound to engine commands in an unbroken sequence
-(`throttle_down` F1, `throttle_up` F2, `throttle_full` F3, then horizontal throttle, prop, mixture, carb heat,
-cowl flaps, magnetos, starters), `pause_toggle` is `P` (`0x50`), `show_menu` is Escape (`0x1B`),
-`time_down`/`time_up` are `K`/`L`, `zoom_in`/`zoom_out` are `=`/`-`, the two pitch trim commands are `]`/`[`,
-the aileron and rudder trims sit on the digit row (`5 6 7` and `8 9 0`) and flaps are `1`/`2`. The punctuation
-block `0xB0..0xBD` follows the layout of the public XPLM key constants; those values were not independently
-confirmed beyond the pairs above (`= -`, `] [`, `` ` `` for the flight configuration window).
+Native conflict dispatch is not yet recovered. `bindings_for_chord` preserves both records; `command_for_chord` returns a binding only when unique. The viewer does not guess which conflicting command should run.
 
-`tools/extract_keymap.py` writes the table as `assets/keymap/default_keys.tsv` (command, key name, code,
-description); `src/keymap.rs` embeds it.
+## Port and checks
 
-## What is not in the table
+`tools/extract_commands.py` now uses the observed native bounds and requires this exact baseline SHA256. Its four-column catalogue output remains compatible; `--modifiers` appends a fifth mask column. `tools/extract_keymap.py` generates five-column key TSV. The Rust parser also accepts legacy four-column rows as unmodified; duplicate commands are rejected but conflicting chords are retained.
 
-The default modifier keys (Shift, Ctrl, Alt), if the original uses any, are not part of this record and are not
-reproduced. There is no default keyboard stick: the arrows are bound to moving the view, the original flies with
-a joystick or the mouse yoke. openXplane's keyboard stick (arrows, Z/X) is therefore an addition, switchable with
-Tab ([../docs/KEYBOARD.md](../docs/KEYBOARD.md)). User re-binding (the original's `Joystick, Keys & Nullzone`
-settings and its key file) was not analysed.
+The viewer reads winit modifier state and the logical key without modifiers. It matches the exact chord rather than sending Ctrl+P to unmodified P. It retains the press chord for repeats and release and releases held commands on focus loss; that event-lifecycle policy is independently implemented and not verified against original OS events. Keyboard-stick additions apply only to unmodified keys.
 
-## Implementation and limits
+`tools/check_native_key_defaults.py` executes the original copy block `0x140c647a0..0x140c647b4` for every one of the 3138 table records. All 182 embedded key/mask pairs match its output exactly; there are no calls or stubs in that block. This does not replay command-name lookup, vector allocation/removal, modifier text normalization, conflict resolution or complete event dispatch. No original-output corpus is distributed; the check uses the locally supplied EXE.
 
-`src/keymap.rs` parses and indexes the table (key name to command and back). `src/pilot.rs` maps the commands that
-mean something to the approximate flight model onto the aircraft controls: throttle, flaps, brakes, the three
-trims, pause and the camera. The rest report "not simulated". The step sizes ("a bit" of throttle or trim) are
-openXplane's choice.
+Rust checks cover modified versus unmodified lookup, conflicts, mask validation, retained press chords on modifier changes and unsupported Super-key input. None is a UI screenshot or native event comparison.
 
-## Checks
-
-75 unit tests pass. The new ones check that the embedded table has 71 bindings and spot values (`P` = pause,
-`F2` = throttle up, `1` = flaps up, `[` = pitch trim down), that F1..F19 follow the virtual key sequence, that the
-parser rejects malformed rows and duplicate keys, and that each pilot command changes the controls as documented
-(throttle clamps, flaps move one detent per press, brakes hold and toggle, trims step, clamp and centre). A flight
-test confirms that positive elevator trim pitches the aircraft up.
+Esc remains bound to `sim/operation/show_menu`; Ctrl+backtick maps to `sim/operation/toggle_settings_window`. The active viewer still exits on Esc and does not implement those original menu handlers. Alt alone has no entry here, so its native menu-bar behavior must be recovered elsewhere. Matched original screenshots and motion evidence remain outstanding. Full key rebinding and layout/platform-specific parity are not claimed.

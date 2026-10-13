@@ -36,3 +36,5 @@ Static ASCII strings in the supplied baseline EXE contain these paths:
 The menu-specific font/style and texture assignments still require handler/resource analysis. The original `Resources/fonts` and `Resources/bitmaps/interface11` directories are now available in the local `Xplane12/Resources` tree. They remain local reference assets. Run `cargo run -p xp-app -- ui-resources /path/to/Xplane12` to check the original menu files. The viewer does not yet use these textures or fonts. Matched reference screenshots and motion captures are also still required. An independently downloaded font with the same family name would not establish that its version or metrics match this reference build.
 
 See [../research/UI_RESOURCES.md](../research/UI_RESOURCES.md) for the local codec check and native main-menu resource references.
+
+The 2026-10-13 input correction recovers Shift/Alt/Ctrl masks and all 182 default chords. Esc remains show_menu; Ctrl+backtick is toggle_settings_window. Alt alone has no command-table binding, so menu-bar behavior is not established by the modifier recovery. See [../research/KEYMAP.md](../research/KEYMAP.md).

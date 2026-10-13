@@ -39,7 +39,7 @@ the original content, not only unit tests.
    PANEL_3D, materials and normal/lit maps, `xp-check` over the whole directory, an apt.dat index, decoding the
    surface codes.
 2. **Datarefs and commands** (registries done): a typed dataref registry, the 5503-record dataref catalog and the
-   3012-command catalog of the reference build, six ACF-backed datarefs with confirmed types, and a command
+   3138-command catalog of the reference build, six ACF-backed datarefs with confirmed types, and a command
    registry with phases and handler chains. Remaining: backing values for the other datarefs, propagating writes
    to the aircraft state, the built-in command handlers. Everything after depends on it.
 3. **Flight model**: wing forces from AFL, propeller and engine, landing gear, mass and centre of gravity,
