@@ -1,5 +1,5 @@
 //! The aircraft object filled from the ACF properties, following the schema recovered from the reference loader
-//! (`0x141a972a0` and the loaders it calls; `research/ACF_OBJECT.md`). The schema (`data/object_schema.tsv`) was
+//! (`0x141a972a0` and the loaders it calls; `research/ACF_LOADING.md`). The schema (`data/object_schema.tsv`) was
 //! derived by running the original loader on the reference aircraft and on randomised copies of them
 //! (`tools/derive_acf_schema.py`): each row names a key template (integer path components are `{}`), the region
 //! it lands in, the destination as a base offset plus a stride per index, and the transform from the parsed value
@@ -331,6 +331,23 @@ pub fn load_object(acf: &Aircraft, schema: &Schema) -> ObjectWords {
                 }
             };
             store(&mut words, &e.region, *offset, word);
+        }
+    }
+    // Original wing-loader tail 0x141aae9ee..0x141aaea17: the reader loads
+    // all eleven rib values, then only 0..=elements is converted to metres.
+    // Counts beyond the recovered eleven-rib domain are not modelled here.
+    if let Some(wings) = words.regions.get_mut("R6028") {
+        for slot in 0..48u32 {
+            let base = slot * 0x36c8;
+            let count = wings.get(&(base + 4)).copied().unwrap_or(0) as i32;
+            if !(0..=10).contains(&count) {
+                continue;
+            }
+            for rib in 0..=count as u32 {
+                if let Some(word) = wings.get_mut(&(base + 0x70 + rib * 4)) {
+                    *word = (f32::from_bits(*word) * f32::from_bits(0x3e9c0ebf)).to_bits();
+                }
+            }
         }
     }
     words

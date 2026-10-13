@@ -204,7 +204,7 @@ _wing/{}/_bot_t1	float	R6028	730	14024	raw
 _wing/{}/_bot_t2	float	R6028	740	14024	raw	
 _wing/{}/_c_off_for_RIB/{}	float	R6028	9c	14024,4	raw	
 _wing/{}/_c_rat_for_RIB/{}	float	R6028	c8	14024,4	raw	
-_wing/{}/_chord_for_RIB/{}	float	R6028	70	14024,4	?	
+_wing/{}/_chord_for_RIB/{}	float	R6028	70	14024,4	raw
 _wing/{}/_dihed_design	float	R6028	20	14024	raw	
 _wing/{}/_dihed_full_up	float	R6028	24	14024	raw	
 _wing/{}/_elev1/{}	int	R6028	35c	14024,4	int	

@@ -1,8 +1,8 @@
 //! The aircraft object built from the ACF properties against the words the original loader leaves
 //! (`tools/gen_acf_object_vectors.py`). Needs the reference aircraft in `Xplane12/` (not distributed); the
-//! test is skipped without them.
+//! run explicitly with OPENXPLANE_REFERENCE_ROOT. It is diagnostic, not a parity assertion.
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::PathBuf;
 use xp_acf::Aircraft;
 use xp_acf::object::{Schema, load_object};
 
@@ -28,21 +28,23 @@ fn expected(name: &str) -> BTreeMap<(String, u32), u32> {
 }
 
 #[test]
-fn object_matches_the_original_loader() {
+#[ignore = "requires local reference aircraft; diagnostic mismatch report, not a parity assertion"]
+fn object_loader_diagnostics() {
     let schema = Schema::load();
+    let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Xplane12"));
     for (dir, name) in [
         ("Cessna 172 SP", "Cessna_172SP"),
         ("Cessna 172 SP", "Cessna_172SP_G1000"),
         ("Cessna 172 SP", "Cessna_172SP_seaplane"),
     ] {
-        let path = format!(
-            "{}/../../Xplane12/{dir}/{name}.acf",
-            env!("CARGO_MANIFEST_DIR")
+        let path = root.join(dir).join(format!("{name}.acf"));
+        assert!(
+            path.exists(),
+            "reference aircraft is required: {}",
+            path.display()
         );
-        if !Path::new(&path).exists() {
-            eprintln!("skipped: {path} is not present");
-            continue;
-        }
         let acf = Aircraft::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
         let got = load_object(&acf, &schema);
         let want = expected(name);

@@ -304,7 +304,7 @@ impl FlightModel {
             let (mut x, mut y, mut z, mut chord) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
             for i in 0..=n {
                 let t = i as f32 / n as f32;
-                let c = w.root_chord + (w.tip_chord - w.root_chord) * t;
+                let c = w.boundary_chord(i);
                 let p = w.root + u * (w.semilen * t);
                 x.push(p.x);
                 y.push(p.y);

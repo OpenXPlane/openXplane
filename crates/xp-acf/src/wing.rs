@@ -25,6 +25,8 @@ pub struct Wing {
     pub root: Vec3,
     pub root_chord: f32,
     pub tip_chord: f32,
+    /// Active rib chords from ACF, metres. None uses the approximate linear fallback.
+    pub rib_chords: Option<Vec<f32>>,
     pub semilen: f32,
     pub dihedral_deg: f32,
     pub sweep_deg: f32,
@@ -79,7 +81,7 @@ impl Wing {
     /// Wings selected by the original metre-space enabled predicate.
     pub fn all_from_acf(acf: &Aircraft) -> Result<Vec<Wing>, String> {
         let mut wings = Vec::new();
-        for index in 0..32 {
+        for index in 0..48 {
             let key = |k: &str| format!("_wing/{index}/{k}");
             let Ok(semilen) = float(acf, &key("_semilen_SEG")) else {
                 continue;
@@ -97,6 +99,25 @@ impl Wing {
                 ));
             }
             let elements = elements as usize;
+            let rib_prefix = key("_chord_for_RIB/");
+            let rib_chords = if acf
+                .properties
+                .iter()
+                .any(|p| p.key.starts_with(&rib_prefix))
+            {
+                if elements > 10 {
+                    return Err(format!(
+                        "wing {index}: rib chords require at most ten elements"
+                    ));
+                }
+                Some(
+                    (0..=elements)
+                        .map(|rib| float(acf, &key(&format!("_chord_for_RIB/{rib}"))).map(ft))
+                        .collect::<Result<Vec<_>, _>>()?,
+                )
+            } else {
+                None
+            };
             let mut controls = vec![[0.0f32; 4]; elements];
             for (slot, name) in ["_ailn1", "_elev1", "_rudd1", "_flap1"].iter().enumerate() {
                 for (i, c) in controls.iter_mut().enumerate() {
@@ -120,6 +141,7 @@ impl Wing {
                 ),
                 root_chord: ft(root_chord),
                 tip_chord: ft(tip_chord),
+                rib_chords,
                 semilen: ft(semilen),
                 dihedral_deg: float(acf, &key("_dihed_design"))?,
                 sweep_deg: float(acf, &key("_sweep_design"))?,
@@ -159,13 +181,25 @@ impl Wing {
         .normalize()
     }
 
+    /// Stored ACF chord at an active rib, or the approximate linear fallback.
+    pub fn boundary_chord(&self, index: usize) -> f32 {
+        assert!(index <= self.elements);
+        self.rib_chords.as_ref().map_or_else(
+            || {
+                self.root_chord
+                    + (self.tip_chord - self.root_chord) * (index as f32 / self.elements as f32)
+            },
+            |chords| chords[index],
+        )
+    }
+
     pub fn element(&self, index: usize) -> Element {
         let n = self.elements as f32;
         let s0 = index as f32 / n;
         let s1 = (index + 1) as f32 / n;
         let sc = 0.5 * (s0 + s1);
-        let c0 = self.root_chord + (self.tip_chord - self.root_chord) * s0;
-        let c1 = self.root_chord + (self.tip_chord - self.root_chord) * s1;
+        let c0 = self.boundary_chord(index);
+        let c1 = self.boundary_chord(index + 1);
         let chord = 0.5 * (c0 + c1);
         let u = self.span_direction();
         // direction to the right-hand side along the span (flips for left halves)
@@ -290,6 +324,28 @@ mod tests {
         }
         s += &format!("P _wing/{n}/_part_x {x}\nP _wing/{n}/_is_right_mult {side}\n");
         s
+    }
+
+    #[test]
+    fn uses_non_linear_rib_chords_and_reads_slot_47() {
+        let mut source = wing_text(47, 0.0, 1.0, 0.0, 0.0);
+        for (rib, value) in [5.0f32, 7.0, 2.0, 4.0, 3.0].into_iter().enumerate() {
+            source += &format!("P _wing/47/_chord_for_RIB/{rib} {value}\n");
+        }
+        let wings = Wing::all_from_acf(&acf(&source)).unwrap();
+        assert_eq!(wings.len(), 1);
+        let wing = &wings[0];
+        assert_eq!(wing.index, 47);
+        assert_eq!(
+            wing.boundary_chord(1).to_bits(),
+            (7.0 * ACF_FT_TO_M).to_bits()
+        );
+        assert_eq!(
+            wing.element(0).chord,
+            0.5 * (wing.boundary_chord(0) + wing.boundary_chord(1))
+        );
+        let partial = source.replace("P _wing/47/_chord_for_RIB/2 2\n", "");
+        assert!(Wing::all_from_acf(&acf(&partial)).is_err());
     }
 
     #[test]
