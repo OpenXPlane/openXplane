@@ -89,7 +89,7 @@ _body/{}/_bot_s1	float	R6040	638	13512	raw
 _body/{}/_bot_s2	float	R6040	648	13512	raw	
 _body/{}/_bot_t1	float	R6040	640	13512	raw	
 _body/{}/_bot_t2	float	R6040	650	13512	raw	
-_body/{}/_geo_xyz/{},{},{}	float	R6040	65c	13512,216,12,4	?	
+_body/{}/_geo_xyz/{},{},{}	float	R6040	65c	13512,216,12,4	scale:3e9c0ebf
 _body/{}/_part_area_rule	float	R6040	8	13512	floor:d:3f50624dd2f1a9fc:3f800000:raw	
 _body/{}/_part_cd	float	R6040	0	13512	?	
 _body/{}/_part_rad	coeff	R6040	c	13512	raw	3e9c0ebf

@@ -80,3 +80,58 @@ fn object_loader_diagnostics() {
         eprintln!("{name}: {same} same, {different} different, {missing} missing, {extra} extra");
     }
 }
+
+#[test]
+#[ignore = "requires all three local reference aircraft; strict body-grid field comparison"]
+fn body_grid_coordinates_match_completed_original_loader() {
+    let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Xplane12"));
+    let schema = Schema::load();
+    for name in [
+        "Cessna_172SP",
+        "Cessna_172SP_G1000",
+        "Cessna_172SP_seaplane",
+    ] {
+        let path = root.join("Cessna 172 SP").join(format!("{name}.acf"));
+        let acf = Aircraft::parse(
+            &std::fs::read_to_string(&path).expect("local reference aircraft required"),
+        )
+        .unwrap();
+        let got = load_object(&acf, &schema);
+        let want = expected(name);
+        let mut checked = 0;
+        for p in &acf.properties {
+            let Some(rest) = p.key.strip_prefix("_body/") else {
+                continue;
+            };
+            let Some((body, coordinates)) = rest.split_once("/_geo_xyz/") else {
+                continue;
+            };
+            let Ok(body) = body.parse::<u32>() else {
+                continue;
+            };
+            let Ok(indices) = coordinates
+                .split(',')
+                .map(str::parse::<u32>)
+                .collect::<Result<Vec<_>, _>>()
+            else {
+                continue;
+            };
+            if indices.len() != 3 {
+                continue;
+            }
+            assert!(body < 39 && indices[0] < 20 && indices[1] < 18 && indices[2] < 3);
+            let offset =
+                body * 0x34c8 + 0x65c + indices[0] * 216 + indices[1] * 12 + indices[2] * 4;
+            let original = want
+                .get(&("R6040".to_owned(), offset))
+                .copied()
+                .unwrap_or(0);
+            assert_eq!(got.word("R6040", offset), original, "{name} {}", p.key);
+            checked += 1;
+        }
+        assert!(checked > 0, "no body coordinates in {name}");
+        eprintln!("{name}: {checked} exact body grid words");
+    }
+}
