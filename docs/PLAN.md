@@ -102,3 +102,7 @@ The native ordered classification collection and visible-window query now match 
 ## Keyboard interceptor wrapper/adapter (2026-10-13)
 
 Both native interceptor layers now match 1864 local cases, including signed results/context tokens, phases 0/2, timing arithmetic and callback mutations. The 2152-case combined keyboard replay executes them unchanged; only their external clock/scope/context/export endpoints are controlled. Recover actual module/registration lifecycle and endpoint effects, plus menu widget actions, before live integration. Evidence: `research/KEY_INTERCEPT_WRAPPER.md`.
+
+## Native command block-mask query (2026-10-13)
+
+The complete per-command mask query now matches 6418 local original-code cases without stubs, including all 3138 catalogue IDs. Esc/main-menu/settings commands are exempt from this query but remain subject to other gates. The show_menu opening action is still unidentified; reconstruct complete Begin/End routing and its ID-3 callback path next. Evidence: `research/COMMAND_BLOCK_MASK.md`.

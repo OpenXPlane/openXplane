@@ -50,3 +50,5 @@ The complete keyboard entry now has combined UI/filter/binding evidence across 2
 The keyboard capture query now uses recovered classification/list/opacity behavior rather than a supplied boolean (`research/UI_CLASSIFICATION_QUERY.md`): 1054 query contexts and 2152 strengthened combined keyboard cases pass. Class-2 semantics, runtime registry construction and concrete menu actions remain unresolved. No original menu has been rendered or visually compared yet.
 
 The native interceptor wrapper and registered adapter now have 1864 exact local comparisons and execute inside the strengthened 2152-case full keyboard replay (`research/KEY_INTERCEPT_WRAPPER.md`). Actual external export/context effects and runtime registration remain unverified. The live viewer is unchanged; this supplies no menu pixels or motion evidence.
+
+The command block-mask query confirms exemptions for show_menu/main-menu/settings in 6418 local native cases (`research/COMMAND_BLOCK_MASK.md`). Exemptions do not bypass other input gates and do not prove opening behavior. Actual ID-3 actions, viewer UI and paired visual evidence remain unfinished.

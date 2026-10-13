@@ -5,3 +5,5 @@ pub mod flight_map;
 pub mod keymap;
 
 pub mod key_event;
+
+pub mod command_gate;
