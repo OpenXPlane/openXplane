@@ -1,4 +1,4 @@
-use xp_dataref::command_dispatch::{self, CommandState, Phase, Services, State};
+use xp_dataref::command_dispatch::{self, CommandState, ContinueServices, Phase, Services, State};
 struct Replay {
     mutation: u32,
     primary_mutation: bool,
@@ -23,6 +23,7 @@ impl Services for Replay {
                 }
                 3 => {
                     s.observers.insert(4);
+                    s.dt = -0.375;
                 }
                 _ => {}
             }
@@ -32,13 +33,26 @@ impl Services for Replay {
         self.trace.push(format!("P:{}", u8::from(before)));
         if before && self.primary_mutation {
             s.commands[command as usize].primary = 4;
+            s.dt = 0.25;
         }
         self.before
     }
 }
+impl ContinueServices for Replay {
+    fn continued(&mut self, s: &mut State, object: u64, command: i32, elapsed: f32, dt: f32) {
+        self.callback(s, object, command, Phase::Continue);
+        *self.trace.last_mut().unwrap() = format!(
+            "F:{object}:{:08x}:{:08x}:{}",
+            elapsed.to_bits(),
+            dt.to_bits(),
+            s.commands[command as usize].count
+        );
+    }
+}
+
 #[test]
-#[ignore = "requires local full Begin/End replay; set OPENXPLANE_COMMAND_DISPATCH_VECTORS"]
-fn native_begin_end_counters_snapshots_and_callbacks_match() {
+#[ignore = "requires local full Begin/Continue/End replay; set OPENXPLANE_COMMAND_DISPATCH_VECTORS"]
+fn native_command_phases_counters_snapshots_and_callbacks_match() {
     let text = std::fs::read_to_string(
         std::env::var_os("OPENXPLANE_COMMAND_DISPATCH_VECTORS")
             .expect("set OPENXPLANE_COMMAND_DISPATCH_VECTORS"),
@@ -51,15 +65,17 @@ fn native_begin_end_counters_snapshots_and_callbacks_match() {
         let signed = |i: usize| v[i].parse::<i32>().unwrap();
         let unsigned = |i: usize| v[i].parse::<u32>().unwrap();
         let command = signed(1);
-        let phase = if unsigned(0) == 0 {
-            Phase::Begin
-        } else {
-            Phase::End
+        let phase = match unsigned(0) {
+            0 => Phase::Begin,
+            1 => Phase::End,
+            _ => Phase::Continue,
         };
         let mut state = State {
             commands: vec![CommandState::default(); 3138],
             observers: [1, 2, 3].into_iter().collect(),
             block_byte: unsigned(3) as u8,
+            dt: v[12].parse().unwrap(),
+            rate_delta: 0.75,
             now: f64::from_bits(u64::from_str_radix(v[9], 16).unwrap()),
             ..State::default()
         };
@@ -78,7 +94,11 @@ fn native_begin_end_counters_snapshots_and_callbacks_match() {
             before: signed(8),
             trace: Vec::new(),
         };
-        command_dispatch::dispatch(&mut state, command, unsigned(5), phase, &mut r).unwrap();
+        if phase == Phase::Continue {
+            command_dispatch::continue_command(&mut state, command, unsigned(5), &mut r).unwrap();
+        } else {
+            command_dispatch::dispatch(&mut state, command, unsigned(5), phase, &mut r).unwrap();
+        }
         let mut expected = output.split_whitespace();
         let slot = state.commands[command as usize];
         assert_eq!(
@@ -108,11 +128,21 @@ fn native_begin_end_counters_snapshots_and_callbacks_match() {
             "observers case {count}"
         );
         assert_eq!(
+            state.rate_delta.to_bits(),
+            u32::from_str_radix(expected.next().unwrap(), 16).unwrap(),
+            "rate case {count}"
+        );
+        assert_eq!(
+            state.dt.to_bits(),
+            u32::from_str_radix(expected.next().unwrap(), 16).unwrap(),
+            "dt case {count}"
+        );
+        assert_eq!(
             r.trace,
             expected.map(str::to_string).collect::<Vec<_>>(),
             "trace case {count}"
         );
         count += 1;
     }
-    assert_eq!(count, 1768);
+    assert_eq!(count, 2152);
 }

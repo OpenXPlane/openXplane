@@ -110,3 +110,7 @@ The complete per-command mask query now matches 6418 local original-code cases w
 ## Complete Begin/End command executor (2026-10-13)
 
 Both native dispatchers now match 1768 local original-code cases, including counters/time, override priority, real observer snapshot/iteration, removals/additions and post-plugin primary changes. Allocator and callback/plugin endpoints are controlled. Trace ID-3 observer/override/primary construction to the actual window action, then integrate with the viewer. Evidence: `research/COMMAND_BEGIN_END.md`.
+
+## Held-command Continue (2026-10-14)
+
+The third native command phase now joins full Begin/End with 2152 combined original-code cases: zero-count nested Begin, float32 elapsed/ramp arithmetic and live dt callback reads are recovered. Scheduling and actual menu callback registration/effects remain unported. Next: the real ID-3 observer/override/primary chain, held scheduling, then live UI integration and paired captures. Evidence: `research/COMMAND_CONTINUE.md`.

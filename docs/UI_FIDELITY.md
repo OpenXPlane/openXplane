@@ -54,3 +54,5 @@ The native interceptor wrapper and registered adapter now have 1864 exact local 
 The command block-mask query confirms exemptions for show_menu/main-menu/settings in 6418 local native cases (`research/COMMAND_BLOCK_MASK.md`). Exemptions do not bypass other input gates and do not prove opening behavior. Actual ID-3 actions, viewer UI and paired visual evidence remain unfinished.
 
 The complete command Begin/End executor now has 1768 original-code comparisons (`research/COMMAND_BEGIN_END.md`). Dispatches include menu IDs, but their callbacks still supply controlled effects. Live ID-3 registration and window actions remain unidentified; there is no Alt/Esc renderer or paired visual evidence yet.
+
+The command lifecycle now includes native Continue, verified in 2152 combined cases (`research/COMMAND_CONTINUE.md`). Real held scheduling and ID-3 window actions are still missing; this adds no screenshot/motion evidence and does not change the viewer's Esc exit behavior.

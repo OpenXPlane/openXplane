@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Phase {
     Begin,
     End,
+    Continue,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -25,11 +26,14 @@ pub struct State {
     pub gate: CommandGate,
     pub block_byte: u8,
     pub now: f64,
+    pub dt: f32,
+    /// Raw owner+0 float written by Continue.
+    pub rate_delta: f32,
 }
 
 pub trait Services {
     fn callback(&mut self, state: &mut State, object: u64, command: i32, phase: Phase);
-    /// Native arguments are (command, Begin=1/End=0, Begin=0/End=1, before=1/after=0).
+    /// Native args: (command, begin, end, before). Continue uses begin=end=0.
     fn intercept(&mut self, state: &mut State, command: i32, phase: Phase, before: bool) -> i32;
 }
 
@@ -59,6 +63,7 @@ pub fn dispatch(
             }
             slot.count = slot.count.wrapping_add(1);
         }
+        Phase::Continue => return Err("use continue_command for Continue callbacks"),
         Phase::End => {
             if slot.count > 0 {
                 slot.count -= 1;
@@ -87,6 +92,64 @@ pub fn dispatch(
     Ok(())
 }
 
+/// Continue virtual slot +0x8 also receives cached elapsed time and current dt.
+pub trait ContinueServices: Services {
+    fn continued(&mut self, state: &mut State, object: u64, command: i32, elapsed: f32, dt: f32);
+}
+
+/// Entire native Continue 0x140c7f8c0, including a real Begin when count is zero.
+/// Callback changes made by Begin are observed, without repeating the initial gates.
+/// Finite float arithmetic preserves the original subtraction/cast and f32 ramp order.
+#[allow(clippy::manual_clamp)] // Keep the recovered comparison order explicit.
+pub fn continue_command(
+    state: &mut State,
+    command: i32,
+    source_mask: u32,
+    services: &mut impl ContinueServices,
+) -> Result<(), &'static str> {
+    if state.block_byte != 0 || state.gate.is_blocked(command, source_mask) {
+        return Ok(());
+    }
+    let index = usize::try_from(command)
+        .ok()
+        .filter(|&i| i < state.commands.len())
+        .ok_or("invalid native command-vector index")?;
+    if state.commands[index].count == 0 {
+        dispatch(state, command, source_mask, Phase::Begin, services)?;
+    }
+    let elapsed = (state.now - f64::from(state.commands[index].started)) as f32;
+    let ramp = (elapsed - 1.0) * 3.0 + 1.0;
+    let ramp = if 1.0 > ramp {
+        1.0
+    } else if 4.0 < ramp {
+        4.0
+    } else {
+        ramp
+    };
+    state.rate_delta = ramp * state.dt;
+    if let Some(object) = state.overrides.get(&command).copied().filter(|&o| o != 0) {
+        let dt = state.dt;
+        services.continued(state, object, command, elapsed, dt);
+        return Ok(());
+    }
+    let snapshot: Vec<_> = state.observers.iter().copied().collect();
+    for (i, object) in snapshot.into_iter().enumerate() {
+        if i == 0 || state.observers.contains(&object) {
+            let dt = state.dt;
+            services.continued(state, object, command, elapsed, dt);
+        }
+    }
+    if services.intercept(state, command, Phase::Continue, true) != 0 {
+        let object = state.commands[index].primary;
+        if object != 0 {
+            let dt = state.dt;
+            services.continued(state, object, command, elapsed, dt);
+        }
+    }
+    services.intercept(state, command, Phase::Continue, false);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,6 +157,7 @@ mod tests {
     struct Effects {
         calls: Vec<u64>,
         mutate: bool,
+        held: Vec<(u64, f32, f32)>,
     }
     impl Services for Effects {
         fn callback(&mut self, state: &mut State, object: u64, _: i32, _: Phase) {
@@ -106,6 +170,51 @@ mod tests {
         fn intercept(&mut self, _: &mut State, _: i32, _: Phase, _: bool) -> i32 {
             1
         }
+    }
+    impl ContinueServices for Effects {
+        fn continued(
+            &mut self,
+            state: &mut State,
+            object: u64,
+            command: i32,
+            elapsed: f32,
+            dt: f32,
+        ) {
+            self.callback(state, object, command, Phase::Continue);
+            self.held.push((object, elapsed, dt));
+        }
+    }
+    #[test]
+    fn continue_begins_zero_count_and_preserves_ramp_order() {
+        let mut state = State {
+            commands: vec![
+                CommandState {
+                    primary: 5,
+                    ..CommandState::default()
+                };
+                4
+            ],
+            now: 2.75,
+            dt: 0.25,
+            ..State::default()
+        };
+        let mut effects = Effects::default();
+        continue_command(&mut state, 3, 0, &mut effects).unwrap();
+        assert_eq!(state.commands[3].count, 1);
+        assert_eq!(state.commands[3].started, 2.75);
+        assert_eq!(state.rate_delta, 0.25);
+        assert_eq!(effects.calls, [5, 5]);
+        state.now = 4.25;
+        continue_command(&mut state, 3, 0, &mut effects).unwrap();
+        assert_eq!(state.commands[3].count, 1);
+        assert_eq!(state.rate_delta, 0.625);
+        state.now = 9.75;
+        continue_command(&mut state, 3, 0, &mut effects).unwrap();
+        assert_eq!(state.rate_delta, 1.0);
+        assert_eq!(
+            effects.held,
+            [(5, 0.0, 0.25), (5, 1.5, 0.25), (5, 7.0, 0.25)]
+        );
     }
     #[test]
     fn repeated_begin_preserves_first_time_and_blocked_end_still_releases() {

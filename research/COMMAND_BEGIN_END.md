@@ -34,3 +34,7 @@ The corpus remains local and the comparison is opt-in, ignored in ordinary CI. O
 This removes a missing executor layer between keyboard Begin/End requests and actual handlers. It does not identify ID 3's registered/override/observer objects in a live engine. Their construction and concrete callback effects still need recovery. The current viewer continues using its independent command lifecycle and exits on Esc; the recovered dispatcher is not wired there yet.
 
 Next: trace native observer/override/primary registration for show_menu, connect its actual window action and live input state, then recover Alt activation and menu layout/rendering. Paired original/openXplane screenshots and GIF/video remain required; command replays do not establish menu pixels or whole-game parity.
+
+## Subsequent Continue extension (2026-10-14)
+
+The current generator/test now covers 2152 combined Begin/Continue/End cases, superseding the initial 1768-case corpus above. See `COMMAND_CONTINUE.md` for elapsed/dt arguments, nested Begin and scope limits. The original Begin/End-only comparison remains historical evidence; do not interpret it as proof of held-command scheduling.
