@@ -66,3 +66,5 @@ pub mod ui_menu_focus_graph;
 pub mod ui_input_construct;
 
 pub mod ui_panel_construct;
+
+pub mod ui_menu_member_construct;

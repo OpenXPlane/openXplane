@@ -284,3 +284,12 @@ identities and complete allocation snapshots ([evidence](../research/UI_PANEL_CO
 Next concrete main-menu interfaces/children/layout/resources, heap/localized
 strings and live factory/key/focus integration. Opening ID3/Alt, original
 rendering and matched captures remain unfinished; UI verified share stays zero.
+
+## Embedded menu members (2026-10-14)
+
+180 original member/capture/registration/vector-growth scenarios now match exact
+bytes, capacities and allocation/copy/free order
+([evidence](../research/UI_MENU_MEMBER_CONSTRUCT.md)). Next global interface
+linkage1410c7bb0, then combine concrete panel prefix with common/member stages
+and recover singleton/child/layout/resource creation. Callable/lifetime/large
+allocation and original rendering remain unfinished; UI verified share stays zero.
