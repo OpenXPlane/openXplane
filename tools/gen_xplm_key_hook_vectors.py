@@ -5,6 +5,8 @@ import random
 import sys
 from pathlib import Path
 from emulate_xp import Emulator, RET_ADDR
+from xplm_reference_state import install_tls, read_stack
+from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RSP
 SHA256 = '706c6f1fd856c1a8c121edac2c8df12e65603e821e3f786ee8bde72543c1401f'
 S, H = 0x180069660, 0x180069690
@@ -28,18 +30,9 @@ def cases():
 def main(path):
     assert hashlib.sha256(Path(path).read_bytes()).hexdigest() == SHA256
     e = Emulator(path); top = e.heap_top
-    log = []; active_mask = [0]; values = []
+    log = []; values = []; tls_pointer = [0]
     def validate(stage):
         return lambda emu: log.append(f'V:{stage}')
-    def enter(emu):
-        pointer, plugin = emu.reg(UC_X86_REG_RCX), emu.reg(UC_X86_REG_RDX)&0xffffffff
-        emu.write_u32(pointer, plugin); log.append(f'G:{plugin}')
-        emu.uc.reg_write(UC_X86_REG_RAX, pointer)
-    def active(emu):
-        plugin = emu.read_u32(emu.reg(UC_X86_REG_RCX)); log.append(f'A:{plugin}')
-        emu.uc.reg_write(UC_X86_REG_RAX, int(bool(active_mask[0] & (1<<plugin))))
-    def leave(emu):
-        log.append(f'E:{emu.read_u32(emu.reg(UC_X86_REG_RCX))}')
     def sniff(emu):
         refcon = emu.reg(UC_X86_REG_R9); i = refcon-100
         assert [emu.reg(r)&0xffffffff for r in [UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8]] == [values[1],values[3],values[2]]
@@ -60,14 +53,24 @@ def main(path):
     # Cleanup is called twice, before and after pending clears; infer step from pending.
     def cleanup(emu):
         base=emu.reg(UC_X86_REG_RCX);flush(0 if e.read(base+20,1)[0] else 2)(emu)
-    e.stubs.update({0x180021e10:validate(0),0x1800156a0:validate(1),0x18001cc90:enter,0x18001d1d0:active,0x18001cf60:leave,RET_ADDR+0x100:sniff,RET_ADDR+0x200:hotkey,RET_ADDR+0x300:window,0x180008950:cleanup,0x1800094f0:flush(1),0x1800091a0:flush(1)})
+    e.stubs.update({0x180021e10:validate(0),0x1800156a0:validate(1),RET_ADDR+0x100:sniff,RET_ADDR+0x200:hotkey,RET_ADDR+0x300:window,0x180008950:cleanup,0x1800094f0:flush(1),0x1800091a0:flush(1)})
+    def context_enter_trace(uc, address, size, user):
+        log.append(f'G:{e.reg(UC_X86_REG_RDX) & 0xffffffff}')
+    def context_trace(kind):
+        return lambda uc, address, size, user: log.append(f'{kind}:{read_stack(e, tls_pointer[0])[-1]}')
+    e.uc.hook_add(UC_HOOK_CODE, context_enter_trace, begin=0x18001cc90, end=0x18001cc90)
+    e.uc.hook_add(UC_HOOK_CODE, context_trace('A'), begin=0x18001d1d0, end=0x18001d1d0)
+    e.uc.hook_add(UC_HOOK_CODE, context_trace('E'), begin=0x18001cf60, end=0x18001cf60)
+    e.stubs[0x1800213f0] = lambda emu: log.append(f'L:{emu.reg(UC_X86_REG_RCX) & 0xffffffff}')
+    e.stubs[0x180015470] = lambda emu: log.append('C')
     print('# dll_sha256',SHA256)
-    print('# full export/internal key hook and consumed-sniffer EndCall unchanged; validation/context/user callbacks/deferred-list helpers logged')
+    print('# full export/internal key hook and consumed-sniffer EndCall unchanged; context ctor/activation/dtor and enabled query unchanged on ready TLS; validation/lazy-loader/user callbacks/deferred-list helpers logged')
     print('# P phase char key flags active target focus sdepth spending hdepth hpending sn [deleted before plugin result]* hk [deleted key flags plugin]* -> result sdepth spending hdepth hpending trace*')
     count=0
     for case in cases():
-        values[:]=case;e.heap_top=top;log.clear();active_mask[0]=case[4]
+        values[:]=case;e.heap_top=top;log.clear()
         phase,char,key,flags,active_bits,target,focus,sd,sp,hd,hp,sniffers,hotkeys=case
+        tls_pointer[0], _, _ = install_tls(e, stack=[-1], enabled=[int(bool(active_bits & (1 << i))) for i in range(4)], pending=-1)
         for base,depth,pending in [(S,sd,sp),(H,hd,hp)]:
             e.write(base,bytes(24));e.write_u32(base+16,depth);e.write(base+20,bytes([pending]))
         nodes=[e.alloc(64) for _ in sniffers]
@@ -80,6 +83,7 @@ def main(path):
             n=nodes[i];e.write(n,bytes(104));e.write_u64(n,nodes[i+1] if i+1<len(nodes) else 0);e.write(n+8,bytes([deleted]));e.write_u32(n+40,plugin);e.write(n+44,bytes([k]));e.write_u32(n+48,f);e.write_u64(n+88,RET_ADDR+0x200);e.write_u64(n+96,200+i)
         w=e.alloc(136);e.write(w,bytes(136));e.write_u64(w+80,RET_ADDR+0x300);e.write_u32(w+120,3);e.write_u64(w+128,300);e.write_u64(0x1800696d8,w if focus else 0)
         result=e.call(0x18001a670,ints=[char,flags,key,phase],stack=[0 if target==0 else (w if target==1 else w+8)],max_instructions=100000)&0xffffffff
+        assert read_stack(e, tls_pointer[0]) == [-1]
         print('P',*case[:11],len(sniffers),*(v for row in sniffers for v in row),len(hotkeys),*(v for row in hotkeys for v in row),'->',result,e.read_u32(S+16),e.read(S+20,1)[0],e.read_u32(H+16),e.read(H+20,1)[0],*log);count+=1
     print('# cases',count)
 

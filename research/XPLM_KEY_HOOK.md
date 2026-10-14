@@ -38,3 +38,7 @@ The corpus stays local; this comparison is ignored in ordinary CI. The subsequen
 ## Next and visual limits
 
 The missing-module pause is resolved. Next: recover context/activation/list lifecycle services, and use available module symbols to trace real UI registrations/actions. Actual show_menu/Alt actions, live viewer input, menu layout/rendering and paired screenshots/GIF/video remain unverified. This port is not a live plugin loader or proof of whole-game/UI parity.
+
+## Subsequent context recovery (2026-10-14)
+
+The current hook corpus now executes original initialized-TLS context ctor/activation/dtor and enabled query, replacing its former activation-result loggers. The mask initializes real record bytes; plugin 0 is always active. See `XPLM_CONTEXT.md` for 1108 direct context cases, stronger 1090/2152 hook/paired comparisons and the remaining validation/module/TLS-initialization limits.

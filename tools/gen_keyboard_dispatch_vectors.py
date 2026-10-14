@@ -9,6 +9,7 @@ import sys
 from emulate_xp import Emulator, RET_ADDR
 from extract_commands import detailed_records, REFERENCE_SHA256
 from gen_xplm_key_hook_vectors import SHA256 as SDK_SHA256
+from xplm_reference_state import install_tls, read_stack
 from gen_ui_capture_vectors import install_allocator, build_registry
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_XMM0
@@ -52,12 +53,14 @@ def map_sdk(emu, path):
     emu.write_u64(0x180069660, first)
     emu.write_u64(0x180069690, 0)
     emu.write_u64(0x1800696d8, 0)
+    tls, _, _ = install_tls(emu, stack=[-1], enabled=[], pending=-1)
+    return tls
 
 
 def main(path, sdk_path):
     detailed_records(path)
     e = Emulator(path)
-    map_sdk(e, sdk_path)
+    tls = map_sdk(e, sdk_path)
     owner, vector, root, vt, mode_ptr = e.alloc(64), e.alloc(48), e.alloc(64), e.alloc(96), e.alloc(4)
     e.write_u64(root, vt)
     e.write_u64(vt + 0x50, 0x1412ee8a0)
@@ -114,17 +117,9 @@ def main(path, sdk_path):
     e.write_u64(0x146105018, RET_ADDR + 0x600)
     e.write_u32(0x14610551c, 0)
     e.uc.hook_add(UC_HOOK_CODE, lambda uc, addr, size, user: log.append(f'D:{e.reg(UC_X86_REG_R9) & 0xffffffff}'), begin=0x18001a670, end=0x18001a670)
-    # Original DLL routing executes; thread/context services remain controlled.
+    # DLL context ctor/activation/dtor also execute on initialized synthetic TLS.
     e.stubs[0x180021e10] = lambda emu: None
     e.stubs[0x1800156a0] = lambda emu: None
-    def sdk_enter(emu):
-        pointer = emu.reg(UC_X86_REG_RCX)
-        assert emu.reg(UC_X86_REG_RDX) & 0xffffffff == 0
-        emu.write_u32(pointer, 0)
-        emu.uc.reg_write(UC_X86_REG_RAX, pointer)
-    e.stubs[0x18001cc90] = sdk_enter
-    e.stubs[0x18001d1d0] = lambda emu: emu.uc.reg_write(UC_X86_REG_RAX, 1)
-    e.stubs[0x18001cf60] = lambda emu: None
     e.stubs[RET_ADDR + 0x400] = intercept
     e.stubs[RET_ADDR + 0x500] = lambda emu: emu.uc.reg_write(UC_X86_REG_RAX, 0)
     e.stubs[RET_ADDR + 0x600] = lambda emu: None
@@ -134,7 +129,7 @@ def main(path, sdk_path):
     e.stubs[0x140c7fc40] = command('E')
     print('# reference_sha256', REFERENCE_SHA256)
     print('# sdk_sha256', SDK_SHA256)
-    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; native capture and interceptor wrapper/adapter unchanged; DLL export/body also unchanged; plugin sniffer/UI-own/Begin/End and validation/clock/context/allocator endpoints stubbed')
+    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; native capture and interceptor wrapper/adapter unchanged; DLL export/body also unchanged; plugin sniffer/UI-own/Begin/End and validation/EXE-clock-context/allocator endpoints stubbed; DLL TLS context helpers unchanged')
     print('# K capture first second own mode block char key mask flags focus suppression update_mode update_block -> suppression active* mode block trace*')
     count = 0
     for case in cases():
@@ -160,6 +155,7 @@ def main(path, sdk_path):
         e.write(0x1800696a4, b'\0')
         log.clear()
         e.call(0x140c627a0, ints=[owner, char, key, flags], max_instructions=15000)
+        assert read_stack(e, tls) == [-1]
         assert e.read_u32(0x180069670) == 0 and e.read(0x180069674, 1)[0] == 0
         assert e.read_u32(0x1800696a0) == 0 and e.read(0x1800696a4, 1)[0] == 0
         active = [struct.unpack('<i', e.read(vector + i * 16 + 12, 4))[0] for i in range(3)]

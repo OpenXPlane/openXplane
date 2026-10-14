@@ -3,7 +3,7 @@ use openxplane::{
     xplm_key_hook::{self, Hotkey, Iteration, List, Services, Sniffer, State, Window},
 };
 struct Replay {
-    active: u32,
+    context: openxplane::xplm_context::State,
     outcomes: Vec<i32>,
     trace: Vec<String>,
 }
@@ -14,10 +14,16 @@ impl Services for Replay {
     fn enter(&mut self, _: &mut State, p: i32) -> bool {
         self.trace.push(format!("G:{p}"));
         self.trace.push(format!("A:{p}"));
-        self.active & (1 << p) != 0
+        self.context.enter(p);
+        self.context
+            .active(&mut ContextTrace(&mut self.trace))
+            .unwrap()
     }
     fn leave(&mut self, _: &mut State, p: i32) {
         self.trace.push(format!("E:{p}"));
+        self.context
+            .leave(&mut ContextTrace(&mut self.trace))
+            .unwrap();
     }
     fn sniff(&mut self, _: &mut State, i: usize, _: InterceptInput, r: u64) -> i32 {
         self.trace.push(format!("S:{i}:{r}"));
@@ -38,6 +44,22 @@ impl Services for Replay {
             .push(format!("F:{i}:{step}:{}:{}", it.depth, it.pending));
     }
 }
+struct ContextTrace<'a>(&'a mut Vec<String>);
+impl openxplane::xplm_context::Services for ContextTrace<'_> {
+    fn validate_enabled(&mut self, _: &mut openxplane::xplm_context::State) {
+        self.0.push("C".into());
+    }
+    fn ensure_loaded(&mut self, _: &mut openxplane::xplm_context::State, p: i32) {
+        self.0.push(format!("L:{p}"));
+    }
+    fn unload(&mut self, _: &mut openxplane::xplm_context::State, _: i32) {
+        panic!("no pending unload in key replay")
+    }
+    fn notify_unload(&mut self, _: &mut openxplane::xplm_context::State) {
+        panic!("no pending unload in key replay")
+    }
+}
+
 #[test]
 #[ignore = "requires local Windows XPLM DLL replay; set OPENXPLANE_XPLM_KEY_HOOK_VECTORS"]
 fn native_xplm_key_phases_callbacks_and_iteration_state_match() {
@@ -102,7 +124,11 @@ fn native_xplm_key_phases_callbacks_and_iteration_state_match() {
             }),
         };
         let mut r = Replay {
-            active,
+            context: openxplane::xplm_context::State {
+                stack: vec![-1],
+                enabled: (0..4).map(|i| u8::from(active & (1 << i) != 0)).collect(),
+                ..openxplane::xplm_context::State::default()
+            },
             outcomes,
             trace: Vec::new(),
         };
@@ -113,6 +139,7 @@ fn native_xplm_key_phases_callbacks_and_iteration_state_match() {
             phase,
         };
         let result = xplm_key_hook::dispatch(&mut s, input, target, &mut r);
+        assert_eq!(r.context.stack, [-1]);
         let mut out = b.split_whitespace();
         let expected: Vec<u32> = (0..5)
             .map(|_| out.next().unwrap().parse().unwrap())

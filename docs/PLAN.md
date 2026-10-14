@@ -126,3 +126,7 @@ The requested DLL is now present and the pause is resolved. Its full keyboard ho
 ## Paired EXE/XPLM keyboard execution (2026-10-14)
 
 2152 combined cases now execute original EXE and actual Windows DLL keyboard dispatch in one CPU address space, replacing the export logger. Rust composes both recovered layers. Explicit sniffer registrations and controlled validation/context/callback effects remain; this is not a live Windows loader or game. Next: real SDK context/list lifecycle and menu actions. Evidence: `research/KEYBOARD_PAIRED_REPLAY.md`.
+
+## SDK initialized-TLS context and activation (2026-10-14)
+
+1108 local native contexts verify push/activation/pop, raw enabled records, cached IDs and pending-unload request order. Both the 1090-case DLL hook and 2152-case paired keyboard replay remove SDK context-result stubs and execute the original functions. TLS is explicitly initialized with reserved capacity; real OS/module lifecycle and validation remain unported. Next: loading/unloading and deferred-list bodies, then real menu actions. Evidence: `research/XPLM_CONTEXT.md`.

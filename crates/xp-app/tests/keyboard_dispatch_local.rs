@@ -103,7 +103,15 @@ impl key_intercept::Services for HookReplay<'_> {
             ],
             ..SdkState::default()
         };
-        let result = xplm_key_hook::dispatch(&mut sdk, i, refcon, &mut SdkReplay(self.0));
+        let mut services = SdkReplay {
+            replay: self.0,
+            context: openxplane::xplm_context::State {
+                stack: vec![-1],
+                ..openxplane::xplm_context::State::default()
+            },
+        };
+        let result = xplm_key_hook::dispatch(&mut sdk, i, refcon, &mut services);
+        assert_eq!(services.context.stack, [-1]);
         assert_eq!(
             (sdk.sniffer_iteration.depth, sdk.sniffer_iteration.pending),
             (0, 0)
@@ -116,22 +124,28 @@ impl key_intercept::Services for HookReplay<'_> {
     }
 }
 
-struct SdkReplay<'a>(&'a mut Replay);
+struct SdkReplay<'a> {
+    replay: &'a mut Replay,
+    context: openxplane::xplm_context::State,
+}
 impl SdkServices for SdkReplay<'_> {
     fn validate(&mut self, _: u8) {}
     fn enter(&mut self, _: &mut SdkState, plugin: i32) -> bool {
         assert_eq!(plugin, 0);
-        true
+        self.context.enter(plugin);
+        self.context.active(&mut ContextBoundary).unwrap()
     }
-    fn leave(&mut self, _: &mut SdkState, _: i32) {}
+    fn leave(&mut self, _: &mut SdkState, _: i32) {
+        self.context.leave(&mut ContextBoundary).unwrap();
+    }
     fn sniff(&mut self, _: &mut SdkState, _: usize, i: InterceptInput, refcon: u64) -> i32 {
         assert!(refcon == 0 || refcon == 2);
-        self.0.trace.push(format!(
+        self.replay.trace.push(format!(
             "N:{}:{}:{}:{refcon}",
             i.character, i.virtual_key, i.flags
         ));
-        self.0.mutate();
-        self.0.v[if refcon == 0 { 1 } else { 2 }] as i32
+        self.replay.mutate();
+        self.replay.v[if refcon == 0 { 1 } else { 2 }] as i32
     }
     fn hotkey(&mut self, _: &mut SdkState, _: usize, _: u64) {
         panic!("no hotkeys in paired replay")
@@ -141,6 +155,22 @@ impl SdkServices for SdkReplay<'_> {
     }
     fn flush(&mut self, _: &mut SdkState, _: SdkList, _: u8) {
         panic!("no deferred list changes in paired replay")
+    }
+}
+
+struct ContextBoundary;
+impl openxplane::xplm_context::Services for ContextBoundary {
+    fn validate_enabled(&mut self, _: &mut openxplane::xplm_context::State) {
+        panic!("plugin zero bypasses enabled export")
+    }
+    fn ensure_loaded(&mut self, _: &mut openxplane::xplm_context::State, _: i32) {
+        panic!("plugin zero bypasses lazy load")
+    }
+    fn unload(&mut self, _: &mut openxplane::xplm_context::State, _: i32) {
+        panic!("no pending unload")
+    }
+    fn notify_unload(&mut self, _: &mut openxplane::xplm_context::State) {
+        panic!("no pending unload")
     }
 }
 
