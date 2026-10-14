@@ -190,3 +190,12 @@ verify guard, alpha/membership/map effects and identity error propagation. Combi
 native replay is still required before extending this evidence to the complete
 Esc route. See [bridge limits](../research/UI_MENU_DIRECT_GRAPH.md). Visual checks
 and the full phase requirements remain outstanding.
+
+## Combined direct/close replay (2026-10-14)
+
+728 two-action scenarios now match 1456 original direct actions, 1092 actual close
+helpers and 252 visibility calls on one graph. Profile: argument 0, UI mode 0/2;
+mode-1 document/dialog and fallback/own/focused Esc entry remain unverified
+([evidence and limits](../research/UI_MENU_DIRECT_GRAPH.md)). Continue into these
+branches and actual construction before original renderer and matched captures.
+UI/graphics verified coverage stays zero.

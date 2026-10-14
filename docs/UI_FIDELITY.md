@@ -122,3 +122,8 @@ Controller close now toggles the shared graph: 1456 original close calls reach
 ([close-graph evidence](../research/UI_MENU_CLOSE_GRAPH.md)). Delete/reset/update
 bodies remain controlled and live menu/viewer integration is pending. No
 matched screenshots or motion captures were produced by this CPU comparison.
+
+The direct/close bridge now has combined original-code evidence for argument 0
+and UI mode 0/2: 1456 direct actions reach 1092 actual close helpers and 252
+visibility bodies ([limits](../research/UI_MENU_DIRECT_GRAPH.md)). This does not
+prove mode-1 dialogs, actual Esc entry, construction or paired visual fidelity.
