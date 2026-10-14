@@ -120,7 +120,7 @@ This is a self-assessed, weighted rubric, not a measurement (method and per-subs
 
 Next up:
 
-- Join graph-backed close (1456 original close calls, 367 actual visibility calls) with direct/fallback/own/focused menu routes. Recover construction/factory, reset/delete/update/environment, binding/focus, parent callbacks and mutable listeners; wire original layout/fonts/GPU output and compare matched Alt/Esc screenshots/GIF/video.
+- Replay complete original direct action plus graph-backed close on one state, then join fallback/own/focused Esc routing and actual construction. Recover remaining effect/lifetime bodies and original rendering; produce paired Alt/Esc screenshots/GIF/video.
 - Join verified close-map helper (574 native contexts) with direct/fallback/own/focused menu routes; recover actual window update/reset/visibility/delete/environment/final effects, factory and registry lifetime. Complete document/binding/dialog/submission effects, identify show_menu ID-3/Alt activation and recover original layout/font/GPU output with paired captures.
 - Trace actual Alt/Esc show_menu/main-menu/settings actions: live observer/override/primary registration, held-command scheduling, UI classification/registry lifecycle, focus callers, leave/enter notifications, widget masks and concrete child callbacks. Connect the verified keyboard/command routing to the live viewer.
 - Recover original menu state, layout and font roles; connect the 25 available textures and 12 fonts to GPU rendering, then compare paired screenshots and GIF/video under identical conditions. Esc still exits the viewer and no original menu is drawn.

@@ -182,3 +182,11 @@ show/hide calls, including reset-to-show, map clearing and post-close queries
 focused routes and actual construction, remaining service/lifetime effects and
 original rendering. Delete is still a request, not proven destruction. Paired
 captures remain pending; UI/graphics verified coverage stays zero.
+
+## Direct action / close bridge (2026-10-14)
+
+Direct action now delegates close to the shared graph. Ordinary integration tests
+verify guard, alpha/membership/map effects and identity error propagation. Combined
+native replay is still required before extending this evidence to the complete
+Esc route. See [bridge limits](../research/UI_MENU_DIRECT_GRAPH.md). Visual checks
+and the full phase requirements remain outstanding.

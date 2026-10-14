@@ -52,3 +52,5 @@ pub mod ui_widget_tree;
 pub mod ui_window_graph;
 
 pub mod ui_menu_close_graph;
+
+pub mod ui_menu_direct_graph;
