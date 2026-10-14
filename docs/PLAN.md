@@ -118,3 +118,7 @@ The third native command phase now joins full Begin/End with 2152 combined origi
 ## External keyboard module boundary (2026-10-14)
 
 The next actual keyboard-hook endpoint needs `Resources/plugins/XPLM_64.dll` from the same original Windows installation. The executable names that path/export, but the supplied reference tree has no module. Per the user's instruction, pause for this specific file after publishing the investigation. Menu callback registration and candidate runtime vtables remain unproven; see `research/UI_REGISTRATION_NEXT_INPUT.md`. Resume with DLL identity/exports and actual hook/context behavior, retaining the full 1:1 acceptance scope.
+
+## Actual Windows XPLM key hook (2026-10-14)
+
+The requested DLL is now present and the pause is resolved. Its full keyboard hook matches 1090 local Windows-code cases for phase routing, sniffers/hotkeys/window input and iteration-state requests. Validation/context/activation/user-callback/deferred-list bodies are controlled endpoints; EXE↔DLL replay integration remains next. Exact EXE/DLL build pairing is not proven by version metadata. See `research/XPLM_KEY_HOOK.md`; live Alt/Esc menus and paired visuals remain unfinished.

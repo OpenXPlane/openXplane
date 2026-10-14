@@ -23,3 +23,7 @@ Startup `0x141c26694..0x141c2669c` still establishes the menu/settings controlle
 The user explicitly requested stopping when a genuinely necessary reference file is needed and resuming after they attach it. Preserve the full whole-game/UI 1:1 objective. Pause at this missing external-module boundary after publishing these observations. Resume by checking the supplied DLL's identity, architecture/build compatibility and exports; then analyze the actual keyboard hook/context endpoints. Do not count a module attachment or green kernel tests as proof of original menu behavior.
 
 Alt activation, actual Esc window actions, live viewer integration, rendering and paired original/openXplane screenshots/GIF/video remain required. Progress rubric shares are unchanged.
+
+## Resolved input boundary (2026-10-14)
+
+The requested Windows XPLM module and adjacent Windows/Linux SDK modules are now supplied. The goal resumed; the file pause is resolved. See `XPLM_KEY_HOOK.md` for exact DLL identity, missing version-pairing evidence and the first actual Windows hook comparison. Earlier statements about absence describe the preceding local state, not the current reference tree.
