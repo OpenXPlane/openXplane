@@ -103,3 +103,9 @@ alpha mutations ([visibility evidence](../research/UI_WINDOW_VISIBILITY.md)).
 Ancestor alpha is preserved, including repeated membership in the controlled
 zero-ancestor profile. Parent/dirty propagation and other effect bodies are still
 services; live menu rendering and matched screenshots/motion remain unverified.
+
+Widget reparent and dirty propagation now have 744+744 original-code comparisons
+([widget-tree evidence](../research/UI_WIDGET_TREE.md)), including callbacks that
+change parent/flags. Shared window/widget ancestry is the next integration gate;
+independent opacity-path and tree comparisons do not prove the combined menu
+lifecycle. No paired visual captures were produced by these CPU comparisons.

@@ -151,3 +151,13 @@ mutable listeners next; then share actual state with close/direct/fallback/focus
 menu routes and integrate the original renderer. Stable manager and empty listener
 profiles do not establish whole UI equivalence. Paired screenshots and motion
 captures remain pending; UI verified share remains zero.
+
+## Widget parent/dirty progress (2026-10-14)
+
+Widget reparent now matches 744 original scenarios, with another 744 comparisons
+for full 32-bit dirty propagation ([evidence](../research/UI_WIDGET_TREE.md)).
+Next combine it with visibility on a shared graph: parent changes alter opacity
+ancestry, so the earlier controlled visibility paths cannot prove this composition.
+Binding/focus effects, parent callback bodies, vector growth and lifetime remain
+unfinished. Then connect menu routes and original rendering and obtain matched
+screenshots/motion captures; UI verified coverage remains zero.
