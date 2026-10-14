@@ -116,3 +116,9 @@ An old zero-alpha ancestor no longer determines visibility after reparenting to
 the implementation node; that node's alpha is now used. Actual close/menu route
 and viewer integration are still pending. This CPU evidence produces no paired
 screenshots or motion capture and does not raise UI/graphics verified coverage.
+
+Controller close now toggles the shared graph: 1456 original close calls reach
+367 original visibility bodies and match post-close presence queries
+([close-graph evidence](../research/UI_MENU_CLOSE_GRAPH.md)). Delete/reset/update
+bodies remain controlled and live menu/viewer integration is pending. No
+matched screenshots or motion captures were produced by this CPU comparison.

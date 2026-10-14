@@ -172,3 +172,13 @@ with close/direct/fallback/focused menu routes and recover remaining binding,
 callback, listener and factory/lifetime effects. Live original layout/font/GPU
 rendering and paired visual evidence remain unfinished; UI verified share stays
 zero and all whole-game exit checks remain active.
+
+## Graph-backed controller close (2026-10-14)
+
+Controller close now toggles the shared graph instead of logging visibility.
+728 two-call scenarios match 1456 original close executions and 367 actual
+show/hide calls, including reset-to-show, map clearing and post-close queries
+([evidence](../research/UI_MENU_CLOSE_GRAPH.md)). Next integrate direct/fallback/own/
+focused routes and actual construction, remaining service/lifetime effects and
+original rendering. Delete is still a request, not proven destruction. Paired
+captures remain pending; UI/graphics verified coverage stays zero.
