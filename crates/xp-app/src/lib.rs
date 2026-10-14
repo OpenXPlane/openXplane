@@ -54,3 +54,5 @@ pub mod ui_window_graph;
 pub mod ui_menu_close_graph;
 
 pub mod ui_menu_direct_graph;
+
+pub mod ui_menu_action_graph;

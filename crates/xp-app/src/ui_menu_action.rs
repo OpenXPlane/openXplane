@@ -21,7 +21,7 @@ pub trait Services {
     /// 0x1417e2640 on global 0x1460fc940. Full meaning/body unported.
     fn query_b(&mut self, state: &mut State) -> u8;
     /// Slot +0x170 interface +0x08 -> thunk 0x140ef6f10 -> body 0x140f0a2c0, argument 0.
-    fn direct(&mut self, state: &mut State, argument: i32);
+    fn direct(&mut self, state: &mut State, argument: i32) -> Result<(), &'static str>;
     fn allocate(&mut self, state: &mut State, bytes: u64) -> u64;
     /// Original empty wrapper ctor 0x1410c7d20; two independent temporaries.
     fn callback(&mut self, state: &mut State, index: u8) -> u64;
@@ -39,11 +39,11 @@ pub fn dispatch(state: &mut State, services: &mut impl Services) -> Result<(), &
         return Ok(());
     }
     if state.engine_byte != 0 {
-        services.direct(state, 0);
+        services.direct(state, 0)?;
         return Ok(());
     }
     if services.query_a(state) != 0 && services.query_b(state) != 0 {
-        services.direct(state, 0);
+        services.direct(state, 0)?;
         return Ok(());
     }
     let result = if services.query_a(state) != 0 {

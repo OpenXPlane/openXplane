@@ -209,3 +209,12 @@ cleanup ordering and state with actual graph-backed close. Total remains
 are controlled, not functional runtime dialogs ([limits](../research/UI_MENU_DIRECT_GRAPH.md)).
 Next connect fallback/own/focused Esc and recover construction/lifetime/effects,
 then original renderer and matched visual captures. UI verified share stays zero.
+
+## Concrete fallback / graph bridge (2026-10-14)
+
+Both recovered fallback direct routes now call the full direct handler and
+actual graph-backed close; the property gate remains intact. Ordinary integration
+tests and 746 previous native fallback cases pass. Combined native fallback
+replay and own/focused Esc entry remain pending ([limits](../research/UI_MENU_ACTION_GRAPH.md)).
+Construction/query/submission/lifetime, original rendering and paired captures
+remain incomplete; UI verified share stays zero.

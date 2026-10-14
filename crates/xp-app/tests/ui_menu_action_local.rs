@@ -21,8 +21,9 @@ impl Services for Replay {
         self.trace.push("Q".into());
         self.cache
     }
-    fn direct(&mut self, _: &mut State, argument: i32) {
+    fn direct(&mut self, _: &mut State, argument: i32) -> Result<(), &'static str> {
         self.trace.push(format!("V:{argument}"));
+        Ok(())
     }
     fn allocate(&mut self, _: &mut State, bytes: u64) -> u64 {
         self.trace.push(format!("A:{bytes}"));
