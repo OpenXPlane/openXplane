@@ -227,3 +227,12 @@ fallback route and both wrapper lifecycles ([scope](../research/UI_MENU_ACTION_G
 Queries and construction/resolution/submission/effect bodies remain controlled.
 Next connect own/focused Esc entry, recover actual construction/lifetime/effects
 and original rendering, then matched visuals. UI verified share stays zero.
+
+## Concrete key entry / shared menu graph (2026-10-14)
+
+728 sequences now match 1456 original own/focused entries through concrete
+fallback/direct/graph close, including consumed bytes, gates and post-action
+state ([evidence](../research/UI_MENU_KEY_GRAPH.md)). Native focus is pinned to
+a panel, child absent and effect bodies controlled. Viewer is still unwired.
+Next recover construction/focus, actual opening ID3/Alt and remaining effects,
+then original renderer and matched captures. UI verified share stays zero.

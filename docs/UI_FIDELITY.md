@@ -137,3 +137,9 @@ Combined fallback/direct/close now has 1456 original fallback calls across all
 fallback routes, including independent queries and engine mutation
 ([limits](../research/UI_MENU_ACTION_GRAPH.md)). Own/focused Esc entry and original
 viewer/GPU construction remain pending; this CPU replay is not visual evidence.
+
+Concrete own/focused Esc/Enter handling now reaches graph-backed close in 1456
+original-code entries ([key-graph scope](../research/UI_MENU_KEY_GRAPH.md)). This
+is a synthetic already-created panel with pinned focus; it does not establish
+show_menu opening, Alt activation or viewer rendering. Paired visuals remain
+pending and UI/graphics verified coverage stays zero.
