@@ -48,3 +48,5 @@ pub mod ui_window_order;
 pub mod ui_window_visibility;
 
 pub mod ui_widget_tree;
+
+pub mod ui_window_graph;

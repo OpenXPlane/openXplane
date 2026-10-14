@@ -59,7 +59,8 @@ pub trait Services {
     /// 0x1412e47a0 on show / 0x1412e4680 on hide, both with flag 1.
     fn activate(&mut self, state: &mut State, entry: usize, show: bool);
     /// 0x1412f77a0(widget, impl on show / null on hide).
-    fn reparent(&mut self, state: &mut State, entry: usize, show: bool);
+    fn reparent(&mut self, state: &mut State, entry: usize, show: bool)
+    -> Result<(), &'static str>;
     fn refresh(&mut self, state: &mut State);
     /// 0x1410c90c0(4, 1, token), after the hide body.
     fn event(&mut self, state: &mut State, token: u64);
@@ -89,7 +90,7 @@ pub fn dispatch(
         let entry = state.registry.extract(token)?;
         state.registry.insert(entry, 1)?;
         state.alpha(entry, 1.0)?;
-        services.reparent(state, entry, true);
+        services.reparent(state, entry, true)?;
         services.refresh(state);
     } else if visible {
         let entry = state.registry.extract(token)?;
@@ -104,7 +105,7 @@ pub fn dispatch(
             state.membership.remove(i);
         }
         state.alpha(entry, 0.0)?;
-        services.reparent(state, entry, false);
+        services.reparent(state, entry, false)?;
         services.refresh(state);
         services.event(state, token);
     }

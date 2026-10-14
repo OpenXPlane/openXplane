@@ -161,3 +161,14 @@ ancestry, so the earlier controlled visibility paths cannot prove this compositi
 Binding/focus effects, parent callback bodies, vector growth and lifetime remain
 unfinished. Then connect menu routes and original rendering and obtain matched
 screenshots/motion captures; UI verified coverage remains zero.
+
+## Combined window/widget graph (2026-10-14)
+
+Show/hide, actual reparent and dirty propagation now compose on shared ancestry
+and match 728 three-action sequences (2184 original visibility calls, including
+728 toggle wrappers). Native visibility is checked after every action. See
+[combined graph evidence](../research/UI_WINDOW_GRAPH.md). Next share this state
+with close/direct/fallback/focused menu routes and recover remaining binding,
+callback, listener and factory/lifetime effects. Live original layout/font/GPU
+rendering and paired visual evidence remain unfinished; UI verified share stays
+zero and all whole-game exit checks remain active.

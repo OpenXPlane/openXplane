@@ -25,13 +25,14 @@ impl Services for Replay {
     fn activate(&mut self, _: &mut State, i: usize, show: bool) {
         self.0.push(format!("B:{i}:{}", u8::from(show)));
     }
-    fn reparent(&mut self, s: &mut State, i: usize, show: bool) {
+    fn reparent(&mut self, s: &mut State, i: usize, show: bool) -> Result<(), &'static str> {
         let bits = s.registry.entries[i]
             .opacity_root_to_leaf
             .last()
             .unwrap()
             .to_bits();
         self.0.push(format!("P:{i}:{}:{bits}", u8::from(show)));
+        Ok(())
     }
     fn refresh(&mut self, _: &mut State) {
         self.0.push("R".into());

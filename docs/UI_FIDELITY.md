@@ -109,3 +109,10 @@ Widget reparent and dirty propagation now have 744+744 original-code comparisons
 change parent/flags. Shared window/widget ancestry is the next integration gate;
 independent opacity-path and tree comparisons do not prove the combined menu
 lifecycle. No paired visual captures were produced by these CPU comparisons.
+
+Show/hide and actual widget reparent now share ancestry: 2184 original visibility
+calls include native queries after each action ([combined graph evidence](../research/UI_WINDOW_GRAPH.md)).
+An old zero-alpha ancestor no longer determines visibility after reparenting to
+the implementation node; that node's alpha is now used. Actual close/menu route
+and viewer integration are still pending. This CPU evidence produces no paired
+screenshots or motion capture and does not raise UI/graphics verified coverage.
