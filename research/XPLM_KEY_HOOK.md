@@ -18,7 +18,7 @@ Export `0x18001a670` normalizes character/key bytes, invokes validation helper `
 - Phase 2: scan zero-before sniffers. This branch does **not** use phase 0's deleted-node test. Raw callback return 0 consumes; other results permit continuation. Finish iteration and return 1 if unconsumed.
 - Other phases return 1.
 
-A completed list iteration decrements depth and clamps negative results to zero. When depth becomes zero and pending byte (+0x14) is nonzero, it requests cleanup, merge deferred list, clears pending, then requests cleanup again. In phase-0 sniffer consumption, original helper `0x180008010` supplies the same sequence. List helper bodies, plugin activation/context, thread checks and user callback effects are explicit service boundaries, not invented effects.
+A completed list iteration decrements depth and clamps negative results to zero. When depth becomes zero and pending byte (+0x14) is nonzero, it requests list consistency validation, drains deferred deletions, clears pending, then requests list consistency validation again. In phase-0 sniffer consumption, original helper `0x180008010` supplies the same sequence. List helper bodies, thread checks and user callback effects remain service boundaries; initialized-TLS context/activation are covered by the later replay described below.
 
 `xp-app::xplm_key_hook` preserves these paths and request order. It supports fixed ordered list topology and explicit callback services. Reentrant dispatch, actual plugin registration, node link/lifetime changes, invalid focused-window replacement and assertion handling remain unported.
 
@@ -42,3 +42,25 @@ The missing-module pause is resolved. Next: recover context/activation/list life
 ## Subsequent context recovery (2026-10-14)
 
 The current hook corpus now executes original initialized-TLS context ctor/activation/dtor and enabled query, replacing its former activation-result loggers. The mask initializes real record bytes; plugin 0 is always active. See `XPLM_CONTEXT.md` for 1108 direct context cases, stronger 1090/2152 hook/paired comparisons and the remaining validation/module/TLS-initialization limits.
+
+## Deferred-list helper correction and ownership evidence
+
+Inspection of the helper bodies corrects the earlier cleanup/merge labels:
+`0x180008950` validates linked-list consistency when diagnostic global
+`0x1800696e8` points to an enabled record; it does not merge or delete entries.
+`0x1800094f0` and `0x1800091a0` drain **deleted** sniffer/hotkey queues. They pop
+queue head through node+0x18 before membership/ownership checks. The first
+missing-node or wrong-owner rejection logs and tracks the attempted deletion,
+leaving the live list unchanged but the rejected queue entry already removed.
+For a valid sniffer, the helper obtains the owner again, records deletion,
+unlinks live next/previous pointers and requests a 0x40-byte free. Hotkeys have
+additional string cleanup and a 0x68-byte node free. These are static observations
+of the pinned Windows DLL; full drain execution/port is still outstanding.
+
+Deletion ownership is sniffer node+0x20 or hotkey node+0x28. Do not substitute
+the sniffer callback-context ID at node+0x30. `XPLMGetMyID` now has 1657 direct
+native comparisons on initialized TLS and a port in `xplm_context` (see
+`XPLM_CONTEXT.md`); it inherits nonzero IDs through zero frames. Diagnostic,
+tracking-map, allocator/string and registration/lifetime bodies remain separate
+work. Current hook replay still logs all three list-service requests and does
+not claim its synthetic list is physically mutated by the original helpers.

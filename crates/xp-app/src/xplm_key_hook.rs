@@ -43,14 +43,14 @@ pub enum List {
 }
 pub trait Services {
     fn validate(&mut self, stage: u8);
-    /// Context acquisition plus native activation check; both bodies are unported.
+    /// Context acquisition plus activation check; initialized-TLS bodies are in xplm_context.
     fn enter(&mut self, state: &mut State, plugin: i32) -> bool;
     fn leave(&mut self, state: &mut State, plugin: i32);
     fn sniff(&mut self, state: &mut State, index: usize, input: InterceptInput, refcon: u64)
     -> i32;
     fn hotkey(&mut self, state: &mut State, index: usize, refcon: u64);
     fn window(&mut self, state: &mut State, token: u64, input: InterceptInput, refcon: u64);
-    /// Original cleanup/merge/cleanup sequence; pending clears between steps 1 and 2.
+    /// Original validate/drain-deleted/validate sequence; pending clears between steps 1 and 2.
     fn flush(&mut self, state: &mut State, list: List, step: u8);
 }
 fn leave_iteration(state: &mut State, list: List, services: &mut impl Services) {

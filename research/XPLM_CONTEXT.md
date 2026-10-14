@@ -32,3 +32,27 @@ The 2152-case paired EXE/DLL replay also executes SDK context functions on initi
 All corpora stay local and original-code comparisons are opt-in, ignored in ordinary CI. Neither original binary is distributed.
 
 Next: recover real module loading/unloading, validation and deferred callback-list lifecycle, then actual show_menu/Alt registrations and window effects. The viewer still exits on Esc; menus, paired screenshots and motion parity remain unfinished.
+
+## Ownership query: XPLMGetMyID
+
+The actual export `0x180022e50` tail-jumps to `0x18001d420`. On initialized TLS,
+this function scans the int32 context vector backwards, skipping **every zero
+frame**, and returns the first nonzero signed word. Empty/all-zero stacks return
+0. Negative IDs are returned unchanged; there is no enabled-record query,
+lazy-load request or stack mutation. This differs from activation, which reads
+the final frame directly: `[7, 0]` activates system context 0 but reports owner 7.
+`xplm_context::State::current_id` reproduces this ownership query.
+
+The same local generator now also executes the complete export/body for 1657
+stacks: exhaustive lengths 0..6 over `{0, -1, 7}`, all-zero lengths 0..63, and
+500 seeded stacks up to 63 words including signed extremes and nested zero
+frames. Both the signed result and every retained frame match exactly. No
+service stub is reached by these owner cases. The existing 1108 lifecycle cases
+still pass. The additional ignored Rust comparison verifies the pinned DLL
+header and requires all 1657 records. The native corpus remains local.
+
+This query is used by deferred deletion (`0x1800094f0` for sniffers and
+`0x1800091a0` for hotkeys). It establishes the effective owner of a context; it
+does not yet implement deletion, registration or actual menu callbacks. Native
+TLS initialization (the unready branch calls `0x18002fe3c`), per-thread creation,
+concurrent access and real plugin lifetime remain unverified.

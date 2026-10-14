@@ -50,10 +50,10 @@ def main(path):
             if step==1:assert emu.reg(UC_X86_REG_RDX)==base+8
             log.append(f'F:{0 if base==S else 1}:{step}:{depth}:{pending}')
         return run
-    # Cleanup is called twice, before and after pending clears; infer step from pending.
-    def cleanup(emu):
+    # List consistency validation runs twice; infer its step from the pending byte.
+    def check_list(emu):
         base=emu.reg(UC_X86_REG_RCX);flush(0 if e.read(base+20,1)[0] else 2)(emu)
-    e.stubs.update({0x180021e10:validate(0),0x1800156a0:validate(1),RET_ADDR+0x100:sniff,RET_ADDR+0x200:hotkey,RET_ADDR+0x300:window,0x180008950:cleanup,0x1800094f0:flush(1),0x1800091a0:flush(1)})
+    e.stubs.update({0x180021e10:validate(0),0x1800156a0:validate(1),RET_ADDR+0x100:sniff,RET_ADDR+0x200:hotkey,RET_ADDR+0x300:window,0x180008950:check_list,0x1800094f0:flush(1),0x1800091a0:flush(1)})
     def context_enter_trace(uc, address, size, user):
         log.append(f'G:{e.reg(UC_X86_REG_RDX) & 0xffffffff}')
     def context_trace(kind):

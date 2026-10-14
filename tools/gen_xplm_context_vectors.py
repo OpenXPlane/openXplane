@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Full initialized-TLS context ctor/activation/dtor and enabled query, no context-result stubs."""
 import hashlib
+import itertools
 import random
 import sys
 from pathlib import Path
@@ -53,6 +54,23 @@ def main(path):
         final=read_stack(e,pointers[0]);final_enabled=[e.read(pointers[2]+i*0x110+0x88,1)[0] for i in range(len(enabled))]
         print('T',plugin,pending,len(stack),*stack,len(enabled),*enabled,load_mutation,unload_mutation,'->',active,len(final),*final,len(final_enabled),*final_enabled,e.read_u32(0x180068290),*log);count+=1
     print('# cases',count)
+    # Complete GetMyID export/body runs without result or helper stubs on ready TLS.
+    stacks = [list(v) for n in range(7) for v in itertools.product([0, -1, 7], repeat=n)]
+    stacks += [[0] * n for n in range(64)]
+    rng = random.Random(2026101403)
+    words = [-2147483648, -7, -1, 0, 0, 0, 1, 2, 7, 2147483647]
+    stacks += [rng.choices(words, k=rng.randrange(64)) for _ in range(500)]
+    print('# O depth stack* -> signed_my_id depth stack*; initialized TLS, no callee stubs reached')
+    for stack in stacks:
+        e.heap_top=persistent
+        tls, _, _ = install_tls(e, stack)
+        log.clear()
+        result=e.call(0x180022e50,max_instructions=50000)&0xffffffff
+        if result >= 0x80000000: result -= 0x100000000
+        final=read_stack(e,tls)
+        assert final == stack and not log
+        print('O',len(stack),*stack,'->',result,len(final),*final)
+    print('# owner_cases',len(stacks))
 
 
 if __name__=='__main__':main(sys.argv[1])

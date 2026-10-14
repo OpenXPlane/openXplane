@@ -26,6 +26,16 @@ pub trait Services {
     fn notify_unload(&mut self, state: &mut State);
 }
 impl State {
+    /// XPLMGetMyID (0x180022e50 -> 0x18001d420) skips zero frames.
+    /// Empty/all-zero stacks return 0; negative IDs retain their signed word.
+    pub fn current_id(&self) -> i32 {
+        self.stack
+            .iter()
+            .rev()
+            .copied()
+            .find(|id| *id != 0)
+            .unwrap_or(0)
+    }
     /// Constructor 0x18001cc90 appends the full signed plugin word.
     pub fn enter(&mut self, plugin: i32) {
         self.stack.push(plugin);
@@ -109,6 +119,19 @@ mod tests {
         assert!(!state.active(&mut effects).unwrap());
         assert_eq!(state.stack, [0]);
         assert_eq!(effects.calls, ["load1", "validate"]);
+    }
+    #[test]
+    fn ownership_query_inherits_through_zero_frames() {
+        let mut state = State::default();
+        assert_eq!(state.current_id(), 0);
+        state.enter(7);
+        state.enter(0);
+        state.enter(0);
+        assert_eq!(state.current_id(), 7);
+        state.enter(-1);
+        state.enter(0);
+        assert_eq!(state.current_id(), -1);
+        assert_eq!(state.stack, [7, 0, 0, -1, 0]);
     }
     #[test]
     fn pending_unload_waits_until_no_frame_references_plugin() {
