@@ -72,3 +72,10 @@ The concrete kind-11 window creation path now identifies menu panel vtable
 constant query and no-op slots unchanged. The nontrivial fallback action is
 still controlled, and actual creation/flags/focus/child graph, Alt activation
 and layout/rendering are unverified. This does not add paired visual evidence.
+
+
+The concrete Esc fallback request flow now has 746 contexts across direct, own
+callback and focused/filter routes (`research/UI_MENU_ACTION.md`). Actual
+property-2 getter and empty-wrapper lifecycle execute unchanged. Query/window
+construction/direct/resolution/submission effects are still service boundaries;
+no opening/closing or visual outcome is proven by those ordered requests.

@@ -86,7 +86,10 @@ OPENXPLANE_UI_MENU_KEY_VECTORS=/private/tmp/openxplane-ui-menu-key.txt cargo tes
 The concrete fallback `0x140f00310` starts by querying panel +0x28 interface
 slot +0x10 with value 2 and testing returned float against zero (NaN follows
 nonzero path). Later it queries engine state and can allocate another object.
-Its complete effects are not ported or inferred from these partial observations.
+Its complete request flow now has 746 contexts across direct/own/focused routes
+(`UI_MENU_ACTION.md`); query/construction/resolution/direct/submission effects
+remain unported. Its actual property-2 getter produces only 0/1; the generic
+NaN branch above does not imply concrete panel opacity or a NaN input.
 That body, kind-11 creation/map/registry lifecycle, actual flags/focus/child graph,
 show_menu ID-3 opening callback, Alt-only activation, original layout/fonts/GPU
 rendering and paired screenshots/GIF/video remain outstanding. The active viewer

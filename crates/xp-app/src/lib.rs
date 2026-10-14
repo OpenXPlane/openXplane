@@ -36,3 +36,5 @@ pub mod xplm_deferred;
 pub mod xplm_sniffer;
 
 pub mod ui_menu_key;
+
+pub mod ui_menu_action;
