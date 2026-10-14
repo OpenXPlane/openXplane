@@ -11,7 +11,13 @@ pub struct State {
 pub trait Services {
     fn prepare(&mut self, state: &mut State);
     fn controller(&mut self, state: &mut State) -> u64;
-    fn close(&mut self, state: &mut State, controller: u64, kind: i32, flag: u8);
+    fn close(
+        &mut self,
+        state: &mut State,
+        controller: u64,
+        kind: i32,
+        flag: u8,
+    ) -> Result<(), &'static str>;
     fn notify(&mut self, state: &mut State);
     fn query_a(&mut self, state: &mut State) -> u8;
     fn document(&mut self, state: &mut State) -> Vec<u8>;
@@ -46,7 +52,7 @@ pub fn dispatch(
     state.guard_c9 = 1;
     services.prepare(state);
     let controller = services.controller(state);
-    services.close(state, controller, 11, u8::from(state.flag_c8 == 0));
+    services.close(state, controller, 11, u8::from(state.flag_c8 == 0))?;
     if argument != 12 && state.ui_mode == 1 && argument <= 0 {
         services.notify(state);
         let mut loaded = false;

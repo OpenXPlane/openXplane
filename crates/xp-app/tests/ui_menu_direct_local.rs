@@ -17,12 +17,19 @@ impl Services for Replay {
         self.trace.push("M".into());
         7
     }
-    fn close(&mut self, s: &mut State, controller: u64, kind: i32, flag: u8) {
+    fn close(
+        &mut self,
+        s: &mut State,
+        controller: u64,
+        kind: i32,
+        flag: u8,
+    ) -> Result<(), &'static str> {
         assert_eq!(controller, 7);
         self.trace.push(format!("C:{kind}:{flag}:{}", s.guard_c9));
         if self.v[8] >= 0 {
             s.ui_mode = self.v[8] as i32;
         }
+        Ok(())
     }
     fn notify(&mut self, _: &mut State) {
         self.trace.push("N".into());
