@@ -44,3 +44,5 @@ pub mod ui_menu_direct;
 pub mod ui_menu_close;
 
 pub mod ui_window_order;
+
+pub mod ui_window_visibility;

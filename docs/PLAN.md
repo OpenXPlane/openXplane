@@ -140,3 +140,14 @@ listener callbacks, integrate the menu close route, then render original menus a
 collect paired Alt/Esc screenshots and motion captures. Neither this list kernel nor
 the earlier close-map replay proves a functioning original UI; UI verified coverage
 remains zero. Whole-game requirements and the phase exit checks above remain active.
+
+## Show/hide state progress (2026-10-14)
+
+The complete original show/hide control flow, registry and membership mutations,
+entry attachment and leaf-alpha stores now match 728 consecutive two-call
+scenarios (1456 native calls). See [visibility evidence](../research/UI_WINDOW_VISIBILITY.md).
+Recover parent/dirty propagation, owner/preparation/activation/refresh/event and
+mutable listeners next; then share actual state with close/direct/fallback/focused
+menu routes and integrate the original renderer. Stable manager and empty listener
+profiles do not establish whole UI equivalence. Paired screenshots and motion
+captures remain pending; UI verified share remains zero.

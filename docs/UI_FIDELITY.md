@@ -97,3 +97,9 @@ combined CPU cases ([window order evidence](../research/UI_WINDOW_ORDER.md)).
 The recovered lookup removes a list node; it must not be treated as a pure query.
 This does not establish full show/hide effects or viewer rendering. No new paired
 screenshots/GIF/video were produced by this CPU comparison.
+
+Show/hide now has 1456 original-code calls verifying registry/membership and leaf
+alpha mutations ([visibility evidence](../research/UI_WINDOW_VISIBILITY.md)).
+Ancestor alpha is preserved, including repeated membership in the controlled
+zero-ancestor profile. Parent/dirty propagation and other effect bodies are still
+services; live menu rendering and matched screenshots/motion remain unverified.
