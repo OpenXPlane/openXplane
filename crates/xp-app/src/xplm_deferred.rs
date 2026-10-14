@@ -36,6 +36,7 @@ pub struct Node {
     pub previous: u64,
     pub deferred_next: u64,
     pub owner: i32,
+    pub deleted: u8,
     pub text: Option<Text>,
     pub tracking: Option<Tracking>,
     /// Retained audit record; allocator lifetime is a service, not a Rust object removal.
@@ -62,7 +63,7 @@ pub trait Services {
     fn free(&mut self, state: &mut State, allocation: Allocation, bytes: u64);
 }
 impl State {
-    fn contains(&self, token: u64) -> Result<bool, &'static str> {
+    pub(crate) fn contains(&self, token: u64) -> Result<bool, &'static str> {
         let mut current = self.head;
         for _ in 0..=self.nodes.len() {
             if current == 0 {
@@ -75,7 +76,7 @@ impl State {
         }
         Err("cyclic live list")
     }
-    fn reject(&mut self, reason: Rejection, token: u64, services: &mut impl Services) {
+    pub(crate) fn reject(&mut self, reason: Rejection, token: u64, services: &mut impl Services) {
         services.diagnostic(self, reason, token);
         services.notify(self);
         services.bad_free(self, token);
@@ -135,6 +136,51 @@ impl State {
             .freed = true;
         Ok(())
     }
+    pub(crate) fn delete_checked(
+        &mut self,
+        kind: Kind,
+        token: u64,
+        services: &mut impl Services,
+    ) -> Result<(), &'static str> {
+        let plugin = self.context.current_id();
+        if !self.contains(token)? {
+            self.reject(Rejection::MissingAfter, token, services);
+        } else if self.nodes[&token].owner != plugin && plugin != 0 {
+            self.reject(Rejection::OwnerAfter, token, services);
+        } else {
+            let elapsed = services.elapsed(self);
+            services.tracking_entry(self, kind, token);
+            self.nodes
+                .get_mut(&token)
+                .ok_or("missing tracking node")?
+                .tracking = Some(Tracking {
+                plugin,
+                flag: 0,
+                elapsed,
+            });
+            if self.head == token {
+                self.head = self.nodes[&token].next;
+            }
+            let previous = self.nodes[&token].previous;
+            if previous != 0 {
+                let next = self.nodes[&token].next;
+                self.nodes
+                    .get_mut(&previous)
+                    .ok_or("unmapped previous node")?
+                    .next = next;
+            }
+            let next = self.nodes[&token].next;
+            if next != 0 {
+                let previous = self.nodes[&token].previous;
+                self.nodes
+                    .get_mut(&next)
+                    .ok_or("unmapped next node")?
+                    .previous = previous;
+            }
+        }
+        self.free_node(kind, token, services)?;
+        Ok(())
+    }
 }
 /// Recovered sniffer 0x1800094f0 / hotkey 0x1800091a0 deletion flow, with
 /// diagnostic assertions disabled and mapped readable records. Queue production,
@@ -165,46 +211,7 @@ pub fn drain(
             state.reject(Rejection::OwnerBefore, token, services);
             continue;
         }
-        let plugin = state.context.current_id();
-        if !state.contains(token)? {
-            state.reject(Rejection::MissingAfter, token, services);
-        } else if state.nodes[&token].owner != plugin && plugin != 0 {
-            state.reject(Rejection::OwnerAfter, token, services);
-        } else {
-            let elapsed = services.elapsed(state);
-            services.tracking_entry(state, kind, token);
-            state
-                .nodes
-                .get_mut(&token)
-                .ok_or("missing tracking node")?
-                .tracking = Some(Tracking {
-                plugin,
-                flag: 0,
-                elapsed,
-            });
-            if state.head == token {
-                state.head = state.nodes[&token].next;
-            }
-            let previous = state.nodes[&token].previous;
-            if previous != 0 {
-                let next = state.nodes[&token].next;
-                state
-                    .nodes
-                    .get_mut(&previous)
-                    .ok_or("unmapped previous node")?
-                    .next = next;
-            }
-            let next = state.nodes[&token].next;
-            if next != 0 {
-                let previous = state.nodes[&token].previous;
-                state
-                    .nodes
-                    .get_mut(&next)
-                    .ok_or("unmapped next node")?
-                    .previous = previous;
-            }
-        }
-        state.free_node(kind, token, services)?;
+        state.delete_checked(kind, token, services)?;
     }
     Ok(())
 }

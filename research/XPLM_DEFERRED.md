@@ -44,7 +44,7 @@ native termination behavior.
 `xplm_context::State::current_id`. Freed records are retained for audit; actual
 allocation and tracking-map storage are services. It rejects unmapped/cyclic
 state and service-expanded queues instead of inventing unsafe memory behavior.
-It is not connected to the viewer or concrete registration APIs yet.
+It now backs the recovered key-sniffer registration APIs (see `XPLM_SNIFFER.md`); hotkey registration and viewer/hook lifetime integration remain unfinished.
 
 ## Original-code comparison
 
@@ -82,6 +82,7 @@ OPENXPLANE_XPLM_DEFERRED_VECTORS=/private/tmp/openxplane-xplm-deferred.txt cargo
 The corpus is local and its native comparison is ignored in ordinary CI. A
 normal regression test covers rejected-owner queue consumption followed by an
 allowed deletion and relinking. Library tests and xp-app clippy pass locally.
-Next recover registration/unregistration and connect list lifetime to the real
-hook routing, then actual Alt/Esc menu callbacks/layout/rendering and paired
+Sniffer registration/unregistration now has 1126 additional native scenarios;
+next connect registered list lifetime to the real hook routing and recover
+hotkey registration, then actual Alt/Esc menu callbacks/layout/rendering and paired
 screenshots/GIF/video. Whole-game 1:1 remains unproven.

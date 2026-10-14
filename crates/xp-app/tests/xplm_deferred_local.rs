@@ -96,6 +96,7 @@ fn native_deferred_deletion_topology_ownership_strings_and_requests_match() {
                     previous: 0,
                     deferred_next: 0,
                     owner,
+                    deleted: 0,
                     text: (kind == Kind::Hotkey).then_some(Text {
                         length,
                         capacity,
@@ -180,6 +181,7 @@ fn native_deferred_deletion_topology_ownership_strings_and_requests_match() {
 fn rejected_owner_pops_queue_without_unlinking_and_allowed_delete_relinks() {
     let make = |owner, next, previous, deferred_next| Node {
         owner,
+        deleted: 0,
         next,
         previous,
         deferred_next,
