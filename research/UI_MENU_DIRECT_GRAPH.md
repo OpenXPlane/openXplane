@@ -1,44 +1,52 @@
-# Direct menu action -> graph-backed close
+# Direct menu action -> graph-backed close, including document/dialog flow
 
-The bridge reuses the complete recovered direct handler and overrides only its
-close endpoint with `ui_menu_close_graph::dispatch`. All remaining direct effects
-are forwarded unchanged. The caller supplies controller identity; mismatch
-returns an error before modifying the graph. That validation is a port contract,
-not a claim about native invalid-pointer behavior.
+Reference: X-Plane.exe 12.4.3.11, SHA256
+`2ca099b7c6b218e78d02bdbe298be2aebf670b67c5adff827449b065e1107936`.
 
-Ordinary composition tests verify re-entry guard suppression, actual graph alpha/
-membership changes, map clearing, request order and mismatch error propagation.
-The previously established 694 native direct-handler cases remain a separate
-stage comparison. The combined replay below now proves one explicit bridge
-profile; it does not establish the entire native menu route.
+The bridge reuses the complete recovered direct handler and replaces its close
+endpoint with actual graph-backed controller close. Other effects delegate
+unchanged. Controller identity mismatch is a port error contract, not a claim
+about original invalid-pointer behavior. Ordinary integration tests cover guard,
+graph alpha/membership/map changes and error propagation.
 
-Next extend the combined replay to the mode-1 document/dialog branch,
-then join the concrete fallback and own/focused Esc callback. Actual widget
-construction, effect bodies and lifetime remain incomplete. Viewer rendering,
-original Alt/Esc screenshots/GIF/video and whole-game parity remain unproven.
-
-## Combined original-code replay
+## Combined native comparison
 
 `tools/gen_ui_menu_direct_graph_vectors.py` executes 728 synthetic two-action
-scenarios: 1456 original direct actions (`0x140f0a2c0`), 1092 original close
-helpers (`0x14150ce20`) and 252 reached visibility bodies. Close is not stubbed.
-Original getter/mode/toggle/show/hide, registry/membership, actual widget
-reparent/dirty and map stores execute on the same graph. Original presence is
-queried after each action. Raw guard 255 suppresses the whole action; unguarded
-actions normalize the close flag from c8 and clear c9 on completion.
+scenarios: 1456 original direct actions, 1092 real close helpers and 252 reached
+visibility bodies. Close is not stubbed. Original query/getter/mode/toggle,
+show/hide, registry/membership, reparent/dirty, map stores, enum predicate and
+callback-wrapper construction/destruction execute unchanged on shared state.
+Original presence is queried after each action. Modes 0/1/2 are now exercised;
+argument is 0. Guard 255 suppresses action and unguarded calls clear c9 at end.
 
-The Rust bridge comparison checks final panel guard/c8/UI mode, both presence
-queries, controller map, modes, registry/membership, attachments, alpha bits,
-parents/flags, child vectors and remaining-effect request order. All scenarios
-passed. Corpus is local at `/private/tmp/openxplane-ui-menu-direct-graph.txt`;
-opt-in replay uses `OPENXPLANE_UI_MENU_DIRECT_GRAPH_VECTORS`. Original files
-and corpus are not published.
+Mode-1 paths make 364 notification requests, 244 document/load requests, 48
+controlled load failures and 168 dialog construction/destruction requests.
+All 244 document paths reach temporary cleanup. Load-result responses, byte
+validation and synthetic inline string `test.sit` are controlled inputs, not
+actual content loading. Dialog wrappers bind callback values 0/3 and release
+second then first; global byte 0x1457770c6 is stored before component requests.
 
-This combined profile uses argument 0 and UI mode 0/2, so the mode-1 document/
-dialog branch is not reached. Preparation/controller singleton lookup and
-remaining close/window/callback/allocation/CRT-copy effects are controlled;
-manager identity is stable, listener/protected/observer lists empty and vectors
-have spare capacity. Initial state is synthetic rather than real construction.
-Mode-1 combined effects, fallback and own/focused Esc entry, lifetime and viewer
-rendering remain unverified. No paired visual capture was produced; UI/graphics
-verified coverage remains zero.
+Rust compares both presence queries, panel c9/c8/UI-mode/global-byte state,
+controller map/modes, registry/membership/attachment, leaf alpha bits, parents,
+flags, child vectors and complete effect/cleanup request order. All 728
+scenarios pass. Corpus stays local at
+`/private/tmp/openxplane-ui-menu-direct-graph-dialog.txt`; opt-in test uses
+`OPENXPLANE_UI_MENU_DIRECT_GRAPH_VECTORS`. Original files and numeric corpus are
+not published. The preceding mode0/2 corpus was narrower; current generator
+now includes mode1. Separate 694-case direct evidence remains applicable.
+
+## Limits and next work
+
+Preparation/controller singleton lookup, document/query/validation/load,
+binding/dialog constructor/component/destructor and remaining close/window/
+callback/allocation/CRT-copy effects remain controlled. Manager identity and
+entry/widget mapping are stable; listener/protected/observer lists empty,
+parent chains finite, vectors have spare capacity and document strings are
+inline. Actual construction/destruction, other arguments/string storage, mode
+mutation through effect callbacks and real document/dialog implementations need
+further evidence. These tests prove request composition, not functional dialogs.
+
+Join concrete fallback and own/focused Esc routing to this shared state next.
+Actual widget construction, original layout/fonts/GPU output, matched Alt/Esc
+screenshots/GIF/video and whole-game parity remain unfinished. No paired visual
+capture was produced; UI/graphics verified coverage remains zero.

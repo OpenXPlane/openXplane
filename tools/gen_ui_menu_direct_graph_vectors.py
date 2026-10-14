@@ -24,8 +24,8 @@ def cases():
 
 def main(path):
     assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==REFERENCE_SHA256
-    e=Emulator(path);panel=e.alloc(0x300);panel_vt=e.alloc(0x180);e.write(panel_vt,bytes(0x180));e.write_u64(panel_vt+0x118,RET_ADDR+0x200);e.write(RET_ADDR+0x200,b'\xc3');controller=e.alloc(0x2b0);manager=e.alloc(0x180);impl=e.alloc(0x180);vtable=e.alloc(0x190);e.write(vtable,bytes(0x190));e.write_u64(vtable+0x188,RET_ADDR+0x100);e.write_u64(vtable+0x180,RET_ADDR+0x110);e.write(RET_ADDR+0x100,b'\xc3');e.write(RET_ADDR+0x110,b'\xc3');top=e.heap_top
-    config=[];mapnode=[0];updates=[0];vis=[0];closes=[0];entries=[];widgets=[];graph=[];log=[];allocs=[0];frees=[0]
+    e=Emulator(path);panel=e.alloc(0x300);panel_vt=e.alloc(0x180);e.write(panel_vt,bytes(0x180));e.write_u64(panel_vt+0x118,RET_ADDR+0x200);e.write(RET_ADDR+0x200,b'\xc3');controller=e.alloc(0x2b0);manager=e.alloc(0x180);impl=e.alloc(0x180);vtable=e.alloc(0x190);e.write(vtable,bytes(0x190));e.write_u64(vtable+0x188,RET_ADDR+0x100);e.write_u64(vtable+0x180,RET_ADDR+0x110);e.write(RET_ADDR+0x100,b'\xc3');e.write(RET_ADDR+0x110,b'\xc3');object_vt=e.alloc(8);e.write_u64(object_vt,RET_ADDR+0x300);e.write(RET_ADDR+0x300,b'\xc3');top=e.heap_top
+    values=[];documents=[b'',b'a',b'test.sit',b'x'*15];callbacks=[];allocated=[0];config=[];mapnode=[0];updates=[0];vis=[0];closes=[0];entries=[];widgets=[];graph=[];log=[];allocs=[0];frees=[0]
     def idx(p):return entries.index(p)
     def prepare_panel(emu):
         assert emu.reg(UC_X86_REG_RCX)==panel
@@ -57,7 +57,7 @@ def main(path):
         assert emu.reg(UC_X86_REG_RCX)==24
         allocs[0]+=1;emu.uc.reg_write(UC_X86_REG_RAX,emu.alloc(24))
     def free(emu):
-        assert emu.reg(UC_X86_REG_RDX)==24;frees[0]+=1
+        assert emu.reg(UC_X86_REG_RDX) in [24,40];frees[0]+=1
     def owner(emu):
         p=emu.reg(UC_X86_REG_RCX);parent=emu.reg(UC_X86_REG_RDX)
         assert parent in [0,impl]
@@ -80,6 +80,48 @@ def main(path):
         assert emu.reg(UC_X86_REG_RCX)==4 and emu.reg(UC_X86_REG_RDX)==1 and emu.reg(UC_X86_REG_R8) in [11,12]
         log.append(f'E:4:1:{emu.reg(UC_X86_REG_R8)}')
     e.stubs.update({0x1422e7bf0:alloc,0x1422e7c2c:free,0x1412f6250:owner,0x1412fc4b0:prepare,0x1412e47a0:lambda emu:active(emu,True),0x1412e4680:lambda emu:active(emu,False),0x1412fa3b0:refresh,0x1410c90c0:event,RET_ADDR+0x100:lambda emu:callback(emu,False),RET_ADDR+0x110:lambda emu:callback(emu,True),RET_ADDR+0x200:prepare_panel,0x14150d020:get_controller,0x1423c0280:move,0x14150e420:update,0x1412f9480:reset,0x1412c6070:delete,0x14150cf80:environment,0x140c7f790:lambda emu:log.append('C'),0x1414d7470:lambda emu:log.append('P'),0x14150fee0:final})
+    def doc(emu):
+        p=emu.reg(UC_X86_REG_RCX);data=documents[values[12]]
+        emu.write(p,bytes(32));emu.write(p,data);emu.write_u64(p+16,len(data));emu.write_u64(p+24,15)
+        log.append('F');emu.uc.reg_write(UC_X86_REG_RAX,p)
+    def validate(emu):
+        p=emu.reg(UC_X86_REG_RCX);assert emu.read(emu.read_u64(p),emu.read_u64(p+8))==documents[values[12]]
+        log.append(f'V:{documents[values[12]].hex() or "-"}');emu.uc.reg_write(UC_X86_REG_RAX,values[5])
+    def load(emu):
+        assert emu.reg(UC_X86_REG_RCX)==0x142f2d770
+        p=emu.reg(UC_X86_REG_RDX);assert emu.read(p,emu.read_u64(p+16))==documents[values[12]]
+        log.append(f'L:{emu.reg(UC_X86_REG_R8)&255}');emu.uc.reg_write(UC_X86_REG_RAX,values[6])
+    def allocate(emu):
+        size=emu.reg(UC_X86_REG_RCX);
+        if size==24:return alloc(emu)
+        assert size in [0x28,0x320]
+        p=emu.alloc(size);emu.write(p,bytes(size));emu.uc.reg_write(UC_X86_REG_RAX,p)
+        if size==0x320:allocated[0]=p;log.append('A:800')
+    def bind(emu):
+        assert emu.reg(UC_X86_REG_RDX)==panel+0x48
+        p=emu.reg(UC_X86_REG_RCX);assert p in callbacks;log.append(f'B:{emu.read_u64(p+0x18)}')
+    def construct(emu):
+        assert emu.reg(UC_X86_REG_RCX)==allocated[0] and emu.reg(UC_X86_REG_RDX)==values[9]
+        assert [emu.reg(UC_X86_REG_R8),emu.reg(UC_X86_REG_R9)]==callbacks[::-1]
+        assert [emu.read_u64(cb+0x18) for cb in callbacks]==[0,3]
+        p=allocated[0];emu.write_u64(p,object_vt);emu.write_u64(p+0x2c8,17);emu.write_u64(p+0x2d8,18)
+        log.append(f'T:{values[9]}:3:0');emu.uc.reg_write(UC_X86_REG_RAX,p)
+    def cb(uc,a,s,u):
+        assert e.reg(UC_X86_REG_RDX)==panel+0x48 and e.reg(UC_X86_REG_R9)==0
+        callbacks.append(e.reg(UC_X86_REG_RCX));log.append(f'H:{e.reg(UC_X86_REG_R8)}')
+    def drop(uc,a,s,u):
+        i=callbacks.index(e.reg(UC_X86_REG_RCX));log.append(f'D:{[0,3][i]}')
+    def field(emu):
+        assert emu.reg(UC_X86_REG_RCX)==17 and emu.read(0x1457770c6,1)[0]==1
+        log.append('E:c8:1')
+    def component(emu):assert emu.reg(UC_X86_REG_RCX)==allocated[0]+0x260;log.append('E:260')
+    def field2(emu):assert emu.reg(UC_X86_REG_RCX)==18;log.append('E:d8')
+    def destroy(emu):assert emu.reg(UC_X86_REG_RCX)==allocated[0] and emu.reg(UC_X86_REG_RDX)==1;log.append('X:1')
+    def query_document(emu):log.append('Q');emu.uc.reg_write(UC_X86_REG_RAX,values[4])
+    def notify(emu):assert emu.reg(UC_X86_REG_RCX)==0x142609340;log.append('N')
+    e.stubs.update({0x140658af0:notify,0x140f0a1b0:query_document,0x140efe0d0:doc,0x140efdda0:validate,0x1417fa7a0:load,0x140f0a210:lambda emu:log.append('FAIL'),0x1422e7bf0:allocate,0x1410c8de0:bind,0x140ec9c10:construct,0x1411103e0:field,0x1410c9d10:component,0x14111bb90:field2,RET_ADDR+0x300:destroy})
+    e.uc.hook_add(UC_HOOK_CODE,cb,begin=0x1410c7d20,end=0x1410c7d20);e.uc.hook_add(UC_HOOK_CODE,drop,begin=0x1410c8430,end=0x1410c8430)
+    e.uc.hook_add(UC_HOOK_CODE,lambda uc,a,s,u:log.append('DROP'),begin=0x140f0a404,end=0x140f0a404)
     def linked(owner,offset,values):
         head=e.alloc(24);nodes=[e.alloc(24) for _ in values];chain=[head]+nodes
         for i,p in enumerate(chain):
@@ -93,7 +135,7 @@ def main(path):
         return out
     def csv(v):return ','.join(map(str,v)) if v else '-'
     print('# reference_sha256',REFERENCE_SHA256)
-    print('# full direct/close/query/getter/mode/toggle/show/hide/reparent/find/dirty/map-store original; argument0; ui_mode0/2; preparation/controller getter controlled; close effects controlled; bind/activation/callbacks/memmove/alloc/refresh/event controlled; spare capacity; stable manager; empty listeners')
+    print('# full direct/close/query/getter/mode/toggle/show/hide/reparent/find/dirty/map-store original; argument0; ui_mode0/1/2; inline document profile; document/dialog/binding effects controlled; preparation/controller getter controlled; close effects controlled; bind/activation/callbacks/memmove/alloc/refresh/event controlled; spare capacity; stable manager; empty listeners')
     count=0
     for case_no,(root,w1,w2,p0,p1,p2,classes,order,members,attached) in enumerate(cases()):
         e.heap_top=top;log.clear();allocs[0]=frees[0]=0;entries.clear();widgets.clear();graph.clear();e.write(manager,bytes(0x180));e.write(impl,bytes(0x180))
@@ -121,13 +163,16 @@ def main(path):
         e.write_u32(0x145a11f48,config[3]);e.write(controller+0x2a8,bytes([config[4]]))
         e.write(panel,bytes(0x300));e.write_u64(panel,panel_vt)
         e.write(panel+0x2c9,bytes([255 if case_no%4==0 else 0]));e.write(panel+0x2c8,bytes([255 if case_no%3==0 else 0]))
-        e.write_u32(0x145a12118+0x18,(case_no%2)*2)
+        e.write_u32(0x145a12118+0x18,case_no%3)
+        values[:]=[0,0,0,case_no%3,(case_no%2)*255,case_no%256,0 if case_no%5==0 else 255,-1,-1,case_no+7,0,0,2]
+        e.write_u64(panel+0x1a8,values[9]);e.write(0x1457770c6,b'\0')
         queries=[]
         for _ in range(2):
+            callbacks.clear();allocated[0]=0
             e.call(0x140f0a2c0,ints=[panel,0],max_instructions=100000)
             queries.append(e.call(0x141512eb0,ints=[controller,11],max_instructions=100000)&255)
         ro,rm=read_list(h),read_list(m);assert len(ro)==e.read_u64(impl+0x158) and len(rm)==e.read_u64(manager+0x98)
-        print('C',root,w1,w2,p0,p1,p2,csv(classes),csv(order),csv(members),csv(attached),ialpha,csv(config),'->',csv(ro),csv(rm),csv([int(e.read_u64(p+0x88)!=0) for p in entries]),csv([e.read_u32(p+0x58) for p in widgets]),csv([-1 if e.read_u64(p+0x60)==0 else graph.index(e.read_u64(p+0x60)) for p in graph]),csv([e.read_u32(p+0xf8) for p in graph]),';'.join(csv([graph.index(e.read_u64(a)) for a in range(e.read_u64(p+0x70),e.read_u64(p+0x78),8)]) for p in graph),csv(queries),csv([e.read_u32(p+0x1ac) for p in entries]),e.read_u64(n+40),csv([e.read(panel+0x2c9,1)[0],e.read(panel+0x2c8,1)[0],e.read_u32(0x145a12118+0x18)]),*log);count+=1
+        print('C',root,w1,w2,p0,p1,p2,csv(classes),csv(order),csv(members),csv(attached),ialpha,csv(config),'->',csv(ro),csv(rm),csv([int(e.read_u64(p+0x88)!=0) for p in entries]),csv([e.read_u32(p+0x58) for p in widgets]),csv([-1 if e.read_u64(p+0x60)==0 else graph.index(e.read_u64(p+0x60)) for p in graph]),csv([e.read_u32(p+0xf8) for p in graph]),';'.join(csv([graph.index(e.read_u64(a)) for a in range(e.read_u64(p+0x70),e.read_u64(p+0x78),8)]) for p in graph),csv(queries),csv([e.read_u32(p+0x1ac) for p in entries]),e.read_u64(n+40),csv([e.read(panel+0x2c9,1)[0],e.read(panel+0x2c8,1)[0],e.read_u32(0x145a12118+0x18),e.read(0x1457770c6,1)[0]]),*log);count+=1
     print('# contexts',count,'native direct executions',count*2,'native close executions',closes[0],'native visibility executions',vis[0])
 
 

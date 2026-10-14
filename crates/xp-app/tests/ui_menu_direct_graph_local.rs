@@ -16,6 +16,7 @@ const PATHS: &[&[f32]] = &[
 ];
 #[derive(Default)]
 struct Replay {
+    directv: Vec<i128>,
     trace: Vec<String>,
     config: Vec<i64>,
     updates: usize,
@@ -130,79 +131,111 @@ impl ui_menu_close_graph::Services for Replay {
 }
 use openxplane::{ui_menu_direct as direct, ui_menu_direct_graph};
 impl direct::Services for Replay {
-    fn prepare(&mut self, _state: &mut direct::State) {
-        self.trace.push(format!("P:{}", _state.guard_c9));
+    fn prepare(&mut self, s: &mut direct::State) {
+        self.trace.push(format!("P:{}", s.guard_c9));
+        if self.directv[7] >= 0 {
+            s.flag_c8 = self.directv[7] as u8;
+        }
+        if self.directv[11] != 0 {
+            direct::dispatch(s, -5, self).unwrap();
+        }
     }
-    fn controller(&mut self, _state: &mut direct::State) -> u64 {
+    fn controller(&mut self, _: &mut direct::State) -> u64 {
         self.trace.push("M".into());
         7
     }
     fn close(
         &mut self,
-        _state: &mut direct::State,
-        _controller: u64,
-        _kind: i32,
-        _flag: u8,
+        s: &mut direct::State,
+        controller: u64,
+        kind: i32,
+        flag: u8,
     ) -> Result<(), &'static str> {
-        panic!("unexpected direct effect in mode0/2 profile")
+        assert_eq!(controller, 7);
+        self.trace.push(format!("C:{kind}:{flag}:{}", s.guard_c9));
+        if self.directv[8] >= 0 {
+            s.ui_mode = self.directv[8] as i32;
+        }
+        Ok(())
     }
-    fn notify(&mut self, _state: &mut direct::State) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn notify(&mut self, _: &mut direct::State) {
+        self.trace.push("N".into());
     }
-    fn query_a(&mut self, _state: &mut direct::State) -> u8 {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn query_a(&mut self, _: &mut direct::State) -> u8 {
+        self.trace.push("Q".into());
+        self.directv[4] as u8
     }
-    fn document(&mut self, _state: &mut direct::State) -> Vec<u8> {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn document(&mut self, _: &mut direct::State) -> Vec<u8> {
+        self.trace.push("F".into());
+        [b"".as_slice(), b"a", b"test.sit", b"xxxxxxxxxxxxxxx"][self.directv[12] as usize].to_vec()
     }
-    fn validate(&mut self, _state: &mut direct::State, _document: &[u8]) -> u8 {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn validate(&mut self, _: &mut direct::State, document: &[u8]) -> u8 {
+        let hex = if document.is_empty() {
+            "-".into()
+        } else {
+            document
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        };
+        self.trace.push(format!("V:{hex}"));
+        self.directv[5] as u8
     }
-    fn load(&mut self, _state: &mut direct::State, _document: &[u8], _validation: u8) -> u8 {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn load(&mut self, _: &mut direct::State, _: &[u8], validation: u8) -> u8 {
+        self.trace.push(format!("L:{validation}"));
+        self.directv[6] as u8
     }
-    fn load_failed(&mut self, _state: &mut direct::State) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn load_failed(&mut self, _: &mut direct::State) {
+        self.trace.push("FAIL".into());
     }
-    fn drop_document(&mut self, _state: &mut direct::State, _document: Vec<u8>) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn drop_document(&mut self, _: &mut direct::State, _: Vec<u8>) {
+        self.trace.push("DROP".into());
     }
-    fn allocate(&mut self, _state: &mut direct::State, _bytes: u64) -> u64 {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn allocate(&mut self, _: &mut direct::State, bytes: u64) -> u64 {
+        self.trace.push(format!("A:{bytes}"));
+        100
     }
-    fn callback(&mut self, _state: &mut direct::State, _id: i32) -> u64 {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn callback(&mut self, _: &mut direct::State, id: i32) -> u64 {
+        self.trace.push(format!("H:{id}"));
+        self.trace.push(format!("B:{id}"));
+        200 + id as u64
     }
     fn construct(
         &mut self,
-        _state: &mut direct::State,
-        _allocation: u64,
-        _source: u64,
-        _second: u64,
-        _first: u64,
+        _: &mut direct::State,
+        allocation: u64,
+        source: u64,
+        second: u64,
+        first: u64,
     ) -> u64 {
-        panic!("unexpected direct effect in mode0/2 profile")
+        assert_eq!((allocation, second, first), (100, 203, 200));
+        self.trace.push(format!("T:{source}:3:0"));
+        100
     }
-    fn drop_callback(&mut self, _state: &mut direct::State, _callback: u64) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn drop_callback(&mut self, _: &mut direct::State, callback: u64) {
+        self.trace.push(format!("D:{}", callback - 200));
     }
-    fn field_c8_action(&mut self, _state: &mut direct::State, _object: u64) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn field_c8_action(&mut self, s: &mut direct::State, object: u64) {
+        assert_eq!(object, 100);
+        assert_eq!(s.flag_7770c6, 1);
+        self.trace.push("E:c8:1".into());
     }
-    fn component_260_action(&mut self, _state: &mut direct::State, _object: u64) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn component_260_action(&mut self, _: &mut direct::State, object: u64) {
+        assert_eq!(object, 100);
+        self.trace.push("E:260".into());
     }
-    fn field_d8_action(&mut self, _state: &mut direct::State, _object: u64) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn field_d8_action(&mut self, _: &mut direct::State, object: u64) {
+        assert_eq!(object, 100);
+        self.trace.push("E:d8".into());
     }
-    fn destroy(&mut self, _state: &mut direct::State, _object: u64, _flag: u32) {
-        panic!("unexpected direct effect in mode0/2 profile")
+    fn destroy(&mut self, _: &mut direct::State, object: u64, flag: u32) {
+        assert_eq!(object, 100);
+        self.trace.push(format!("X:{flag}"));
     }
 }
-
 #[test]
 #[ignore = "requires combined original direct close graph corpus via OPENXPLANE_UI_MENU_DIRECT_GRAPH_VECTORS"]
-fn native_complete_direct_close_graph_mode0_2() {
+fn native_complete_direct_close_graph_document_dialog() {
     let data = std::fs::read_to_string(
         std::env::var("OPENXPLANE_UI_MENU_DIRECT_GRAPH_VECTORS").expect("corpus path"),
     )
@@ -234,6 +267,21 @@ fn native_complete_direct_close_graph_mode0_2() {
         };
         s.by_kind.insert(11, config[0] as u64);
         let mut replay = Replay {
+            directv: vec![
+                0,
+                0,
+                0,
+                (count % 3) as i128,
+                ((count % 2) * 255) as i128,
+                (count % 256) as i128,
+                if count % 5 == 0 { 0 } else { 255 },
+                -1,
+                -1,
+                (count + 7) as i128,
+                0,
+                0,
+                2,
+            ],
             trace: vec![],
             config,
             updates: 0,
@@ -242,7 +290,8 @@ fn native_complete_direct_close_graph_mode0_2() {
         let mut panel = direct::State {
             guard_c9: if count % 4 == 0 { 255 } else { 0 },
             flag_c8: if count % 3 == 0 { 255 } else { 0 },
-            ui_mode: ((count % 2) * 2) as i32,
+            ui_mode: (count % 3) as i32,
+            source_token: (count + 7) as u64,
             ..Default::default()
         };
         for _ in 0..2 {
@@ -304,7 +353,13 @@ fn native_complete_direct_close_graph_mode0_2() {
         assert_eq!(s.modes, csv::<i32>(v[22]), "{line}");
         assert_eq!(s.by_kind[&11], v[23].parse::<u64>().unwrap(), "{line}");
         assert_eq!(
-            [panel.guard_c9 as i32, panel.flag_c8 as i32, panel.ui_mode].to_vec(),
+            [
+                panel.guard_c9 as i32,
+                panel.flag_c8 as i32,
+                panel.ui_mode,
+                panel.flag_7770c6 as i32
+            ]
+            .to_vec(),
             csv::<i32>(v[24]),
             "{line}"
         );

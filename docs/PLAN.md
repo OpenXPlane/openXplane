@@ -199,3 +199,13 @@ mode-1 document/dialog and fallback/own/focused Esc entry remain unverified
 ([evidence and limits](../research/UI_MENU_DIRECT_GRAPH.md)). Continue into these
 branches and actual construction before original renderer and matched captures.
 UI/graphics verified coverage stays zero.
+
+## Direct/close/document/dialog composition (2026-10-14)
+
+The combined replay now includes UI mode1: 244 document/load requests, 48
+controlled failures and 168 dialog construction/destruction requests match
+cleanup ordering and state with actual graph-backed close. Total remains
+1456 direct actions over 728 two-call scenarios. Actual document/dialog bodies
+are controlled, not functional runtime dialogs ([limits](../research/UI_MENU_DIRECT_GRAPH.md)).
+Next connect fallback/own/focused Esc and recover construction/lifetime/effects,
+then original renderer and matched visual captures. UI verified share stays zero.
