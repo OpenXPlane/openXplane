@@ -132,3 +132,8 @@ The combined direct/close replay now exercises document/dialog request flow in
 mode1, including success/failure responses and cleanup. Its actual load/dialog
 effects remain controlled ([current scope](../research/UI_MENU_DIRECT_GRAPH.md));
 this does not prove a working dialog or original GPU pixels.
+
+Combined fallback/direct/close now has 1456 original fallback calls across all
+fallback routes, including independent queries and engine mutation
+([limits](../research/UI_MENU_ACTION_GRAPH.md)). Own/focused Esc entry and original
+viewer/GPU construction remain pending; this CPU replay is not visual evidence.

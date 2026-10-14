@@ -218,3 +218,12 @@ tests and 746 previous native fallback cases pass. Combined native fallback
 replay and own/focused Esc entry remain pending ([limits](../research/UI_MENU_ACTION_GRAPH.md)).
 Construction/query/submission/lifetime, original rendering and paired captures
 remain incomplete; UI verified share stays zero.
+
+## Combined fallback / graph replay (2026-10-14)
+
+728 two-action scenarios now match 1456 original fallbacks, 938 direct actions,
+927 real close helpers and 220 visibility calls on shared state, including every
+fallback route and both wrapper lifecycles ([scope](../research/UI_MENU_ACTION_GRAPH.md)).
+Queries and construction/resolution/submission/effect bodies remain controlled.
+Next connect own/focused Esc entry, recover actual construction/lifetime/effects
+and original rendering, then matched visuals. UI verified share stays zero.
