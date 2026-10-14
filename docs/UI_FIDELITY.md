@@ -91,3 +91,9 @@ The registered-window close helper now has 574 original-code contexts
 (`research/UI_MENU_CLOSE.md`), including actual kind-map value clearing and
 post-close presence queries. Window hide/delete/update and renderer effects
 remain service boundaries; no paired screenshot or motion evidence is added.
+
+Native window extraction and classification-dependent reinsertion now match 700
+combined CPU cases ([window order evidence](../research/UI_WINDOW_ORDER.md)).
+The recovered lookup removes a list node; it must not be treated as a pure query.
+This does not establish full show/hide effects or viewer rendering. No new paired
+screenshots/GIF/video were produced by this CPU comparison.

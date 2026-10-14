@@ -130,3 +130,13 @@ The requested DLL is now present and the pause is resolved. Its full keyboard ho
 ## SDK initialized-TLS context and activation (2026-10-14)
 
 1108 local native contexts verify push/activation/pop, raw enabled records, cached IDs and pending-unload request order. Both the 1090-case DLL hook and 2152-case paired keyboard replay remove SDK context-result stubs and execute the original functions. TLS is explicitly initialized with reserved capacity; real OS/module lifecycle and validation remain unported. Next: loading/unloading and deferred-list bodies, then real menu actions. Evidence: `research/XPLM_CONTEXT.md`.
+
+## Window visibility progress (2026-10-14)
+
+Registry extraction and classified reinsertion now match 700 combined original-code
+cases. See [UI_WINDOW_ORDER](../research/UI_WINDOW_ORDER.md) for pointer/list semantics
+and supported profiles. Continue with show/hide membership, widget alpha/parents and
+listener callbacks, integrate the menu close route, then render original menus and
+collect paired Alt/Esc screenshots and motion captures. Neither this list kernel nor
+the earlier close-map replay proves a functioning original UI; UI verified coverage
+remains zero. Whole-game requirements and the phase exit checks above remain active.
