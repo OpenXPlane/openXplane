@@ -148,3 +148,9 @@ Owner/selected binding now matches 1045 whole native helper cases
 ([scope](../research/UI_FOCUS_BINDING.md)). Binding and widget parent links are
 distinct; binding callbacks can change the chain being cleared. This is not yet
 joined to the key graph and does not prove live focus or paired UI pixels.
+
+Focus/menu composition now reads current focus after graph-close and executes
+recovered owner/selected binding. Its ordinary tests use controlled blur/child
+effects; combined original replay is still pending
+([limits](../research/UI_MENU_FOCUS_GRAPH.md)). This does not establish live viewer
+focus or paired rendering.

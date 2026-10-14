@@ -245,3 +245,13 @@ These links are separate from widget parents. Next join binding with the actual
 window/key graph and verify subsequent routing; virtual callback bodies and real
 construction/lifetime remain unfinished. Opening ID3/Alt, original rendering and
 paired captures are still required. UI verified share stays zero.
+
+## Focus / menu composition (2026-10-14)
+
+Owner binding now executes within menu graph-close and focused entry reads
+current binding focus/child state. Ordinary integration tests verify clearing,
+controlled blur focus loss and next-key routing, plus child-before-filter
+consumption. Combined original replay is still required
+([scope](../research/UI_MENU_FOCUS_GRAPH.md)). Actual callback/construction/lifetime,
+opening ID3/Alt, viewer rendering and paired captures remain unfinished.
+UI verified share stays zero.
