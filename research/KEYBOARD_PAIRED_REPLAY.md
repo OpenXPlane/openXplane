@@ -28,3 +28,14 @@ OPENXPLANE_KEYBOARD_DISPATCH_VECTORS=/private/tmp/openxplane-keyboard-paired.txt
 The new test requires both digest headers, rejecting the older EXE-only corpus. Corpora remain local and the comparison is ignored in ordinary CI. The original DLL and executable are not copied into the repository.
 
 Next: recover DLL context/activation and real callback/list registration, then trace actual menu handlers and connect input/lifecycle to the viewer. Whole-game X-Plane 12 parity and Alt/Esc pixel/motion fidelity remain unproven.
+
+
+## Mutable registration extension
+
+`KEYBOARD_REGISTERED_REPLAY.md` records 528 additional paired cases with initial
+sniffers created by the original SDK API and callback thunks invoking native
+registration/removal during EXE-routed events. It checks mutable lists plus
+EXE suppression/binding/mode/block and route order, including callback-side
+gates. This earlier 2152-case replay retains its fixed-list scope and still
+passes after the mapping-only SDK loader option was added. Neither comparison
+is a live loader/game or proof of menu/visual parity.

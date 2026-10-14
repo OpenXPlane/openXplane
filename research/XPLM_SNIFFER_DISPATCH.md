@@ -91,11 +91,11 @@ readable/acyclic, and plugin unload is absent. Recursive event dispatch,
 concurrent mutations, loader/validation/unload effects, real tracking/allocator
 bodies, enabled assertions and unsafe lifetime/error paths remain unverified.
 This is an SDK CPU replay with synthetic callbacks, not Windows loading or the
-running simulator. EXE/DLL release-build pairing remains unproven. Existing
-paired EXE/DLL replay still uses its earlier fixed sniffer list; this mutable
-registration test has not yet been combined with EXE routing.
+running simulator. EXE/DLL release-build pairing remains unproven. The earlier 2152-case paired EXE/DLL replay keeps its fixed-list scope. A new
+528-case paired replay now combines real registration/mutation with EXE routing
+(`KEYBOARD_REGISTERED_REPLAY.md`), with hotkey/window lists still empty.
 
-Next connect these registered token paths with complete SDK hotkey/window
-lifecycle and paired EXE input, then identify actual Alt/Esc show_menu actions,
+Registered token paths now also have paired EXE input evidence. Next recover
+complete SDK hotkey/window lifecycle, then identify actual Alt/Esc show_menu actions,
 focus/widget graph and original layout/fonts/GPU output. Paired screenshots,
 GIF/video and whole-game X-Plane 12 1:1 acceptance remain outstanding.

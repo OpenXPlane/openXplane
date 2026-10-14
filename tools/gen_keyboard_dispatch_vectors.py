@@ -24,7 +24,7 @@ def cases():
         yield rng.randrange(2), rng.choice([-1, 0, 1]), rng.choice([-1, 0, 1]), rng.choice([0, 1, 255]), rng.choice([0, 1000, 1001]), rng.choice([0, 1, 255]), rng.choice([-2147483648, -1, 0, 3, 27, 65, 127, 128, 255, 2147483647]), rng.choice([0, 27, 67, 283, 0xffffffff]), rng.choice([0, 8, 0x400, 0xffffffff]), rng.getrandbits(32), rng.randrange(2), rng.choice([0, 1, -1]), rng.choice([-1, 0, 1000, 1001]), rng.choice([-1, 0, 255])
 
 
-def map_sdk(emu, path):
+def map_sdk(emu, path, initialize=True):
     data = Path(path).read_bytes()
     assert hashlib.sha256(data).hexdigest() == SDK_SHA256
     pe = struct.unpack_from('<I', data, 0x3c)[0]
@@ -41,6 +41,8 @@ def map_sdk(emu, path):
         high = (address + max(virtual_size, raw_size) + 0xfff) & ~0xfff
         emu._map(low, high - low)
         emu.write(address, data[raw_offset:raw_offset + raw_size])
+    if not initialize:
+        return None
     # Explicit synthetic registration: one before sniffer, one after sniffer.
     first, second = emu.alloc(64), emu.alloc(64)
     for node, following, before, refcon in [(first, second, 1, 0), (second, 0, 0, 2)]:
