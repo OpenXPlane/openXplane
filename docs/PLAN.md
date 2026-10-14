@@ -293,3 +293,12 @@ bytes, capacities and allocation/copy/free order
 linkage1410c7bb0, then combine concrete panel prefix with common/member stages
 and recover singleton/child/layout/resource creation. Callable/lifetime/large
 allocation and original rendering remain unfinished; UI verified share stays zero.
+
+## Global interface lifecycle (2026-10-14)
+
+210 complete native ctor/destructor sequences now verify global-head insertion,
+head/middle/tail unlink, retained detached links and bit0-only free requests
+([scope](../research/UI_INTERFACE_CHAIN.md)). Next combine concrete panel
+initialization with common/member stages; full derived teardown, resources,
+opening ID3/Alt and original renderer remain incomplete. No paired captures;
+UI verified share stays zero.

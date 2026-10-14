@@ -175,3 +175,8 @@ Embedded main-menu member construction now matches 180 original complete ctor/
 registration/growth cases ([scope](../research/UI_MENU_MEMBER_CONSTRUCT.md)).
 This establishes member state and parent registration, not full panel creation,
 layout/resources or pixels. Matched captures remain pending.
+
+Embedded-interface global linking/unlinking now has 210 whole original ctor/
+destructor comparisons ([limits](../research/UI_INTERFACE_CHAIN.md)). This
+is one construction/lifecycle dependency, not complete panel teardown or GPU
+pixels. Original rendering and matched captures remain pending.
