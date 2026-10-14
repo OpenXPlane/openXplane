@@ -64,3 +64,11 @@ The requested SDK module is now available and its actual Windows keyboard hook h
 The keyboard comparison now crosses the actual EXE→Windows DLL export boundary in 2152 synthetic CPU cases (`research/KEYBOARD_PAIRED_REPLAY.md`). It replaces the export-result logger with original DLL routing, but controls registrations/context/callback effects. It does not initialize or render the original game; live Alt/Esc and paired pixels/motion remain outstanding.
 
 SDK context ctor/activation/dtor now execute inside both hook comparisons (`research/XPLM_CONTEXT.md`), with 1108 direct contexts and stronger 1090/2152 hook/paired cases. Plugin 0 bypasses enabled checks; other plugins use actual record bytes with controlled lazy loading. Ready TLS and callback effects are explicit inputs, not live game initialization or menu pixels.
+
+
+The concrete kind-11 window creation path now identifies menu panel vtable
+0x1426064f0 and its own Esc/Enter callback (`research/UI_MAIN_MENU_KEY.md`).
+1940 contexts compare direct and focused/filter routes with the real getters,
+constant query and no-op slots unchanged. The nontrivial fallback action is
+still controlled, and actual creation/flags/focus/child graph, Alt activation
+and layout/rendering are unverified. This does not add paired visual evidence.

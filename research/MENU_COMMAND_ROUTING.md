@@ -45,3 +45,12 @@ Next: recover the six service bodies needed for these menu routes, original cont
 ## State-service continuation
 
 The stronger replay in [UI_WINDOW_STATE.md](UI_WINDOW_STATE.md) now executes both queried services and their window-registry/parent-opacity dependencies without replacements. It covers 1033 state contexts and both menu commands; only the four action bodies are logged. `WindowState::menu_requests` computes the query values from those explicit states. The engine-state byte's lifecycle, real window creation and live integration remain unresolved.
+
+
+## Concrete widget continuation
+
+`UI_MAIN_MENU_KEY.md` now traces kind-11 creation to `0x140ed3d70` and its
+menu-panel constructor `0x140ecb340`. The actual panel vtable's own Esc/Enter
+callback has 1940 native contexts covering both direct and focused/filter paths.
+Its fallback action body and actual window/flag/focus lifecycle remain unfinished;
+this does not identify show_menu ID 3 or establish menu visuals.
