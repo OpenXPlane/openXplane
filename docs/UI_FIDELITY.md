@@ -85,3 +85,9 @@ The direct menu action now has 694 full native control-flow comparisons
 (`research/UI_MENU_DIRECT.md`), including c9 re-entry protection and the kind-11
 close request. Close/window/document/dialog bodies remain explicit services;
 this does not prove hiding a real window or menu rendering.
+
+
+The registered-window close helper now has 574 original-code contexts
+(`research/UI_MENU_CLOSE.md`), including actual kind-map value clearing and
+post-close presence queries. Window hide/delete/update and renderer effects
+remain service boundaries; no paired screenshot or motion evidence is added.

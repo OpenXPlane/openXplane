@@ -87,8 +87,10 @@ Static inspection of full `0x14150ce20..0x14150cf7d` confirms the requested clos
 helper queries the recovered window registry/opacity, calls window services,
 optionally clears the controller kind-map value for kinds listed at controller
 +0x90..0x98, and calls final `0x14150fee0` even when its initial query is false.
-That helper body is still controlled in the direct replay; clearing/hiding actual
-windows is not proven by the close request. No pixel or running-menu outcome is
+The direct-only replay still controls that helper. A separate 574-context
+comparison now executes its full body and actual kind-map store
+(`UI_MENU_CLOSE.md`), with registered-only getter state and window-system effect
+services controlled. Actual rendering/hiding/destruction remain unverified. No pixel or running-menu outcome is
 claimed.
 
 Next port concrete close/registry/map effects, preparation, document/query/load,

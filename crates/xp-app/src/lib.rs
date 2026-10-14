@@ -40,3 +40,5 @@ pub mod ui_menu_key;
 pub mod ui_menu_action;
 
 pub mod ui_menu_direct;
+
+pub mod ui_menu_close;
