@@ -54,13 +54,13 @@ missing-node or wrong-owner rejection logs and tracks the attempted deletion,
 leaving the live list unchanged but the rejected queue entry already removed.
 For a valid sniffer, the helper obtains the owner again, records deletion,
 unlinks live next/previous pointers and requests a 0x40-byte free. Hotkeys have
-additional string cleanup and a 0x68-byte node free. These are static observations
-of the pinned Windows DLL; full drain execution/port is still outstanding.
+additional string cleanup and a 0x68-byte node free. These observations of the pinned DLL now have a standalone drain port and
+1704 native comparisons; see `XPLM_DEFERRED.md` for exact scope.
 
 Deletion ownership is sniffer node+0x20 or hotkey node+0x28. Do not substitute
 the sniffer callback-context ID at node+0x30. `XPLMGetMyID` now has 1657 direct
 native comparisons on initialized TLS and a port in `xplm_context` (see
-`XPLM_CONTEXT.md`); it inherits nonzero IDs through zero frames. Diagnostic,
-tracking-map, allocator/string and registration/lifetime bodies remain separate
-work. Current hook replay still logs all three list-service requests and does
+`XPLM_CONTEXT.md`); it inherits nonzero IDs through zero frames. String free sizing/reset and live/deferred links now have native comparisons.
+Diagnostic, tracking-map, real allocator and registration/lifetime bodies remain
+separate work. Current hook replay still logs all three list-service requests and does
 not claim its synthetic list is physically mutated by the original helpers.

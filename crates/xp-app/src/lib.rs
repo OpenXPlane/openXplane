@@ -30,3 +30,5 @@ pub mod key_intercept;
 pub mod xplm_key_hook;
 
 pub mod xplm_context;
+
+pub mod xplm_deferred;
