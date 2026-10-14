@@ -1,5 +1,8 @@
 use openxplane::key_intercept::{self, State as InterceptorState};
 use openxplane::ui_state::{RegisteredWindow, WindowState};
+use openxplane::xplm_key_hook::{
+    self, List as SdkList, Services as SdkServices, Sniffer, State as SdkState,
+};
 use openxplane::{
     keyboard_dispatch::{self, InterceptInput, Services},
     ui_input::{self, KeyInput},
@@ -82,19 +85,85 @@ impl key_intercept::Services for HookReplay<'_> {
     fn leave_hook(&mut self, _: &mut InterceptorState, _: i32) {}
     fn call_hook(&mut self, _: &mut InterceptorState, i: InterceptInput, refcon: u64) -> i32 {
         assert_eq!(refcon, 0);
+        self.0.trace.push(format!("D:{}", i.phase));
+        let mut sdk = SdkState {
+            sniffers: vec![
+                Sniffer {
+                    deleted: 0,
+                    before: 1,
+                    plugin: 0,
+                    refcon: 0,
+                },
+                Sniffer {
+                    deleted: 0,
+                    before: 0,
+                    plugin: 0,
+                    refcon: 2,
+                },
+            ],
+            ..SdkState::default()
+        };
+        let result = xplm_key_hook::dispatch(&mut sdk, i, refcon, &mut SdkReplay(self.0));
+        assert_eq!(
+            (sdk.sniffer_iteration.depth, sdk.sniffer_iteration.pending),
+            (0, 0)
+        );
+        assert_eq!(
+            (sdk.hotkey_iteration.depth, sdk.hotkey_iteration.pending),
+            (0, 0)
+        );
+        result as i32
+    }
+}
+
+struct SdkReplay<'a>(&'a mut Replay);
+impl SdkServices for SdkReplay<'_> {
+    fn validate(&mut self, _: u8) {}
+    fn enter(&mut self, _: &mut SdkState, plugin: i32) -> bool {
+        assert_eq!(plugin, 0);
+        true
+    }
+    fn leave(&mut self, _: &mut SdkState, _: i32) {}
+    fn sniff(&mut self, _: &mut SdkState, _: usize, i: InterceptInput, refcon: u64) -> i32 {
+        assert!(refcon == 0 || refcon == 2);
+        self.0.trace.push(format!(
+            "N:{}:{}:{}:{refcon}",
+            i.character, i.virtual_key, i.flags
+        ));
         self.0.mutate();
-        self.0.v[if i.phase == 0 { 1 } else { 2 }] as i32
+        self.0.v[if refcon == 0 { 1 } else { 2 }] as i32
+    }
+    fn hotkey(&mut self, _: &mut SdkState, _: usize, _: u64) {
+        panic!("no hotkeys in paired replay")
+    }
+    fn window(&mut self, _: &mut SdkState, _: u64, _: InterceptInput, _: u64) {
+        panic!("no plugin window in paired replay")
+    }
+    fn flush(&mut self, _: &mut SdkState, _: SdkList, _: u8) {
+        panic!("no deferred list changes in paired replay")
     }
 }
 
 #[test]
-#[ignore = "requires local full keyboard replay; set OPENXPLANE_KEYBOARD_DISPATCH_VECTORS"]
+#[ignore = "requires local paired EXE/DLL keyboard replay; set OPENXPLANE_KEYBOARD_DISPATCH_VECTORS"]
 fn native_keyboard_gates_ui_and_binding_transitions_match() {
     let text = std::fs::read_to_string(
         std::env::var_os("OPENXPLANE_KEYBOARD_DISPATCH_VECTORS")
             .expect("set OPENXPLANE_KEYBOARD_DISPATCH_VECTORS"),
     )
     .unwrap();
+    assert!(
+        text.contains(
+            "# sdk_sha256 706c6f1fd856c1a8c121edac2c8df12e65603e821e3f786ee8bde72543c1401f"
+        ),
+        "requires paired EXE/DLL corpus"
+    );
+    assert!(
+        text.contains(
+            "# reference_sha256 2ca099b7c6b218e78d02bdbe298be2aebf670b67c5adff827449b065e1107936"
+        ),
+        "requires baseline EXE corpus"
+    );
     let mut count = 0;
     for line in text.lines().filter(|l| l.starts_with("K ")) {
         let (input, output) = line.split_once(" -> ").unwrap();

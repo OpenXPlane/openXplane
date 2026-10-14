@@ -122,3 +122,7 @@ The next actual keyboard-hook endpoint needs `Resources/plugins/XPLM_64.dll` fro
 ## Actual Windows XPLM key hook (2026-10-14)
 
 The requested DLL is now present and the pause is resolved. Its full keyboard hook matches 1090 local Windows-code cases for phase routing, sniffers/hotkeys/window input and iteration-state requests. Validation/context/activation/user-callback/deferred-list bodies are controlled endpoints; EXE↔DLL replay integration remains next. Exact EXE/DLL build pairing is not proven by version metadata. See `research/XPLM_KEY_HOOK.md`; live Alt/Esc menus and paired visuals remain unfinished.
+
+## Paired EXE/XPLM keyboard execution (2026-10-14)
+
+2152 combined cases now execute original EXE and actual Windows DLL keyboard dispatch in one CPU address space, replacing the export logger. Rust composes both recovered layers. Explicit sniffer registrations and controlled validation/context/callback effects remain; this is not a live Windows loader or game. Next: real SDK context/list lifecycle and menu actions. Evidence: `research/KEYBOARD_PAIRED_REPLAY.md`.

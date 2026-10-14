@@ -20,12 +20,12 @@ Static inspection of `0x1412e3470` shows collection helper `0x1412dc3c0` with ar
 
 ## Combined local evidence
 
-`tools/gen_keyboard_dispatch_vectors.py` executes the entire entry function, focused wrapper/base dispatcher/filter/initial mapped CRT, and binding loop unchanged. A nonmutating code hook records focused-wrapper arguments. The initial replay logged five endpoints. The strengthened current replay executes the manager query and collection on actual synthetic registries; The current replay also executes the interceptor wrapper/adapter unchanged. Own widget key callback, external export and Begin/End remain logging stubs, together with controlled clock/context and allocator/free services. Interceptor outcomes and callback gate mutations remain explicit inputs, not recovered effects.
+`tools/gen_keyboard_dispatch_vectors.py` executes the complete EXE entry, native manager query/collection, interceptor wrapper/adapter, focused wrapper/filter/initial mapped CRT and binding loop unchanged. The paired replay also calls the real Windows DLL export/body. Nonmutating hooks record boundary arguments. Plugin sniffer bodies, the own widget callback and Begin/End effects remain logging endpoints, with controlled validation/clock/context/allocator services. Sniffer results and mutations are explicit inputs; DLL interceptor results are computed by original code. See `KEYBOARD_PAIRED_REPLAY.md` for the exact synthetic registration and module limits.
 
 2152 cases compare exact callback order and arguments, all active fields, release suppression, and final mode/block state. A 1152-case matrix covers both query paths, interceptor outcomes, raw own-handler results, named/zero keys, acceptance masks, mode gates, block bytes and signed-character clamping. Seeded cases add arbitrary flags, full-word keys (including a byte alias), missing focus, suppression, negative interceptor returns and mode/block mutations inside interceptor/own handlers. Characters below -1 are tested only without focus or with the named Escape shortcut, which bypasses the unsupported CRT classification domain. This does not extend the earlier CRT locale/input guarantee.
 
 ```sh
-python tools/gen_keyboard_dispatch_vectors.py /path/to/X-Plane.exe > /private/tmp/openxplane-keyboard-dispatch.txt
+python tools/gen_keyboard_dispatch_vectors.py /path/to/X-Plane.exe /path/to/XPLM_64.dll > /private/tmp/openxplane-keyboard-dispatch.txt
 OPENXPLANE_KEYBOARD_DISPATCH_VECTORS=/private/tmp/openxplane-keyboard-dispatch.txt cargo test --offline -p xp-app --test keyboard_dispatch_local -- --ignored
 ```
 

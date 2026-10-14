@@ -33,8 +33,8 @@ python tools/gen_xplm_key_hook_vectors.py /path/to/XPLM_64.dll > /private/tmp/op
 OPENXPLANE_XPLM_KEY_HOOK_VECTORS=/private/tmp/openxplane-xplm-key-hook.txt cargo test --offline -p xp-app --test xplm_key_hook_local -- --ignored
 ```
 
-The corpus stays local; this comparison is ignored in ordinary CI. The current combined EXE keyboard replay still uses an export logger: connecting the actual DLL to that replay remains a next step. Do not describe the separate DLL comparison as an executed EXE↔DLL integration check.
+The corpus stays local; this comparison is ignored in ordinary CI. The subsequent paired replay now executes this DLL export/body from the original EXE adapter (`KEYBOARD_PAIRED_REPLAY.md`). It has explicit synthetic registrations and controlled services; this separate 1090-case comparison still does not establish a running game/module loader.
 
 ## Next and visual limits
 
-The missing-module pause is resolved. Next: connect actual DLL dispatch to the combined EXE keyboard replay, recover context/activation/list lifecycle services, and use available module symbols to trace real UI registrations/actions. Actual show_menu/Alt actions, live viewer input, menu layout/rendering and paired screenshots/GIF/video remain unverified. This port is not a live plugin loader or proof of whole-game/UI parity.
+The missing-module pause is resolved. Next: recover context/activation/list lifecycle services, and use available module symbols to trace real UI registrations/actions. Actual show_menu/Alt actions, live viewer input, menu layout/rendering and paired screenshots/GIF/video remain unverified. This port is not a live plugin loader or proof of whole-game/UI parity.

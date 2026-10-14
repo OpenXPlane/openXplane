@@ -34,3 +34,7 @@ The 2152-case combined keyboard replay now executes both native interceptor laye
 ## Remaining UI and runtime fidelity
 
 Recover external hook/context services and actual registration lifecycle when their module is available, plus action-bearing menu widgets and show_menu/Alt handlers. The viewer still uses its independent lifecycle and exits on Esc; these modules are not yet wired to live UI. Original/openXplane paired screenshots and GIF/video remain required. None of these service-boundary replays establishes whole input, plugin, menu-rendering or game parity.
+
+## Subsequent paired module replay (2026-10-14)
+
+The combined keyboard replay now executes the actual Windows XPLM export/body from the EXE adapter, rather than its previous export logger. See `KEYBOARD_PAIRED_REPLAY.md` for the two pinned module digests, explicit synthetic sniffer registrations and remaining validation/context/plugin callback boundaries. The separate interceptor corpus above still controls the export and is not itself a paired module run.

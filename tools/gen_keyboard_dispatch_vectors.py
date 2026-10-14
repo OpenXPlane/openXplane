@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Replay complete keyboard entry, native focused filter, and binding loop together."""
+import hashlib
+from pathlib import Path
 import itertools
 import random
 import struct
 import sys
 from emulate_xp import Emulator, RET_ADDR
 from extract_commands import detailed_records, REFERENCE_SHA256
+from gen_xplm_key_hook_vectors import SHA256 as SDK_SHA256
 from gen_ui_capture_vectors import install_allocator, build_registry
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_XMM0
@@ -20,9 +23,41 @@ def cases():
         yield rng.randrange(2), rng.choice([-1, 0, 1]), rng.choice([-1, 0, 1]), rng.choice([0, 1, 255]), rng.choice([0, 1000, 1001]), rng.choice([0, 1, 255]), rng.choice([-2147483648, -1, 0, 3, 27, 65, 127, 128, 255, 2147483647]), rng.choice([0, 27, 67, 283, 0xffffffff]), rng.choice([0, 8, 0x400, 0xffffffff]), rng.getrandbits(32), rng.randrange(2), rng.choice([0, 1, -1]), rng.choice([-1, 0, 1000, 1001]), rng.choice([-1, 0, 255])
 
 
-def main(path):
+def map_sdk(emu, path):
+    data = Path(path).read_bytes()
+    assert hashlib.sha256(data).hexdigest() == SDK_SHA256
+    pe = struct.unpack_from('<I', data, 0x3c)[0]
+    assert struct.unpack_from('<H', data, pe + 4)[0] == 0x8664
+    optional = pe + 24
+    assert struct.unpack_from('<H', data, optional)[0] == 0x20b
+    base = struct.unpack_from('<Q', data, optional + 24)[0]
+    assert base == 0x180000000
+    table = optional + struct.unpack_from('<H', data, pe + 20)[0]
+    for i in range(struct.unpack_from('<H', data, pe + 6)[0]):
+        virtual_size, rva, raw_size, raw_offset = struct.unpack_from('<IIII', data, table + i * 40 + 8)
+        address = base + rva
+        low = address & ~0xfff
+        high = (address + max(virtual_size, raw_size) + 0xfff) & ~0xfff
+        emu._map(low, high - low)
+        emu.write(address, data[raw_offset:raw_offset + raw_size])
+    # Explicit synthetic registration: one before sniffer, one after sniffer.
+    first, second = emu.alloc(64), emu.alloc(64)
+    for node, following, before, refcon in [(first, second, 1, 0), (second, 0, 0, 2)]:
+        emu.write(node, bytes(64))
+        emu.write_u64(node, following)
+        emu.write_u64(node + 0x28, RET_ADDR + 0x400)
+        emu.write_u32(node + 0x30, 0)
+        emu.write_u32(node + 0x34, before)
+        emu.write_u64(node + 0x38, refcon)
+    emu.write_u64(0x180069660, first)
+    emu.write_u64(0x180069690, 0)
+    emu.write_u64(0x1800696d8, 0)
+
+
+def main(path, sdk_path):
     detailed_records(path)
     e = Emulator(path)
+    map_sdk(e, sdk_path)
     owner, vector, root, vt, mode_ptr = e.alloc(64), e.alloc(48), e.alloc(64), e.alloc(96), e.alloc(4)
     e.write_u64(root, vt)
     e.write_u64(vt + 0x50, 0x1412ee8a0)
@@ -46,6 +81,7 @@ def main(path):
     def intercept(emu):
         char, flags, key, phase = [emu.reg(r) & 0xffffffff for r in [UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9]]
         assert char <= 255 and key <= 255 and phase in [0, 2]
+        log.append(f'N:{char}:{key}:{flags}:{phase}')
         mutation()
         emu.uc.reg_write(UC_X86_REG_RAX, values[1 if phase == 0 else 2] & 0xffffffff)
 
@@ -73,10 +109,22 @@ def main(path):
         log.append(f'P:{char}:{key}:{flags}:{phase}')
     e.uc.hook_add(UC_HOOK_CODE, intercept_trace, begin=0x141913800, end=0x141913800)
     e.write_u64(0x146104f88, 0x141917f20)
-    e.write_u64(0x146106038, RET_ADDR + 0x400)
+    e.write_u64(0x146106038, 0x18001a670)
     e.write_u64(0x146105010, RET_ADDR + 0x500)
     e.write_u64(0x146105018, RET_ADDR + 0x600)
     e.write_u32(0x14610551c, 0)
+    e.uc.hook_add(UC_HOOK_CODE, lambda uc, addr, size, user: log.append(f'D:{e.reg(UC_X86_REG_R9) & 0xffffffff}'), begin=0x18001a670, end=0x18001a670)
+    # Original DLL routing executes; thread/context services remain controlled.
+    e.stubs[0x180021e10] = lambda emu: None
+    e.stubs[0x1800156a0] = lambda emu: None
+    def sdk_enter(emu):
+        pointer = emu.reg(UC_X86_REG_RCX)
+        assert emu.reg(UC_X86_REG_RDX) & 0xffffffff == 0
+        emu.write_u32(pointer, 0)
+        emu.uc.reg_write(UC_X86_REG_RAX, pointer)
+    e.stubs[0x18001cc90] = sdk_enter
+    e.stubs[0x18001d1d0] = lambda emu: emu.uc.reg_write(UC_X86_REG_RAX, 1)
+    e.stubs[0x18001cf60] = lambda emu: None
     e.stubs[RET_ADDR + 0x400] = intercept
     e.stubs[RET_ADDR + 0x500] = lambda emu: emu.uc.reg_write(UC_X86_REG_RAX, 0)
     e.stubs[RET_ADDR + 0x600] = lambda emu: None
@@ -85,7 +133,8 @@ def main(path):
     e.stubs[0x140c7fac0] = command('B')
     e.stubs[0x140c7fc40] = command('E')
     print('# reference_sha256', REFERENCE_SHA256)
-    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; native capture and interceptor wrapper/adapter unchanged; export/UI-own/Begin/End and clock/context/allocator endpoints stubbed')
+    print('# sdk_sha256', SDK_SHA256)
+    print('# whole 0x140c627a0, focused wrapper/base/filter/CRT, binding loop unchanged; native capture and interceptor wrapper/adapter unchanged; DLL export/body also unchanged; plugin sniffer/UI-own/Begin/End and validation/clock/context/allocator endpoints stubbed')
     print('# K capture first second own mode block char key mask flags focus suppression update_mode update_block -> suppression active* mode block trace*')
     count = 0
     for case in cases():
@@ -105,8 +154,14 @@ def main(path):
         e.write(0x145a0df02, bytes([block]))
         e.write_u64(0x145a0dfc8, root if focus else 0)
         e.write_u32(root + 0x18, mask)
+        e.write_u32(0x180069670, 0)
+        e.write(0x180069674, b'\0')
+        e.write_u32(0x1800696a0, 0)
+        e.write(0x1800696a4, b'\0')
         log.clear()
-        e.call(0x140c627a0, ints=[owner, char, key, flags], max_instructions=5000)
+        e.call(0x140c627a0, ints=[owner, char, key, flags], max_instructions=15000)
+        assert e.read_u32(0x180069670) == 0 and e.read(0x180069674, 1)[0] == 0
+        assert e.read_u32(0x1800696a0) == 0 and e.read(0x1800696a4, 1)[0] == 0
         active = [struct.unpack('<i', e.read(vector + i * 16 + 12, 4))[0] for i in range(3)]
         after = struct.unpack('<i', e.read(owner + 32, 4))[0]
         print('K', *case, '->', after, *active, e.read_u32(mode_ptr), e.read(0x145a0df02, 1)[0], *log)
@@ -115,4 +170,4 @@ def main(path):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2])
