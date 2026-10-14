@@ -143,3 +143,8 @@ original-code entries ([key-graph scope](../research/UI_MENU_KEY_GRAPH.md)). Thi
 is a synthetic already-created panel with pinned focus; it does not establish
 show_menu opening, Alt activation or viewer rendering. Paired visuals remain
 pending and UI/graphics verified coverage stays zero.
+
+Owner/selected binding now matches 1045 whole native helper cases
+([scope](../research/UI_FOCUS_BINDING.md)). Binding and widget parent links are
+distinct; binding callbacks can change the chain being cleared. This is not yet
+joined to the key graph and does not prove live focus or paired UI pixels.

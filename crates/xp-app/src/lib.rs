@@ -58,3 +58,5 @@ pub mod ui_menu_direct_graph;
 pub mod ui_menu_action_graph;
 
 pub mod ui_menu_key_graph;
+
+pub mod ui_focus_binding;

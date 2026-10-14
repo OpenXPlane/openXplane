@@ -236,3 +236,12 @@ state ([evidence](../research/UI_MENU_KEY_GRAPH.md)). Native focus is pinned to
 a panel, child absent and effect bodies controlled. Viewer is still unwired.
 Next recover construction/focus, actual opening ID3/Alt and remaining effects,
 then original renderer and matched captures. UI verified share stays zero.
+
+## Owner/selected binding (2026-10-14)
+
+Full owner binding now matches 1045 original cases, including blur/stop callbacks
+that alter owners, selected links and focus ([evidence](../research/UI_FOCUS_BINDING.md)).
+These links are separate from widget parents. Next join binding with the actual
+window/key graph and verify subsequent routing; virtual callback bodies and real
+construction/lifetime remain unfinished. Opening ID3/Alt, original rendering and
+paired captures are still required. UI verified share stays zero.
