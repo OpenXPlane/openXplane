@@ -18,7 +18,9 @@ makes no claim for other virtual tables/NaN providers.
 Property 0 returns immediately; the caller's Esc own handler still consumes the
 event. Otherwise the fallback rereads engine byte. Nonzero invokes panel+0x170
 interface slot +0x08 with int 0. Original thunk `0x140ef6f10` adjusts this by
--0x170 and calls `0x140f0a2c0(panel,0)`. Its full effects are still unported.
+-0x170 and calls `0x140f0a2c0(panel,0)`. Its full control flow and scalar guards now have 694 direct native comparisons
+(`UI_MENU_DIRECT.md`); actual window/document/dialog callee effects remain
+unported.
 
 With zero engine byte, query A (`0x140f0a1b0`) runs. Only a nonzero result requests
 query B (`0x1417e2640` on `0x1460fc940`); if B is nonzero the same direct action
@@ -82,7 +84,8 @@ behavior; failures/exceptions/unwind, populated wrapper lifetime, real UI/cache/
 manager content, focus/child graph and concrete actions are unverified. The port
 currently establishes request control flow, not opening/closing/resuming a menu.
 
-Next recover direct `0x140f0a2c0` and submission `0x140ef67c0`, constructor
+Direct `0x140f0a2c0` now has recovered request control flow. Next recover its
+close/preparation/document/binding effects, submission `0x140ef67c0`, constructor
 `0x140ec9c10`, query/manager/cache bodies, kind-11 creation/registry lifecycle and
 actual show_menu ID-3/Alt entry. Original layout/fonts/GPU rendering and matched
 screenshots/GIF/video remain outstanding. The active viewer still exits on Esc

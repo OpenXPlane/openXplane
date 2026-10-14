@@ -38,3 +38,5 @@ pub mod xplm_sniffer;
 pub mod ui_menu_key;
 
 pub mod ui_menu_action;
+
+pub mod ui_menu_direct;

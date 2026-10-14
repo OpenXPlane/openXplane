@@ -79,3 +79,9 @@ callback and focused/filter routes (`research/UI_MENU_ACTION.md`). Actual
 property-2 getter and empty-wrapper lifecycle execute unchanged. Query/window
 construction/direct/resolution/submission effects are still service boundaries;
 no opening/closing or visual outcome is proven by those ordered requests.
+
+
+The direct menu action now has 694 full native control-flow comparisons
+(`research/UI_MENU_DIRECT.md`), including c9 re-entry protection and the kind-11
+close request. Close/window/document/dialog bodies remain explicit services;
+this does not prove hiding a real window or menu rendering.
