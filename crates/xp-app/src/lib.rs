@@ -62,3 +62,5 @@ pub mod ui_menu_key_graph;
 pub mod ui_focus_binding;
 
 pub mod ui_menu_focus_graph;
+
+pub mod ui_input_construct;

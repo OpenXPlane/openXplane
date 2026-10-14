@@ -265,3 +265,13 @@ include one asserted nonzero stop ([scope](../research/UI_MENU_FOCUS_GRAPH.md)).
 Callbacks, real construction/lifetime and opening ID3/Alt remain unfinished.
 Next recover those effects and original renderer, then matched captures.
 UI verified share stays zero; viewer remains unwired.
+
+## Input-node base construction (2026-10-14)
+
+Complete native base/callback/string initialization now matches 64 poisoned
+inline-name scenarios, including full object/sentinel bytes and allocator
+snapshots ([evidence](../research/UI_INPUT_CONSTRUCT.md)). Input-node +0x60 is
+a string; widget geometry +0x60 is a distinct parent field. Continue outer panel
+constructors and real factory/child/layout/resource creation, then opening ID3/Alt
+and original rendering. Heap-name/lifetime and matched captures remain unverified.
+UI verified share stays zero.

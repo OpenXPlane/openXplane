@@ -160,3 +160,8 @@ entries and 144 original binding calls match owner/selected/global-focus state
 and subsequent routing ([current scope](../research/UI_MENU_FOCUS_GRAPH.md)).
 Virtual callbacks and real construction remain controlled/unverified; this is
 not a working original viewer menu or paired visual evidence.
+
+Input-node base construction now matches 64 original byte/snapshot comparisons
+([scope](../research/UI_INPUT_CONSTRUCT.md)). This establishes initial input/
+container state for inline names, not full panel geometry, live creation or GPU
+pixels. Original menus and matched captures remain pending.
