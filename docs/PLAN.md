@@ -255,3 +255,13 @@ consumption. Combined original replay is still required
 ([scope](../research/UI_MENU_FOCUS_GRAPH.md)). Actual callback/construction/lifetime,
 opening ID3/Alt, viewer rendering and paired captures remain unfinished.
 UI verified share stays zero.
+
+## Combined mutable focus / menu replay (2026-10-14)
+
+728 native own/focused sequences now compare the whole menu graph plus actual
+owner binding: 1456 key entries, 300 closes, 72 visibility and 144 binding calls.
+Owner/selected/focus state and next-key routing match; 16 blur/25 stop callbacks
+include one asserted nonzero stop ([scope](../research/UI_MENU_FOCUS_GRAPH.md)).
+Callbacks, real construction/lifetime and opening ID3/Alt remain unfinished.
+Next recover those effects and original renderer, then matched captures.
+UI verified share stays zero; viewer remains unwired.

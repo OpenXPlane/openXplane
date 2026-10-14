@@ -154,3 +154,9 @@ recovered owner/selected binding. Its ordinary tests use controlled blur/child
 effects; combined original replay is still pending
 ([limits](../research/UI_MENU_FOCUS_GRAPH.md)). This does not establish live viewer
 focus or paired rendering.
+
+Mutable focus is now part of combined original key/close/binding replay: 1456 key
+entries and 144 original binding calls match owner/selected/global-focus state
+and subsequent routing ([current scope](../research/UI_MENU_FOCUS_GRAPH.md)).
+Virtual callbacks and real construction remain controlled/unverified; this is
+not a working original viewer menu or paired visual evidence.
