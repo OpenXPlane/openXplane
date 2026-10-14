@@ -158,3 +158,77 @@ pub fn unregister(
     state.end_iteration(services)?;
     Ok(i32::from(token.is_some()))
 }
+
+/// Registered sniffer callbacks may invoke the actual recovered registration APIs.
+pub trait DispatchServices: Services + crate::xplm_context::Services {
+    fn validate_key_caller(&mut self, list: &mut xplm_deferred::State);
+    fn callback(
+        &mut self,
+        state: &mut State,
+        token: u64,
+        record: Record,
+        input: crate::keyboard_dispatch::InterceptInput,
+    ) -> i32;
+}
+/// Token-based sniffer paths of XPLMKeyPressHook. Phases 0/2 only; hotkeys and
+/// focused windows remain in xplm_key_hook and are not dispatched here.
+/// Empty input returns 1; phase 0 rejects deleted records, phase 2 does not.
+pub fn dispatch(
+    state: &mut State,
+    input: crate::keyboard_dispatch::InterceptInput,
+    services: &mut impl DispatchServices,
+) -> Result<u32, &'static str> {
+    if input.phase != 0 && input.phase != 2 {
+        return Err("sniffer phase must be 0 or 2");
+    }
+    services.validate_key_caller(&mut state.list);
+    Services::validate_thread(services, &mut state.list);
+    if input.character == 0 && input.virtual_key == 0 && input.flags == 0 {
+        return Ok(1);
+    }
+    state.iteration.depth = state.iteration.depth.wrapping_add(1);
+    let mut token = state.list.head;
+    let mut visited = std::collections::BTreeSet::new();
+    while token != 0 {
+        if !visited.insert(token) {
+            return Err("cyclic sniffer dispatch");
+        }
+        let record = *state.records.get(&token).ok_or("missing dispatch record")?;
+        let node = state
+            .list
+            .nodes
+            .get(&token)
+            .ok_or("unmapped dispatch node")?;
+        let eligible = if input.phase == 0 {
+            node.deleted == 0 && record.binding.before != 0
+        } else {
+            record.binding.before == 0
+        };
+        if eligible {
+            state.list.context.enter(record.plugin);
+            let active = state.list.context.active(services)?;
+            if active {
+                // Native loads callback/refcon after activation, then reads next after release.
+                let record = *state
+                    .records
+                    .get(&token)
+                    .ok_or("record invalidated by activation")?;
+                if services.callback(state, token, record, input) == 0 {
+                    // Original consumed path drains while callback context is still present.
+                    state.end_iteration(services)?;
+                    state.list.context.leave(services)?;
+                    return Ok(0);
+                }
+            }
+            state.list.context.leave(services)?;
+        }
+        token = state
+            .list
+            .nodes
+            .get(&token)
+            .ok_or("node invalidated during callback")?
+            .next;
+    }
+    state.end_iteration(services)?;
+    Ok(1)
+}

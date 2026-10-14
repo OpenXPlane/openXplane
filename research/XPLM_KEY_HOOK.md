@@ -72,6 +72,9 @@ not claim its synthetic list is physically mutated by the original helpers.
 registration/unregistration exports, original removal/EndCall/deferred helpers
 and ready-TLS IDs. The port now creates and queues callback records according
 to those APIs, including duplicate and rejected-owner behavior. The existing
-hook replay still supplies explicit synthetic lists; it does not yet invoke
-these registrations or model their mutation during user callbacks. Hotkey
+hook replay still supplies explicit synthetic lists; its original fixed-list generator does not invoke these registrations or model
+mutation during user callbacks. A separate 524-case generator now uses actual
+registrations and callback thunks calling original API bodies, with token-based
+Rust dispatch (`XPLM_SNIFFER_DISPATCH.md`). Hotkey/window lists are empty in that
+comparison; full mutable SDK/EXE integration remains unfinished. Hotkey
 registration, window creation and actual menu actions/visuals remain unfinished.

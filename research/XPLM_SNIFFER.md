@@ -49,8 +49,9 @@ stores set 1 or clear 0.
 `xp-app::xplm_sniffer` now connects these APIs and EndCall (`0x180008010`) to the
 recovered `xplm_deferred` list, preserving callback records and explicit freed/
 unlinked audit entries. It retains external service boundaries for validation,
-lazy loading, allocator, clock, tracking and diagnostics. Hotkey registration
-and key-hook/viewer integration remain unfinished.
+lazy loading, allocator, clock, tracking and diagnostics. Registered sniffer phases 0/2 now have 524 mutable native event scenarios
+(`XPLM_SNIFFER_DISPATCH.md`); hotkey registration and full key-hook/viewer
+integration remain unfinished.
 
 ## Direct original-code evidence
 
@@ -93,7 +94,8 @@ rejects invalid token/cyclic state rather than claiming unsafe native memory
 behavior. This is a local CPU API/list replay, not Windows DLL loading or a
 running simulator. Actual callback effects are not exercised by registration.
 
-Next connect token-based registered callbacks and list mutation to the actual
-key-hook routing, recover hotkey registration/window creation and actual
+Registered token-based sniffer callbacks/list mutation now have original SDK
+routing comparisons. Next combine them with complete SDK/EXE routing, recover
+hotkey registration/window creation and actual
 Alt/Esc menu actions, then original layout/rendering and paired screenshot/
 GIF/video acceptance. Whole-game X-Plane 12 1:1 remains unproven.
