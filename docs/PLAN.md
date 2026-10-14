@@ -275,3 +275,12 @@ a string; widget geometry +0x60 is a distinct parent field. Continue outer panel
 constructors and real factory/child/layout/resource creation, then opening ID3/Alt
 and original rendering. Heap-name/lifetime and matched captures remain unverified.
 UI verified share stays zero.
+
+## Common panel construction (2026-10-14)
+
+Full common-panel ctor through input/callback/string bases now matches 256
+poisoned inline scenarios, including strings, raw168/169/16a flags, interface
+identities and complete allocation snapshots ([evidence](../research/UI_PANEL_CONSTRUCT.md)).
+Next concrete main-menu interfaces/children/layout/resources, heap/localized
+strings and live factory/key/focus integration. Opening ID3/Alt, original
+rendering and matched captures remain unfinished; UI verified share stays zero.

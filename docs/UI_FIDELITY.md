@@ -165,3 +165,8 @@ Input-node base construction now matches 64 original byte/snapshot comparisons
 ([scope](../research/UI_INPUT_CONSTRUCT.md)). This establishes initial input/
 container state for inline names, not full panel geometry, live creation or GPU
 pixels. Original menus and matched captures remain pending.
+
+Common panel construction now has 256 original nested ctor comparisons and
+provides initial Esc/Enter flag fields ([scope](../research/UI_PANEL_CONSTRUCT.md)).
+Concrete main-menu geometry/resources, heap/localized strings and live creation
+remain pending; these byte images are not original GPU pixels.
