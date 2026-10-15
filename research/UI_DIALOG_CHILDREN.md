@@ -61,6 +61,8 @@ and corpus are not published; source/generator/test/report are published.
 
 ## Next dependencies
 
+The [callback-list receiver](UI_CALLBACK_LIST.md) now has a72-sequence combined
+copy/append/lifetime comparison; child1410d7490 and the dialog use this dependency.
 Recover the actual four nested constructors and resource/refresh bodies, and
 compose them with dialog140ec9c10's strings, callback copies and global interface.
 The full dialog still needs layout/widget bindings; Main Menu singleton

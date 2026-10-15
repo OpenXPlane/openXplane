@@ -365,3 +365,18 @@ Next recover these nested constructor/resource/refresh bodies and compose them
 with dialog140ec9c10, its verified strings/callback links/interface, then actual
 layout/widget bindings and singleton publication. Real opening/Alt, viewer/GPU
 rendering and paired captures remain required; compatibility shares stay unchanged.
+
+## Retained callback-list copies (2026-10-15)
+
+Parent receiver141149460 now composes callback copying/peer registration with
+120-byte list-node append semantics.72 unchanged native sequences include576
+appends and360 source/base teardowns; list links/counts, live copied parameters/
+peer sets and allocation/free sizes/counts match after each of936 actions
+([scope and remaining byte-layout boundary](../research/UI_CALLBACK_LIST.md)).
+The ordinary bound-temporary lifetime regression passes;200 normal tests pass.
+
+Next compose actual child1410d7490, including refresh1411396d0, this receiver and
+temporary cleanup, then replace its controlled outer-factory endpoint. Recover
+remaining nested children/resources/refresh and complete dialog/layout/binding/
+singleton construction. Native tree layout/custom callable/list destruction and
+actual opening/Alt/viewer/GPU paired captures remain unverified. Shares unchanged.

@@ -210,3 +210,10 @@ conditional constructor calls and inline fifth-object containers match with
 explicit controlled nested constructors/resource/refresh. This is not full
 widget construction or rendered UI. Recover those nested bodies, complete
 dialog/layout/binding composition and retain the original paired-visual gate.
+
+Parent callback-list receiver141149460 now has72 original append/lifetime
+sequences/936 compared states ([scope](../research/UI_CALLBACK_LIST.md)). It
+retains registered copies rather than references to temporary wrappers. List
+link/count fields and logical callback state match; internal callback-tree bytes
+remain unmodeled. Actual child refresh/construction, full dialog/layout/bindings,
+opening/Alt and paired original GPU captures remain required.

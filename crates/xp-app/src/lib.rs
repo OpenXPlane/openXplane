@@ -78,3 +78,5 @@ pub mod ui_callback_links;
 pub mod ui_native_string;
 
 pub mod ui_dialog_children;
+
+pub mod ui_callback_list;
