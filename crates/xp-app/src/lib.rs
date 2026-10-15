@@ -70,3 +70,5 @@ pub mod ui_panel_construct;
 pub mod ui_menu_member_construct;
 
 pub mod ui_interface_chain;
+
+pub mod ui_main_menu_construct;

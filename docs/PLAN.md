@@ -298,7 +298,25 @@ allocation and original rendering remain unfinished; UI verified share stays zer
 
 210 complete native ctor/destructor sequences now verify global-head insertion,
 head/middle/tail unlink, retained detached links and bit0-only free requests
-([scope](../research/UI_INTERFACE_CHAIN.md)). Next combine concrete panel
-initialization with common/member stages; full derived teardown, resources,
-opening ID3/Alt and original renderer remain incomplete. No paired captures;
+([scope](../research/UI_INTERFACE_CHAIN.md)). Concrete prefix composition is
+now verified below; full derived teardown, resources, opening ID3/Alt and
+original renderer remain incomplete. No paired captures;
 UI verified share stays zero.
+
+## Concrete Main Menu prefix (2026-10-15)
+
+480 original executions now verify composition of common/input/callback,
+global-interface and three embedded-member constructors through the exact
+intermediate boundary0x140ecb592
+([evidence and controlled endpoints](../research/UI_MAIN_MENU_CONSTRUCT.md)).
+Whole object/allocated bytes, global head/links, parent-vector growth and
+allocation/copy/free order match, including null optional callback allocation.
+The earlier710 native constructor cases pass again; ordinary xp-app tests pass
+196 with40 opt-in tests ignored. The new480-case native replay runs separately.
+
+Next recover shared-dialog singleton branches and actual dialog/callback
+construction from0x140ecb592, then remaining children, layout, resources,
+heap strings/full teardown and live factory/key/focus integration. The prefix
+is not a complete usable menu. Opening ID3/Alt, original GPU output and paired
+screenshots/GIF/video remain unverified. Esc still exits the viewer. Overall
+rubric stays41.4% implemented/28.2% verified; UI/Rendering verified share stays0.

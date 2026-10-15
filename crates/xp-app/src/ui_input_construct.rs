@@ -54,15 +54,18 @@ pub fn construct(
     ] {
         q(image, off, value);
     }
-    q(image, 0x48, 0x1426401e0);
-    q(image, 0x50, 0);
-    q(image, 0x58, 0);
-    let mut callback = allocate(image, 40, services)?;
-    for off in [0, 8, 16] {
-        q(&mut callback.bytes, off, callback.address);
-    }
-    callback.bytes[24..26].copy_from_slice(&0x101u16.to_le_bytes());
-    q(image, 0x50, callback.address);
+    let callback = {
+        let (prefix, tail) = image.split_at_mut(0x48);
+        let (callback, suffix) = tail.split_at_mut(24);
+        construct_callback(
+            callback,
+            &mut CallbackView {
+                prefix,
+                tail: suffix,
+                services,
+            },
+        )?
+    };
     for (off, value) in [
         (0, 0x142674670),
         (0x20, 0x142674790),
@@ -110,4 +113,37 @@ pub fn construct(
     name[24..32].copy_from_slice(&15u64.to_le_bytes());
     name[0] = 0;
     Ok(vec![callback, first, second, third])
+}
+
+struct CallbackView<'a, S> {
+    prefix: &'a [u8],
+    tail: &'a [u8],
+    services: &'a mut S,
+}
+impl<S: Services> Services for CallbackView<'_, S> {
+    fn allocate(&mut self, image: &[u8], bytes: usize) -> Result<Block, &'static str> {
+        let mut full = self.prefix.to_vec();
+        full.extend_from_slice(image);
+        full.extend_from_slice(self.tail);
+        self.services.allocate(&full, bytes)
+    }
+}
+/// Callback container 0x1410c7b50, independently embedded in input and menu objects.
+pub fn construct_callback(
+    image: &mut [u8],
+    services: &mut impl Services,
+) -> Result<Block, &'static str> {
+    if image.len() != 24 {
+        return Err("callback container image size mismatch");
+    }
+    q(image, 0, 0x1426401e0);
+    q(image, 8, 0);
+    q(image, 16, 0);
+    let mut sentinel = allocate(image, 40, services)?;
+    for off in [0, 8, 16] {
+        q(&mut sentinel.bytes, off, sentinel.address);
+    }
+    sentinel.bytes[24..26].copy_from_slice(&0x101u16.to_le_bytes());
+    q(image, 8, sentinel.address);
+    Ok(sentinel)
 }

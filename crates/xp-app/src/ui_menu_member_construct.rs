@@ -61,6 +61,20 @@ pub fn construct(
     registry: &mut Registry,
     services: &mut impl Services,
 ) -> Result<(), &'static str> {
+    initialize(image, identity, parent, variant)?;
+    if parent != 0 {
+        registry.append(identity + 0x10, services)?;
+    }
+    Ok(())
+}
+
+/// Initialize the embedded object before parent-vector registration.
+pub fn initialize(
+    image: &mut [u8],
+    identity: u64,
+    parent: u64,
+    variant: bool,
+) -> Result<(), &'static str> {
     if image.len() != 0x58 {
         return Err("member image size mismatch");
     }
@@ -71,8 +85,5 @@ pub fn construct(
     q(image, 0x18, if variant { 0x14260d050 } else { 0x14260d018 });
     q(image, 0x20, identity);
     q(image, 0x50, identity + 0x18);
-    if parent != 0 {
-        registry.append(identity + 0x10, services)?;
-    }
     Ok(())
 }

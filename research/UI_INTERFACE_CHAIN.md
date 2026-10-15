@@ -39,8 +39,8 @@ higher-level interface callbacks/lifetime are unverified. The full concrete
 main-menu destructor dispatches through a different derived thunk; this does
 not establish its complete teardown.
 
-Next combine interface linkage with common-panel and embedded-member constructors
-for concrete panel initialization, then singleton/dialog/child/layout/resource
-creation and actual lifecycle. Opening ID3/Alt, viewer/GPU output and paired
+Interface linkage now composes with common-panel and embedded-member constructors
+in the [480-case concrete prefix comparison](UI_MAIN_MENU_CONSTRUCT.md). Next recover
+singleton/dialog/child/layout/resource creation and actual lifecycle. Opening ID3/Alt, viewer/GPU output and paired
 screenshots/GIF/video remain missing. UI verified share stays zero; whole-game
 parity is still incomplete.

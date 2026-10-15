@@ -180,3 +180,11 @@ Embedded-interface global linking/unlinking now has 210 whole original ctor/
 destructor comparisons ([limits](../research/UI_INTERFACE_CHAIN.md)). This
 is one construction/lifecycle dependency, not complete panel teardown or GPU
 pixels. Original rendering and matched captures remain pending.
+
+Concrete Main Menu initialization now composes these constructors in480 exact
+original-prefix comparisons ([scope](../research/UI_MAIN_MENU_CONSTRUCT.md)).
+The asserted stop0x140ecb592 precedes singleton dialogs; it is not a normal
+constructor return. Full object/allocation bytes, global links and three parent
+registrations match with controlled translation/memory endpoints. Actual shared
+dialogs, children/layout/resources, opening/Alt, viewer rendering and paired
+screenshots/GIF/video remain required. No visible menu change is claimed.
