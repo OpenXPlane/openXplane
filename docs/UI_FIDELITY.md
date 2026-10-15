@@ -203,3 +203,10 @@ including aligned storage and full allocation/free snapshots
 label profile through the recovered common/input constructors. Actual dialog
 translation/formatting, children/layout/bindings and singleton composition are
 still unfinished. Original viewer menus and paired captures remain missing.
+
+The dialog's40-byte child bundle now has576 whole outer-factory comparisons
+([evidence](../research/UI_DIALOG_CHILDREN.md)). Its five-pointer creation flow,
+conditional constructor calls and inline fifth-object containers match with
+explicit controlled nested constructors/resource/refresh. This is not full
+widget construction or rendered UI. Recover those nested bodies, complete
+dialog/layout/binding composition and retain the original paired-visual gate.

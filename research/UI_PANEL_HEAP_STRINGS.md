@@ -71,9 +71,11 @@ arbitrary object destruction are unverified. The source bounds supported input
 length/capacity and reports unsupported profiles rather than reproducing native
 fatal failure behavior. It does not implement arbitrary MSVC string operations.
 
-Heap strings remove a prerequisite for dialog140ec9c10, but that constructor's
-translation/formatting, embedded callback copies,1410d6ca0 children, layout and
-widget bindings still need composition and verification. Main-menu singleton
+Heap strings remove a prerequisite for dialog140ec9c10. Its child factory now
+has a [576-case outer-body replay](UI_DIALOG_CHILDREN.md), with nested child/
+resource/refresh effects still controlled. Translation/formatting, embedded
+callback copies, actual children, layout and widget bindings still need
+composition and verification. Main-menu singleton
 publication and the remaining menu constructor are incomplete. Opening ID3/Alt,
 original GPU output and paired screenshots/GIF/video remain missing; Esc still
 exits the viewer. Overall rubric stays41.4% implemented/28.2% verified and

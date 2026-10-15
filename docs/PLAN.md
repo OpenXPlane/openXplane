@@ -350,3 +350,18 @@ copies,1410d6ca0 child construction and layout/widget bindings, then singleton
 publication and remaining Main Menu construction. Failure/overflow, reentrancy
 and full teardown remain unverified. No opening/Alt/viewer/pixel parity claim;
 UI verified share and overall estimates stay unchanged.
+
+## Dialog child factory (2026-10-15)
+
+576 complete original outer-factory1410d6ca0 executions now match bundle/heap
+bytes at allocator/constructor/resource/refresh entries and on completion
+([scope](../research/UI_DIALOG_CHILDREN.md)). All32 external allocation failure
+masks and distinct constructor return pointers are covered. Inline fifth-object
+and empty list/hash initialization are ported; four nested constructors and
+resource/refresh effects remain controlled. Actual null-parent acceptance and
+failed required internal allocations are not verified.
+
+Next recover these nested constructor/resource/refresh bodies and compose them
+with dialog140ec9c10, its verified strings/callback links/interface, then actual
+layout/widget bindings and singleton publication. Real opening/Alt, viewer/GPU
+rendering and paired captures remain required; compatibility shares stay unchanged.
