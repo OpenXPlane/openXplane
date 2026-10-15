@@ -320,3 +320,18 @@ heap strings/full teardown and live factory/key/focus integration. The prefix
 is not a complete usable menu. Opening ID3/Alt, original GPU output and paired
 screenshots/GIF/video remain unverified. Esc still exits the viewer. Overall
 rubric stays41.4% implemented/28.2% verified; UI/Rendering verified share stays0.
+
+## Bound dialog callback lifetime (2026-10-15)
+
+324 unchanged native sequences/5832 calls now verify reciprocal registration,
+copy inheritance, duplicate suppression and removal in six lifetime orders
+([evidence and scope](../research/UI_CALLBACK_LINKS.md)). Allocation/free endpoints
+are controlled. Ordered live sets and parameters match; internal tree bytes and
+free-pointer order are not represented. No callable invocation is claimed.
+
+This supplies a concrete dependency of dialog140ec9c10: it copies bound temporaries
+at+1f8/+260 before the outer Main Menu ctor releases those temporaries. Next add
+the heap-string/common-panel profile required by the dialog label, recover its
+children/layout/resources and compare complete dialog/singleton composition.
+Actual opening/Alt/viewer/GPU output and paired captures remain incomplete.
+Compatibility shares stay unchanged.

@@ -188,3 +188,11 @@ constructor return. Full object/allocation bytes, global links and three parent
 registrations match with controlled translation/memory endpoints. Actual shared
 dialogs, children/layout/resources, opening/Alt, viewer rendering and paired
 screenshots/GIF/video remain required. No visible menu change is claimed.
+
+Bound dialog callback lifetime now has324 original sequences/5832 intermediate
+state comparisons ([scope](../research/UI_CALLBACK_LINKS.md)). Temporary copies
+preserve reciprocal registration and source removal detaches survivors. This
+checks ordered logical links, full-width parameters and allocation/free counts,
+not native tree bytes or a complete dialog. Heap-string/common-panel support,
+real dialog children/resources/layout and singleton composition are next.
+Original rendering and paired screenshots/GIF/video remain missing.
