@@ -33,14 +33,25 @@ pub fn construct(
     name: &mut [u8; 32],
     services: &mut impl Services,
 ) -> Result<Vec<Block>, &'static str> {
+    let mut owned = crate::ui_native_string::NativeString::inline(*name)?;
+    let result = construct_owned(
+        image,
+        &mut owned,
+        &mut crate::ui_native_string::InlineServices(services),
+    )?;
+    *name = owned.raw;
+    Ok(result)
+}
+/// Original base ctor with an owned inline or heap-backed name argument.
+pub fn construct_owned(
+    image: &mut [u8],
+    name: &mut crate::ui_native_string::NativeString,
+    services: &mut impl crate::ui_native_string::Services,
+) -> Result<Vec<Block>, &'static str> {
     if image.len() != 0x128 {
         return Err("input node image size mismatch");
     }
-    let len = u64::from_le_bytes(name[16..24].try_into().unwrap());
-    let cap = u64::from_le_bytes(name[24..32].try_into().unwrap());
-    if len > 15 || cap != 15 {
-        return Err("only valid inline name profile verified");
-    }
+    name.validate()?;
     q(image, 0, 0x142674610);
     q(image, 8, 0);
     q(image, 16, 0);
@@ -77,9 +88,7 @@ pub fn construct(
     ] {
         q(image, off, value);
     }
-    image[0x60..0x70].copy_from_slice(&name[..16]);
-    q(image, 0x70, len);
-    q(image, 0x78, 15);
+    let owned_name = name.copy_into(image, 0x60, services)?;
     for off in [0x80, 0x88, 0x90, 0x98] {
         q(image, off, 0);
     }
@@ -109,10 +118,12 @@ pub fn construct(
     }
     q(image, 0x110, third.address);
     d(image, 0x120, 0);
-    name[16..24].fill(0);
-    name[24..32].copy_from_slice(&15u64.to_le_bytes());
-    name[0] = 0;
-    Ok(vec![callback, first, second, third])
+    name.consume(image, services)?;
+    let mut blocks = vec![callback, first, second, third];
+    if let Some(block) = owned_name.storage {
+        blocks.push(block);
+    }
+    Ok(blocks)
 }
 
 struct CallbackView<'a, S> {

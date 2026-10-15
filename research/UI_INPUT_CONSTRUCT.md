@@ -40,10 +40,11 @@ are not published. Only source/generator/test and evidence are published.
 
 ## Limits and next steps
 
-Verified profile is a valid inline string with capacity15 and length<=15,
-successful nonzero allocator results and exact object size. Heap-string copying/
-large allocation guards, allocator failure, destructor/lifetime and reentrancy
-are not verified. This is raw base initialization, not complete panel creation,
+The original64-case corpus covers valid inline strings with capacity15 and
+length<=15. [Nested heap-constructor replay](UI_PANEL_HEAP_STRINGS.md) now also
+verifies heap-name copying and aligned backing cleanup through the shared base
+implementation. Allocation failure/overflow aborts, full object lifetime and
+reentrancy are not verified. This is raw base initialization, not complete panel creation,
 widget geometry or GPU rendering. It is not yet the live menu node factory.
 
 Continue outer constructors to recover flags168/169/16a, strings, panel interface

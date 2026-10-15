@@ -36,10 +36,12 @@ corpus are not published. Only source/generator/test and evidence are published.
 
 ## Remaining boundaries
 
-Profile requires separate valid inline string objects, capacity15/length<=15,
-successful allocations and exact0x170 image size. Heap/localized strings, large
-allocation guards/failure, destructor/lifetime and reentrant allocation remain
-unverified. The raw constructor model is not yet the live node factory.
+The original256-case corpus covers separate inline capacity15/length<=15
+arguments. The [324-case heap extension](UI_PANEL_HEAP_STRINGS.md) now verifies
+mixed inline/heap strings, aligned storage and ordered constructor-argument
+cleanup through the same implementation. Allocation failure/overflow aborts,
+full object teardown, translation and reentrancy remain unverified. The raw
+constructor model is not yet the live node factory.
 
 Concrete main-menu ctor `0x140ecb340`, outer kind11 window construction, child/
 geometry/layout/resource setup and actual callback bodies remain unfinished.

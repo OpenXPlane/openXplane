@@ -66,8 +66,9 @@ This gives the connection-lifetime port a concrete constructor dependency.
 
 Dialog140ec9c10 also requires a translated auxiliary string, a heap-backed
 label, common-panel flags1/0/1, callback/interface/member initialization,
-1410d6ca0 child construction and layout/widget binding. The existing common-panel
-port accepts inline strings only, so heap-string handling is a next prerequisite.
+1410d6ca0 child construction and layout/widget binding. The [common-panel heap extension](UI_PANEL_HEAP_STRINGS.md) now covers this
+string-ownership prerequisite; actual translation/formatting and full dialog
+composition remain unfinished.
 The dialog ctor, singleton publication path, resource/UI construction and their
 composition with this link model still need original-code comparisons. No claim
 of complete dialog construction, callback invocation, custom callable lifetime,

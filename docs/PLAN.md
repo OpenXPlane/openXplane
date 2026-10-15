@@ -335,3 +335,18 @@ the heap-string/common-panel profile required by the dialog label, recover its
 children/layout/resources and compare complete dialog/singleton composition.
 Actual opening/Alt/viewer/GPU output and paired captures remain incomplete.
 Compatibility shares stay unchanged.
+
+## Heap-string panel construction (2026-10-15)
+
+324 complete original common/wrapper/input/string ctor cases now verify mixed
+inline/heap source ownership, nested identifier temporaries, spare capacity,
+embedded zeros and aligned allocation/cleanup around4096-byte boundaries
+([evidence and limits](../research/UI_PANEL_HEAP_STRINGS.md)). Full panel/source/
+allocated bytes and ordered allocate/free snapshots match. Earlier64 input,
+256 inline common and480 concrete-prefix cases pass after the shared refactoring.
+
+Next compose actual dialog140ec9c10: translation/formatting, callback-member
+copies,1410d6ca0 child construction and layout/widget bindings, then singleton
+publication and remaining Main Menu construction. Failure/overflow, reentrancy
+and full teardown remain unverified. No opening/Alt/viewer/pixel parity claim;
+UI verified share and overall estimates stay unchanged.

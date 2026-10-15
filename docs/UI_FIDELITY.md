@@ -196,3 +196,10 @@ checks ordered logical links, full-width parameters and allocation/free counts,
 not native tree bytes or a complete dialog. Heap-string/common-panel support,
 real dialog children/resources/layout and singleton composition are next.
 Original rendering and paired screenshots/GIF/video remain missing.
+
+Common-panel heap-string ownership now matches324 complete original ctor cases,
+including aligned storage and full allocation/free snapshots
+([scope](../research/UI_PANEL_HEAP_STRINGS.md)). This enables the dialog's long
+label profile through the recovered common/input constructors. Actual dialog
+translation/formatting, children/layout/bindings and singleton composition are
+still unfinished. Original viewer menus and paired captures remain missing.
