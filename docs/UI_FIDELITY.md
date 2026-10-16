@@ -224,3 +224,10 @@ Controlled refresh can redirect the parent; its list retains a registered0/0
 copy after temporary cleanup. Final child/base bytes and logical list/callback
 state match. Actual refresh, remaining children/full dialog, callback-tree heap
 bytes and combined native factory/visual evidence remain unfinished.
+
+The third-child refresh caller1411396d0 now has972 whole original comparisons
+([scope](../research/UI_CONTEXT_REFRESH.md)) and ordinary child-constructor
+integration. Context selection, Zulu/day override arithmetic, option cleanup and
+mutable listener traversal match with explicit controlled providers/CRT parsing/
+time conversion/notifications. Actual provider bodies and combined original
+constructor/factory evidence remain pending. This is not rendered-menu parity.

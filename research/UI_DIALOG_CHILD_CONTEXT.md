@@ -59,9 +59,11 @@ corpus are not published; source/generator/test/report are published.
 
 ## Next
 
-Recover actual refresh1411396d0, remaining child constructors1410d6a40/
-1410d6fc0/1410d75a0 and resource/refresh bodies, then compare combined factory
-composition. Finish dialog140ec9c10, layout/widget bindings, Main Menu singleton
+The [whole refresh caller](UI_CONTEXT_REFRESH.md) now has972 original cases and
+ordinary constructor integration; its providers, CRT parsing, time conversion and
+notification effects remain controlled. Recover these remaining bodies plus
+child constructors1410d6a40/1410d6fc0/1410d75a0 and resource/refresh bodies, then
+compare combined original constructor/factory composition. Finish dialog140ec9c10, layout/widget bindings, Main Menu singleton
 publication and construction. Opening ID3/Alt, original viewer/GPU output and
 paired screenshots/GIF/video remain missing. Esc still exits the viewer.
 Estimates stay41.4% implemented/28.2% verified; Rendering/UI verified0. Whole-game

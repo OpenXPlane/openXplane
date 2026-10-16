@@ -398,3 +398,19 @@ Next recover refresh1411396d0 and remaining nested child/resource/refresh bodies
 then complete native factory/dialog/layout/binding/singleton construction and
 live key/focus integration. Opening/Alt, original GPU output and paired captures
 remain required. Compatibility shares stay unchanged.
+
+## Whole context-refresh caller (2026-10-16)
+
+972 unchanged original1411396d0 executions now verify context selection, ordered
+Zulu/day overrides, exact float edge behavior, string cleanup and live listener
+next/head reloads ([scope](../research/UI_CONTEXT_REFRESH.md)). Full object/global/
+listener snapshots and service arguments/order match. Engine/context/option/CRT/
+time-conversion/free/notification endpoints are controlled; actual calendar and
+text parsing are not yet established. An ordinary constructor test now invokes
+the recovered refresh rather than assigning a completed payload.
+
+Next recover these remaining services and compare original constructor-plus-
+refresh/factory composition; recover other nested children and complete dialog/
+layout/binding/singleton/Main Menu construction and teardown. Default FP rounding
+only; status flags, invalid/nonterminating graphs and failure paths are unverified.
+Opening/Alt, original GPU output and matched captures remain required. Shares unchanged.
