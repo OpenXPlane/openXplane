@@ -43,6 +43,21 @@ impl State {
         );
         Ok(())
     }
+    /// Adopt an already initialized raw container; its sentinel allocation was
+    /// accounted for by the enclosing constructor. Tree backing stays opaque.
+    pub fn adopt_container(&mut self, id: u64) -> Result<(), &'static str> {
+        if id == 0 || self.nodes.contains_key(&id) {
+            return Err("fresh container identity required");
+        }
+        self.nodes.insert(
+            id,
+            Node {
+                kind: Kind::Container,
+                peers: BTreeSet::new(),
+            },
+        );
+        Ok(())
+    }
     pub fn container(&mut self, id: u64, services: &mut impl Services) -> Result<(), &'static str> {
         self.insert(id, Kind::Container, services)
     }

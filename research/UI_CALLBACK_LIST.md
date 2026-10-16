@@ -64,8 +64,9 @@ published. Source, generator, opt-in test and report are published.
 ## Remaining work
 
 The receiver supplies a prerequisite of actual child1410d7490 and the dialog's
-later bindings. Compose that constructor's base/callback fields, refresh1411396d0,
-receiver copy and temporary teardown, then connect it to outer factory1410d6ca0.
+later bindings. That constructor now has a [216-call whole-body comparison](UI_DIALOG_CHILD_CONTEXT.md)
+with refresh controlled, and an ordinary adapter connects it to outer factory
+kind2. Recover the real refresh and compare full native factory composition.
 The other nested child/resource/refresh bodies and complete dialog/layout/
 singleton/Main Menu construction remain unfinished. Opening ID3/Alt, original
 viewer/GPU output and paired screenshots/GIF/video remain missing; Esc still

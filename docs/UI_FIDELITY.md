@@ -217,3 +217,10 @@ retains registered copies rather than references to temporary wrappers. List
 link/count fields and logical callback state match; internal callback-tree bytes
 remain unmodeled. Actual child refresh/construction, full dialog/layout/bindings,
 opening/Alt and paired original GPU captures remain required.
+
+Third-child1410d7490 construction now has216 complete original comparisons and
+an ordinary outer-factory adapter test ([scope](../research/UI_DIALOG_CHILD_CONTEXT.md)).
+Controlled refresh can redirect the parent; its list retains a registered0/0
+copy after temporary cleanup. Final child/base bytes and logical list/callback
+state match. Actual refresh, remaining children/full dialog, callback-tree heap
+bytes and combined native factory/visual evidence remain unfinished.

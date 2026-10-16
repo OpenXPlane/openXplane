@@ -63,8 +63,11 @@ and corpus are not published; source/generator/test/report are published.
 
 The [callback-list receiver](UI_CALLBACK_LIST.md) now has a72-sequence combined
 copy/append/lifetime comparison; child1410d7490 and the dialog use this dependency.
-Recover the actual four nested constructors and resource/refresh bodies, and
-compose them with dialog140ec9c10's strings, callback copies and global interface.
+Third-child1410d7490 now has a [216-call complete ctor comparison](UI_DIALOG_CHILD_CONTEXT.md)
+and an ordinary outer-factory adapter test; its refresh remains controlled and
+callback-tree backing logical. Recover the remaining nested constructors and
+resource/refresh bodies and compare combined factory composition, then join
+dialog140ec9c10's strings, callback copies and global interface.
 The full dialog still needs layout/widget bindings; Main Menu singleton
 publication and remaining construction are unfinished. Opening ID3/Alt, original
 viewer/GPU output and paired screenshots/GIF/video remain missing. Esc still

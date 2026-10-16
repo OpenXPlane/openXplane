@@ -380,3 +380,21 @@ temporary cleanup, then replace its controlled outer-factory endpoint. Recover
 remaining nested children/resources/refresh and complete dialog/layout/binding/
 singleton construction. Native tree layout/custom callable/list destruction and
 actual opening/Alt/viewer/GPU paired captures remain unverified. Shares unchanged.
+
+## Third child and retained parent registration (2026-10-16)
+
+Child1410d7490 now composes raw initialization, callback-container creation,
+reciprocal copy/parent-list registration and temporary base teardown.108 two-child
+sequences/216 normal original returns match96-byte object images,120-byte base
+sentinels, allocation/refresh snapshots and live callback/list state
+([scope](../research/UI_DIALOG_CHILD_CONTEXT.md)). Refresh can change the parent;
+registration uses the post-refresh parent+58. A production adapter and ordinary
+test connect this constructor to kind2 of the outer factory. Actual refresh and
+other nested endpoints remain controlled; callback-tree backing is logical and
+there is no combined original whole-factory heap replay yet.202 ordinary tests
+pass,45 local opt-in tests are ignored in that run; native replay runs separately.
+
+Next recover refresh1411396d0 and remaining nested child/resource/refresh bodies,
+then complete native factory/dialog/layout/binding/singleton construction and
+live key/focus integration. Opening/Alt, original GPU output and paired captures
+remain required. Compatibility shares stay unchanged.
