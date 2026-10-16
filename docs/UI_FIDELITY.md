@@ -238,3 +238,11 @@ refresh body is no longer replaced in this replay. Leaf providers remain
 controlled, callback-tree heap bytes opaque and observers initially empty.
 This closes a CPU composition gap; full factory/dialog and paired GPU evidence
 remain missing, and no visible menu change is claimed.
+
+Second-child1410d6fc0 now has920 whole original comparisons and an ordinary
+receiver integration with the third child ([scope](../research/UI_DIALOG_CHILD_SELECTION.md)).
+Global interface/data/catalog/variant/callback construction is recovered with
+explicit controlled property/config/effect bodies. Raw constructor snapshots and
+logical live receiver lists remain distinct; no executable ABI/live viewer claim
+is made. First/fourth children, full factory/dialog and paired GPU evidence remain
+unfinished.

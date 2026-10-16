@@ -432,3 +432,20 @@ unchanged. Next recover remaining nested child/resource/provider bodies and
 compare the complete factory, then finish dialog/layout/bindings/singleton/menu
 construction and full teardown. Original opening/Alt/viewer/GPU and paired
 screenshots/GIF/video remain required.
+
+## Second child and shared receiver creation (2026-10-16)
+
+920 complete native1410d6fc0 executions now verify global-interface registration,
+raw data initialization, catalog selection/equality/variant assignment and retained
+parent callbacks ([scope](../research/UI_DIALOG_CHILD_SELECTION.md)). Full object/
+sentinel bytes, allocation/provider snapshots and logical receiver/callback state
+match. Property/config/effect bodies remain controlled. Nonempty stable catalogs,
+valid tags/parents, successful allocations and absent incoming optional text apply;
+heap destination optional cleanup and full teardown remain unverified.
+
+The kind1 adapter and ordinary second-then-third test connect actual constructed
+receiver lists. Prior216 child and972 combined-refresh cases still pass;204 normal
+tests pass with48 opt-in cases ignored in that run. This is not native full-factory
+or live viewer evidence. Next recover first/fourth children and remaining provider
+bodies, then complete factory/dialog/layout/bindings/singleton/menu/teardown and
+original opening/Alt/GPU paired captures. Compatibility shares stay unchanged.

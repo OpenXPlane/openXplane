@@ -19,7 +19,8 @@ Refresh replacements are retained. No semantic meaning is inferred for the raw
 payload defaults or refresh output beyond these observed stores.
 
 The source models the complete96-byte object and120-byte base sentinel as byte
-images. Callback-tree backing remains opaque: head identity/count fields match,
+images. Its fresh base receiver list is also registered for later child bindings;
+the [second-to-third receiver test](UI_DIALOG_CHILD_SELECTION.md) uses this graph. Callback-tree backing remains opaque: head identity/count fields match,
 while peer sets/list links use the recovered callback modules. An initialized
 container is adopted without counting its sentinel allocation twice.
 `Initialization` returns base-sentinel ownership and opaque callback-head identity;

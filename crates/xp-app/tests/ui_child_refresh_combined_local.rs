@@ -192,6 +192,8 @@ fn native_child_refresh_and_retained_callback_compose_in_one_execution() {
         .unwrap();
         assert_eq!(image.to_vec(), hex(v[21]), "case {count}");
         assert_eq!(init.base_sentinel.address, num(v[22]));
+        assert_eq!(parents[&identity].sentinel, init.base_sentinel.address);
+        assert!(parents[&identity].entries.is_empty());
         assert_eq!(init.base_sentinel.bytes, hex(v[23]));
         assert_eq!(
             init.callback_head,

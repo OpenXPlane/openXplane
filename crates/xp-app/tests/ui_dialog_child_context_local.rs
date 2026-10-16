@@ -194,6 +194,11 @@ fn native_child_constructor_with_real_retained_callback_lifetime() {
         .unwrap();
         assert_eq!(image.to_vec(), hex(v[4]), "case {cases}, child {index}");
         assert_eq!(result.base_sentinel.address, num(v[5]));
+        assert_eq!(
+            parents[&objects[index]].sentinel,
+            result.base_sentinel.address
+        );
+        assert!(parents[&objects[index]].entries.is_empty());
         assert_eq!(result.base_sentinel.bytes, hex(v[6]));
         assert_eq!(
             result.callback_head,

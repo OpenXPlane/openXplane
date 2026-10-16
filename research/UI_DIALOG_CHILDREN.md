@@ -65,8 +65,10 @@ The [callback-list receiver](UI_CALLBACK_LIST.md) now has a72-sequence combined
 copy/append/lifetime comparison; child1410d7490 and the dialog use this dependency.
 Third-child1410d7490 now has a [216-call complete ctor comparison](UI_DIALOG_CHILD_CONTEXT.md)
 and an ordinary outer-factory adapter test; its refresh remains controlled and
-callback-tree backing logical. Recover the remaining nested constructors and
-resource/refresh bodies and compare combined factory composition, then join
+callback-tree backing logical. Second-child1410d6fc0 now also has a [920-case complete outer constructor replay](UI_DIALOG_CHILD_SELECTION.md),
+with property/config/effect services controlled and ordinary receiver integration.
+Recover first/fourth constructors1410d6a40/1410d75a0 and remaining provider bodies
+and compare combined factory composition, then join
 dialog140ec9c10's strings, callback copies and global interface.
 The full dialog still needs layout/widget bindings; Main Menu singleton
 publication and remaining construction are unfinished. Opening ID3/Alt, original

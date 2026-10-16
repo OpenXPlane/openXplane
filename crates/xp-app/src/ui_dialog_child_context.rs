@@ -46,7 +46,9 @@ pub fn construct(
         .identity
         .checked_add(0x20)
         .ok_or("callback identity overflow")?;
-    if context.callbacks.nodes.contains_key(&callback) {
+    if context.callbacks.nodes.contains_key(&callback)
+        || context.parents.contains_key(&context.identity)
+    {
         return Err("fresh child callback required");
     }
     q(image, 0, 0x142642d00);
@@ -60,6 +62,9 @@ pub fn construct(
     q(&mut base.bytes, 8, base.address);
     q(image, 8, base.address);
     image[0x18] = 0;
+    context
+        .parents
+        .insert(context.identity, ui_callback_list::List::new(base.address)?);
     let head = {
         let (prefix, tail) = image.split_at_mut(0x20);
         let (raw, suffix) = tail.split_at_mut(24);
