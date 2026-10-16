@@ -65,8 +65,9 @@ used; FP status/exception flags and other rounding modes are not compared.
 An ordinary integration test runs the real child constructor, this refresh,
 callback copying/parent-list registration and temporary teardown together, with
 explicit provider endpoints. A day366.9 input produces366 while retaining the
-parent callback copy. A combined original constructor-plus-refresh replay is
-still pending; this ordinary test is not presented as that evidence.
+parent callback copy. A [972-case combined original constructor-plus-refresh replay](UI_CHILD_REFRESH_COMBINED.md)
+now separately verifies their original composition, with leaf providers still
+controlled. The ordinary test is not presented as that native evidence.
 
 Corpus stays local at `/private/tmp/openxplane-ui-context-refresh.txt`, replayed
 via `OPENXPLANE_UI_CONTEXT_REFRESH_VECTORS`. Executable/assets and corpus are not

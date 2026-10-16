@@ -231,3 +231,10 @@ integration. Context selection, Zulu/day override arithmetic, option cleanup and
 mutable listener traversal match with explicit controlled providers/CRT parsing/
 time conversion/notifications. Actual provider bodies and combined original
 constructor/factory evidence remain pending. This is not rendered-menu parity.
+
+Original child+refresh+retained callback lifetime now compose in972 whole native
+constructor executions ([scope](../research/UI_CHILD_REFRESH_COMBINED.md)). The
+refresh body is no longer replaced in this replay. Leaf providers remain
+controlled, callback-tree heap bytes opaque and observers initially empty.
+This closes a CPU composition gap; full factory/dialog and paired GPU evidence
+remain missing, and no visible menu change is claimed.

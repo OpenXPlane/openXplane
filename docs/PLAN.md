@@ -414,3 +414,21 @@ refresh/factory composition; recover other nested children and complete dialog/
 layout/binding/singleton/Main Menu construction and teardown. Default FP rounding
 only; status flags, invalid/nonterminating graphs and failure paths are unverified.
 Opening/Alt, original GPU output and matched captures remain required. Shares unchanged.
+
+## Original child and refresh composed (2026-10-16)
+
+972 original child1410d7490 executions now include actual refresh1411396d0,
+callback construction/binding, parent list copy and temporary teardown in one
+normal-return run ([scope](../research/UI_CHILD_REFRESH_COMBINED.md)). Object/
+base bytes, service snapshots/arguments/order and parent/callback state match.
+Only leaf providers/CRT/time conversion/allocator/free remain controlled; fresh
+observer lists and valid stable parents apply. Shared replay extraction retains
+all972 independent corpus rows byte-for-byte and the standalone replay passes.
+203 ordinary tests pass;47 opt-in tests are ignored in that run, with the new
+972-case native replay executed separately.
+
+This strengthens composition evidence; production behavior and estimates are
+unchanged. Next recover remaining nested child/resource/provider bodies and
+compare the complete factory, then finish dialog/layout/bindings/singleton/menu
+construction and full teardown. Original opening/Alt/viewer/GPU and paired
+screenshots/GIF/video remain required.
