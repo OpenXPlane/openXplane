@@ -84,3 +84,6 @@ Rendering/UI verified0. This is construction evidence, not visual parity.
 
 
 2026-10-17: [nested refresh](UI_NESTED_REFRESH.md) now has432 native cases and192 root-constructor compositions with engine0/fresh lists. Final root refresh141138cf0 and remaining leaf providers still need recovery; full factory and visual parity remain unverified.
+
+
+2026-10-17: [final root refresh outer body](UI_ROOT_REFRESH.md) now has118 whole native comparisons with controlled leaf bodies. Composition with actual nested refresh/payload assignment and complete factory still needs verification; this adds no visual parity evidence.

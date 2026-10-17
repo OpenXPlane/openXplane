@@ -79,3 +79,6 @@ Formatting, generator syntax and diff checks pass. No live GPU test was run.
 
 
 2026-10-17: [payload assignment](UI_PAYLOAD_MOVE.md) now has720 native cases;432 additional refresh runs execute that original body (27 reached assignments, inline buffers). Earlier controlled-assignment evidence remains scoped as above. Final root refresh and remaining providers are still pending.
+
+
+2026-10-17: [final root refresh outer body](UI_ROOT_REFRESH.md) now has118 whole native comparisons with controlled leaf bodies. Composition with actual nested refresh/payload assignment and complete factory still needs verification; this adds no visual parity evidence.

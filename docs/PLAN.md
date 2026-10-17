@@ -499,3 +499,16 @@ remains unported; its record/config parsing and other provider bodies still need
 recovery. This removes an assignment stub in the nested-refresh adapter, without
 claiming full factory/dialog or original Alt/Esc/GPU behavior. Estimates reviewed
 and unchanged; paired visual captures remain required.
+
+
+## Final root refresh outer body (2026-10-17)
+
+[Root refresh evidence](../research/UI_ROOT_REFRESH.md):118 whole native runs
+match resource/configuration selection, fallback strings, vector caller ownership,
+count/refill, one-time retained callbacks and live primary listener traversal.
+The apply-record flag is verified as R8B; upper register bits are excluded from
+that byte argument. Root/declared memory and live provider operands are checked
+through the refresh_image bridge. Leaf provider/parser/effect bodies and nested
+refresh are controlled here. Next compose real nested refresh/payload movement,
+then native full constructor/factory and remaining providers/dialog/layout/menu.
+Original Alt/Esc/GPU and paired captures remain unverified; estimates unchanged.
