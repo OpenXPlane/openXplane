@@ -124,6 +124,45 @@ impl State {
         Ok(())
     }
 }
+/// Publish logical receiver links/counts into the factory's mapped byte images.
+/// Callback RB nodes and receiver wrapper payloads remain logical, not ABI bytes.
+/// Call after a child constructor returns its owned base/record blocks.
+pub fn publish_callback_links(
+    state: &mut State,
+    callbacks: &crate::ui_callback_links::State,
+    parents: &BTreeMap<u64, crate::ui_callback_list::List>,
+) -> Result<(), &'static str> {
+    fn put(state: &mut State, p: u64, value: u64) -> Result<(), &'static str> {
+        let (base, bytes) = state
+            .blocks
+            .range_mut(..=p)
+            .next_back()
+            .ok_or("unmapped callback image")?;
+        let offset = (p - base) as usize;
+        bytes
+            .get_mut(offset..offset + 8)
+            .ok_or("short callback image")?
+            .copy_from_slice(&value.to_le_bytes());
+        Ok(())
+    }
+    for (parent, list) in parents {
+        put(state, parent + 16, list.entries.len() as u64)?;
+        for (p, next, previous) in list.links() {
+            if list.entries.contains(&p) {
+                state.blocks.entry(p).or_insert_with(|| vec![0; 16]);
+            }
+            put(state, p, next)?;
+            put(state, p + 8, previous)?;
+        }
+    }
+    for (p, node) in &callbacks.nodes {
+        if node.kind == crate::ui_callback_links::Kind::Container {
+            put(state, p + 16, node.peers.len() as u64)?;
+        }
+    }
+    Ok(())
+}
+
 pub trait Services {
     fn allocate(&mut self, state: &mut State, bytes: usize) -> Result<Option<Block>, &'static str>;
     /// Kinds0..3 correspond to1410d6a40/1410d6fc0/1410d7490/1410d75a0.

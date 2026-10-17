@@ -76,3 +76,6 @@ Validation:204 ordinary tests pass;57 opt-in tests are ignored in the ordinary
 run. All three118-case refresh/constructor replays pass when explicitly enabled;
 both earlier192-case constructor replays pass too. Formatting, Python syntax and
 diff checks pass. No live viewer/GPU run or paired visual capture was performed.
+
+
+2026-10-17: [whole all-child factory composition](UI_FACTORY_COMPOSED.md) now has216 native runs with every constructor body, shared receivers and logical callbacks. Refresh/provider computations remain controlled here; composition with actual recovered refreshes and full dialog/live GPU is next. Estimates unchanged.

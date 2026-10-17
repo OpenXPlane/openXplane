@@ -332,3 +332,15 @@ receiver links and logical callback peers match;34 inline assignments are reache
 Fresh lists apply; callback RB backing and remaining leaf calculations are still
 unverified. Next compare full factory/dialog and recover providers/layout/menu/
 teardown. Live Alt/Esc/GPU and paired captures remain pending; estimates unchanged.
+
+
+## All child constructors within the original factory (2026-10-17)
+
+[Factory composition evidence](../research/UI_FACTORY_COMPOSED.md):216 whole
+native factory calls execute all four constructor bodies and inline fifth/hash
+initialization. Raw declared heap/bundle snapshots, shared receiver links/counts
+and callback peers match;972 retained entries survive temporary cleanup.
+Refresh/provider effects remain controlled in these cases. Actual root/context
+refresh evidence is still separate. Next combine those bodies with the factory,
+recover fifth refresh/remaining providers and complete dialog/layout/menu/teardown.
+Original live Alt/Esc/GPU and paired captures remain unverified; estimates unchanged.
