@@ -96,3 +96,6 @@ Validation:204 ordinary tests pass;55 opt-in tests are ignored in that run.
 The118-case root refresh replay passes separately through refresh_image.
 Formatting, generator syntax and diff checks pass. No live viewer/GPU test was
 performed.
+
+
+2026-10-17: [composed root/nested/payload refresh](UI_REFRESH_CHAIN.md) now has118 native cases. Combined assignment reaches17 inline-buffer cases; full constructor/factory and live GPU remain pending.

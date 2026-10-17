@@ -309,3 +309,15 @@ through the refresh_image bridge. Leaf provider/parser/effect bodies and nested
 refresh are controlled here. Next compose real nested refresh/payload movement,
 then native full constructor/factory and remaining providers/dialog/layout/menu.
 Original Alt/Esc/GPU and paired captures remain unverified; estimates unchanged.
+
+
+## Shared root/nested/payload refresh execution (2026-10-17)
+
+[Composed refresh evidence](../research/UI_REFRESH_CHAIN.md):118 whole native
+runs execute actual root, nested and payload/string/vector assignment bodies.
+Shared root memory, global/index, live links and logical callbacks match.17 runs
+reach payload assignment under inline storage;322 root+nested notifications are
+checked. Earlier118 independent corpus rows remain byte-for-byte unchanged.
+Leaf calculations remain controlled. Next compare entire root construction with
+both real refreshes, then full factory/dialog/layout/menu/teardown and original
+Alt/Esc/GPU paired captures. Estimates reviewed and unchanged.

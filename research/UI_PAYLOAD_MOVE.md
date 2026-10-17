@@ -85,3 +85,6 @@ Validation:204 ordinary tests pass;54 opt-in tests are ignored in that run.
 The720-case payload replay and both432-case nested-refresh replays pass
 separately, including the combined run through assign_nested. Formatting,
 Python syntax and diff checks pass. No live viewer/GPU check was performed.
+
+
+2026-10-17: [composed root/nested/payload refresh](UI_REFRESH_CHAIN.md) now has118 native cases. Combined assignment reaches17 inline-buffer cases; full constructor/factory and live GPU remain pending.

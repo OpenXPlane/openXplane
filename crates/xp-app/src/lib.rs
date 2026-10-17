@@ -98,3 +98,5 @@ pub mod ui_nested_refresh;
 pub mod ui_payload_move;
 
 pub mod ui_root_refresh;
+
+pub mod ui_refresh_chain;

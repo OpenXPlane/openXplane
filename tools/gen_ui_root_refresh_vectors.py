@@ -8,9 +8,9 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP,UC_X86_REG_RIP
 ACTIVE,INDEX=0x145a10798,0x142640504
 COUNTS={0x1417fb320:1,0x141a64260:2,0x1405dd5c0:2,0x141a3b600:2,0x141141de0:3,0x1405ddde0:1,0x141100c40:1,0x1417f6dc0:1,0x1410fa920:2,0x1408acd90:1,0x1414cc7f0:0,0x1414d0900:2,0x1414ce750:2,0x141110050:1,0x140d776a0:2,0x1417e9f50:0,0x140d77340:3,0x1417e8460:2,0x1405df240:3,0x1414ccf50:2,0x1415404e0:1,0x1411490b0:2,0x1417e9a40:2,0x1405de1d0:1,0x141138650:2,0x1411399c0:1,0x140f59550:1,0x14113a300:1,0x1410c9d10:1}
-def main(path):
+def main(path,native_nested=False):
  assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==REFERENCE_SHA256
- e=Emulator(path);obj=e.alloc(0x3e0);resource=e.alloc(0x6200);borrowed=e.alloc(32);heaps=[e.alloc(4135)for _ in range(5)];entrydata=e.alloc(240);items=e.alloc(32);nodes=[e.alloc(120)for _ in range(3)];head2=e.alloc(120);temp_setup=e.alloc(104);top=e.heap_top;v={};events=[];live=set();ranges=[]
+ e=Emulator(path);obj=e.alloc(0x3e0);resource=e.alloc(0x6200);borrowed=e.alloc(32);heaps=[e.alloc(4135)for _ in range(5)];entrydata=e.alloc(240);items=e.alloc(32);nodes=[e.alloc(120)for _ in range(3)];head2=e.alloc(120);temp_setup=e.alloc(104);settings=e.alloc(0xdb0)if native_nested else 0;nested_items=e.alloc(32)if native_nested else 0;nested_nodes=[e.alloc(16)for _ in range(3)]if native_nested else [];nested_head2=e.alloc(16)if native_nested else 0;top=e.heap_top;v={};events=[];live=set();ranges=[]
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x)
  def blocks():return '/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(ranges))
  def snap():return f'{blocks()};{e.read_u64(ACTIVE)};{e.read_u32(INDEX)}'
@@ -35,7 +35,7 @@ def main(path):
  writes=[];reads=[]
  def write(p,data):
   e.write(p,data)
-  if v.get('stack',0)<=p and p+len(data)<=v.get('stack',0)+0x300:writes.append((p,data))
+  if v.get('stack',0)-(0x200 if native_nested else 0)<=p and p+len(data)<=v.get('stack',0)+0x300:writes.append((p,data))
  def read(p,n):
   data=e.read(p,n);reads.append((p,data));return data
  def vector(p):write(p,entrydata.to_bytes(8,'little')+(entrydata+80).to_bytes(8,'little')+(entrydata+240).to_bytes(8,'little'));return p
@@ -88,10 +88,18 @@ def main(path):
    else:assert table==0x14264fa78 and capture==obj+0x268;e.write_u64(obj+0x358,e.read_u64(obj+0x350)+4)
   elif fn==0x1411399c0:e.write(obj+0x211,bytes([v['seed']^0x12]))
   elif fn==0x140f59550:
-   if v['mutate']:e.write_u64(items+8,0);e.write_u64(obj+0x3c8,items+24)
+   if v['mutate']:
+    p=nested_items if v.get('in_nested')else items;off=0x3a8 if v.get('in_nested')else 0x3c8;e.write_u64(p+8,0);e.write_u64(obj+off,p+24)
   elif fn==0x14113a300:e.write(obj+0x398,b'\0')
   elif fn==0x1410c9d10:
    if v['listeners']==2 and args[0]==nodes[0]+16:e.write_u64(obj+8,head2);e.write_u64(nodes[0],head2)
+   if native_nested and v['listeners']==2 and args[0]==nested_nodes[0]+16:e.write_u64(obj+0x270,nested_head2);e.write_u64(nested_nodes[0],nested_head2)
+  elif fn==0x141142ce0:e.write(obj+0x398,b'\xff');e.write_u32(INDEX,88)
+  elif fn==0x141a64250:result=settings
+  elif fn==0x1417f7610:
+   p=args[0];raw=bytearray((v['seed']+k)%256 for k in range(0xe0));raw[0x30:0x50]=bytes(32);raw[0x30:0x34]=b'abc\0';raw[0x40:0x48]=(3).to_bytes(8,'little');raw[0x48:0x50]=(15).to_bytes(8,'little');raw[0x58]=[0,1,255][v['case']%3]
+   raw[0xa8:0xb0]=(p+0xc0).to_bytes(8,'little');raw[0xb0:0xb8]=(p+0xc0+[0,2,8][v['case']%3]*4).to_bytes(8,'little');raw[0xb8:0xc0]=(p+0xe0).to_bytes(8,'little');write(p,bytes(raw));result=p
+  elif fn==0x1408ab620:read(args[0]-0x30,0xe0)
   elif fn==0x1422e7c2c:pass
   else:raise AssertionError(hex(fn))
   result=int(result)
@@ -100,8 +108,23 @@ def main(path):
   def stub(emu,fn=fn,n=n):leaf(fn,[emu.reg(r)for r in [UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8][:n]])
   e.stubs[fn]=stub
  e.stubs.update({0x1422e7bf0:allocator,0x1422e7c2c:free})
+ nested_stub=e.stubs[0x14113a300]
+ if native_nested:
+  for fn,n in {0x141142ce0:2,0x141a64250:2,0x1417f7610:2,0x1408ab620:1}.items():
+   def stub(emu,fn=fn,n=n):leaf(fn,[emu.reg(r)for r in [UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8][:n]])
+   e.stubs[fn]=stub
+  def copy(emu):
+   d,src,n=emu.reg(UC_X86_REG_RCX),emu.reg(UC_X86_REG_RDX),emu.reg(UC_X86_REG_R8)
+   if n:emu.write(d,emu.read(src,n))
+   ret(d)
+  e.stubs[0x1423c0280]=copy
+  def nested_scope(uc,a,size,user):
+   if v['phase']=='body':v['in_nested']=a==0x14113a300
+  e.uc.hook_add(UC_HOOK_CODE,nested_scope,begin=0x14113a300,end=0x14113a300)
+  e.uc.hook_add(UC_HOOK_CODE,nested_scope,begin=0x1411393c2,end=0x1411393c2)
+
  def capture(uc,address,size,user):
-  if v['phase']=='body':v['stack']=e.reg(UC_X86_REG_RSP);v['initial_stack']=e.read(v['stack'],0x300).hex()
+  if v['phase']=='body':v['stack']=e.reg(UC_X86_REG_RSP);v['initial_stack']=e.read(v['stack']-(0x200 if native_nested else 0),0x500 if native_nested else 0x300).hex()
  e.uc.hook_add(UC_HOOK_CODE,capture,begin=0x141138d0b,end=0x141138d0b)
  def entries(parent,head):
   out=[];p=e.read_u64(head);previous=head
@@ -122,6 +145,7 @@ def main(path):
   return ';'.join(out) or '-'
 
  print('# reference_sha256',REFERENCE_SHA256)
+ print('# actual nested14113a300 + payload1410faec0/string/vector helpers; remaining leaf providers controlled' if native_nested else '# nested refresh controlled')
  print('# whole141138cf0 normal return; all leaf providers/parser/string/vector effects controlled; callback bind/list/copy/destroy bodies original; raw root/declared memory/global/index snapshots, leaf args/input reads/local writes, logical callbacks/receiver links; stack snapshot only initial and live provider operands; no full factory or GPU evidence')
  rows=[]
  for cli,fallback,keys,mismatch in itertools.product(range(3),range(3),range(3),range(2)):
@@ -131,10 +155,11 @@ def main(path):
  rng=random.Random(2026101704)
  for i in range(40):rows.append(dict(engine=255,active=rng.choice([0,7]),available=rng.randrange(2),flag=rng.choice([0,255]),test=rng.randrange(2),cli=rng.randrange(3),fallback=rng.randrange(3),keys=rng.randrange(3),mismatch=rng.randrange(2),strings=rng.randrange(3),bound=rng.randrange(2),listeners=rng.randrange(3),count=rng.choice([0,1,3]),alias_text=rng.randrange(2),alias_vector=rng.randrange(2),mutate=rng.randrange(2)))
  for i,inputs in enumerate(rows):
-  seed=[0,0xa5,255][i%3];e.heap_top=top;v.clear();v.update(inputs);v.update(seed=seed,phase='setup',stack=0,validation=0);live.clear();events.clear()
+  seed=[0,0xa5,255][i%3];e.heap_top=top;v.clear();v.update(inputs);v.update(seed=seed,phase='setup',stack=0,validation=0,in_nested=False,case=i);live.clear();events.clear()
   e.write(obj,bytes([seed])*0x3e0)
-  saved=e.stubs.pop(0x14113a300);e.stubs[0x14113a300]=lambda emu:None;e.stubs[0x141138cf0]=lambda emu:None
+  saved=e.stubs.pop(0x14113a300,nested_stub);e.stubs[0x14113a300]=lambda emu:None;e.stubs[0x141138cf0]=lambda emu:None
   e.call(0x1410d6a40,ints=[obj,1]);del e.stubs[0x141138cf0];e.stubs[0x14113a300]=saved
+  if native_nested:del e.stubs[0x14113a300]
   parent=obj+0x1e0;parent_head=e.read_u64(parent+8);head=e.read_u64(obj+8);live.add(obj+0x288)
   if inputs['bound']:
    e.call(0x1410c7d20,ints=[temp_setup,obj+0x288,0,0]);e.call(0x141149460,ints=[parent,temp_setup]);live.add(e.read_u64(parent_head+8)+16);e.call(0x1410c8430,ints=[temp_setup])
@@ -150,9 +175,16 @@ def main(path):
   for j,n in enumerate([111,222,0,444]):e.write_u64(items+j*8,n)
   e.write_u64(obj+0x3c8,items);e.write_u64(obj+0x3d0,items+inputs['count']*8);e.write_u64(obj+0x3d8,items+32);e.write_u64(ACTIVE,999);e.write_u32(INDEX,5)
   ranges[:]=[(obj,0x3e0),(resource+0x6178,32),(borrowed,32),(entrydata,240),(items,32),(head,120),(head2,120),*[(p,120)for p in nodes],*[(p,4135)for p in heaps]]
+  if native_nested:
+   nested_head=e.read_u64(obj+0x270);e.write_u64(nested_head,nested_nodes[0]if inputs['listeners']else nested_head);e.write_u64(nested_head+8,nested_nodes[-1]if inputs['listeners']else nested_head);e.write_u64(obj+0x278,3 if inputs['listeners']else 0)
+   for j,p in enumerate(nested_nodes):e.write_u64(p,nested_nodes[j+1]if j<2 else nested_head);e.write_u64(p+8,nested_head if j==0 else nested_nodes[j-1])
+   e.write_u64(nested_head2,nested_head2);e.write_u64(nested_head2+8,nested_head2)
+   for j,n in enumerate([111,222,0,444]):e.write_u64(nested_items+j*8,n)
+   e.write_u64(obj+0x3a8,nested_items);e.write_u64(obj+0x3b0,nested_items+inputs['count']*8);e.write_u64(obj+0x3b8,nested_items+32);e.write_u32(settings+0xdac,0 if i%2 else 7)
+   ranges.extend([(nested_head,16),(nested_head2,16),(nested_items,32),(settings+0xdac,4),*[(p,16)for p in nested_nodes]])
   initial=snap();initial_entries=entries(parent,parent_head);initial_graph=graph();events.clear();v.update(phase='body',stack=0,validation=0)
   e.call(0x141138cf0,ints=[obj],max_instructions=200000);assert e.reg(UC_X86_REG_RIP)==RET_ADDR
   live.update(p+16 for p in entries(parent,parent_head));e.write_u64(ACTIVE,e.read_u64(ACTIVE))
   print('C',obj,v['stack'],initial,v['initial_stack'],parent_head,','.join(map(str,initial_entries))or'-',initial_graph,'->',snap(),graph(),list_image(parent,parent_head),'|'.join(events))
  print('# cases',len(rows))
-if __name__=='__main__':main(sys.argv[1])
+if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:])

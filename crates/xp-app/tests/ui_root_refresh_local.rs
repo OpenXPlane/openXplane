@@ -99,7 +99,7 @@ fn snapshot(s: &State) -> String {
         s.memory
             .blocks
             .iter()
-            .filter(|(p, _)| **p != s.stack)
+            .filter(|(p, b)| !(**p <= s.stack && s.stack < **p + b.len() as u64))
             .map(|(p, b)| format!("{p}:{}", text(b)))
             .collect::<Vec<_>>()
             .join("/"),
@@ -124,6 +124,7 @@ fn compare(actual: &str, expected: &str, where_: &str) {
 struct Replay {
     events: Vec<String>,
     position: usize,
+    native_nested: bool,
 }
 impl Replay {
     fn event(&mut self) -> Vec<String> {
@@ -154,6 +155,11 @@ impl ui_callback_list::Services for Replay {
 }
 impl Services for Replay {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
+        if self.native_nested && function == 0x14113a300 {
+            assert_eq!(args, [s.identity + 0x268]);
+            openxplane::ui_refresh_chain::refresh_nested(s, self, s.stack - 0x100)?;
+            return Ok(0);
+        }
         let e = self.event();
         assert_eq!(e[0], "I", "event {}", self.position);
         let v: Vec<_> = e[1].split(',').collect();
@@ -178,9 +184,14 @@ impl Services for Replay {
                 );
             }
         }
-        let stack = s.memory.blocks.remove(&s.stack).unwrap();
+        let scratch = if self.native_nested {
+            s.stack - 0x200
+        } else {
+            s.stack
+        };
+        let stack = s.memory.blocks.remove(&scratch).unwrap();
         *s = parse_snapshot(&e[3], s.identity, s.stack);
-        s.memory.blocks.insert(s.stack, stack);
+        s.memory.blocks.insert(scratch, stack);
         if e[6] != "-" {
             for r in e[6].split('/') {
                 let (p, b) = r.split_once(':').unwrap();
@@ -193,9 +204,15 @@ impl Services for Replay {
 #[test]
 #[ignore = "requires local original corpus via OPENXPLANE_UI_ROOT_REFRESH_VECTORS"]
 fn whole_native_root_refresh_resource_cli_fallbacks_vectors_and_retained_callbacks() {
-    let corpus =
-        std::fs::read_to_string(std::env::var("OPENXPLANE_UI_ROOT_REFRESH_VECTORS").unwrap())
-            .unwrap();
+    replay_corpus("OPENXPLANE_UI_ROOT_REFRESH_VECTORS", false);
+}
+#[test]
+#[ignore = "requires local combined corpus via OPENXPLANE_UI_REFRESH_CHAIN_VECTORS"]
+fn native_root_nested_refresh_and_payload_chain() {
+    replay_corpus("OPENXPLANE_UI_REFRESH_CHAIN_VECTORS", true);
+}
+fn replay_corpus(env: &str, native_nested: bool) {
+    let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut cases = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
         let v: Vec<_> = row.split_whitespace().collect();
@@ -204,7 +221,10 @@ fn whole_native_root_refresh_resource_cli_fallbacks_vectors_and_retained_callbac
         let id = num(v[1]);
         let stack = num(v[2]);
         let mut state = parse_snapshot(v[3], id, stack);
-        state.memory.blocks.insert(stack, hex(v[4]));
+        state
+            .memory
+            .blocks
+            .insert(if native_nested { stack - 0x200 } else { stack }, hex(v[4]));
         let mut callbacks = parse_graph(v[7]);
         let mut parents = BTreeMap::from([(
             id + 0x1e0,
@@ -220,6 +240,7 @@ fn whole_native_root_refresh_resource_cli_fallbacks_vectors_and_retained_callbac
         let mut replay = Replay {
             events: v[12].split('|').map(str::to_string).collect(),
             position: 0,
+            native_nested,
         };
         let mut image = state.memory.read(id, 0x3e0).unwrap();
         ui_root_refresh::refresh_image(

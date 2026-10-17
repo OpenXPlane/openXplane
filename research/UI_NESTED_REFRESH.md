@@ -82,3 +82,6 @@ Formatting, generator syntax and diff checks pass. No live GPU test was run.
 
 
 2026-10-17: [final root refresh outer body](UI_ROOT_REFRESH.md) now has118 whole native comparisons with controlled leaf bodies. Composition with actual nested refresh/payload assignment and complete factory still needs verification; this adds no visual parity evidence.
+
+
+2026-10-17: [composed root/nested/payload refresh](UI_REFRESH_CHAIN.md) now has118 native cases. Combined assignment reaches17 inline-buffer cases; full constructor/factory and live GPU remain pending.
