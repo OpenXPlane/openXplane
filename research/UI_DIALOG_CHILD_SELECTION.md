@@ -97,3 +97,6 @@ GIF/video remain missing; Esc still exits the viewer. Overall rubric remains
 
 
 2026-10-17 update: [first child](UI_DIALOG_CHILD_ROOT.md) now has192 native cases with two controlled refresh bodies. Shared data initializer is reused; source integration connects root/selection/context receivers. Fourth child and root refreshes remain pending; no native combined-factory or visual parity claim.
+
+
+2026-10-18: [factory with actual root refresh chain](UI_FACTORY_ROOT_REFRESH_CHAIN.md) now has118 complete native calls, all four constructors and actual root/nested/payload bodies. Shared-state execution exposed and fixed the selection resource-index constant (now reloads77/88). Other child/fifth refreshes and full dialog/live GPU remain pending; estimates unchanged.

@@ -80,3 +80,6 @@ Validation:204 ordinary tests pass;58 opt-in tests are ignored in the ordinary
 run. The216-case composed replay and earlier576-case controlled-child factory
 replay both pass explicitly. Formatting, Python syntax and diff checks pass.
 No live viewer/GPU run or paired visual capture was performed.
+
+
+2026-10-18: [factory with actual root refresh chain](UI_FACTORY_ROOT_REFRESH_CHAIN.md) now has118 complete native calls, all four constructors and actual root/nested/payload bodies. Shared-state execution exposed and fixed the selection resource-index constant (now reloads77/88). Other child/fifth refreshes and full dialog/live GPU remain pending; estimates unchanged.

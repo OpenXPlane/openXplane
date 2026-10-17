@@ -8,7 +8,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP,UC_X86_REG_RIP
 ACTIVE,INDEX=0x145a10798,0x142640504
 COUNTS={0x1417fb320:1,0x141a64260:2,0x1405dd5c0:2,0x141a3b600:2,0x141141de0:3,0x1405ddde0:1,0x141100c40:1,0x1417f6dc0:1,0x1410fa920:2,0x1408acd90:1,0x1414cc7f0:0,0x1414d0900:2,0x1414ce750:2,0x141110050:1,0x140d776a0:2,0x1417e9f50:0,0x140d77340:3,0x1417e8460:2,0x1405df240:3,0x1414ccf50:2,0x1415404e0:1,0x1411490b0:2,0x1417e9a40:2,0x1405de1d0:1,0x141138650:2,0x1411399c0:1,0x140f59550:1,0x14113a300:1,0x1410c9d10:1}
-def main(path,native_nested=False,construct=False):
+def main(path,native_nested=False,construct=False,factory=False):
+ construct=construct or factory
  native_nested=native_nested or construct
  assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==REFERENCE_SHA256
  e=Emulator(path);obj=e.alloc(0x3e0);resource=e.alloc(0x6200);borrowed=e.alloc(32);heaps=[e.alloc(4135)for _ in range(5)];entrydata=e.alloc(240);items=e.alloc(32);nodes=[e.alloc(120)for _ in range(3)];head2=e.alloc(120);temp_setup=e.alloc(104);settings=e.alloc(0xdb0)if native_nested else 0;nested_items=e.alloc(32)if native_nested else 0;nested_nodes=[e.alloc(16)for _ in range(3)]if native_nested else [];nested_head2=e.alloc(16)if native_nested else 0;top=e.heap_top;v={};events=[];live=set();ranges=[]
@@ -168,6 +169,17 @@ def main(path,native_nested=False,construct=False):
   i=len(rows);rows.append(dict(engine=255,active=0,available=1,flag=flag,test=test,cli=0,fallback=0,keys=0,mismatch=0,strings=strings,bound=bound,listeners=i%3,count=[0,1,3][i%3],alias_text=0,alias_vector=i%2,mutate=i%2))
  rng=random.Random(2026101704)
  for i in range(40):rows.append(dict(engine=255,active=rng.choice([0,7]),available=rng.randrange(2),flag=rng.choice([0,255]),test=rng.randrange(2),cli=rng.randrange(3),fallback=rng.randrange(3),keys=rng.randrange(3),mismatch=rng.randrange(2),strings=rng.randrange(3),bound=rng.randrange(2),listeners=rng.randrange(3),count=rng.choice([0,1,3]),alias_text=rng.randrange(2),alias_vector=rng.randrange(2),mutate=rng.randrange(2)))
+ factory_run=None
+ if factory:
+  from gen_ui_factory_composed_vectors import install
+  def factory_begin():
+   v['factory_initial']=snap();v['factory_ranges']={p for p,n in ranges};events.clear()
+  def factory_finish():
+   parent=obj+0x1e0;head=e.read_u64(parent+8);live.add(obj+0x288);live.update(p+16 for p in entries(parent,head))
+   row=' '.join(map(str,['C',obj,v['stack'],v['factory_initial'],v['initial_stack'],head,'-','-','->',snap(),graph(),list_image(parent,head),'|'.join(events),1]))
+   return row,[(p,n)for p,n in ranges if p not in v['factory_ranges']]
+  factory_run=install(e,dict(identity=obj,resource=resource,begin=factory_begin,finish=factory_finish));top=e.heap_top
+  print('# whole factory/all child constructors with actual root/nested/payload chain; remaining child refresh/provider effects controlled')
  for i,inputs in enumerate(rows):
   seed=[0,0xa5,255][i%3];e.heap_top=top;v.clear();v.update(inputs);v.update(seed=seed,phase='setup',stack=0,validation=0,in_nested=False,case=i);live.clear();events.clear()
   e.write(obj,bytes([seed])*0x3e0)
@@ -185,6 +197,8 @@ def main(path,native_nested=False,construct=False):
    e.write_u32(settings+0xdac,0 if i%2 else 7);e.write_u64(ACTIVE,999);e.write_u32(INDEX,5)
    ranges[:]=[(obj,0x3e0),(resource+0x6178,32),(borrowed,32),(entrydata,240),(items,32),(head2,120),*[(p,120)for p in nodes],*[(p,4135)for p in heaps],(nested_head2,16),(nested_items,32),(settings+0xdac,4),*[(p,16)for p in nested_nodes]]
    initial=snap();events.clear();v.update(phase='body',stack=0,validation=0,ctor_alloc=0)
+   if factory_run:
+    print(factory_run(seed,[0,1,2,3,4,255][i%6],inputs['engine'],i%2,[-2147483648,0,2147483647][i%3],i));continue
    flag=[0,1,128,255,256,257,0x1234567887654321,0xffffffffffffffff][i%8]
    result=e.call(0x1410d6a40,ints=[obj,flag],max_instructions=200000);assert e.reg(UC_X86_REG_RIP)==RET_ADDR and result==obj and v['ctor_alloc']==7
    parent=obj+0x1e0;parent_head=e.read_u64(parent+8);live.add(obj+0x288);live.update(p+16 for p in entries(parent,parent_head))
@@ -220,4 +234,4 @@ def main(path,native_nested=False,construct=False):
   live.update(p+16 for p in entries(parent,parent_head));e.write_u64(ACTIVE,e.read_u64(ACTIVE))
   print('C',obj,v['stack'],initial,v['initial_stack'],parent_head,','.join(map(str,initial_entries))or'-',initial_graph,'->',snap(),graph(),list_image(parent,parent_head),'|'.join(events))
  print('# cases',len(rows))
-if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:], '--construct' in sys.argv[2:])
+if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:], '--construct' in sys.argv[2:], '--factory' in sys.argv[2:])

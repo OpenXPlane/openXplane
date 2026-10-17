@@ -247,6 +247,7 @@ fn native_whole_selection_child_data_global_interface_clamping_variants_and_call
         let mut s = State {
             image: vec![seed; 0x2d0],
             active_global: inputs[6] as u64,
+            resource_index: 0,
             catalog_base: bases[0],
             catalog_values: v[10].split(',').map(num).collect(),
             interfaces: ui_interface_chain::State {

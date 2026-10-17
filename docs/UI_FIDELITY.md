@@ -344,3 +344,16 @@ Refresh/provider effects remain controlled in these cases. Actual root/context
 refresh evidence is still separate. Next combine those bodies with the factory,
 recover fifth refresh/remaining providers and complete dialog/layout/menu/teardown.
 Original live Alt/Esc/GPU and paired captures remain unverified; estimates unchanged.
+
+
+## Whole factory with actual root refreshes (2026-10-18)
+
+[Factory/root-chain evidence](../research/UI_FACTORY_ROOT_REFRESH_CHAIN.md):118
+whole original factory calls execute all four constructors and actual root/nested/
+payload bodies. Shared memory/global/index state, declared heap and649 retained
+entries match. This exposed a resource-index bug: selection must reload global
+142640504 after engine gating, receiving88/77 rather than0.34 inline assignments
+are reached. Context/other child/fifth refresh and remaining leaf providers stay
+controlled. Next include actual context refresh, recover remaining refreshes/
+providers and complete dialog/layout/menu/teardown. Live Alt/Esc/GPU and paired
+captures remain unverified; estimates unchanged.

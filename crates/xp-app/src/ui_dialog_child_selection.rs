@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 pub struct State {
     pub image: Vec<u8>,
     pub active_global: u64,
+    /// Shared global142640504, reloaded after the engine gate.
+    pub resource_index: u32,
     pub catalog_base: u64,
     pub catalog_values: Vec<u64>,
     pub interfaces: ui_interface_chain::State,
@@ -155,7 +157,7 @@ pub fn construct(
     );
     if services.engine(state) != 0
         && state.active_global == 0
-        && services.resource_present(state, 0)
+        && services.resource_present(state, state.resource_index)
     {
         services.alternate(state);
     } else {
@@ -376,6 +378,7 @@ mod tests {
         let mut state = State {
             image: vec![0xcc; 0x2d0],
             active_global: 0,
+            resource_index: 0,
             catalog_base: 0x900000,
             catalog_values: vec![42],
             interfaces: ui_interface_chain::State {

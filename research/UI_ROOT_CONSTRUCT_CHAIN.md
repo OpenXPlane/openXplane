@@ -79,3 +79,6 @@ diff checks pass. No live viewer/GPU run or paired visual capture was performed.
 
 
 2026-10-17: [whole all-child factory composition](UI_FACTORY_COMPOSED.md) now has216 native runs with every constructor body, shared receivers and logical callbacks. Refresh/provider computations remain controlled here; composition with actual recovered refreshes and full dialog/live GPU is next. Estimates unchanged.
+
+
+2026-10-18: [factory with actual root refresh chain](UI_FACTORY_ROOT_REFRESH_CHAIN.md) now has118 complete native calls, all four constructors and actual root/nested/payload bodies. Shared-state execution exposed and fixed the selection resource-index constant (now reloads77/88). Other child/fifth refreshes and full dialog/live GPU remain pending; estimates unchanged.

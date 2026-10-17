@@ -1,3 +1,5 @@
+#[path = "support/ui_root_replay.rs"]
+mod root_replay;
 use openxplane::{
     ui_callback_links as links,
     ui_callback_list::List,
@@ -129,6 +131,7 @@ impl openxplane::ui_callback_list::Services for Replay {
 struct Provider<'a> {
     replay: &'a mut Replay,
     id: u64,
+    resource_available: bool,
 }
 impl Provider<'_> {
     fn allocate(&mut self, image: &[u8], n: usize) -> Result<Block, &'static str> {
@@ -205,7 +208,7 @@ impl selection::Services for Provider<'_> {
     }
     fn resource_present(&mut self, s: &mut selection::State, index: u32) -> bool {
         self.effect(&mut s.image, 0x141a64260, &[0x146124398, index as u64]);
-        true
+        self.resource_available
     }
     fn alternate(&mut self, s: &mut selection::State) {
         self.effect(&mut s.image, 0x14111bb90, &[self.id]);
@@ -265,6 +268,9 @@ struct Host {
     temporaries: Vec<u64>,
     temporary_index: usize,
     head: u64,
+    active_global: u64,
+    resource_index: u32,
+    resource_available: bool,
 }
 impl Host {
     fn keep(s: &mut factory::State, b: Block) {
@@ -306,8 +312,41 @@ impl factory::Services for Host {
         let mut provider = Provider {
             replay: &mut self.replay,
             id: p,
+            resource_available: self.resource_available,
         };
         match kind {
+            0 if provider.replay.events[provider.replay.index].starts_with("Q~") => {
+                let event = provider.replay.event();
+                let row = event[1..].join("~").replace('!', " ").replace('^', "|");
+                let fields = row.split_whitespace().collect::<Vec<_>>();
+                assert_eq!(num(fields[1]), p);
+                assert_eq!(num(fields[13]), args[0]);
+                let initial = root_replay::parse_snapshot(fields[3], p, num(fields[2]));
+                assert_eq!(s.blocks[&p], initial.memory.read(p, 0x3e0).unwrap());
+                let (state, runtime) =
+                    root_replay::run_constructor_row(&row, &mut self.callbacks, &mut self.parents);
+                s.blocks.insert(p, state.image);
+                for block in state.blocks.into_iter().filter(|b| b.bytes.len() != 40) {
+                    Self::keep(s, block);
+                }
+                self.active_global = runtime.active_global;
+                self.resource_index = runtime.resource_index;
+                for event in fields[12].split('|') {
+                    let e = event.split('~').collect::<Vec<_>>();
+                    if e[0] == "I" && num(e[1].split(',').next().unwrap()) == 0x141a64260 {
+                        let resource = num(e[4]);
+                        self.resource_available = u64::from_le_bytes(
+                            runtime
+                                .memory
+                                .read(resource + 0x6188, 8)
+                                .unwrap()
+                                .try_into()
+                                .unwrap(),
+                        ) != 0;
+                        break;
+                    }
+                }
+            }
             0 => {
                 let mut state = root::State::new(vec![]);
                 root::construct_factory_child(
@@ -341,7 +380,8 @@ impl factory::Services for Host {
                 };
                 let mut state = selection::State {
                     image: vec![],
-                    active_global: 0,
+                    active_global: self.active_global,
+                    resource_index: self.resource_index,
                     catalog_base: self.catalog,
                     catalog_values: (0..3).map(|i| 0x1122334400000000 + i).collect(),
                     interfaces: ui_interface_chain::State {
@@ -433,9 +473,15 @@ impl factory::Services for Host {
 #[test]
 #[ignore = "requires local whole factory corpus via OPENXPLANE_UI_FACTORY_COMPOSED_VECTORS"]
 fn native_factory_all_four_constructors_share_receivers_and_callback_graph() {
-    let corpus =
-        std::fs::read_to_string(std::env::var("OPENXPLANE_UI_FACTORY_COMPOSED_VECTORS").unwrap())
-            .unwrap();
+    replay_factory("OPENXPLANE_UI_FACTORY_COMPOSED_VECTORS", 216);
+}
+#[test]
+#[ignore = "requires local factory+root corpus via OPENXPLANE_UI_FACTORY_ROOT_CHAIN_VECTORS"]
+fn native_factory_with_actual_root_nested_and_payload_refresh_chain() {
+    replay_factory("OPENXPLANE_UI_FACTORY_ROOT_CHAIN_VECTORS", 118);
+}
+fn replay_factory(env: &str, expected_cases: usize) {
+    let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
         let v = row.split_whitespace().collect::<Vec<_>>();
@@ -454,6 +500,9 @@ fn native_factory_all_four_constructors_share_receivers_and_callback_graph() {
             temporaries: v[3].split(',').map(num).collect(),
             temporary_index: 0,
             head: 0,
+            active_global: 0,
+            resource_index: 0,
+            resource_available: true,
         };
         let mut state = factory::State::new([seed; 40]);
         state.construct(&mut host).unwrap();
@@ -484,5 +533,5 @@ fn native_factory_all_four_constructors_share_receivers_and_callback_graph() {
         assert_eq!(host.temporary_index, host.temporaries.len());
         count += 1;
     }
-    assert_eq!(count, 216);
+    assert_eq!(count, expected_cases);
 }
