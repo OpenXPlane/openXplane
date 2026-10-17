@@ -95,4 +95,4 @@ GIF/video remain unverified. Compatibility shares were reviewed and remain
 Validation:204 ordinary tests pass;55 opt-in tests are ignored in that run.
 The118-case root refresh replay passes separately through refresh_image.
 Formatting, generator syntax and diff checks pass. No live viewer/GPU test was
-performed. The earlier approval-service quota failure recovered before writing.
+performed.
