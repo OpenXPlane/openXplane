@@ -43,6 +43,18 @@ pub trait Services {
         blocks: &mut Vec<Block>,
         identity: u64,
     ) -> Result<(), &'static str>;
+    /// Final refresh may retain callbacks in the receiver lists just constructed.
+    /// Legacy effect providers keep their existing context-free entry point.
+    fn refresh_root_with_context(
+        &mut self,
+        image: &mut [u8],
+        blocks: &mut Vec<Block>,
+        identity: u64,
+        _callbacks: &mut ui_callback_links::State,
+        _parents: &mut BTreeMap<u64, ui_callback_list::List>,
+    ) -> Result<(), &'static str> {
+        self.refresh_root(image, blocks, identity)
+    }
 }
 fn q(b: &mut [u8], o: usize, v: u64) {
     b[o..o + 8].copy_from_slice(&v.to_le_bytes());
@@ -232,7 +244,13 @@ pub fn construct(
     for o in [0x3c8, 0x3d0, 0x3d8] {
         q(&mut state.image, o, 0);
     }
-    services.refresh_root(&mut state.image, &mut state.blocks, context.identity)?;
+    services.refresh_root_with_context(
+        &mut state.image,
+        &mut state.blocks,
+        context.identity,
+        context.callbacks,
+        context.parents,
+    )?;
     Ok(())
 }
 /// Kind0 adapter. Internal allocations remain owned in State. Constructor

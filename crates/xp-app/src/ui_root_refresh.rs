@@ -240,6 +240,19 @@ pub fn refresh(
             .ok_or("missing nested receiver")?
             .append(temp, context.callbacks, h)?;
         context.callbacks.destroy(temp, h)?;
+        // Publish only receiver links when a mapped list header is supplied.
+        // Internal callback RB storage remains owned by the logical graph.
+        let list = &context.parents[&(o + 0x1e0)];
+        if s.memory.read(list.sentinel, 16).is_ok() {
+            for (p, next, previous) in list.links() {
+                if s.memory.read(p, 16).is_err() {
+                    s.memory.blocks.insert(p, vec![0; 16]);
+                }
+                s.putq(p, next)?;
+                s.putq(p + 8, previous)?;
+            }
+        }
+
         s.putq(
             o + 0x1f0,
             context.parents[&(o + 0x1e0)].entries.len() as u64,

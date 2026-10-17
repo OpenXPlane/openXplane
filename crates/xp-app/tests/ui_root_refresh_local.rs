@@ -262,3 +262,164 @@ fn replay_corpus(env: &str, native_nested: bool) {
     }
     assert_eq!(cases, 118);
 }
+
+/// Whole fresh constructor, including both nested refresh invocations and the
+/// final root refresh. Callback tree allocation bytes remain deliberately opaque.
+struct ConstructorHost {
+    runtime: State,
+    replay: Replay,
+}
+impl ConstructorHost {
+    fn publish(&mut self, image: &[u8], blocks: &[openxplane::ui_input_construct::Block]) {
+        self.runtime
+            .memory
+            .blocks
+            .insert(self.runtime.identity, image.to_vec());
+        for block in blocks.iter().filter(|b| b.bytes.len() != 40) {
+            self.runtime
+                .memory
+                .blocks
+                .insert(block.address, block.bytes.clone());
+        }
+    }
+    fn capture(&mut self, image: &mut [u8], blocks: &mut [openxplane::ui_input_construct::Block]) {
+        image.copy_from_slice(
+            &self
+                .runtime
+                .memory
+                .read(self.runtime.identity, image.len())
+                .unwrap(),
+        );
+        for block in blocks.iter_mut().filter(|b| b.bytes.len() != 40) {
+            block.bytes = self
+                .runtime
+                .memory
+                .read(block.address, block.bytes.len())
+                .unwrap();
+        }
+    }
+}
+impl openxplane::ui_dialog_child_root::Services for ConstructorHost {
+    fn allocate(
+        &mut self,
+        image: &[u8],
+        blocks: &[openxplane::ui_input_construct::Block],
+        bytes: usize,
+    ) -> Result<openxplane::ui_input_construct::Block, &'static str> {
+        self.publish(image, blocks);
+        let e = self.replay.event();
+        assert_eq!(e[0], "C");
+        let (n, p) = e[1].split_once(',').unwrap();
+        assert_eq!(num(n) as usize, bytes);
+        compare(
+            &snapshot(&self.runtime),
+            &e[2],
+            &format!("constructor allocation {}", self.replay.position),
+        );
+        let scratch = self.runtime.stack - 0x200;
+        let stack = self.runtime.memory.blocks.remove(&scratch).unwrap();
+        self.runtime = parse_snapshot(&e[3], self.runtime.identity, self.runtime.stack);
+        self.runtime.memory.blocks.insert(scratch, stack);
+        Ok(openxplane::ui_input_construct::Block {
+            address: num(p),
+            bytes: hex(&e[4]),
+        })
+    }
+    fn refresh_nested(
+        &mut self,
+        image: &mut [u8],
+        blocks: &mut Vec<openxplane::ui_input_construct::Block>,
+        identity: u64,
+    ) -> Result<(), &'static str> {
+        assert_eq!(identity, self.runtime.identity + 0x268);
+        self.publish(image, blocks);
+        let temporary = self.runtime.stack + 0x1e0;
+        openxplane::ui_refresh_chain::refresh_nested(
+            &mut self.runtime,
+            &mut self.replay,
+            temporary,
+        )?;
+        self.capture(image, blocks);
+        Ok(())
+    }
+    fn refresh_root(
+        &mut self,
+        _: &mut [u8],
+        _: &mut Vec<openxplane::ui_input_construct::Block>,
+        _: u64,
+    ) -> Result<(), &'static str> {
+        Err("final refresh requires freshly constructed callback context")
+    }
+    fn refresh_root_with_context(
+        &mut self,
+        image: &mut [u8],
+        blocks: &mut Vec<openxplane::ui_input_construct::Block>,
+        identity: u64,
+        callbacks: &mut ui_callback_links::State,
+        parents: &mut BTreeMap<u64, List>,
+    ) -> Result<(), &'static str> {
+        assert_eq!(identity, self.runtime.identity);
+        self.publish(image, blocks);
+        ui_root_refresh::refresh_image(
+            image,
+            &mut self.runtime,
+            Context { callbacks, parents },
+            &mut self.replay,
+        )?;
+        self.capture(image, blocks);
+        Ok(())
+    }
+}
+#[test]
+#[ignore = "requires local whole constructor corpus via OPENXPLANE_UI_ROOT_CONSTRUCT_CHAIN_VECTORS"]
+fn native_whole_root_constructor_both_refreshes_and_payload_chain() {
+    let corpus = std::fs::read_to_string(
+        std::env::var("OPENXPLANE_UI_ROOT_CONSTRUCT_CHAIN_VECTORS").unwrap(),
+    )
+    .unwrap();
+    let mut cases = 0;
+    for row in corpus.lines().filter(|r| r.starts_with("C ")) {
+        let v: Vec<_> = row.split_whitespace().collect();
+        assert_eq!(v.len(), 14);
+        assert_eq!(&v[6..9], ["-", "-", "->"]);
+        let (id, stack) = (num(v[1]), num(v[2]));
+        let mut runtime = parse_snapshot(v[3], id, stack);
+        runtime.memory.blocks.insert(stack - 0x200, hex(v[4]));
+        let mut state =
+            openxplane::ui_dialog_child_root::State::new(runtime.memory.read(id, 0x3e0).unwrap());
+        let mut host = ConstructorHost {
+            runtime,
+            replay: Replay {
+                events: v[12].split('|').map(str::to_string).collect(),
+                position: 0,
+                native_nested: true,
+            },
+        };
+        let mut callbacks = ui_callback_links::State::default();
+        let mut parents = BTreeMap::new();
+        openxplane::ui_dialog_child_root::construct(
+            &mut state,
+            num(v[13]),
+            openxplane::ui_dialog_child_root::Context {
+                identity: id,
+                callbacks: &mut callbacks,
+                parents: &mut parents,
+            },
+            &mut host,
+        )
+        .unwrap();
+        compare(
+            &snapshot(&host.runtime),
+            v[9],
+            &format!("final whole constructor case{cases}"),
+        );
+        assert_eq!(state.image, host.runtime.memory.read(id, 0x3e0).unwrap());
+        assert_eq!(graph(&callbacks), v[10]);
+        assert_eq!(list(&parents[&(id + 0x1e0)]), v[11]);
+        assert_eq!(parents[&(id + 0x1e0)].sentinel, num(v[5]));
+        assert_eq!(parents.len(), 3);
+        assert_eq!(host.replay.position, host.replay.events.len());
+        cases += 1;
+    }
+    assert_eq!(cases, 118);
+}

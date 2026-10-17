@@ -321,3 +321,14 @@ checked. Earlier118 independent corpus rows remain byte-for-byte unchanged.
 Leaf calculations remain controlled. Next compare entire root construction with
 both real refreshes, then full factory/dialog/layout/menu/teardown and original
 Alt/Esc/GPU paired captures. Estimates reviewed and unchanged.
+
+
+## Whole root construction with actual refreshes (2026-10-17)
+
+[Constructor composition evidence](../research/UI_ROOT_CONSTRUCT_CHAIN.md):118
+whole original constructors now execute both nested refreshes, final root refresh
+and payload helpers in the same call. Shared state, seven allocation boundaries,
+receiver links and logical callback peers match;34 inline assignments are reached.
+Fresh lists apply; callback RB backing and remaining leaf calculations are still
+unverified. Next compare full factory/dialog and recover providers/layout/menu/
+teardown. Live Alt/Esc/GPU and paired captures remain pending; estimates unchanged.

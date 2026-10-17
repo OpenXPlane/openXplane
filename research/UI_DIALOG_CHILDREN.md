@@ -87,3 +87,6 @@ Rendering/UI verified0. This is construction evidence, not visual parity.
 
 
 2026-10-17: [final root refresh outer body](UI_ROOT_REFRESH.md) now has118 whole native comparisons with controlled leaf bodies. Composition with actual nested refresh/payload assignment and complete factory still needs verification; this adds no visual parity evidence.
+
+
+2026-10-17: [whole fresh root construction](UI_ROOT_CONSTRUCT_CHAIN.md) now has118 native runs with both actual nested refreshes, final root refresh and34 reached inline payload assignments. Remaining providers and full factory/dialog/live GPU remain pending; estimates unchanged.

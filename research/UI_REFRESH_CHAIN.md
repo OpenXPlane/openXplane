@@ -81,3 +81,6 @@ Validation:204 ordinary tests pass;56 opt-in tests are ignored in that run.
 Both118-case root replays pass separately, including the native composed chain.
 Earlier independent C rows regenerate byte-for-byte. Formatting, Python syntax
 and diff checks pass. No live viewer/GPU test was performed.
+
+
+2026-10-17: [whole fresh root construction](UI_ROOT_CONSTRUCT_CHAIN.md) now has118 native runs with both actual nested refreshes, final root refresh and34 reached inline payload assignments. Remaining providers and full factory/dialog/live GPU remain pending; estimates unchanged.
