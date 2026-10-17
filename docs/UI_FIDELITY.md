@@ -246,3 +246,16 @@ explicit controlled property/config/effect bodies. Raw constructor snapshots and
 logical live receiver lists remain distinct; no executable ABI/live viewer claim
 is made. First/fourth children, full factory/dialog and paired GPU evidence remain
 unfinished.
+
+
+## First child and receiver chain (2026-10-17)
+
+[First child evidence](../research/UI_DIALOG_CHILD_ROOT.md):192 whole native
+constructor cases match object/all seven heap blocks and service-entry snapshots.
+Allocator and both refresh bodies remain controlled. Shared data initialization
+is reused by the second child, whose920-case replay is rerun after extraction.
+Ordinary integration now constructs root, selection and context receivers in
+sequence, with controlled effects. Native full-factory composition, fourth child,
+both root refresh bodies and remaining providers are next, followed by dialog/
+layout/bindings/menu/teardown. Original Alt/Esc, GPU and paired captures remain
+unverified. Compatibility estimates were reviewed and remain unchanged.

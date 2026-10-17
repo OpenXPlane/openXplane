@@ -71,34 +71,6 @@ impl<S: Services> ui_input_construct::Services for View<'_, S> {
         ui_input_construct::Services::allocate(self.services, &image, n)
     }
 }
-fn record(image: &mut [u8], services: &mut impl Services) -> Result<Block, &'static str> {
-    let base = 0x130;
-    for off in [0, 0x20, 0x40, 0x60, 0x80, 0xa8, 0xc8, 0xe8, 0x108] {
-        image[base + off..base + off + 16].fill(0);
-        q(image, base + off + 16, 0);
-        q(image, base + off + 24, 15);
-    }
-    d(image, base + 0xa0, u32::MAX);
-    image[base + 0xa4] = 0;
-    d(image, base + 0x128, 0x1000000);
-    image[base + 0x12c] = 0;
-    for off in (0x130..=0x178).step_by(8) {
-        q(image, base + off, 0);
-    }
-    q(image, base + 0x180, 0);
-    q(image, base + 0x188, 0);
-    let mut tree = required(image, 32, services)?;
-    for off in [0, 8, 16] {
-        q(&mut tree.bytes, off, tree.address);
-    }
-    tree.bytes[24..26].copy_from_slice(&0x101u16.to_le_bytes());
-    q(image, base + 0x180, tree.address);
-    image[base + 0x190] = 0;
-    image[base + 0x192..base + 0x194].copy_from_slice(&0xfcu16.to_le_bytes());
-    image[base + 0x194] = 255;
-    // Original141a40ad0 visits no nodes in this freshly initialized tree.
-    Ok(tree)
-}
 fn clear_inline_optional(image: &mut [u8]) -> Result<(), &'static str> {
     for off in [0x90, 0x70] {
         if getq(image, off + 24) > 15 {
@@ -173,7 +145,7 @@ pub fn construct(
         q(&mut state.image, off, 0);
     }
     d(&mut state.image, 0x128, 0);
-    let tree = record(&mut state.image, services)?;
+    let tree = crate::ui_record_construct::construct(&mut state.image, 0x130, services)?;
     d(&mut state.image, 0x2c8, 0);
     services.bind_property(
         state,
@@ -357,6 +329,27 @@ mod tests {
             Ok(())
         }
     }
+    impl crate::ui_dialog_child_root::Services for Host {
+        fn allocate(&mut self, image: &[u8], _: &[Block], n: usize) -> Result<Block, &'static str> {
+            ui_input_construct::Services::allocate(self, image, n)
+        }
+        fn refresh_nested(
+            &mut self,
+            _: &mut [u8],
+            _: &mut Vec<Block>,
+            _: u64,
+        ) -> Result<(), &'static str> {
+            Ok(())
+        }
+        fn refresh_root(
+            &mut self,
+            _: &mut [u8],
+            _: &mut Vec<Block>,
+            _: u64,
+        ) -> Result<(), &'static str> {
+            Ok(())
+        }
+    }
     #[test]
     fn constructed_selection_receiver_accepts_context_child_copy() {
         let mut host = Host {
@@ -364,7 +357,7 @@ mod tests {
             entry: 0x5000,
         };
         let mut callbacks = ui_callback_links::State::default();
-        let mut parents = BTreeMap::from([(0x7000, ui_callback_list::List::new(0x8000).unwrap())]);
+        let mut parents = BTreeMap::new();
         let mut state = State {
             image: vec![0xcc; 0x2d0],
             active_global: 0,
@@ -376,6 +369,25 @@ mod tests {
             },
         };
         let mut factory = crate::ui_dialog_children::State::new([0xdd; 40]);
+        let mut root = crate::ui_dialog_child_root::State::new(vec![0xaa; 0x3e0]);
+        factory.blocks.insert(0x7000, root.image.clone());
+        crate::ui_dialog_child_root::construct_factory_child(
+            &mut factory,
+            0x7000,
+            1,
+            &mut root,
+            crate::ui_dialog_child_root::Context {
+                identity: 0x7000,
+                callbacks: &mut callbacks,
+                parents: &mut parents,
+            },
+            &mut host,
+        )
+        .unwrap();
+        assert_eq!(factory.blocks[&0x7000], root.image);
+        assert!(parents[&0x71e0].entries.is_empty());
+        assert!(parents[&0x7268].entries.is_empty());
+        assert!(callbacks.nodes[&0x7288].peers.is_empty());
         factory.blocks.insert(0x3000, state.image.clone());
         let init = construct_factory_child(
             &mut factory,

@@ -449,3 +449,16 @@ tests pass with48 opt-in cases ignored in that run. This is not native full-fact
 or live viewer evidence. Next recover first/fourth children and remaining provider
 bodies, then complete factory/dialog/layout/bindings/singleton/menu/teardown and
 original opening/Alt/GPU paired captures. Compatibility shares stay unchanged.
+
+
+## First child and receiver chain (2026-10-17)
+
+[First child evidence](../research/UI_DIALOG_CHILD_ROOT.md):192 whole native
+constructor cases match object/all seven heap blocks and service-entry snapshots.
+Allocator and both refresh bodies remain controlled. Shared data initialization
+is reused by the second child, whose920-case replay is rerun after extraction.
+Ordinary integration now constructs root, selection and context receivers in
+sequence, with controlled effects. Native full-factory composition, fourth child,
+both root refresh bodies and remaining providers are next, followed by dialog/
+layout/bindings/menu/teardown. Original Alt/Esc, GPU and paired captures remain
+unverified. Compatibility estimates were reviewed and remain unchanged.

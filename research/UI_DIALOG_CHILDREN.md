@@ -75,3 +75,6 @@ publication and remaining construction are unfinished. Opening ID3/Alt, original
 viewer/GPU output and paired screenshots/GIF/video remain missing. Esc still
 exits the viewer. Shares remain41.4% implemented/28.2% verified overall and
 Rendering/UI verified0. This is construction evidence, not visual parity.
+
+
+2026-10-17 update: [first child](UI_DIALOG_CHILD_ROOT.md) now has192 native cases with two controlled refresh bodies. Shared data initializer is reused; source integration connects root/selection/context receivers. Fourth child and root refreshes remain pending; no native combined-factory or visual parity claim.
