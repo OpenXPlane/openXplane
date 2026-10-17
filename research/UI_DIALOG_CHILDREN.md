@@ -93,3 +93,6 @@ Rendering/UI verified0. This is construction evidence, not visual parity.
 
 
 2026-10-17: [whole all-child factory composition](UI_FACTORY_COMPOSED.md) now has216 native runs with every constructor body, shared receivers and logical callbacks. Refresh/provider computations remain controlled here; composition with actual recovered refreshes and full dialog/live GPU is next. Estimates unchanged.
+
+
+2026-10-18: [fifth refresh and full chain](UI_FIFTH_REFRESH.md) now has528 standalone native cases and118 whole-factory calls containing actual root/context/fifth bodies. Range erase and other providers remain controlled; selection/weather refreshes and full dialog/live GPU are next. Estimates unchanged.

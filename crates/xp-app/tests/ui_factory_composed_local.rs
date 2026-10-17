@@ -1,5 +1,7 @@
 #[path = "support/context_refresh_replay.rs"]
 mod context_replay;
+#[path = "support/ui_fifth_replay.rs"]
+mod fifth_replay;
 #[path = "support/ui_root_replay.rs"]
 mod root_replay;
 use openxplane::{
@@ -498,8 +500,24 @@ impl factory::Services for Host {
         Ok(num(&e[3]))
     }
     fn refresh(&mut self, s: &mut factory::State, p: u64) -> Result<(), &'static str> {
-        self.replay
-            .effect(s.blocks.get_mut(&p).unwrap(), 0x141139460, &[p]);
+        if self.replay.events[self.replay.index].starts_with("W~") {
+            let event = self.replay.event();
+            let row = event[1..].join("~").replace('!', " ").replace('^', "|");
+            assert_eq!(num(row.split_whitespace().nth(1).unwrap()), p);
+            let runtime = fifth_replay::run_row(
+                &row,
+                Some(&s.blocks[&p]),
+                Some((self.active_global, self.resource_index)),
+            );
+            for (address, bytes) in &mut s.blocks {
+                *bytes = runtime.memory.read(*address, bytes.len())?;
+            }
+            self.active_global = runtime.active_global;
+            self.resource_index = runtime.resource_index;
+        } else {
+            self.replay
+                .effect(s.blocks.get_mut(&p).unwrap(), 0x141139460, &[p]);
+        }
         let head = u64::from_le_bytes(s.blocks[&p][8..16].try_into().unwrap());
         self.parents.insert(p, List::new(head)?);
         Ok(())
@@ -519,6 +537,11 @@ fn native_factory_with_actual_root_nested_and_payload_refresh_chain() {
 #[ignore = "requires local factory+root+context corpus via OPENXPLANE_UI_FACTORY_ROOT_CONTEXT_VECTORS"]
 fn native_factory_with_actual_root_and_context_refreshes() {
     replay_factory("OPENXPLANE_UI_FACTORY_ROOT_CONTEXT_VECTORS", 118);
+}
+#[test]
+#[ignore = "requires local complete refresh chain via OPENXPLANE_UI_FACTORY_FIFTH_CHAIN_VECTORS"]
+fn native_factory_with_actual_root_context_and_fifth_refreshes() {
+    replay_factory("OPENXPLANE_UI_FACTORY_FIFTH_CHAIN_VECTORS", 118);
 }
 fn replay_factory(env: &str, expected_cases: usize) {
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();

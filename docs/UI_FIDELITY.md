@@ -369,3 +369,16 @@ Zulu/day math, inline/heap/aligned string cleanup and649 retained entries match.
 Context leaf computations/CRT and selection/weather/fifth refresh/providers remain
 controlled. Next recover those dependencies and full dialog/layout/menu/teardown;
 original live Alt/Esc/GPU and paired captures remain unverified. Shares unchanged.
+
+
+## Fifth refresh joins the shared factory (2026-10-18)
+
+[Fifth-refresh evidence](../research/UI_FIFTH_REFRESH.md):528 native calls now
+match outer141139460 and hash-clear dispatcher/bulk behavior, including cached
+next pointers, sentinel reloads, signed iterator indexing, live vector reads,
+override bits and714 notifications. Sparse range erase and remaining dependent
+providers stay controlled.118 whole native factory runs now include actual root/
+nested/payload/context/fifth bodies and649 retained entries; fresh fifth lists
+apply there. Next recover selection/weather refreshes/providers and full dialog/
+layout/menu/teardown. Live Alt/Esc/GPU and paired captures remain unverified;
+shares reviewed and unchanged.

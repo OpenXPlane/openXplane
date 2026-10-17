@@ -175,7 +175,8 @@ pub trait Services {
     ) -> Result<u64, &'static str>;
     /// 141a64260(global146124398,20); result remains opaque.
     fn resource(&mut self, state: &mut State, index: u32) -> Result<u64, &'static str>;
-    /// 141139460; complete body remains unported.
+    /// 141139460; recovered by ui_fifth_refresh with caller-supplied mapped
+    /// runtime/global state and dependent providers.
     fn refresh(&mut self, state: &mut State, object: u64) -> Result<(), &'static str>;
 }
 #[cfg(test)]

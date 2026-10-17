@@ -94,3 +94,6 @@ context and context-constructor compositions pass. Old118 factory/root rows and
 new118 root/context rows regenerate identically. Formatting, Python syntax,
 all-test-target compilation and diff checks pass. No live viewer/GPU run or paired
 visual capture was performed.
+
+
+2026-10-18: [fifth refresh and full chain](UI_FIFTH_REFRESH.md) now has528 standalone native cases and118 whole-factory calls containing actual root/context/fifth bodies. Range erase and other providers remain controlled; selection/weather refreshes and full dialog/live GPU are next. Estimates unchanged.
