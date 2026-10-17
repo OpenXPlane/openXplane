@@ -94,3 +94,5 @@ pub mod ui_dialog_child_root;
 pub mod ui_dialog_child_weather;
 
 pub mod ui_nested_refresh;
+
+pub mod ui_payload_move;

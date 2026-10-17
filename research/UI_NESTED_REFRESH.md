@@ -76,3 +76,6 @@ Validation:204 ordinary tests pass;52 opt-in tests are ignored in that run.
 The432-case standalone refresh,192-case native constructor composition and
 earlier192-case controlled-refresh constructor replays pass separately.
 Formatting, generator syntax and diff checks pass. No live GPU test was run.
+
+
+2026-10-17: [payload assignment](UI_PAYLOAD_MOVE.md) now has720 native cases;432 additional refresh runs execute that original body (27 reached assignments, inline buffers). Earlier controlled-assignment evidence remains scoped as above. Final root refresh and remaining providers are still pending.

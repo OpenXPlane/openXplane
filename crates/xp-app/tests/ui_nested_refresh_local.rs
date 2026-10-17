@@ -56,6 +56,8 @@ struct Replay {
     resources: BTreeMap<u64, bool>,
     settings: u64,
     mode: i32,
+    native_payload: bool,
+    identity: u64,
 }
 impl Replay {
     fn effect(&mut self, s: &mut State, kind: &str, args: &str) -> String {
@@ -98,7 +100,30 @@ impl Services for Replay {
         temp(&self.effect(s, "T", &p.to_string()))
     }
     fn assign_payload(&mut self, s: &mut State, t: &mut Temporary) {
-        t.raw = hex(&self.effect(s, "P", &temp_snapshot(t)));
+        if self.native_payload {
+            let e: Vec<_> = self.events[self.position]
+                .split('~')
+                .map(str::to_string)
+                .collect();
+            self.position += 1;
+            assert_eq!(e[0], "P");
+            assert_eq!(e[1], temp_snapshot(t));
+            assert_eq!(e[2], snapshot(s));
+            let mut backing = BTreeMap::new();
+            openxplane::ui_payload_move::assign_nested(
+                s,
+                self.identity,
+                t,
+                &mut backing,
+                &mut InlineOnly,
+            )
+            .unwrap();
+            assert!(backing.is_empty());
+            assert_eq!(snapshot(s), e[3]);
+            assert_eq!(t.raw, hex(&e[4]));
+        } else {
+            t.raw = hex(&self.effect(s, "P", &temp_snapshot(t)));
+        }
     }
     fn free_temporary_vector(&mut self, s: &mut State, p: u64) {
         self.effect(s, "F", &p.to_string());
@@ -113,9 +138,20 @@ impl Services for Replay {
 #[test]
 #[ignore = "requires local corpus via OPENXPLANE_UI_NESTED_REFRESH_VECTORS"]
 fn whole_native_nested_refresh_mutable_vector_gates_cleanup_and_live_listeners() {
-    let data =
-        std::fs::read_to_string(std::env::var("OPENXPLANE_UI_NESTED_REFRESH_VECTORS").unwrap())
-            .unwrap();
+    replay_corpus("OPENXPLANE_UI_NESTED_REFRESH_VECTORS", false);
+}
+#[test]
+#[ignore = "requires local combined native corpus via OPENXPLANE_UI_NESTED_PAYLOAD_VECTORS"]
+fn whole_native_nested_refresh_with_actual_payload_assignment() {
+    replay_corpus("OPENXPLANE_UI_NESTED_PAYLOAD_VECTORS", true);
+}
+fn replay_corpus(env: &str, native_payload: bool) {
+    let data = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
+    let identity = data
+        .lines()
+        .find_map(|l| l.strip_prefix("# object_identity "))
+        .map(num)
+        .unwrap_or(0);
     let mut cases = 0;
     for row in data.lines().filter(|r| r.starts_with("C ")) {
         let v: Vec<_> = row.split_whitespace().collect();
@@ -128,6 +164,8 @@ fn whole_native_nested_refresh_mutable_vector_gates_cleanup_and_live_listeners()
             resources: v[2].split(',').map(|p| (num(p), num(v[3]) != 0)).collect(),
             settings: num(v[4]),
             mode: v[5].parse().unwrap(),
+            native_payload,
+            identity,
         };
         ui_nested_refresh::refresh(&mut s, &mut replay).unwrap();
         assert_eq!(snapshot(&s), v[7], "case {cases}");
@@ -135,4 +173,23 @@ fn whole_native_nested_refresh_mutable_vector_gates_cleanup_and_live_listeners()
         cases += 1;
     }
     assert_eq!(cases, 432);
+}
+
+struct InlineOnly;
+impl openxplane::ui_payload_move::Services for InlineOnly {
+    fn allocate_vector(
+        &mut self,
+        _: &mut openxplane::ui_payload_move::State,
+        _: usize,
+    ) -> Result<openxplane::ui_input_construct::Block, &'static str> {
+        panic!("inline profile has capacity8")
+    }
+    fn free(
+        &mut self,
+        _: &mut openxplane::ui_payload_move::State,
+        _: u64,
+        _: Option<usize>,
+    ) -> Result<(), &'static str> {
+        panic!("inline profile owns no heap")
+    }
 }

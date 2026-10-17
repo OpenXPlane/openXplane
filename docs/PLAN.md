@@ -487,3 +487,15 @@ refresh141138cf0 remain controlled. Earlier192 controlled-refresh root cases
 still pass. Next recover final root refresh/providers and compare full native
 factory/dialog, then layout/bindings/singleton/menu/teardown and original
 Alt/Esc/GPU paired captures. Estimates remain unchanged after evidence review.
+
+
+## Payload ownership dependency (2026-10-17)
+
+[Payload evidence](../research/UI_PAYLOAD_MOVE.md):720 whole native cases verify
+payload assignment, optional string move and vector move/growth, including heap/
+aligned releases and self-alias.432 nested-refresh compositions now execute real
+assignment in27 reached branches with inline buffers. Full root refresh141138cf0
+remains unported; its record/config parsing and other provider bodies still need
+recovery. This removes an assignment stub in the nested-refresh adapter, without
+claiming full factory/dialog or original Alt/Esc/GPU behavior. Estimates reviewed
+and unchanged; paired visual captures remain required.
