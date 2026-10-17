@@ -6,9 +6,10 @@ import hashlib,itertools,sys
 from pathlib import Path
 from emulate_xp import Emulator
 from extract_commands import REFERENCE_SHA256
+from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX
 
-def main(path):
+def main(path,native_nested=False):
  assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==REFERENCE_SHA256
  e=Emulator(path);objects=[e.alloc(0x3e0) for _ in range(2)];top=e.heap_top;blocks=[];events=[];v={}
  def heap():return '/'.join(f'{p}:{e.read(p,n).hex()}' for p,n in blocks) or '-'
@@ -27,8 +28,21 @@ def main(path):
   if mode&2:emu.write(blocks[1][0]+31,bytes([v['seed']^0x66]));emu.write_u32(obj+0x260,0x89abcdef);emu.write(obj+0x3df,bytes([v['seed']^0x44]))
   events.append(f'R~{target}~{before}~{snapshot()}')
  e.stubs.update({0x1422e7bf0:allocate,0x14113a300:nested,0x141138cf0:root})
+ if native_nested:
+  del e.stubs[0x14113a300]
+  def engine(emu):emu.uc.reg_write(UC_X86_REG_RAX,0)
+  e.stubs[0x1417fb320]=engine
+  def observe(uc,a,size,user):
+   if a==0x14113a300:
+    assert e.reg(UC_X86_REG_RCX)==v['obj']+0x268;v['nested_before']=snapshot()
+   else:events.append(f"N~{v['obj']+0x268}~{v['nested_before']}~{snapshot()}")
+  e.uc.hook_add(UC_HOOK_CODE,observe,begin=0x14113a300,end=0x14113a300)
+  e.uc.hook_add(UC_HOOK_CODE,observe,begin=0x1410d6c6a,end=0x1410d6c6a)
+
  print('# reference_sha256',REFERENCE_SHA256)
- print('# whole1410d6a40 + record141a3c750/empty clear/callback ctor unchanged; only allocator and refresh14113a300/141138cf0 controlled; whole object/all blocks and call-entry snapshots; no live rendering or refresh-body equivalence claim')
+ print('# native nested refresh14113a300 with engine0; root refresh controlled' if native_nested else '# nested/root refresh controlled')
+ print('# whole1410d6a40 + record141a3c750/empty clear/callback ctor unchanged; allocator and root refresh141138cf0 controlled; nested refresh original with controlled engine0' if native_nested else '# whole1410d6a40 + record141a3c750/empty clear/callback ctor unchanged; only allocator and refresh14113a300/141138cf0 controlled')
+ print('# whole object/all blocks and call-entry snapshots; no live rendering; original nested composition applies only to fresh lists/engine0')
  count=0
  for seed,flag,mode,slot in itertools.product([0,0xa5,255],[0,1,128,255,256,257,0x1234567887654321,2**64-1],range(4),range(2)):
   obj=objects[slot];v.update(seed=seed,mode=mode,obj=obj);e.heap_top=top;blocks.clear();events.clear();e.write(obj,bytes([seed])*0x3e0)
@@ -40,4 +54,4 @@ def main(path):
   assert e.read_u64(obj+0x298)==0
   print('C',seed,flag,mode,obj,'->',e.read(obj,0x3e0).hex(),heap(),'/'.join(receivers),'|'.join(events));count+=1
  print('# cases',count)
-if __name__=='__main__':main(sys.argv[1])
+if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:])

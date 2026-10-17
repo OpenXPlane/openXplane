@@ -271,3 +271,16 @@ four child adapters are now connected in ordinary source integration. Native
 combined factory, remaining providers/root refreshes, dialog/layout/bindings/
 menu/teardown and original Alt/Esc/GPU paired captures remain pending. Estimates
 reviewed and unchanged; this is not visual parity evidence.
+
+
+## Nested root refresh and native constructor composition (2026-10-17)
+
+[Nested refresh evidence](../research/UI_NESTED_REFRESH.md):432 whole native
+refresh14113a300 runs match mutable vector traversal, gates, temporary cleanup
+order and live observer links.192 combined native root constructor runs include
+the actual nested refresh under controlled engine0/fresh lists; full object and
+all seven allocations match. Leaf provider/effect bodies and final root
+refresh141138cf0 remain controlled. Earlier192 controlled-refresh root cases
+still pass. Next recover final root refresh/providers and compare full native
+factory/dialog, then layout/bindings/singleton/menu/teardown and original
+Alt/Esc/GPU paired captures. Estimates remain unchanged after evidence review.

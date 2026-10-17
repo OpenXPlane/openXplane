@@ -49,3 +49,6 @@ Python syntax and git diff checks also pass. No live GPU check was performed.
 
 
 2026-10-17: [fourth child](UI_DIALOG_CHILD_WEATHER.md) now has720 native comparisons with controlled providers; source integration connects all four adapters. Root refreshes and provider bodies still need recovery, followed by native full-factory and visual checks.
+
+
+2026-10-17: [nested refresh](UI_NESTED_REFRESH.md) now has432 native cases and192 root-constructor compositions with engine0/fresh lists. Final root refresh141138cf0 and remaining leaf providers still need recovery; full factory and visual parity remain unverified.
