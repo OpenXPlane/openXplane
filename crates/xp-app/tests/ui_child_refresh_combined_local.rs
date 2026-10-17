@@ -130,6 +130,7 @@ impl Services for Combined {
             replay::state(&RefreshState {
                 image: *image,
                 active_global: self.global,
+                resource_index: 0,
                 next: self.next.clone()
             })
         );

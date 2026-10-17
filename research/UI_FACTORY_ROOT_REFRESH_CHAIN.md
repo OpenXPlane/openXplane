@@ -98,3 +98,6 @@ cases); all three earlier118-case root replays and920 independent selection case
 pass explicitly. Earlier118 constructor and216 factory C rows regenerate exactly.
 Formatting, Python syntax, all-test-target compilation and diff checks pass.
 No live viewer/GPU run or paired visual capture was performed.
+
+
+2026-10-18: [factory with actual root/context refreshes](UI_FACTORY_ROOT_CONTEXT_REFRESH.md) now has118 whole original calls with both refreshed children, shared resource index and full callback/list composition. Context reads88/77 after gating; leaf/CRT and remaining refreshes/providers/full dialog/live GPU remain pending. Estimates unchanged.

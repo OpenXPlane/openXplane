@@ -18,6 +18,7 @@ fn native_whole_refresh_context_cli_numeric_edges_and_mutable_listeners() {
         let mut s = State {
             image: hex(v[7]).try_into().unwrap(),
             active_global: replay.v[1],
+            resource_index: 0,
             next,
         };
         ui_context_refresh::refresh(&mut s, &mut replay).unwrap();

@@ -1,3 +1,5 @@
+#[path = "support/context_refresh_replay.rs"]
+mod context_replay;
 #[path = "support/ui_root_replay.rs"]
 mod root_replay;
 use openxplane::{
@@ -132,6 +134,8 @@ struct Provider<'a> {
     replay: &'a mut Replay,
     id: u64,
     resource_available: bool,
+    active_global: u64,
+    resource_index: u32,
 }
 impl Provider<'_> {
     fn allocate(&mut self, image: &[u8], n: usize) -> Result<Block, &'static str> {
@@ -233,7 +237,34 @@ impl selection::Services for Provider<'_> {
 }
 impl context::Services for Provider<'_> {
     fn refresh_context(&mut self, image: &mut [u8; 96]) -> Result<(), &'static str> {
-        self.effect(image, 0x1411396d0, &[self.id]);
+        if self.replay.events[self.replay.index].starts_with("U~") {
+            let event = self.replay.event();
+            let row = event[1..].join("~").replace('!', " ").replace('^', "|");
+            let fields = row.split_whitespace().collect::<Vec<_>>();
+            assert_eq!(fields.len(), 21);
+            assert_eq!(fields[14], "->");
+            assert_eq!(image.as_slice(), hex(fields[7]));
+            assert_eq!(self.resource_index as u64, num(fields[19]));
+            let head = u64::from_le_bytes(image[8..16].try_into().unwrap());
+            let mut next = context_replay::parse_links(fields[8]);
+            assert_eq!(next, BTreeMap::from([(head, head)]));
+            let mut replay = context_replay::Replay::from_fields(&fields, fields[18], &next);
+            assert_eq!(self.active_global, replay.v[1]);
+            openxplane::ui_context_refresh::refresh_image_with_index(
+                image,
+                &mut self.active_global,
+                &mut self.resource_index,
+                &mut next,
+                &mut replay,
+            )?;
+            assert_eq!(image.as_slice(), hex(fields[15]));
+            assert_eq!(self.active_global, num(fields[16]));
+            assert_eq!(next, context_replay::parse_links(fields[17]));
+            assert_eq!(self.resource_index as u64, num(fields[20]));
+            assert_eq!(replay.position, replay.event_count());
+        } else {
+            self.effect(image, 0x1411396d0, &[self.id]);
+        }
         Ok(())
     }
 }
@@ -313,6 +344,8 @@ impl factory::Services for Host {
             replay: &mut self.replay,
             id: p,
             resource_available: self.resource_available,
+            active_global: self.active_global,
+            resource_index: self.resource_index,
         };
         match kind {
             0 if provider.replay.events[provider.replay.index].starts_with("Q~") => {
@@ -425,6 +458,8 @@ impl factory::Services for Host {
                     &mut provider,
                 )?;
                 Self::keep(s, init.base_sentinel);
+                self.active_global = provider.active_global;
+                self.resource_index = provider.resource_index;
             }
             3 => {
                 let ts = [
@@ -479,6 +514,11 @@ fn native_factory_all_four_constructors_share_receivers_and_callback_graph() {
 #[ignore = "requires local factory+root corpus via OPENXPLANE_UI_FACTORY_ROOT_CHAIN_VECTORS"]
 fn native_factory_with_actual_root_nested_and_payload_refresh_chain() {
     replay_factory("OPENXPLANE_UI_FACTORY_ROOT_CHAIN_VECTORS", 118);
+}
+#[test]
+#[ignore = "requires local factory+root+context corpus via OPENXPLANE_UI_FACTORY_ROOT_CONTEXT_VECTORS"]
+fn native_factory_with_actual_root_and_context_refreshes() {
+    replay_factory("OPENXPLANE_UI_FACTORY_ROOT_CONTEXT_VECTORS", 118);
 }
 fn replay_factory(env: &str, expected_cases: usize) {
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();

@@ -357,3 +357,15 @@ are reached. Context/other child/fifth refresh and remaining leaf providers stay
 controlled. Next include actual context refresh, recover remaining refreshes/
 providers and complete dialog/layout/menu/teardown. Live Alt/Esc/GPU and paired
 captures remain unverified; estimates unchanged.
+
+
+## Shared factory with actual context refresh (2026-10-18)
+
+[Root/context composition evidence](../research/UI_FACTORY_ROOT_CONTEXT_REFRESH.md):
+118 whole original factory calls now execute context1411396d0 in addition to all
+four constructors and root/nested/payload bodies. Shared index reloads88/77,
+Zulu/day math, inline/heap/aligned string cleanup and649 retained entries match.
+34 alternate/84 default context branches,82 parses and52 frees are observed.
+Context leaf computations/CRT and selection/weather/fifth refresh/providers remain
+controlled. Next recover those dependencies and full dialog/layout/menu/teardown;
+original live Alt/Esc/GPU and paired captures remain unverified. Shares unchanged.

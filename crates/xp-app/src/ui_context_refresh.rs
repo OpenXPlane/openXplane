@@ -14,6 +14,8 @@ pub enum Key {
 pub struct State {
     pub image: [u8; 96],
     pub active_global: u64,
+    /// Shared global142640504, read after engine gating.
+    pub resource_index: u32,
     pub next: BTreeMap<u64, u64>,
 }
 pub trait Services {
@@ -93,7 +95,7 @@ fn day(value: f64) -> i32 {
 pub fn refresh(state: &mut State, services: &mut impl Services) -> Result<(), &'static str> {
     let alternate = services.engine(state) != 0
         && state.active_global == 0
-        && services.resource_present(state, 0);
+        && services.resource_present(state, state.resource_index);
     let initial = if alternate {
         services.alternate(state)
     } else {
@@ -155,21 +157,35 @@ pub fn refresh(state: &mut State, services: &mut impl Services) -> Result<(), &'
     Ok(())
 }
 /// Bridge for child-constructor refresh services; preserves runtime global/list
-/// changes and partial state on errors. No native callback-tree layout is implied.
+/// changes and partial state on errors. This compatibility entry assumes index0;
+/// use refresh_image_with_index when carrying shared caller state. No native
+/// callback-tree layout is implied.
 pub fn refresh_image(
     image: &mut [u8; 96],
     active_global: &mut u64,
     next: &mut BTreeMap<u64, u64>,
     services: &mut impl Services,
 ) -> Result<(), &'static str> {
+    refresh_image_with_index(image, active_global, &mut 0, next, services)
+}
+/// Bridge carrying the shared resource index between child refresh callers.
+pub fn refresh_image_with_index(
+    image: &mut [u8; 96],
+    active_global: &mut u64,
+    resource_index: &mut u32,
+    next: &mut BTreeMap<u64, u64>,
+    services: &mut impl Services,
+) -> Result<(), &'static str> {
     let mut state = State {
         image: *image,
         active_global: *active_global,
+        resource_index: *resource_index,
         next: std::mem::take(next),
     };
     let result = refresh(&mut state, services);
     *image = state.image;
     *active_global = state.active_global;
+    *resource_index = state.resource_index;
     *next = state.next;
     result
 }

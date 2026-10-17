@@ -12,7 +12,7 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None):
+def install(e,root_harness=None,native_context=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
  def snap():return e.read(bundle,40).hex()+';'+('/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(blocks.items()))or'-')
@@ -96,6 +96,9 @@ def install(e,root_harness=None):
  for fn in [0x14113a300,0x141138cf0,0x140c8f750,0x1417fb320,0x141a64260,0x14111bb90,0x14113ba10,0x140c80d50,0x14163b530,0x14113a460,0x14113d660,0x1411396d0,0x141b77b60,0x14111d6a0,0x141135970,0x141139fe0,0x141149360,0x141139460]:e.stubs[fn]=lambda emu,fn=fn:leaf(emu,fn)
  if root_harness:
   e.stubs.pop(0x14113a300,None);e.stubs.pop(0x141138cf0,None)
+ if native_context:
+  from ui_factory_context_refresh import install as install_context
+  install_context(e,resource,objects,events,v)
  def entries(parent):
   head=e.read_u64(parent+8);out=[];p=e.read_u64(head);previous=head
   while p!=head:assert p not in out and e.read_u64(p+8)==previous;out.append(p);previous=p;p=e.read_u64(p)
@@ -114,7 +117,7 @@ def install(e,root_harness=None):
    base=p in containers;a,b=(0,0)if base else(e.read_u64(p+24),e.read_u64(p+32));ps=peers(p);assert all(x in live for x in ps);out.append(f'{p}:{"B"if base else"W"}:{a}:{b}:{",".join(map(str,ps))or"-"}')
   return ';'.join(out)
  def run_case(seed,mode,engine,secondary,index,case):
-  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
+  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
   e.write(catalog,bytes(168*3))
   for j in range(3):e.write_u64(catalog+j*168+16,0x1122334400000000+j)
   e.write_u64(BEGIN,catalog);e.write_u64(END,catalog+168*3);e.write_u64(HEAD,0);

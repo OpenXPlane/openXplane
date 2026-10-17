@@ -70,3 +70,6 @@ publication and construction. Opening ID3/Alt, original viewer/GPU output and
 paired screenshots/GIF/video remain missing. Esc still exits the viewer.
 Estimates stay41.4% implemented/28.2% verified; Rendering/UI verified0. Whole-game
 parity remains unproven.
+
+
+2026-10-18: [factory with actual root/context refreshes](UI_FACTORY_ROOT_CONTEXT_REFRESH.md) now has118 whole original calls with both refreshed children, shared resource index and full callback/list composition. Context reads88/77 after gating; leaf/CRT and remaining refreshes/providers/full dialog/live GPU remain pending. Estimates unchanged.
