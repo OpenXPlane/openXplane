@@ -46,3 +46,6 @@ Original Alt/Esc, live GPU and paired screenshots/GIF/video remain unverified.
 Validation: 204 ordinary tests pass; 49 opt-in tests are ignored in that run.
 The192-case root and920-case selection replays pass separately. Formatting,
 Python syntax and git diff checks also pass. No live GPU check was performed.
+
+
+2026-10-17: [fourth child](UI_DIALOG_CHILD_WEATHER.md) now has720 native comparisons with controlled providers; source integration connects all four adapters. Root refreshes and provider bodies still need recovery, followed by native full-factory and visual checks.

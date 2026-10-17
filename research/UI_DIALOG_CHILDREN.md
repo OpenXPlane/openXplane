@@ -78,3 +78,6 @@ Rendering/UI verified0. This is construction evidence, not visual parity.
 
 
 2026-10-17 update: [first child](UI_DIALOG_CHILD_ROOT.md) now has192 native cases with two controlled refresh bodies. Shared data initializer is reused; source integration connects root/selection/context receivers. Fourth child and root refreshes remain pending; no native combined-factory or visual parity claim.
+
+
+2026-10-17: [fourth child](UI_DIALOG_CHILD_WEATHER.md) now has720 native comparisons with controlled providers; source integration connects all four adapters. Root refreshes and provider bodies still need recovery, followed by native full-factory and visual checks.

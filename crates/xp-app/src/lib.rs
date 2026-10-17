@@ -90,3 +90,5 @@ pub mod ui_dialog_child_selection;
 pub mod ui_record_construct;
 
 pub mod ui_dialog_child_root;
+
+pub mod ui_dialog_child_weather;

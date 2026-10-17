@@ -259,3 +259,15 @@ sequence, with controlled effects. Native full-factory composition, fourth child
 both root refresh bodies and remaining providers are next, followed by dialog/
 layout/bindings/menu/teardown. Original Alt/Esc, GPU and paired captures remain
 unverified. Compatibility estimates were reviewed and remain unchanged.
+
+
+## Fourth child and all four receiver adapters (2026-10-17)
+
+[Fourth child evidence](../research/UI_DIALOG_CHILD_WEATHER.md):720 whole native
+runs match raw weather initialization/copying, provider-entry snapshots, saved
+first/reloaded second parent, retained callbacks and temporary lifetime. Weather,
+altitude/selection, refresh/special and allocation/free remain controlled. All
+four child adapters are now connected in ordinary source integration. Native
+combined factory, remaining providers/root refreshes, dialog/layout/bindings/
+menu/teardown and original Alt/Esc/GPU paired captures remain pending. Estimates
+reviewed and unchanged; this is not visual parity evidence.

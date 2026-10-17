@@ -350,6 +350,21 @@ mod tests {
             Ok(())
         }
     }
+    impl crate::ui_dialog_child_weather::Services for Host {
+        fn weather(&mut self, _: &mut [u8], _: usize, _: i32, _: u32) {}
+        fn altitude(&mut self, _: &mut [u8], parent: u64) -> u32 {
+            assert_eq!(parent, 0x7000);
+            0
+        }
+        fn selection(&mut self, _: &mut [u8], parent: u64) -> [u8; 32] {
+            assert_eq!(parent, 0x3000);
+            [0; 32]
+        }
+        fn refresh(&mut self, _: &mut [u8]) {}
+        fn special(&mut self, _: &mut [u8]) {
+            panic!("default weather mode is3")
+        }
+    }
     #[test]
     fn constructed_selection_receiver_accepts_context_child_copy() {
         let mut host = Host {
@@ -452,6 +467,39 @@ mod tests {
                 first: 0,
                 second: 0
             }
+        );
+        host.entry = 0x500000;
+        factory.blocks.insert(0xa000, vec![0xbb; 0x3e8]);
+        crate::ui_dialog_child_weather::construct_factory_child(
+            &mut factory,
+            0xa000,
+            0x7000,
+            0x3000,
+            crate::ui_dialog_child_weather::Context {
+                identity: 0xa000,
+                temporaries: [0x9300, 0x9400],
+                callbacks: &mut callbacks,
+                parents: &mut parents,
+            },
+            &mut host,
+        )
+        .unwrap();
+        assert_eq!(parents[&0x7000].entries, vec![0x5000, 0x500000]);
+        assert_eq!(parents[&0x3000].entries, vec![0x6000, 0x501000]);
+        assert!(parents[&0xa000].entries.is_empty());
+        assert_eq!(
+            callbacks.nodes[&0xa020]
+                .peers
+                .iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![0x500010, 0x501010]
+        );
+        assert!(!callbacks.nodes.contains_key(&0x9300));
+        assert!(!callbacks.nodes.contains_key(&0x9400));
+        assert_eq!(
+            &factory.blocks[&0xa000][0x58..0x200],
+            &factory.blocks[&0xa000][0x230..0x3d8]
         );
     }
 }
