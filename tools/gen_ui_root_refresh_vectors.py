@@ -8,7 +8,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP,UC_X86_REG_RIP
 ACTIVE,INDEX=0x145a10798,0x142640504
 COUNTS={0x1417fb320:1,0x141a64260:2,0x1405dd5c0:2,0x141a3b600:2,0x141141de0:3,0x1405ddde0:1,0x141100c40:1,0x1417f6dc0:1,0x1410fa920:2,0x1408acd90:1,0x1414cc7f0:0,0x1414d0900:2,0x1414ce750:2,0x141110050:1,0x140d776a0:2,0x1417e9f50:0,0x140d77340:3,0x1417e8460:2,0x1405df240:3,0x1414ccf50:2,0x1415404e0:1,0x1411490b0:2,0x1417e9a40:2,0x1405de1d0:1,0x141138650:2,0x1411399c0:1,0x140f59550:1,0x14113a300:1,0x1410c9d10:1}
-def main(path,native_nested=False,construct=False,factory=False,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_root_tables=False,native_child_tables=False,native_weather=False,native_changed=False,native_alternate=False):
+def main(path,native_nested=False,construct=False,factory=False,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_root_tables=False,native_child_tables=False,native_weather=False,native_changed=False,native_alternate=False,native_reset=False):
+ native_alternate=native_alternate or native_reset
  native_changed=native_changed or native_alternate
  native_weather=native_weather or native_changed
  native_child_tables=native_child_tables or native_weather
@@ -209,13 +210,14 @@ def main(path,native_nested=False,construct=False,factory=False,native_context=F
    parent=obj+0x1e0;head=e.read_u64(parent+8);live.add(obj+0x288);live.update(p+16 for p in entries(parent,head))
    row=' '.join(map(str,['C',obj,v['stack'],v['factory_initial'],v['initial_stack'],head,'-','-','->',snap(),graph(),list_image(parent,head),'|'.join(events),1]))
    return row,[(p,n)for p,n in ranges if p not in v['factory_ranges']]
-  factory_run=install(e,dict(identity=obj,resource=resource,settings=settings,tables=tables,begin=factory_begin,finish=factory_finish),native_context=native_context,native_fifth=native_fifth,native_predicate=native_predicate,native_tables=native_tables,native_engine=native_engine,native_child_tables=native_child_tables,native_weather=native_weather,native_changed=native_changed,native_alternate=native_alternate);top=e.heap_top
+  factory_run=install(e,dict(identity=obj,resource=resource,settings=settings,tables=tables,begin=factory_begin,finish=factory_finish),native_context=native_context,native_fifth=native_fifth,native_predicate=native_predicate,native_tables=native_tables,native_engine=native_engine,native_child_tables=native_child_tables,native_weather=native_weather,native_changed=native_changed,native_alternate=native_alternate,native_reset=native_reset);top=e.heap_top
   print('# whole factory/all child constructors with actual root/nested/payload chain; remaining child refresh/provider effects controlled')
   if native_context:print('# context1411396d0 also original; context leaf providers/CRT/free controlled; shared resource index carried')
   if native_fifth:print('# fifth141139460/hash clear14062b900 also original; fifth range-erase/iterator/grow/sort/payload/free/notify providers controlled')
   if native_predicate:print('# payload predicate14113b9a0 also original; settings record shared with root refresh')
   if native_engine:print('# fifth engine query original with supplied input byte; weather query scope depends native-weather; root/nested/selection/context engine providers controlled')
   if native_tables:print('# indexed accessors original inside fifth/constructor20; root and selection/context scopes follow their enabled flags below')
+  if native_reset:print('# actual selection reset/gate/query/tag/primary/getter; initial callback/config/parser/variant/assignment/free/finish controlled; inherited factory memory preserved')
   if native_alternate:print('# selection alternate14111bb90 also original; search/data/cleanup bodies controlled; both selection exits now actual, supplied scratch/home inputs')
   if native_changed:print('# selection changed14113ba10 also original; no synthetic second-parent write; dirty not cleared; fresh selection receiver')
   if native_weather:print('# weather141139fe0 also original with actual engine/getters; weather/context/weather-command providers controlled')
@@ -284,4 +286,5 @@ def main(path,native_nested=False,construct=False,factory=False,native_context=F
  if native_weather:print('# original weather query/getter returns',factory_run.native_weather_totals)
  if native_changed:print('# original selection changed returns',factory_run.native_changed_total())
  if native_alternate:print('# original selection alternate returns/settings/temp-dtors',factory_run.native_alternate_totals())
-if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:], '--construct' in sys.argv[2:], '--factory' in sys.argv[2:], '--native-context' in sys.argv[2:], '--native-fifth' in sys.argv[2:], '--native-predicate' in sys.argv[2:], '--native-tables' in sys.argv[2:], '--native-engine' in sys.argv[2:], '--native-root-tables' in sys.argv[2:], '--native-child-tables' in sys.argv[2:], '--native-weather' in sys.argv[2:], '--native-changed' in sys.argv[2:], '--native-alternate' in sys.argv[2:])
+ if native_reset:print('# original selection reset stats/returns',factory_run.native_reset_totals())
+if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:], '--construct' in sys.argv[2:], '--factory' in sys.argv[2:], '--native-context' in sys.argv[2:], '--native-fifth' in sys.argv[2:], '--native-predicate' in sys.argv[2:], '--native-tables' in sys.argv[2:], '--native-engine' in sys.argv[2:], '--native-root-tables' in sys.argv[2:], '--native-child-tables' in sys.argv[2:], '--native-weather' in sys.argv[2:], '--native-changed' in sys.argv[2:], '--native-alternate' in sys.argv[2:], '--native-reset' in sys.argv[2:])

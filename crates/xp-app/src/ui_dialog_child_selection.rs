@@ -56,6 +56,8 @@ pub trait Services: ui_input_construct::Services + ui_callback_list::Services {
         state: &mut State,
         argument: u32,
         _base_sentinel: &mut Block,
+        _record_sentinel: &mut Block,
+        _context: &Context<'_>,
     ) -> Result<(), &'static str> {
         self.reset(state, argument);
         Ok(())
@@ -174,7 +176,7 @@ pub fn construct(
         q(&mut state.image, off, 0);
     }
     d(&mut state.image, 0x128, 0);
-    let tree = crate::ui_record_construct::construct(&mut state.image, 0x130, services)?;
+    let mut tree = crate::ui_record_construct::construct(&mut state.image, 0x130, services)?;
     d(&mut state.image, 0x2c8, 0);
     services.bind_property(
         state,
@@ -265,7 +267,7 @@ pub fn construct(
             );
         }
     }
-    services.reset_checked(state, 0, &mut base)?;
+    services.reset_checked(state, 0, &mut base, &mut tree, &context)?;
     services.finish(state);
     Ok(Initialization {
         base_sentinel: base,

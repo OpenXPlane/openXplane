@@ -126,7 +126,8 @@ impl State {
 }
 /// Publish logical receiver links/counts into the factory's mapped byte images.
 /// Callback RB nodes and receiver wrapper payloads remain logical, not ABI bytes.
-/// Call after a child constructor returns its owned base/record blocks.
+/// Publish once owned base/record blocks and current receiver images are mapped,
+/// including at a recovered call boundary inside a child constructor.
 pub fn publish_callback_links(
     state: &mut State,
     callbacks: &crate::ui_callback_links::State,

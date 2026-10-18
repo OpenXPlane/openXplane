@@ -6,6 +6,8 @@ mod change_replay;
 mod context_replay;
 #[path = "support/ui_fifth_replay.rs"]
 mod fifth_replay;
+#[path = "support/ui_selection_reset_replay.rs"]
+mod reset_replay;
 #[path = "support/ui_root_replay.rs"]
 mod root_replay;
 #[path = "support/ui_weather_replay.rs"]
@@ -139,10 +141,12 @@ impl openxplane::ui_callback_list::Services for Replay {
     }
 }
 struct Provider<'a> {
+    inherited: BTreeMap<u64, Vec<u8>>,
     native_child_tables: bool,
     native_weather: bool,
     native_changed: bool,
     native_alternate: bool,
+    native_reset: bool,
     resources: openxplane::ui_payload_move::State,
     replay: &'a mut Replay,
     id: u64,
@@ -300,6 +304,71 @@ impl selection::Services for Provider<'_> {
     fn reset(&mut self, s: &mut selection::State, arg: u32) {
         self.effect(&mut s.image, 0x14113a460, &[self.id, arg as u64]);
     }
+    fn reset_checked(
+        &mut self,
+        s: &mut selection::State,
+        argument: u32,
+        base: &mut Block,
+        tree: &mut Block,
+        context: &selection::Context<'_>,
+    ) -> Result<(), &'static str> {
+        if !self.native_reset {
+            self.reset(s, argument);
+            return Ok(());
+        }
+        let event = self.replay.event();
+        assert_eq!(event[0], "S");
+        let row = event[1..].join("~").replace('!', " ").replace('^', "|");
+        let fields = row.split_whitespace().collect::<Vec<_>>();
+        assert_eq!(num(fields[1]), self.id);
+        assert_eq!(num(fields[3]), argument as u64);
+        let mut published = factory::State::new([0; 40]);
+        published.blocks = self.inherited.clone();
+        published.blocks.insert(self.id, s.image.clone());
+        published.blocks.insert(base.address, base.bytes.clone());
+        published.blocks.insert(tree.address, tree.bytes.clone());
+        factory::publish_callback_links(&mut published, context.callbacks, context.parents)?;
+        assert_eq!(published.blocks[&self.id], s.image);
+        let mut shared = published.blocks;
+        assert_eq!(self.resources.blocks.len(), 20);
+        shared.extend(self.resources.blocks.clone());
+        shared.insert(0x145a10798, s.active_global.to_le_bytes().to_vec());
+        shared.insert(
+            openxplane::ui_selection_reset_gate::RESOURCE_INDEX,
+            s.resource_index.to_le_bytes().to_vec(),
+        );
+        shared.insert(
+            openxplane::ui_selection_reset::CATALOG_BEGIN,
+            s.catalog_base.to_le_bytes().to_vec(),
+        );
+        shared.insert(
+            openxplane::ui_selection_reset::CATALOG_END,
+            (s.catalog_base + s.catalog_values.len() as u64 * 168)
+                .to_le_bytes()
+                .to_vec(),
+        );
+        let mut catalog = vec![0; s.catalog_values.len() * 168];
+        for (i, value) in s.catalog_values.iter().enumerate() {
+            catalog[i * 168 + 16..i * 168 + 24].copy_from_slice(&value.to_le_bytes());
+        }
+        shared.insert(s.catalog_base, catalog);
+        let runtime = reset_replay::run_row(&row, Some(&s.image), Some(base), &shared);
+        // The selected controlled providers only modify this child; every prior
+        // parent, published list field, table and catalog input is preserved.
+        for (p, b) in &shared {
+            if ![self.id, base.address, tree.address].contains(p) {
+                assert_eq!(
+                    runtime.memory.read(*p, b.len())?,
+                    *b,
+                    "preserved reset input at{p:x}"
+                );
+            }
+        }
+        s.image = runtime.memory.read(self.id, 0x2d0)?;
+        base.bytes = runtime.memory.read(base.address, base.bytes.len())?;
+        tree.bytes = runtime.memory.read(tree.address, tree.bytes.len())?;
+        Ok(())
+    }
     fn finish(&mut self, s: &mut selection::State) {
         self.effect(&mut s.image, 0x14113d660, &[self.id]);
     }
@@ -408,6 +477,7 @@ struct Host {
     native_weather: bool,
     native_changed: bool,
     native_alternate: bool,
+    native_reset: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -447,11 +517,19 @@ impl factory::Services for Host {
         let f = e[1].split(',').map(num).collect::<Vec<_>>();
         assert_eq!(&f[..2], &[kind as u64, p]);
         assert_eq!(&f[2..], args);
+        let mut inherited = if self.native_reset {
+            s.blocks.clone()
+        } else {
+            BTreeMap::new()
+        };
+        inherited.remove(&p);
         let mut provider = Provider {
+            inherited,
             native_child_tables: self.native_child_tables,
             native_weather: self.native_weather,
             native_changed: self.native_changed,
             native_alternate: self.native_alternate,
+            native_reset: self.native_reset,
             resources: openxplane::ui_payload_move::State {
                 blocks: self.shared_settings.clone(),
             },
@@ -847,6 +925,15 @@ fn native_factory_with_actual_selection_alternate_changed_and_weather_chain() {
         ReplayMode::Alternate,
     );
 }
+#[test]
+#[ignore = "requires whole reset factory corpus via OPENXPLANE_UI_FACTORY_SELECTION_RESET_VECTORS"]
+fn native_factory_with_actual_selection_reset_and_all_refresh_chains() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_SELECTION_RESET_VECTORS",
+        118,
+        ReplayMode::Reset,
+    );
+}
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 enum ReplayMode {
     Controlled,
@@ -858,6 +945,7 @@ enum ReplayMode {
     Weather,
     Changed,
     Alternate,
+    Reset,
 }
 fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_predicate = mode >= ReplayMode::Predicate;
@@ -868,6 +956,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_weather = mode >= ReplayMode::Weather;
     let native_changed = mode >= ReplayMode::Changed;
     let native_alternate = mode >= ReplayMode::Alternate;
+    let native_reset = mode >= ReplayMode::Reset;
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
@@ -898,6 +987,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
             native_weather,
             native_changed,
             native_alternate,
+            native_reset,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);

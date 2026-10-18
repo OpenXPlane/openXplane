@@ -91,6 +91,11 @@ OPENXPLANE_UI_SELECTION_RESET_VECTORS=/tmp/selection-reset.txt cargo test --offl
 
 ## Integration and limits
 
+This section records the standalone checkpoint. The subsequent
+[factory composition](UI_FACTORY_SELECTION_RESET.md) now compares the actual
+reset inside118 whole original factories, with the remaining provider and
+viewer limitations stated there.
+
 `ui_dialog_child_selection::Services::reset_checked` is a fallible constructor
 boundary, matching the earlier refresh/changed/alternate approach. Its default
 still delegates to the legacy controlled reset. The constructor retains its

@@ -12,9 +12,9 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False,native_weather=False,native_changed=False,native_alternate=False):
+def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False,native_weather=False,native_changed=False,native_alternate=False,native_reset=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
- fifth_scope=None;weather_scope=None;changed_scope=None;alternate_scope=None;context_totals={};selection_totals={}
+ fifth_scope=None;weather_scope=None;changed_scope=None;alternate_scope=None;reset_scope=None;context_totals={};selection_totals={}
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
  def snap():return e.read(bundle,40).hex()+';'+('/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(blocks.items()))or'-')
  def effect(fn,args,apply=lambda:None,result=0):
@@ -105,11 +105,11 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
  if native_child_tables:
   pending=[]
   def selection_entry(uc,a,size,user):
-   if v['kind']==1:
+   if v['kind']==1 and (not reset_scope or not reset_scope['active']):
     assert e.reg(UC_X86_REG_RCX)==0x146124398;index=e.reg(UC_X86_REG_RDX)&0xffffffff;pending.append(index)
     maps=root_harness['tables'].maps;memory='/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(maps.items()));events.append(f'J~{index}~{e.read(objects[1],0x2d0).hex()}~{memory}')
   def selection_return(uc,a,size,user):
-   if v['kind']==1:
+   if v['kind']==1 and (not reset_scope or not reset_scope['active']):
     index=pending.pop();selection_totals[index]=selection_totals.get(index,0)+1;v['selection_returns']+=1
   e.uc.hook_add(UC_HOOK_CODE,selection_entry,begin=0x141a64260,end=0x141a64260)
   e.uc.hook_add(UC_HOOK_CODE,selection_return,begin=0x141a6426d,end=0x141a6426d)
@@ -139,6 +139,14 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
    h.prepare(p,case,profile,dict(blocks))
   def alternate_finish(row):v['alternate_returns']+=1;events.append('P~'+row.replace(' ','!').replace('|','^'))
   alternate_scope=install_alternate(e,tables=root_harness['tables'],before=alternate_begin,on_finish=alternate_finish);top=e.heap_top
+ if native_reset:
+  from ui_selection_reset_harness import install as install_reset
+  def reset_begin(p,h):
+   assert v['kind']==1;case=v['case'];tags=[255,0,1,2,3,4]
+   profile=dict(seed=v['seed'],tag=tags[(case//3)%6],cli=255 if case%2 else 0,alias=case%3,kind=(case//3)%4,index=[-1,1,99][case%3],variant_alias=(case//2)%3,returned_tag=tags[(case//2)%6],listeners=0,mutate=False,argument=0,engine=v['engine'])
+   h['prepare'](p,case,profile,dict(blocks))
+  def reset_finish(row):v['reset_returns']+=1;events.append('S~'+row.replace(' ','!').replace('|','^'))
+  reset_scope=install_reset(e,tables=root_harness['tables'],before=reset_begin,on_finish=reset_finish);top=e.heap_top
  if native_tables:
   def constructor_record_return(uc,a,size,user):
    if v['kind']==-1 and (not fifth_scope or not fifth_scope.active):v['constructor_returns']+=1
@@ -161,7 +169,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
    base=p in containers;a,b=(0,0)if base else(e.read_u64(p+24),e.read_u64(p+32));ps=peers(p);assert all(x in live for x in ps);out.append(f'{p}:{"B"if base else"W"}:{a}:{b}:{",".join(map(str,ps))or"-"}')
   return ';'.join(out)
  def run_case(seed,mode,engine,secondary,index,case):
-  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,alternate_returns=0,changed_returns=0,constructor_returns=0,selection_returns=0,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
+  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,alternate_returns=0,changed_returns=0,reset_returns=0,constructor_returns=0,selection_returns=0,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
   e.write(catalog,bytes(168*3))
   for j in range(3):e.write_u64(catalog+j*168+16,0x1122334400000000+j)
   e.write_u64(BEGIN,catalog);e.write_u64(END,catalog+168*3);e.write_u64(HEAD,0);
@@ -177,7 +185,9 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   assert len(temps)==4+(0 if native_alternate else (secondary if not native_changed or v['changed_returns']==0 else 0))
   if native_changed:assert v['changed_returns']<=1
   if native_alternate:assert v['alternate_returns']+v['changed_returns']==1
+  if native_reset:assert v['reset_returns']==1
   return ' '.join(map(str,['C',seed,catalog,','.join(map(str,temps)),'->',snap(),graph(parents),lists,e.read_u64(HEAD),'|'.join(events)]))
+ run_case.native_reset_totals=lambda:(reset_scope['stats'],reset_scope['totals'])if reset_scope else None
  run_case.native_alternate_totals=lambda:(alternate_scope.total_returns,alternate_scope.get_totals,alternate_scope.temp_dtor_calls)if alternate_scope else None
  run_case.native_changed_total=lambda:changed_scope.total_returns if changed_scope else 0
  run_case.native_weather_totals=weather_scope.native_totals if weather_scope else {}
