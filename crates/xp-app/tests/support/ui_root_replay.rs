@@ -156,6 +156,13 @@ impl ui_callback_list::Services for Replay {
     }
 }
 impl Services for Replay {
+    fn resource_record(&mut self, s: &mut State, index: u32) -> Result<u64, &'static str> {
+        self.invoke(s, 0x141a64260, &[0x146124398, index as u64])
+    }
+    fn settings_record(&mut self, s: &mut State, index: u32) -> Result<u64, &'static str> {
+        self.invoke(s, 0x141a64250, &[0x1461243b0, index as u64])
+    }
+
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         if self.native_nested && function == 0x14113a300 {
             assert_eq!(args, [s.identity + 0x268]);
@@ -206,6 +213,7 @@ impl Services for Replay {
 /// Whole fresh constructor, including both nested refresh invocations and the
 /// final root refresh. Callback tree allocation bytes remain deliberately opaque.
 struct ConstructorHost {
+    native_tables: bool,
     runtime: State,
     replay: Replay,
 }
@@ -274,11 +282,19 @@ impl openxplane::ui_dialog_child_root::Services for ConstructorHost {
         assert_eq!(identity, self.runtime.identity + 0x268);
         self.publish(image, blocks);
         let temporary = self.runtime.stack + 0x1e0;
-        openxplane::ui_refresh_chain::refresh_nested(
-            &mut self.runtime,
-            &mut self.replay,
-            temporary,
-        )?;
+        if self.native_tables {
+            openxplane::ui_refresh_chain::refresh_nested(
+                &mut self.runtime,
+                &mut IndexedReplay(&mut self.replay),
+                temporary,
+            )?;
+        } else {
+            openxplane::ui_refresh_chain::refresh_nested(
+                &mut self.runtime,
+                &mut self.replay,
+                temporary,
+            )?;
+        }
         self.capture(image, blocks);
         Ok(())
     }
@@ -300,20 +316,69 @@ impl openxplane::ui_dialog_child_root::Services for ConstructorHost {
     ) -> Result<(), &'static str> {
         assert_eq!(identity, self.runtime.identity);
         self.publish(image, blocks);
-        ui_root_refresh::refresh_image(
-            image,
-            &mut self.runtime,
-            Context { callbacks, parents },
-            &mut self.replay,
-        )?;
+        if self.native_tables {
+            ui_root_refresh::refresh_image(
+                image,
+                &mut self.runtime,
+                Context { callbacks, parents },
+                &mut IndexedReplay(&mut self.replay),
+            )?;
+        } else {
+            ui_root_refresh::refresh_image(
+                image,
+                &mut self.runtime,
+                Context { callbacks, parents },
+                &mut self.replay,
+            )?;
+        }
         self.capture(image, blocks);
         Ok(())
     }
+}
+/// Inherits both production lookups; nested calls retain this same adapter.
+struct IndexedReplay<'a>(&'a mut Replay);
+impl ui_callback_links::Services for IndexedReplay<'_> {
+    fn allocate(&mut self, n: usize) {
+        self.0.allocate(n);
+    }
+    fn free(&mut self, n: usize) {
+        self.0.free(n);
+    }
+}
+impl ui_callback_list::Services for IndexedReplay<'_> {
+    fn allocate_entry(&mut self, n: usize) -> Result<u64, &'static str> {
+        self.0.allocate_entry(n)
+    }
+}
+impl Services for IndexedReplay<'_> {
+    fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
+        if self.0.native_nested && function == 0x14113a300 {
+            assert_eq!(args, [s.identity + 0x268]);
+            openxplane::ui_refresh_chain::refresh_nested(s, self, s.stack - 0x100)?;
+            return Ok(0);
+        }
+        self.0.invoke(s, function, args)
+    }
+}
+pub(crate) fn run_constructor_tables_row(
+    row: &str,
+    callbacks: &mut ui_callback_links::State,
+    parents: &mut BTreeMap<u64, List>,
+) -> (openxplane::ui_dialog_child_root::State, State) {
+    run_constructor_impl(row, callbacks, parents, true)
 }
 pub(crate) fn run_constructor_row(
     row: &str,
     callbacks: &mut ui_callback_links::State,
     parents: &mut BTreeMap<u64, List>,
+) -> (openxplane::ui_dialog_child_root::State, State) {
+    run_constructor_impl(row, callbacks, parents, false)
+}
+fn run_constructor_impl(
+    row: &str,
+    callbacks: &mut ui_callback_links::State,
+    parents: &mut BTreeMap<u64, List>,
+    native_tables: bool,
 ) -> (openxplane::ui_dialog_child_root::State, State) {
     let v: Vec<_> = row.split_whitespace().collect();
     assert_eq!(v.len(), 14);
@@ -324,6 +389,7 @@ pub(crate) fn run_constructor_row(
     let mut state =
         openxplane::ui_dialog_child_root::State::new(runtime.memory.read(id, 0x3e0).unwrap());
     let mut host = ConstructorHost {
+        native_tables,
         runtime,
         replay: Replay {
             events: v[12].split('|').map(str::to_string).collect(),

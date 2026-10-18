@@ -111,3 +111,9 @@ cases pass. The three prior/current fifth replay modes and earlier118 shared-gat
 factory replay pass too. Earlier528/118 controlled-getter C rows regenerate
 unchanged. Formatting, Python syntax, all-test-target compilation and diff checks
 pass. No live viewer/GPU run or paired visual capture was performed.
+
+
+The subsequent [root/nested table composition](UI_ROOT_RECORD_TABLES.md) executes
+actual getters through root construction as well, using complete per-index
+resource strings and checking all20 table input regions before fifth execution.
+Earlier cohorts above retain their explicitly controlled-root scope.

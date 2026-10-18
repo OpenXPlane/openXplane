@@ -14,7 +14,9 @@ def install(e,resource=None,before=None,on_finish=None,native_predicate=False,se
  if native_predicate:settings=settings or e.alloc(0xdb0)
  external={resource+0x6188:8,vec:64,grown:128,payload:32,tree:32,tree2:32,hhead2:32,buckets:1024,head2:120,**{p:128 for p in records},**{p:32 for p in tnodes+hnodes+targets},**{p:120 for p in listeners}}
  if native_predicate:external[settings+0xdac]=4
- if tables:external.update(tables.maps)
+ if tables:
+  external.update(tables.maps)
+  if tables.root_strings:external.pop(resource+0x6188,None)
  if native_engine:
   assert native_predicate and tables
   external[ENGINE_BYTE]=1

@@ -307,6 +307,7 @@ struct Host {
     native_predicate: bool,
     native_tables: bool,
     native_engine: bool,
+    native_root_tables: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -362,8 +363,15 @@ impl factory::Services for Host {
                 assert_eq!(num(fields[13]), args[0]);
                 let initial = root_replay::parse_snapshot(fields[3], p, num(fields[2]));
                 assert_eq!(s.blocks[&p], initial.memory.read(p, 0x3e0).unwrap());
-                let (state, runtime) =
-                    root_replay::run_constructor_row(&row, &mut self.callbacks, &mut self.parents);
+                let (state, runtime) = if self.native_root_tables {
+                    root_replay::run_constructor_tables_row(
+                        &row,
+                        &mut self.callbacks,
+                        &mut self.parents,
+                    )
+                } else {
+                    root_replay::run_constructor_row(&row, &mut self.callbacks, &mut self.parents)
+                };
                 s.blocks.insert(p, state.image);
                 for block in state.blocks.into_iter().filter(|b| b.bytes.len() != 40) {
                     Self::keep(s, block);
@@ -377,6 +385,37 @@ impl factory::Services for Host {
                     .filter(|(_, bytes)| bytes.len() == 4)
                     .map(|(p, bytes)| (*p, bytes.clone()))
                     .collect();
+                if self.native_root_tables {
+                    self.shared_settings.clear();
+                    use openxplane::ui_indexed_records::{self, Kind};
+                    for index in [-1i32, 0, 1, 5, 20, 77, 78, 88, 89] {
+                        let resource = ui_indexed_records::lookup(
+                            &runtime.memory,
+                            Kind::Resource,
+                            index as u32 as u64,
+                        )?;
+                        let settings = ui_indexed_records::lookup(
+                            &runtime.memory,
+                            Kind::Settings,
+                            index as u32 as u64,
+                        )?;
+                        self.shared_settings.insert(
+                            resource + 0x6178,
+                            runtime.memory.read(resource + 0x6178, 32)?,
+                        );
+                        self.shared_settings
+                            .insert(settings + 0xdac, runtime.memory.read(settings + 0xdac, 4)?);
+                        if index == 88 {
+                            self.resource_available = u64::from_le_bytes(
+                                runtime
+                                    .memory
+                                    .read(resource + 0x6188, 8)?
+                                    .try_into()
+                                    .unwrap(),
+                            ) != 0;
+                        }
+                    }
+                }
                 if self.native_tables {
                     for table in [0x146124398, 0x1461243b0] {
                         self.shared_settings
@@ -541,7 +580,10 @@ impl factory::Services for Host {
             let row = event[1..].join("~").replace('!', " ").replace('^', "|");
             assert_eq!(num(row.split_whitespace().nth(1).unwrap()), p);
             let runtime = if self.native_engine {
-                assert_eq!(self.shared_settings.len(), 3);
+                assert_eq!(
+                    self.shared_settings.len(),
+                    if self.native_root_tables { 20 } else { 3 }
+                );
                 fifth_replay::run_engine_row(
                     &row,
                     Some(&s.blocks[&p]),
@@ -622,10 +664,11 @@ fn native_factory_with_actual_fifth_gate_and_shared_root_settings() {
         true,
         false,
         false,
+        false,
     );
 }
 fn replay_factory(env: &str, expected_cases: usize) {
-    replay_factory_mode(env, expected_cases, false, false, false);
+    replay_factory_mode(env, expected_cases, false, false, false, false);
 }
 #[test]
 #[ignore = "requires native fifth table chain via OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS"]
@@ -635,6 +678,7 @@ fn native_factory_with_real_fifth_record_tables() {
         118,
         true,
         true,
+        false,
         false,
     );
 }
@@ -647,6 +691,19 @@ fn native_factory_with_actual_fifth_query_and_record_tables() {
         true,
         true,
         true,
+        false,
+    );
+}
+#[test]
+#[ignore = "requires actual root/fifth tables via OPENXPLANE_UI_FACTORY_ROOT_TABLES_VECTORS"]
+fn native_factory_with_real_root_nested_and_fifth_record_tables() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_ROOT_TABLES_VECTORS",
+        118,
+        true,
+        true,
+        true,
+        true,
     );
 }
 fn replay_factory_mode(
@@ -655,6 +712,7 @@ fn replay_factory_mode(
     native_predicate: bool,
     native_tables: bool,
     native_engine: bool,
+    native_root_tables: bool,
 ) {
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
@@ -681,6 +739,7 @@ fn replay_factory_mode(
             native_predicate,
             native_tables,
             native_engine,
+            native_root_tables,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);

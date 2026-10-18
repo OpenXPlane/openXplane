@@ -1,5 +1,9 @@
 //! Root refresh141138cf0. Version-bound leaf identities are data, not host calls.
-use crate::{ui_callback_links, ui_callback_list, ui_payload_move};
+use crate::{
+    ui_callback_links, ui_callback_list,
+    ui_indexed_records::{self, Kind},
+    ui_payload_move,
+};
 use std::collections::BTreeMap;
 pub struct State {
     pub memory: ui_payload_move::State,
@@ -14,6 +18,13 @@ pub struct Context<'a> {
 }
 /// Arguments use recovered logical widths;141141de0 third argument is R8B.
 pub trait Services: ui_callback_list::Services {
+    /// Original descriptor/stride lookup over mapped logical memory.
+    fn resource_record(&mut self, state: &mut State, index: u32) -> Result<u64, &'static str> {
+        ui_indexed_records::lookup(&state.memory, Kind::Resource, index as u64)
+    }
+    fn settings_record(&mut self, state: &mut State, index: u32) -> Result<u64, &'static str> {
+        ui_indexed_records::lookup(&state.memory, Kind::Settings, index as u64)
+    }
     fn invoke(
         &mut self,
         state: &mut State,
@@ -46,7 +57,7 @@ fn invoke(s: &mut State, h: &mut impl Services, f: u64, a: &[u64]) -> Result<u64
 }
 fn resource(s: &mut State, h: &mut impl Services) -> Result<u64, &'static str> {
     let index = s.resource_index;
-    invoke(s, h, 0x141a64260, &[0x146124398, index as u64])
+    h.resource_record(s, index)
 }
 fn manager(s: &mut State, h: &mut impl Services) -> Result<u64, &'static str> {
     invoke(s, h, 0x1414cc7f0, &[])

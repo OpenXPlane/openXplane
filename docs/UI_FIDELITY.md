@@ -417,3 +417,14 @@ sort effects exercise15 intervening byte changes. Root/other child queries and
 registry production/lifetime remain controlled or unproven, as do full dialog,
 viewer and paired GPU evidence. See [UI_ENGINE_QUERY](../research/UI_ENGINE_QUERY.md).
 Compatibility estimates were reviewed and remain unchanged.
+
+
+Root141138cf0 and both nested14113a300 calls now use production indexed lookups.
+118 complete original factory runs execute226 root/nested resource and46 settings
+returns against distinct valid32-byte source strings. All20 array input regions
+are inherited and compared before fifth refresh;649 retained entries match.
+Root index flow changes the fifth paths (23 sorts/11 payload assignments), as
+confirmed against original code. Selection/context lookups and other providers
+remain controlled; registry production/full dialog/viewer/GPU/paired captures are
+unverified. See [UI_ROOT_RECORD_TABLES](../research/UI_ROOT_RECORD_TABLES.md).
+Estimates reviewed and unchanged.

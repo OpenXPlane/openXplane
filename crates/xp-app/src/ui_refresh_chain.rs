@@ -70,7 +70,12 @@ impl<S: root::Services> Adapter<'_, S> {
         if self.error.is_some() {
             return 0;
         }
-        let value = match self.host.invoke(self.root, f, a) {
+        let result = match f {
+            0x141a64260 => self.host.resource_record(self.root, a[1] as u32),
+            0x141a64250 => self.host.settings_record(self.root, a[1] as u32),
+            _ => self.host.invoke(self.root, f, a),
+        };
+        let value = match result {
             Ok(v) => v,
             Err(e) => {
                 self.error = Some(e);

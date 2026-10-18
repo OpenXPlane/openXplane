@@ -91,3 +91,9 @@ newer toolchain, so its outcome is checked separately.
 
 The complete local workspace suite passes310 tests with81 opt-in tests ignored;
 the original972 context-refresh cases also pass after this maintenance.
+
+
+The subsequent [root/nested table composition](UI_ROOT_RECORD_TABLES.md) executes
+actual getters through root construction as well, using complete per-index
+resource strings and checking all20 table input regions before fifth execution.
+Earlier cohorts above retain their explicitly controlled-root scope.

@@ -57,7 +57,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
  e.uc.hook_add(UC_HOOK_CODE,temporary,begin=0x1410c7d20,end=0x1410c7d20)
  def leaf(emu,fn):
   k=v['kind']
-  if root_harness and k==0:original_stubs[fn](emu);return
+  if root_harness and k==0:return original_stubs[fn](emu)
   if native_tables and k==-1 and fn==0x141a64260:return True
   p=objects[k] if k>=0 else v['fifth'];rcx=emu.reg(UC_X86_REG_RCX);rdx=emu.reg(UC_X86_REG_RDX);r8=emu.reg(UC_X86_REG_R8);result=0
   if fn==0x14113a300:assert rcx==p+0x268;effect(fn,[rcx],lambda:emu.write(p+0x398,bytes([v['seed']^0x21])))
