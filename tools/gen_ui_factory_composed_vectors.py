@@ -12,8 +12,9 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False):
+def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
+ fifth_scope=None
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
  def snap():return e.read(bundle,40).hex()+';'+('/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(blocks.items()))or'-')
  def effect(fn,args,apply=lambda:None,result=0):
@@ -57,6 +58,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
  def leaf(emu,fn):
   k=v['kind']
   if root_harness and k==0:original_stubs[fn](emu);return
+  if native_tables and k==-1 and fn==0x141a64260:return True
   p=objects[k] if k>=0 else v['fifth'];rcx=emu.reg(UC_X86_REG_RCX);rdx=emu.reg(UC_X86_REG_RDX);r8=emu.reg(UC_X86_REG_R8);result=0
   if fn==0x14113a300:assert rcx==p+0x268;effect(fn,[rcx],lambda:emu.write(p+0x398,bytes([v['seed']^0x21])))
   elif fn==0x141138cf0:assert rcx==p;effect(fn,[p],lambda:emu.write(p+0x3c0,bytes([v['seed']^0x22])))
@@ -104,7 +106,11 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   def fifth_begin(p,h):
    case=v['case'];profile=dict(seed=v['seed'],engine=v['engine'],active=e.read_u64(ACTIVE),index=e.read_u32(0x142640504),available=int(e.read_u64(resource+0x6188)!=0),items=[0,1,3][case%3],variant=[0,255][case%2],mutate=case%2,listeners=0,override=[0,1,0x80000000][case%3],bits=[0x80000000,0x3f800000,0x7fc12345][case%3])
    h.prepare(p,case,profile,dict(blocks),mutate=False)
-  install_fifth(e,resource,before=fifth_begin,on_finish=lambda row:events.append('W~'+row.replace(' ','!').replace('|','^')),native_predicate=native_predicate,settings=root_harness.get('settings') if root_harness else None);top=e.heap_top
+  fifth_scope=install_fifth(e,resource,before=fifth_begin,on_finish=lambda row:events.append('W~'+row.replace(' ','!').replace('|','^')),native_predicate=native_predicate,settings=root_harness.get('settings') if root_harness else None,tables=root_harness.get('tables') if root_harness and native_tables else None);top=e.heap_top
+ if native_tables:
+  def constructor_record_return(uc,a,size,user):
+   if v['kind']==-1 and (not fifth_scope or not fifth_scope.active):v['constructor_returns']+=1
+  e.uc.hook_add(UC_HOOK_CODE,constructor_record_return,begin=0x141a6426d,end=0x141a6426d)
  def entries(parent):
   head=e.read_u64(parent+8);out=[];p=e.read_u64(head);previous=head
   while p!=head:assert p not in out and e.read_u64(p+8)==previous;out.append(p);previous=p;p=e.read_u64(p)
@@ -123,7 +129,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
    base=p in containers;a,b=(0,0)if base else(e.read_u64(p+24),e.read_u64(p+32));ps=peers(p);assert all(x in live for x in ps);out.append(f'{p}:{"B"if base else"W"}:{a}:{b}:{",".join(map(str,ps))or"-"}')
   return ';'.join(out)
  def run_case(seed,mode,engine,secondary,index,case):
-  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
+  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,constructor_returns=0,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
   e.write(catalog,bytes(168*3))
   for j in range(3):e.write_u64(catalog+j*168+16,0x1122334400000000+j)
   e.write_u64(BEGIN,catalog);e.write_u64(END,catalog+168*3);e.write_u64(HEAD,0);
@@ -131,11 +137,13 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   e.write(selected,bytes((seed+j*7)%256 for j in range(32)))
   if native_fifth:e.write_u32(OVERRIDE,0x12345678);e.write_u32(BITS,0x11112222)
   result=e.call(0x1410d6ca0,ints=[bundle],max_instructions=300000);assert result==bundle and e.reg(UC_X86_REG_RIP)==RET_ADDR and len(objects)==4
+  if native_tables:assert v['constructor_returns']==1
   parents=[objects[0],objects[0]+0x1e0,objects[0]+0x268,*objects[1:],v['fifth']]
   lists=';'.join(f'{p}:{entries(p)[0]}:{",".join(map(str,entries(p)[1]))or"-"}'for p in parents)
   # The selection may create one or two temporary wrappers; context one, weather two.
   assert len(temps)==4+secondary
   return ' '.join(map(str,['C',seed,catalog,','.join(map(str,temps)),'->',snap(),graph(parents),lists,e.read_u64(HEAD),'|'.join(events)]))
+ run_case.native_getter_totals=fifth_scope.native_totals if fifth_scope else {}
  return run_case
 
 def main(path):

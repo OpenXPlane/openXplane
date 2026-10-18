@@ -394,3 +394,16 @@ payload branches occur in the shared composition. Old opaque-predicate records
 are unchanged and replay under an explicit controlled seam. Engine/resource/
 settings lookup bodies, other dependencies, full dialog/menu/live Alt/Esc/GPU and
 paired captures remain unverified. Shares reviewed and unchanged.
+
+
+## Real indexed records in the fifth element (2026-10-18)
+
+[Indexed-record evidence](../research/UI_INDEXED_RECORDS.md):872 complete original
+accessors match signed-low32/wrapping64 address calculations.528 fifth-refresh
+runs now execute original getters over distinct real-stride cells and live base
+changes.118 whole factory runs also execute the constructor's real index20 lookup;
+90/34 fifth resource/settings returns and118 constructor returns are checked.
+Root descriptors/settings word and649 retained entries stay consistent. Other
+callers' getter bodies and registry/record ownership remain controlled, followed
+by remaining refresh/provider/dialog/layout/menu work. Live Alt/Esc/GPU and paired
+captures remain unverified; shares reviewed and unchanged.

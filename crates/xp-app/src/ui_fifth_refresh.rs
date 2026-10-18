@@ -1,6 +1,9 @@
 //! Fifth dialog child refresh141139460 and hash clear14062b900.
 //! Version-bound provider identities are data, never executable host pointers.
-use crate::ui_payload_move;
+use crate::{
+    ui_indexed_records::{self, Kind},
+    ui_payload_move,
+};
 pub struct State {
     pub memory: ui_payload_move::State,
     pub identity: u64,
@@ -18,6 +21,13 @@ pub trait Services {
         function: u64,
         args: &[u64],
     ) -> Result<u64, &'static str>;
+    /// Original indexed table access. Callers supply mapped table descriptors.
+    fn resource_record(&mut self, state: &mut State, index: u32) -> Result<u64, &'static str> {
+        ui_indexed_records::lookup(&state.memory, Kind::Resource, index as u64)
+    }
+    fn settings_record(&mut self, state: &mut State, index: u32) -> Result<u64, &'static str> {
+        ui_indexed_records::lookup(&state.memory, Kind::Settings, index as u64)
+    }
     /// Default executes recovered14113b9a0. Controlled legacy adapters may
     /// override the opaque endpoint while comparing only its caller.
     fn payload_available(&mut self, state: &mut State) -> Result<bool, &'static str>
@@ -105,11 +115,11 @@ pub fn payload_available(s: &mut State, h: &mut impl Services) -> Result<bool, &
     if call(s, h, 0x1417fb320, &[0x142f2d770])? as u8 == 0 || s.active_global != 0 {
         return Ok(false);
     }
-    let resource = call(s, h, 0x141a64260, &[0x146124398, s.resource_index as u64])?;
+    let resource = h.resource_record(s, s.resource_index)?;
     if s.q(resource + 0x6188)? == 0 {
         return Ok(false);
     }
-    let settings = call(s, h, 0x141a64250, &[0x1461243b0, s.resource_index as u64])?;
+    let settings = h.settings_record(s, s.resource_index)?;
     Ok(s.d(settings + 0xdac)? == 0)
 }
 pub fn refresh(s: &mut State, h: &mut impl Services) -> Result<(), &'static str> {
@@ -124,7 +134,7 @@ pub fn refresh(s: &mut State, h: &mut impl Services) -> Result<(), &'static str>
         s.putq(vector + 8, begin)?;
     }
     if call(s, h, 0x1417fb320, &[0x142f2d770])? as u8 != 0 && s.active_global == 0 {
-        let resource = call(s, h, 0x141a64260, &[0x146124398, s.resource_index as u64])?;
+        let resource = h.resource_record(s, s.resource_index)?;
         if s.q(resource + 0x6188)? != 0 {
             let manager = call(s, h, 0x14193ae40, &[])?;
             call(s, h, 0x141660c60, &[sp + 0x20, manager])?;

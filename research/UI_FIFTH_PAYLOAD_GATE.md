@@ -101,3 +101,6 @@ controlled-predicate and118 factory/fifth replays still pass, and their C rows
 regenerate unchanged. Both new corpora regenerate identically. Formatting,
 Python syntax, all-test-target compilation and diff checks pass. No live
 viewer/GPU run or paired visual capture was performed.
+
+
+2026-10-18: [actual indexed record access](UI_INDEXED_RECORDS.md) now has872 direct original-code cases,528 fifth compositions and118 whole-factory runs with original fifth getter bodies plus constructor index20 lookup. Root/selection/context getters and actual registry production remain controlled; no live GPU/visual parity claim. Earlier modes retain their explicit scope; estimates unchanged.

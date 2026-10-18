@@ -305,6 +305,7 @@ struct Host {
     resource_index: u32,
     resource_available: bool,
     native_predicate: bool,
+    native_tables: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -375,6 +376,12 @@ impl factory::Services for Host {
                     .filter(|(_, bytes)| bytes.len() == 4)
                     .map(|(p, bytes)| (*p, bytes.clone()))
                     .collect();
+                if self.native_tables {
+                    for table in [0x146124398, 0x1461243b0] {
+                        self.shared_settings
+                            .insert(table, runtime.memory.read(table, 8)?);
+                    }
+                }
                 for event in fields[12].split('|') {
                     let e = event.split('~').collect::<Vec<_>>();
                     if e[0] == "I" && num(e[1].split(',').next().unwrap()) == 0x141a64250 {
@@ -511,6 +518,16 @@ impl factory::Services for Host {
         Ok(p)
     }
     fn resource(&mut self, s: &mut factory::State, index: u32) -> Result<u64, &'static str> {
+        if self.native_tables {
+            let memory = openxplane::ui_payload_move::State {
+                blocks: self.shared_settings.clone(),
+            };
+            return openxplane::ui_indexed_records::lookup(
+                &memory,
+                openxplane::ui_indexed_records::Kind::Resource,
+                index as u64,
+            );
+        }
         let e = self.replay.event();
         assert_eq!(e[0], "R");
         assert_eq!(num(&e[1]), index as u64);
@@ -522,7 +539,19 @@ impl factory::Services for Host {
             let event = self.replay.event();
             let row = event[1..].join("~").replace('!', " ").replace('^', "|");
             assert_eq!(num(row.split_whitespace().nth(1).unwrap()), p);
-            let runtime = if self.native_predicate {
+            let runtime = if self.native_tables {
+                assert_eq!(
+                    self.shared_settings.len(),
+                    3,
+                    "root word and two table descriptors required"
+                );
+                fifth_replay::run_tables_row(
+                    &row,
+                    Some(&s.blocks[&p]),
+                    Some((self.active_global, self.resource_index)),
+                    &self.shared_settings,
+                )
+            } else if self.native_predicate {
                 assert_eq!(
                     self.shared_settings.len(),
                     1,
@@ -578,12 +607,32 @@ fn native_factory_with_actual_root_context_and_fifth_refreshes() {
 #[test]
 #[ignore = "requires native shared predicate corpus via OPENXPLANE_UI_FACTORY_SHARED_GATE_VECTORS"]
 fn native_factory_with_actual_fifth_gate_and_shared_root_settings() {
-    replay_factory_mode("OPENXPLANE_UI_FACTORY_SHARED_GATE_VECTORS", 118, true);
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_SHARED_GATE_VECTORS",
+        118,
+        true,
+        false,
+    );
 }
 fn replay_factory(env: &str, expected_cases: usize) {
-    replay_factory_mode(env, expected_cases, false);
+    replay_factory_mode(env, expected_cases, false, false);
 }
-fn replay_factory_mode(env: &str, expected_cases: usize, native_predicate: bool) {
+#[test]
+#[ignore = "requires native fifth table chain via OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS"]
+fn native_factory_with_real_fifth_record_tables() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS",
+        118,
+        true,
+        true,
+    );
+}
+fn replay_factory_mode(
+    env: &str,
+    expected_cases: usize,
+    native_predicate: bool,
+    native_tables: bool,
+) {
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
@@ -607,6 +656,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, native_predicate: bool)
             resource_index: 0,
             resource_available: true,
             native_predicate,
+            native_tables,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);

@@ -125,3 +125,6 @@ visual capture was performed.
 
 
 2026-10-18: [actual payload gate and shared settings](UI_FIFTH_PAYLOAD_GATE.md) now has528 new whole-fifth and118 whole-factory native comparisons with14113b9a0 executing originally. Root/fifth settings identity and bytes are checked; original lookup/provider production and live GPU remain pending. Earlier opaque-predicate evidence retains its explicit scope. Estimates unchanged.
+
+
+2026-10-18: [actual indexed record access](UI_INDEXED_RECORDS.md) now has872 direct original-code cases,528 fifth compositions and118 whole-factory runs with original fifth getter bodies plus constructor index20 lookup. Root/selection/context getters and actual registry production remain controlled; no live GPU/visual parity claim. Earlier modes retain their explicit scope; estimates unchanged.
