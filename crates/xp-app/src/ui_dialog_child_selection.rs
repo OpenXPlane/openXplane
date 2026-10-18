@@ -51,6 +51,15 @@ pub trait Services: ui_input_construct::Services + ui_callback_list::Services {
         Ok(())
     }
     fn reset(&mut self, state: &mut State, argument: u32);
+    fn reset_checked(
+        &mut self,
+        state: &mut State,
+        argument: u32,
+        _base_sentinel: &mut Block,
+    ) -> Result<(), &'static str> {
+        self.reset(state, argument);
+        Ok(())
+    }
     fn finish(&mut self, state: &mut State);
 }
 pub struct Initialization {
@@ -256,7 +265,7 @@ pub fn construct(
             );
         }
     }
-    services.reset(state, 0);
+    services.reset_checked(state, 0, &mut base)?;
     services.finish(state);
     Ok(Initialization {
         base_sentinel: base,

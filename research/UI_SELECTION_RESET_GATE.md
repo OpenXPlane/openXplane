@@ -78,6 +78,10 @@ OPENXPLANE_UI_SELECTION_RESET_GATE_VECTORS=/tmp/reset-gate.txt cargo test --offl
 
 ## Remaining reset and integration work
 
+This section describes the gate-only checkpoint. The subsequent
+[whole reset caller proof](UI_SELECTION_RESET.md) recovers14113a460 separately;
+actual-reset constructor/factory composition remains pending.
+
 These predicates are preparatory components. Whole reset14113a460 is still an
 opaque dependency in the selection constructor and composed factory. Its
 catalog string fallback, aliasable temporary variant, live base reload,
