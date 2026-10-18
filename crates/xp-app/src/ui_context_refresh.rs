@@ -20,7 +20,13 @@ pub struct State {
 }
 pub trait Services {
     fn engine(&mut self, state: &mut State) -> u8;
-    fn resource_present(&mut self, state: &mut State, index: u32) -> bool;
+    /// Supply the version-bound table descriptor and mapped resource fields.
+    fn resource_memory(&self) -> Result<&crate::ui_payload_move::State, &'static str> {
+        Err("resource memory provider required")
+    }
+    fn resource_present(&mut self, _: &mut State, index: u32) -> Result<bool, &'static str> {
+        crate::ui_indexed_records::resource_present(self.resource_memory()?, index)
+    }
     fn alternate(&mut self, state: &mut State) -> [u8; 32];
     fn manager(&mut self, state: &mut State) -> u64;
     fn default_context(&mut self, state: &mut State, manager: u64) -> [u8; 32];
@@ -97,7 +103,7 @@ fn day(value: f64) -> i32 {
 pub fn refresh(state: &mut State, services: &mut impl Services) -> Result<(), &'static str> {
     let alternate = services.engine(state) != 0
         && state.active_global == 0
-        && services.resource_present(state, state.resource_index);
+        && services.resource_present(state, state.resource_index)?;
     let initial = if alternate {
         services.alternate(state)
     } else {
@@ -206,7 +212,7 @@ mod integration {
         fn engine(&mut self, _: &mut State) -> u8 {
             0
         }
-        fn resource_present(&mut self, _: &mut State, _: u32) -> bool {
+        fn resource_present(&mut self, _: &mut State, _: u32) -> Result<bool, &'static str> {
             panic!("engine gate skips resource")
         }
         fn alternate(&mut self, _: &mut State) -> [u8; 32] {

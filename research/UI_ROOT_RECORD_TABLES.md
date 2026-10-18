@@ -94,3 +94,9 @@ produced or verified. Estimates reviewed and unchanged:41.4% implemented/28.2%
 verified overall, Rendering/UI verified0. Next connect actual indexed resource
 lookups to selection/context, recover real query/registry production and remaining
 child/provider bodies, then complete the dialog and live menu/rendering path.
+
+
+The later [selection/context composition](UI_CHILD_RECORD_TABLES.md) removes their
+controlled resource-getter bodies in a separate mode, with explicit selection
+getter-entry and context-entry input-map checks. Earlier rows above retain their
+controlled selection/context scope and regenerate unchanged.

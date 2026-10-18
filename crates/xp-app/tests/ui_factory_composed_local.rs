@@ -133,6 +133,8 @@ impl openxplane::ui_callback_list::Services for Replay {
     }
 }
 struct Provider<'a> {
+    native_child_tables: bool,
+    resources: openxplane::ui_payload_move::State,
     replay: &'a mut Replay,
     id: u64,
     resource_available: bool,
@@ -212,9 +214,21 @@ impl selection::Services for Provider<'_> {
     fn engine(&mut self, s: &mut selection::State) -> u8 {
         num(&self.effect(&mut s.image, 0x1417fb320, &[0x142f2d770])) as u8
     }
-    fn resource_present(&mut self, s: &mut selection::State, index: u32) -> bool {
+    fn resource_present(
+        &mut self,
+        s: &mut selection::State,
+        index: u32,
+    ) -> Result<bool, &'static str> {
+        if self.native_child_tables {
+            let event = self.replay.event();
+            assert_eq!(event[0], "J");
+            assert_eq!(num(&event[1]), index as u64);
+            assert_eq!(hex(&event[2]), s.image);
+            assert_eq!(root_replay::parse_memory(&event[3]), self.resources.blocks);
+            return openxplane::ui_indexed_records::resource_present(&self.resources, index);
+        }
         self.effect(&mut s.image, 0x141a64260, &[0x146124398, index as u64]);
-        self.resource_available
+        Ok(self.resource_available)
     }
     fn alternate(&mut self, s: &mut selection::State) {
         self.effect(&mut s.image, 0x14111bb90, &[self.id]);
@@ -243,7 +257,7 @@ impl context::Services for Provider<'_> {
             let event = self.replay.event();
             let row = event[1..].join("~").replace('!', " ").replace('^', "|");
             let fields = row.split_whitespace().collect::<Vec<_>>();
-            assert_eq!(fields.len(), 21);
+            assert_eq!(fields.len(), if self.native_child_tables { 22 } else { 21 });
             assert_eq!(fields[14], "->");
             assert_eq!(image.as_slice(), hex(fields[7]));
             assert_eq!(self.resource_index as u64, num(fields[19]));
@@ -252,6 +266,11 @@ impl context::Services for Provider<'_> {
             assert_eq!(next, BTreeMap::from([(head, head)]));
             let mut replay = context_replay::Replay::from_fields(&fields, fields[18], &next);
             assert_eq!(self.active_global, replay.v[1]);
+            if self.native_child_tables {
+                assert_eq!(self.resources.blocks.len(), 20);
+                assert_eq!(root_replay::parse_memory(fields[21]), self.resources.blocks);
+                replay.resources = Some(self.resources.clone());
+            }
             openxplane::ui_context_refresh::refresh_image_with_index(
                 image,
                 &mut self.active_global,
@@ -308,6 +327,7 @@ struct Host {
     native_tables: bool,
     native_engine: bool,
     native_root_tables: bool,
+    native_child_tables: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -348,6 +368,10 @@ impl factory::Services for Host {
         assert_eq!(&f[..2], &[kind as u64, p]);
         assert_eq!(&f[2..], args);
         let mut provider = Provider {
+            native_child_tables: self.native_child_tables,
+            resources: openxplane::ui_payload_move::State {
+                blocks: self.shared_settings.clone(),
+            },
             replay: &mut self.replay,
             id: p,
             resource_available: self.resource_available,
@@ -665,10 +689,11 @@ fn native_factory_with_actual_fifth_gate_and_shared_root_settings() {
         false,
         false,
         false,
+        false,
     );
 }
 fn replay_factory(env: &str, expected_cases: usize) {
-    replay_factory_mode(env, expected_cases, false, false, false, false);
+    replay_factory_mode(env, expected_cases, false, false, false, false, false);
 }
 #[test]
 #[ignore = "requires native fifth table chain via OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS"]
@@ -678,6 +703,7 @@ fn native_factory_with_real_fifth_record_tables() {
         118,
         true,
         true,
+        false,
         false,
         false,
     );
@@ -692,6 +718,7 @@ fn native_factory_with_actual_fifth_query_and_record_tables() {
         true,
         true,
         false,
+        false,
     );
 }
 #[test]
@@ -700,6 +727,20 @@ fn native_factory_with_real_root_nested_and_fifth_record_tables() {
     replay_factory_mode(
         "OPENXPLANE_UI_FACTORY_ROOT_TABLES_VECTORS",
         118,
+        true,
+        true,
+        true,
+        true,
+        false,
+    );
+}
+#[test]
+#[ignore = "requires actual selection/context getters via OPENXPLANE_UI_FACTORY_CHILD_TABLES_VECTORS"]
+fn native_factory_with_actual_selection_and_context_resource_tables() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_CHILD_TABLES_VECTORS",
+        118,
+        true,
         true,
         true,
         true,
@@ -713,6 +754,7 @@ fn replay_factory_mode(
     native_tables: bool,
     native_engine: bool,
     native_root_tables: bool,
+    native_child_tables: bool,
 ) {
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
@@ -740,6 +782,7 @@ fn replay_factory_mode(
             native_tables,
             native_engine,
             native_root_tables,
+            native_child_tables,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);

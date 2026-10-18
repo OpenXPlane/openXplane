@@ -12,9 +12,9 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False):
+def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
- fifth_scope=None
+ fifth_scope=None;context_totals={};selection_totals={}
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
  def snap():return e.read(bundle,40).hex()+';'+('/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(blocks.items()))or'-')
  def effect(fn,args,apply=lambda:None,result=0):
@@ -58,6 +58,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
  def leaf(emu,fn):
   k=v['kind']
   if root_harness and k==0:return original_stubs[fn](emu)
+  if native_child_tables and k==1 and fn==0x141a64260:return True
   if native_tables and k==-1 and fn==0x141a64260:return True
   p=objects[k] if k>=0 else v['fifth'];rcx=emu.reg(UC_X86_REG_RCX);rdx=emu.reg(UC_X86_REG_RDX);r8=emu.reg(UC_X86_REG_R8);result=0
   if fn==0x14113a300:assert rcx==p+0x268;effect(fn,[rcx],lambda:emu.write(p+0x398,bytes([v['seed']^0x21])))
@@ -100,7 +101,18 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   e.stubs.pop(0x14113a300,None);e.stubs.pop(0x141138cf0,None)
  if native_context:
   from ui_factory_context_refresh import install as install_context
-  install_context(e,resource,objects,events,v)
+  context_totals=install_context(e,resource,objects,events,v,tables=root_harness.get('tables') if native_child_tables else None)
+ if native_child_tables:
+  pending=[]
+  def selection_entry(uc,a,size,user):
+   if v['kind']==1:
+    assert e.reg(UC_X86_REG_RCX)==0x146124398;index=e.reg(UC_X86_REG_RDX)&0xffffffff;pending.append(index)
+    maps=root_harness['tables'].maps;memory='/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(maps.items()));events.append(f'J~{index}~{e.read(objects[1],0x2d0).hex()}~{memory}')
+  def selection_return(uc,a,size,user):
+   if v['kind']==1:
+    index=pending.pop();selection_totals[index]=selection_totals.get(index,0)+1;v['selection_returns']+=1
+  e.uc.hook_add(UC_HOOK_CODE,selection_entry,begin=0x141a64260,end=0x141a64260)
+  e.uc.hook_add(UC_HOOK_CODE,selection_return,begin=0x141a6426d,end=0x141a6426d)
  if native_fifth:
   from ui_fifth_refresh_harness import install as install_fifth,OVERRIDE,BITS
   def fifth_begin(p,h):
@@ -129,7 +141,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
    base=p in containers;a,b=(0,0)if base else(e.read_u64(p+24),e.read_u64(p+32));ps=peers(p);assert all(x in live for x in ps);out.append(f'{p}:{"B"if base else"W"}:{a}:{b}:{",".join(map(str,ps))or"-"}')
   return ';'.join(out)
  def run_case(seed,mode,engine,secondary,index,case):
-  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,constructor_returns=0,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
+  e.heap_top=top;events.clear();blocks.clear();objects.clear();temps.clear();v.update(seed=seed,kind=-1,mode=mode,engine=engine,secondary=secondary,index=index,bits=[0,0x80000000,0x3f800000,0x7f800000,0x7fc12345][case%5],case=case,constructor_returns=0,selection_returns=0,weather=case%2,rebind=1+case%2,special=case%2);e.write(bundle,bytes([seed])*40)
   e.write(catalog,bytes(168*3))
   for j in range(3):e.write_u64(catalog+j*168+16,0x1122334400000000+j)
   e.write_u64(BEGIN,catalog);e.write_u64(END,catalog+168*3);e.write_u64(HEAD,0);
@@ -138,11 +150,13 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   if native_fifth:e.write_u32(OVERRIDE,0x12345678);e.write_u32(BITS,0x11112222)
   result=e.call(0x1410d6ca0,ints=[bundle],max_instructions=300000);assert result==bundle and e.reg(UC_X86_REG_RIP)==RET_ADDR and len(objects)==4
   if native_tables:assert v['constructor_returns']==1
+  if native_child_tables:assert not pending and v['selection_returns']<=1
   parents=[objects[0],objects[0]+0x1e0,objects[0]+0x268,*objects[1:],v['fifth']]
   lists=';'.join(f'{p}:{entries(p)[0]}:{",".join(map(str,entries(p)[1]))or"-"}'for p in parents)
   # The selection may create one or two temporary wrappers; context one, weather two.
   assert len(temps)==4+secondary
   return ' '.join(map(str,['C',seed,catalog,','.join(map(str,temps)),'->',snap(),graph(parents),lists,e.read_u64(HEAD),'|'.join(events)]))
+ run_case.native_child_getter_totals={'selection':selection_totals,'context':context_totals}
  run_case.native_getter_totals=fifth_scope.native_totals if fifth_scope else {}
  return run_case
 

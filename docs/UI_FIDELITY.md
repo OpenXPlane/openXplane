@@ -428,3 +428,14 @@ confirmed against original code. Selection/context lookups and other providers
 remain controlled; registry production/full dialog/viewer/GPU/paired captures are
 unverified. See [UI_ROOT_RECORD_TABLES](../research/UI_ROOT_RECORD_TABLES.md).
 Estimates reviewed and unchanged.
+
+
+Selection constructor1410d6fc0 and context refresh1411396d0 now query actual
+indexed resource cells in118 original whole-factory runs.45 real getter returns
+per caller (23 at88/22 at77),45 selection getter-entry snapshots and118 context
+input maps match source mapped lookups on the20 inherited regions. Both APIs
+propagate missing-map errors and offer mapped provider defaults; legacy endpoint
+replays remain explicit. Context follows23 alternate/95 default branches.
+Remaining selection/weather/query/registry/provider bodies, full dialog/menu and
+live GPU/paired visuals remain unverified. See
+[UI_CHILD_RECORD_TABLES](../research/UI_CHILD_RECORD_TABLES.md). Estimates unchanged.

@@ -35,6 +35,7 @@ fn index(k: Key) -> usize {
 pub struct Replay {
     events: Vec<String>,
     pub position: usize,
+    pub resources: Option<openxplane::ui_payload_move::State>,
     pub v: Vec<u64>,
     alt: [u8; 32],
     default: [u8; 32],
@@ -63,9 +64,12 @@ impl Services for Replay {
         s.active_global = self.v[2];
         self.v[0] as u8
     }
-    fn resource_present(&mut self, s: &mut State, i: u32) -> bool {
+    fn resource_present(&mut self, s: &mut State, i: u32) -> Result<bool, &'static str> {
+        if let Some(memory) = &self.resources {
+            return openxplane::ui_indexed_records::resource_present(memory, i);
+        }
         self.check("R", i.to_string(), s);
-        self.v[3] != 0
+        Ok(self.v[3] != 0)
     }
     fn alternate(&mut self, s: &mut State) -> [u8; 32] {
         self.check("A", "-".to_string(), s);
@@ -175,6 +179,7 @@ impl Replay {
         Self {
             events: events.split('|').map(str::to_string).collect(),
             position: 0,
+            resources: None,
             v: v[2].split(',').map(num).collect(),
             alt: hex(v[9]).try_into().unwrap(),
             default: hex(v[10]).try_into().unwrap(),

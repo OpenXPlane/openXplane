@@ -193,9 +193,9 @@ impl Services for Replay {
     fn engine(&mut self, s: &mut State) -> u8 {
         self.effect(s, "E", "-") as u8
     }
-    fn resource_present(&mut self, s: &mut State, index: u32) -> bool {
+    fn resource_present(&mut self, s: &mut State, index: u32) -> Result<bool, &'static str> {
         self.effect(s, "R", &index.to_string());
-        self.resource_present
+        Ok(self.resource_present)
     }
     fn alternate(&mut self, s: &mut State) {
         self.effect(s, "V", "-");

@@ -41,3 +41,16 @@ pub fn lookup(
 ) -> Result<u64, &'static str> {
     lookup_at(memory, kind, kind.table(), index)
 }
+
+/// Resource string length at+0x6188 controls the caller's presence gate.
+/// This does not establish how the registry/string is produced or owned.
+pub fn resource_present(memory: &ui_payload_move::State, index: u32) -> Result<bool, &'static str> {
+    let record = lookup(memory, Kind::Resource, index as u64)?;
+    let length = u64::from_le_bytes(
+        memory
+            .read(record.wrapping_add(0x6188), 8)?
+            .try_into()
+            .unwrap(),
+    );
+    Ok(length != 0)
+}

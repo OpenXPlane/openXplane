@@ -7,8 +7,8 @@ from unicorn.x86_const import UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86
 from ui_context_refresh_harness import KEYS,GLOBAL,bits
 INDEX=0x142640504
 
-def install(e,resource,objects,events,owner):
- scope={};trace=[];old=e.stubs.copy()
+def install(e,resource,objects,events,owner,tables=None):
+ scope={};trace=[];old=e.stubs.copy();totals={}
  def obj():return objects[2]
  def links():
   p=e.read_u64(obj()+8);assert e.read_u64(p)==p
@@ -31,9 +31,9 @@ def install(e,resource,objects,events,owner):
   ds=[bits(366.75),bits(-1.),bits(2147483648.),bits(float('inf')),0xfff8000012345678,bits(-0.),bits(365.9)]
   code=[-1,0,42,2147483647][case%4];hour=[0x80000000,0x41480000,0x7fc12345][case%3];numbers=[zs[case%len(zs)],ds[case%len(ds)]]
   fields=[seed,','.join(map(str,v)),*numbers,code,hour,e.read(obj(),96).hex(),links(),bytes(alt).hex(),bytes(default).hex(),context.hex(),*[f'{raw.hex()}:{base}:{storage.hex()if storage else"-"}'for raw,base,storage in strings]]
-  scope.update(active=True,v=v,strings=strings,alt=bytes(alt),default=bytes(default),context=context,code=code,hour=hour,numbers=numbers,key=0,index=index,fields=fields)
+  scope.update(table_snapshot='/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(tables.maps.items())) if tables else None,getter_entries=0,getter_returns=0,active=True,v=v,strings=strings,alt=bytes(alt),default=bytes(default),context=context,code=code,hour=hour,numbers=numbers,key=0,index=index,fields=fields)
  def end(uc,a,size,user):
-  assert scope['active'];row=' '.join(map(str,['C',*scope['fields'],'->',e.read(obj(),96).hex(),e.read_u64(GLOBAL),links(),'|'.join(trace),scope['index'],e.read_u32(INDEX)]));events.append('U~'+row.replace(' ','!').replace('|','^'));scope['active']=False
+  assert scope['active'];assert scope['getter_entries']==scope['getter_returns'];row=' '.join(map(str,['C',*scope['fields'],'->',e.read(obj(),96).hex(),e.read_u64(GLOBAL),links(),'|'.join(trace),scope['index'],e.read_u32(INDEX)]));row+=(' '+scope['table_snapshot'])if tables else '';events.append('U~'+row.replace(' ','!').replace('|','^'));scope['active']=False
  e.uc.hook_add(UC_HOOK_CODE,begin,begin=0x1411396d0,end=0x1411396d0)
  e.uc.hook_add(UC_HOOK_CODE,end,begin=0x1410d7522,end=0x1410d7522)
  def leaf(fn):
@@ -57,8 +57,20 @@ def install(e,resource,objects,events,owner):
   else:raise AssertionError(hex(fn))
  for fn in [0x1417fb320,0x141a64260,0x1417f74f0,0x1414d1170,0x1414cda30,0x140d776a0,0x141126f60,0x1417f9180,0x140d77340,0x142311c58,0x1422e7c2c,0x1417f8960,0x1410c9d10]:
   def dispatch(emu,fn=fn):
+   if scope.get('active') and tables and fn==0x141a64260:return True
    if scope.get('active'):leaf(fn)
    elif fn in old:return old[fn](emu)
    else:return True
   e.stubs[fn]=dispatch
  e.stubs.pop(0x1411396d0,None)
+
+ if tables:
+  def getter_entry(uc,a,size,user):
+   if scope.get('active'):
+    assert e.reg(UC_X86_REG_RCX)==0x146124398;scope['getter_entries']+=1;scope['getter_index']=e.reg(UC_X86_REG_RDX)&0xffffffff
+  def getter_return(uc,a,size,user):
+   if scope.get('active'):
+    index=scope['getter_index'];scope['getter_returns']+=1;totals[index]=totals.get(index,0)+1
+  e.uc.hook_add(UC_HOOK_CODE,getter_entry,begin=0x141a64260,end=0x141a64260)
+  e.uc.hook_add(UC_HOOK_CODE,getter_return,begin=0x141a6426d,end=0x141a6426d)
+ return totals
