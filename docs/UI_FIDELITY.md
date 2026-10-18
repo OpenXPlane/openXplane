@@ -439,3 +439,13 @@ replays remain explicit. Context follows23 alternate/95 default branches.
 Remaining selection/weather/query/registry/provider bodies, full dialog/menu and
 live GPU/paired visuals remain unverified. See
 [UI_CHILD_RECORD_TABLES](../research/UI_CHILD_RECORD_TABLES.md). Estimates unchanged.
+
+
+Whole weather refresh141139fe0 now matches384 complete original calls, including
+live settings/index reloads,424-byte forward/overlapping copies, flags and575
+listener notifications.118 complete factories also execute this actual body,
+with20 inherited table inputs,79 reset/11 resource/28 default paths and649 retained
+entries. Computed weather/context/CLI/notification providers remain controlled;
+real data producers/lifetime, remaining selection/full dialog/menu/viewer/GPU and
+paired visual evidence remain unverified. See
+[UI_WEATHER_REFRESH](../research/UI_WEATHER_REFRESH.md). Estimates unchanged.

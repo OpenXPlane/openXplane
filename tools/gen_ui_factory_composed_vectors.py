@@ -12,9 +12,9 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False):
+def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False,native_weather=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
- fifth_scope=None;context_totals={};selection_totals={}
+ fifth_scope=None;weather_scope=None;context_totals={};selection_totals={}
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
  def snap():return e.read(bundle,40).hex()+';'+('/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(blocks.items()))or'-')
  def effect(fn,args,apply=lambda:None,result=0):
@@ -119,6 +119,12 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
    case=v['case'];profile=dict(seed=v['seed'],engine=v['engine'],active=e.read_u64(ACTIVE),index=e.read_u32(0x142640504),available=int(e.read_u64(resource+0x6188)!=0),items=[0,1,3][case%3],variant=[0,255][case%2],mutate=case%2,listeners=0,override=[0,1,0x80000000][case%3],bits=[0x80000000,0x3f800000,0x7fc12345][case%3])
    h.prepare(p,case,profile,dict(blocks),mutate=False)
   fifth_scope=install_fifth(e,resource,before=fifth_begin,on_finish=lambda row:events.append('W~'+row.replace(' ','!').replace('|','^')),native_predicate=native_predicate,settings=root_harness.get('settings') if root_harness else None,tables=root_harness.get('tables') if root_harness and native_tables else None,native_engine=native_engine);top=e.heap_top
+ if native_weather:
+  from ui_weather_refresh_harness import install as install_weather
+  def weather_begin(p,h):
+   assert v['kind']==3;case=v['case'];profile=dict(seed=v['seed'],engine=v['engine'],active=e.read_u64(ACTIVE),index=e.read_u32(0x142640504),available=int(e.read_u64(resource+0x6188)!=0),cli1=255 if case%3==0 else 0,cli2=255 if case%3==1 else 0,zero1=255 if case&1 else 0,zero2=255 if case&2 else 0,mode7=255 if case%4==0 else 0,mode3=255 if case%4==1 else 0,altitude=v['bits'],alias=(case//3)%3,listeners=0,mutate=False,rebind=objects[v['rebind']])
+   h.prepare(p,case,profile,dict(blocks))
+  weather_scope=install_weather(e,tables=root_harness['tables'],before=weather_begin,on_finish=lambda row:events.append('T~'+row.replace(' ','!').replace('|','^')));top=e.heap_top
  if native_tables:
   def constructor_record_return(uc,a,size,user):
    if v['kind']==-1 and (not fifth_scope or not fifth_scope.active):v['constructor_returns']+=1
@@ -156,6 +162,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   # The selection may create one or two temporary wrappers; context one, weather two.
   assert len(temps)==4+secondary
   return ' '.join(map(str,['C',seed,catalog,','.join(map(str,temps)),'->',snap(),graph(parents),lists,e.read_u64(HEAD),'|'.join(events)]))
+ run_case.native_weather_totals=weather_scope.native_totals if weather_scope else {}
  run_case.native_child_getter_totals={'selection':selection_totals,'context':context_totals}
  run_case.native_getter_totals=fifth_scope.native_totals if fifth_scope else {}
  return run_case

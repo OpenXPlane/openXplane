@@ -68,3 +68,8 @@ Validation:720 native cases pass separately;204 ordinary tests pass with50
 opt-in tests ignored in that run. The four-child integration also passes after
 separating entry addresses from object addresses. Formatting, generator syntax
 and diff checks pass. No live viewer/GPU session was tested.
+
+
+The subsequent [whole weather refresh comparison](UI_WEATHER_REFRESH.md) executes
+actual141139fe0 and composes it into118 original factories. Earlier cohorts above
+retain their controlled weather-refresh scope and regenerate unchanged.

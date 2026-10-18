@@ -90,3 +90,8 @@ reviewed and unchanged:41.4% implemented/28.2% verified overall, Rendering/UI
 verified0. Next recover actual query-byte/registry production and remaining
 selection/weather/provider bodies, complete the dialog/menu and connect the
 verified state and resource pipeline to live rendering before claiming parity.
+
+
+The subsequent [whole weather refresh comparison](UI_WEATHER_REFRESH.md) executes
+actual141139fe0 and composes it into118 original factories. Earlier cohorts above
+retain their controlled weather-refresh scope and regenerate unchanged.

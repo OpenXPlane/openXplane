@@ -1,5 +1,6 @@
 //! Fourth dialog child1410d75a0. Raw initialization/copying and retained
-//! callbacks are recovered; weather/provider/refresh bodies remain services.
+//! callbacks are recovered. Weather computation stays a service; refresh_checked
+//! can bind the recovered ui_weather_refresh body.
 use crate::{
     ui_callback_links, ui_callback_list,
     ui_input_construct::{self, Block},
@@ -16,6 +17,11 @@ pub trait Services: ui_input_construct::Services + ui_callback_list::Services {
     fn altitude(&mut self, image: &mut [u8], parent: u64) -> u32;
     fn selection(&mut self, image: &mut [u8], parent: u64) -> [u8; 32];
     fn refresh(&mut self, image: &mut [u8]);
+    /// Checked bridge for recovered refresh providers; legacy hosts retain refresh.
+    fn refresh_checked(&mut self, image: &mut [u8]) -> Result<(), &'static str> {
+        self.refresh(image);
+        Ok(())
+    }
     fn special(&mut self, image: &mut [u8]);
 }
 pub struct Initialization {
@@ -134,7 +140,7 @@ pub fn construct(
     image[0x58..0x200].copy_from_slice(&source);
     let selected = services.selection(image, getq(image, 0x3e0));
     image[0x200..0x220].copy_from_slice(&selected);
-    services.refresh(image);
+    services.refresh_checked(image)?;
     let targets = [first, getq(image, 0x3e0)];
     for (i, parent) in targets.into_iter().enumerate() {
         context.callbacks.construct(

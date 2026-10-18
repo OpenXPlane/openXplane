@@ -4,6 +4,8 @@ mod context_replay;
 mod fifth_replay;
 #[path = "support/ui_root_replay.rs"]
 mod root_replay;
+#[path = "support/ui_weather_replay.rs"]
+mod weather_replay;
 use openxplane::{
     ui_callback_links as links,
     ui_callback_list::List,
@@ -134,6 +136,7 @@ impl openxplane::ui_callback_list::Services for Replay {
 }
 struct Provider<'a> {
     native_child_tables: bool,
+    native_weather: bool,
     resources: openxplane::ui_payload_move::State,
     replay: &'a mut Replay,
     id: u64,
@@ -308,6 +311,30 @@ impl weather::Services for Provider<'_> {
     fn refresh(&mut self, image: &mut [u8]) {
         self.effect(image, 0x141139fe0, &[self.id]);
     }
+    fn refresh_checked(&mut self, image: &mut [u8]) -> Result<(), &'static str> {
+        if !self.native_weather {
+            self.refresh(image);
+            return Ok(());
+        }
+        let event = self.replay.event();
+        assert_eq!(event[0], "T");
+        let row = event[1..].join("~").replace('!', " ").replace('^', "|");
+        assert_eq!(num(row.split_whitespace().nth(1).unwrap()), self.id);
+        assert_eq!(self.resources.blocks.len(), 20);
+        let runtime = weather_replay::run_row(
+            &row,
+            Some(image),
+            Some((self.active_global, self.resource_index)),
+            &self.resources.blocks,
+        );
+        image.copy_from_slice(&runtime.memory.read(self.id, 0x3e8)?);
+        self.active_global = runtime.active_global;
+        self.resource_index = runtime.resource_index;
+        for (p, b) in &mut self.resources.blocks {
+            *b = runtime.memory.read(*p, b.len())?;
+        }
+        Ok(())
+    }
     fn special(&mut self, image: &mut [u8]) {
         self.effect(image, 0x141149360, &[self.id]);
     }
@@ -328,6 +355,7 @@ struct Host {
     native_engine: bool,
     native_root_tables: bool,
     native_child_tables: bool,
+    native_weather: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -369,6 +397,7 @@ impl factory::Services for Host {
         assert_eq!(&f[2..], args);
         let mut provider = Provider {
             native_child_tables: self.native_child_tables,
+            native_weather: self.native_weather,
             resources: openxplane::ui_payload_move::State {
                 blocks: self.shared_settings.clone(),
             },
@@ -572,6 +601,11 @@ impl factory::Services for Host {
                     &mut provider,
                 )?;
                 Self::keep(s, init.base_sentinel);
+                if self.native_weather {
+                    self.active_global = provider.active_global;
+                    self.resource_index = provider.resource_index;
+                    self.shared_settings = provider.resources.blocks.clone();
+                }
             }
             _ => return Err("unexpected child kind"),
         }
@@ -685,15 +719,11 @@ fn native_factory_with_actual_fifth_gate_and_shared_root_settings() {
     replay_factory_mode(
         "OPENXPLANE_UI_FACTORY_SHARED_GATE_VECTORS",
         118,
-        true,
-        false,
-        false,
-        false,
-        false,
+        ReplayMode::Predicate,
     );
 }
 fn replay_factory(env: &str, expected_cases: usize) {
-    replay_factory_mode(env, expected_cases, false, false, false, false, false);
+    replay_factory_mode(env, expected_cases, ReplayMode::Controlled);
 }
 #[test]
 #[ignore = "requires native fifth table chain via OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS"]
@@ -701,11 +731,7 @@ fn native_factory_with_real_fifth_record_tables() {
     replay_factory_mode(
         "OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS",
         118,
-        true,
-        true,
-        false,
-        false,
-        false,
+        ReplayMode::Tables,
     );
 }
 #[test]
@@ -714,11 +740,7 @@ fn native_factory_with_actual_fifth_query_and_record_tables() {
     replay_factory_mode(
         "OPENXPLANE_UI_FACTORY_FIFTH_ENGINE_VECTORS",
         118,
-        true,
-        true,
-        true,
-        false,
-        false,
+        ReplayMode::Engine,
     );
 }
 #[test]
@@ -727,11 +749,7 @@ fn native_factory_with_real_root_nested_and_fifth_record_tables() {
     replay_factory_mode(
         "OPENXPLANE_UI_FACTORY_ROOT_TABLES_VECTORS",
         118,
-        true,
-        true,
-        true,
-        true,
-        false,
+        ReplayMode::RootTables,
     );
 }
 #[test]
@@ -740,22 +758,35 @@ fn native_factory_with_actual_selection_and_context_resource_tables() {
     replay_factory_mode(
         "OPENXPLANE_UI_FACTORY_CHILD_TABLES_VECTORS",
         118,
-        true,
-        true,
-        true,
-        true,
-        true,
+        ReplayMode::ChildTables,
     );
 }
-fn replay_factory_mode(
-    env: &str,
-    expected_cases: usize,
-    native_predicate: bool,
-    native_tables: bool,
-    native_engine: bool,
-    native_root_tables: bool,
-    native_child_tables: bool,
-) {
+#[test]
+#[ignore = "requires actual weather factory corpus via OPENXPLANE_UI_FACTORY_WEATHER_CHAIN_VECTORS"]
+fn native_factory_with_actual_weather_refresh_and_all_record_tables() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_WEATHER_CHAIN_VECTORS",
+        118,
+        ReplayMode::Weather,
+    );
+}
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+enum ReplayMode {
+    Controlled,
+    Predicate,
+    Tables,
+    Engine,
+    RootTables,
+    ChildTables,
+    Weather,
+}
+fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
+    let native_predicate = mode >= ReplayMode::Predicate;
+    let native_tables = mode >= ReplayMode::Tables;
+    let native_engine = mode >= ReplayMode::Engine;
+    let native_root_tables = mode >= ReplayMode::RootTables;
+    let native_child_tables = mode >= ReplayMode::ChildTables;
+    let native_weather = mode == ReplayMode::Weather;
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
@@ -783,6 +814,7 @@ fn replay_factory_mode(
             native_engine,
             native_root_tables,
             native_child_tables,
+            native_weather,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);

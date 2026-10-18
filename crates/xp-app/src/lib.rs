@@ -105,3 +105,5 @@ pub mod ui_engine_query;
 pub mod ui_fifth_refresh;
 
 pub mod ui_indexed_records;
+
+pub mod ui_weather_refresh;
