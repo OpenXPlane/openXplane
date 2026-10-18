@@ -344,7 +344,7 @@ pub(crate) fn run_constructor_row(
     .unwrap();
     compare(&snapshot(&host.runtime), v[9], "final whole constructor");
     assert_eq!(state.image, host.runtime.memory.read(id, 0x3e0).unwrap());
-    assert_eq!(graph(&callbacks), v[10]);
+    assert_eq!(graph(callbacks), v[10]);
     assert_eq!(list(&parents[&(id + 0x1e0)]), v[11]);
     assert_eq!(parents[&(id + 0x1e0)].sentinel, num(v[5]));
     assert_eq!(parents.len(), 3);

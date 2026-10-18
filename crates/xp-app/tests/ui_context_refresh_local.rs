@@ -24,7 +24,7 @@ fn native_whole_refresh_context_cli_numeric_edges_and_mutable_listeners() {
         ui_context_refresh::refresh(&mut s, &mut replay).unwrap();
         assert_eq!(s.image.to_vec(), hex(v[15]), "case {cases}");
         assert_eq!(s.active_global, num(v[16]));
-        assert_eq!(replay::state(&s).split(';').last().unwrap(), v[17]);
+        assert_eq!(replay::state(&s).split(';').next_back().unwrap(), v[17]);
         assert_eq!(replay.position, replay.event_count());
         cases += 1;
     }

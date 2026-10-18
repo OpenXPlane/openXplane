@@ -191,7 +191,7 @@ fn native_concrete_prefix_snapshots_chain_registration_and_null_callback() {
         assert_eq!(replay.events.join(","), v[22]);
         let actual: BTreeMap<_, _> = blocks
             .into_iter()
-            .chain(registry.storage.into_iter())
+            .chain(registry.storage)
             .chain(replay.freed)
             .map(|b| (b.address, b.bytes))
             .collect();

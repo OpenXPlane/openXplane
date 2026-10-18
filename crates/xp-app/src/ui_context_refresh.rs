@@ -72,6 +72,8 @@ fn narrow(value: f64) -> f32 {
         value as f32
     }
 }
+// Keep the recovered ordered comparisons, including NaN payloads/signed zero.
+#[allow(clippy::manual_clamp)]
 fn hours(value: f64) -> f32 {
     let value = narrow(value);
     let clamped = if 0.0 > value {

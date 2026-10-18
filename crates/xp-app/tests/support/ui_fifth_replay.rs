@@ -110,14 +110,14 @@ impl Services for Replay {
                 );
             }
         }
-        if function == 0x141a64250 {
-            if let Some(address) = self.expected_settings_word {
-                assert_eq!(
-                    num(f[4]) + 0xdac,
-                    address,
-                    "settings identity must match root record"
-                );
-            }
+        if function == 0x141a64250
+            && let Some(address) = self.expected_settings_word
+        {
+            assert_eq!(
+                num(f[4]) + 0xdac,
+                address,
+                "settings identity must match root record"
+            );
         }
         let scratch = s.memory.blocks.remove(&s.stack).unwrap();
         *s = parse(f[3], s.identity, s.stack);

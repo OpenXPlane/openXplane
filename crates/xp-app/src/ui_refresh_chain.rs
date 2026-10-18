@@ -22,11 +22,12 @@ fn links(s: &root::State, base: u64) -> Result<BTreeMap<u64, u64>, &'static str>
     }
     let begin = q(s, base + 0x140)?;
     let end = q(s, base + 0x148)?;
-    if let Some(n) = end.checked_sub(begin) {
-        if n % 8 == 0 && n / 8 <= 100000 {
-            for i in 0..n / 8 {
-                out.insert(begin + i * 8, q(s, begin + i * 8)?);
-            }
+    if let Some(n) = end.checked_sub(begin)
+        && n % 8 == 0
+        && n / 8 <= 100000
+    {
+        for i in 0..n / 8 {
+            out.insert(begin + i * 8, q(s, begin + i * 8)?);
         }
     }
     Ok(out)

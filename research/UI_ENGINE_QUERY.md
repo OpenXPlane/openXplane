@@ -80,3 +80,14 @@ fifth replay modes and the prior118 actual-table factory cases pass. Formatting,
 Python AST and diff checks pass. No live viewer/GPU run or paired capture was
 performed. Reviewed estimates stay41.4% implemented/28.2% verified overall,
 Rendering/UI verified0; this is CPU behavior evidence, not visual parity.
+
+
+Follow-up CI maintenance: kept the recovered time-clamp comparison order with a
+local manual_clamp annotation, collapsed equivalent range/settings guards and
+removed redundant iterator/borrow syntax in replay adapters. No expected data or
+behavior checks were removed. Local `cargo clippy --offline --locked --workspace
+--all-targets -- -D warnings` passes with Rust/Clippy1.96.0; hosted stable uses a
+newer toolchain, so its outcome is checked separately.
+
+The complete local workspace suite passes310 tests with81 opt-in tests ignored;
+the original972 context-refresh cases also pass after this maintenance.
