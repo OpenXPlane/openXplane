@@ -8,7 +8,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP,UC_X86_REG_RIP
 ACTIVE,INDEX=0x145a10798,0x142640504
 COUNTS={0x1417fb320:1,0x141a64260:2,0x1405dd5c0:2,0x141a3b600:2,0x141141de0:3,0x1405ddde0:1,0x141100c40:1,0x1417f6dc0:1,0x1410fa920:2,0x1408acd90:1,0x1414cc7f0:0,0x1414d0900:2,0x1414ce750:2,0x141110050:1,0x140d776a0:2,0x1417e9f50:0,0x140d77340:3,0x1417e8460:2,0x1405df240:3,0x1414ccf50:2,0x1415404e0:1,0x1411490b0:2,0x1417e9a40:2,0x1405de1d0:1,0x141138650:2,0x1411399c0:1,0x140f59550:1,0x14113a300:1,0x1410c9d10:1}
-def main(path,native_nested=False,construct=False,factory=False,native_context=False,native_fifth=False,native_predicate=False,native_tables=False):
+def main(path,native_nested=False,construct=False,factory=False,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False):
+ native_tables=native_tables or native_engine
  native_predicate=native_predicate or native_tables
  native_fifth=native_fifth or native_predicate
  factory=factory or native_context or native_fifth
@@ -185,11 +186,12 @@ def main(path,native_nested=False,construct=False,factory=False,native_context=F
    parent=obj+0x1e0;head=e.read_u64(parent+8);live.add(obj+0x288);live.update(p+16 for p in entries(parent,head))
    row=' '.join(map(str,['C',obj,v['stack'],v['factory_initial'],v['initial_stack'],head,'-','-','->',snap(),graph(),list_image(parent,head),'|'.join(events),1]))
    return row,[(p,n)for p,n in ranges if p not in v['factory_ranges']]
-  factory_run=install(e,dict(identity=obj,resource=resource,settings=settings,tables=tables,begin=factory_begin,finish=factory_finish),native_context=native_context,native_fifth=native_fifth,native_predicate=native_predicate,native_tables=native_tables);top=e.heap_top
+  factory_run=install(e,dict(identity=obj,resource=resource,settings=settings,tables=tables,begin=factory_begin,finish=factory_finish),native_context=native_context,native_fifth=native_fifth,native_predicate=native_predicate,native_tables=native_tables,native_engine=native_engine);top=e.heap_top
   print('# whole factory/all child constructors with actual root/nested/payload chain; remaining child refresh/provider effects controlled')
   if native_context:print('# context1411396d0 also original; context leaf providers/CRT/free controlled; shared resource index carried')
   if native_fifth:print('# fifth141139460/hash clear14062b900 also original; fifth range-erase/iterator/grow/sort/payload/free/notify providers controlled')
   if native_predicate:print('# payload predicate14113b9a0 also original; settings record shared with root refresh')
+  if native_engine:print('# engine query original inside fifth only; byte prepared before fifth entry; root/selection/context engine providers remain controlled')
   if native_tables:print('# indexed accessors original inside fifth only; root/other-child getter providers remain controlled')
  for i,inputs in enumerate(rows):
   seed=[0,0xa5,255][i%3];e.heap_top=top;v.clear();v.update(inputs);v.update(seed=seed,phase='setup',stack=0,validation=0,in_nested=False,case=i);live.clear();events.clear()
@@ -248,4 +250,4 @@ def main(path,native_nested=False,construct=False,factory=False,native_context=F
   print('C',obj,v['stack'],initial,v['initial_stack'],parent_head,','.join(map(str,initial_entries))or'-',initial_graph,'->',snap(),graph(),list_image(parent,parent_head),'|'.join(events))
  print('# cases',len(rows))
  if native_tables:print('# original fifth getter returns',factory_run.native_getter_totals)
-if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:], '--construct' in sys.argv[2:], '--factory' in sys.argv[2:], '--native-context' in sys.argv[2:], '--native-fifth' in sys.argv[2:], '--native-predicate' in sys.argv[2:], '--native-tables' in sys.argv[2:])
+if __name__=='__main__':main(sys.argv[1], '--native-nested' in sys.argv[2:], '--construct' in sys.argv[2:], '--factory' in sys.argv[2:], '--native-context' in sys.argv[2:], '--native-fifth' in sys.argv[2:], '--native-predicate' in sys.argv[2:], '--native-tables' in sys.argv[2:], '--native-engine' in sys.argv[2:])

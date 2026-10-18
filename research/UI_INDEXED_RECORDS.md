@@ -96,8 +96,10 @@ getter rows and118 shared-gate factory rows regenerate byte-for-byte unchanged.
 New modes have explicit replay selection; a controlled getter event cannot
 silently stand in for production default lookup calls.
 
-Next apply real lookups to root/selection/context, recover actual engine query,
-registry data production/ownership and remaining selection/weather refreshes and
+The subsequent [read-only query comparison](UI_ENGINE_QUERY.md) removes the
+engine stub inside the fifth refresh in a separate explicit replay mode.
+Next apply real lookups to root/selection/context, recover query-byte production
+and registry data production/ownership and remaining selection/weather refreshes and
 other providers. Full dialog/layout/widget bindings/singleton/Main Menu/teardown
 and original live Alt/Esc/GPU remain incomplete. No paired screenshots/GIF/video
 were produced or validated by these checks. Shares reviewed and unchanged:41.4% implemented/28.2% verified overall;

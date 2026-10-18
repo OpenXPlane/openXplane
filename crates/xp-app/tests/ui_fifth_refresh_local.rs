@@ -41,3 +41,17 @@ fn native_fifth_refresh_with_actual_signed_record_tables() {
     }
     assert_eq!(cases, 528);
 }
+
+#[test]
+#[ignore = "requires actual query/table corpus via OPENXPLANE_UI_FIFTH_ENGINE_VECTORS"]
+fn native_fifth_refresh_with_actual_read_only_query_and_tables() {
+    let corpus =
+        std::fs::read_to_string(std::env::var("OPENXPLANE_UI_FIFTH_ENGINE_VECTORS").unwrap())
+            .unwrap();
+    let mut cases = 0;
+    for row in corpus.lines().filter(|r| r.starts_with("C ")) {
+        replay::run_engine_row(row, None, None, &Default::default());
+        cases += 1;
+    }
+    assert_eq!(cases, 528);
+}

@@ -407,3 +407,13 @@ Root descriptors/settings word and649 retained entries stay consistent. Other
 callers' getter bodies and registry/record ownership remain controlled, followed
 by remaining refresh/provider/dialog/layout/menu work. Live Alt/Esc/GPU and paired
 captures remain unverified; shares reviewed and unchanged.
+
+
+Read-only query1417fb320 is now recovered and used by default in the fifth refresh
+and availability predicate.768 complete original calls cover every byte with
+three poisoned receivers;528 fifth and118 whole-factory runs execute this actual
+query alongside real indexed lookups (1056/236 actual query returns). Controlled
+sort effects exercise15 intervening byte changes. Root/other child queries and
+registry production/lifetime remain controlled or unproven, as do full dialog,
+viewer and paired GPU evidence. See [UI_ENGINE_QUERY](../research/UI_ENGINE_QUERY.md).
+Compatibility estimates were reviewed and remain unchanged.

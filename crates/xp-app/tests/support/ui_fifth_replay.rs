@@ -70,6 +70,9 @@ struct Replay {
     expected_settings_word: Option<u64>,
 }
 impl Services for Replay {
+    fn engine_query(&mut self, s: &mut State) -> Result<u64, &'static str> {
+        self.invoke(s, 0x1417fb320, &[0x142f2d770])
+    }
     fn resource_record(&mut self, s: &mut State, index: u32) -> Result<u64, &'static str> {
         self.invoke(s, 0x141a64260, &[0x146124398, index as u64])
     }
@@ -130,6 +133,9 @@ impl Services for Replay {
 /// This adapter intentionally inherits the production gate implementation.
 struct NativeReplay<'a>(&'a mut Replay);
 impl Services for NativeReplay<'_> {
+    fn engine_query(&mut self, s: &mut State) -> Result<u64, &'static str> {
+        self.0.engine_query(s)
+    }
     fn resource_record(&mut self, s: &mut State, index: u32) -> Result<u64, &'static str> {
         self.0.resource_record(s, index)
     }
@@ -144,9 +150,27 @@ impl Services for NativeReplay<'_> {
 /// Inherits production gate and both indexed lookup methods.
 struct TableReplay<'a>(&'a mut Replay);
 impl Services for TableReplay<'_> {
+    fn engine_query(&mut self, s: &mut State) -> Result<u64, &'static str> {
+        self.0.engine_query(s)
+    }
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         self.0.invoke(s, function, args)
     }
+}
+/// Inherits the production query, predicate and both indexed lookups.
+struct EngineReplay<'a>(&'a mut Replay);
+impl Services for EngineReplay<'_> {
+    fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
+        self.0.invoke(s, function, args)
+    }
+}
+pub fn run_engine_row(
+    row: &str,
+    image: Option<&[u8]>,
+    inherited: Option<(u64, u32)>,
+    shared: &BTreeMap<u64, Vec<u8>>,
+) -> State {
+    run_impl(row, image, inherited, true, true, true, shared)
 }
 pub fn run_tables_row(
     row: &str,
@@ -154,13 +178,14 @@ pub fn run_tables_row(
     inherited: Option<(u64, u32)>,
     shared: &BTreeMap<u64, Vec<u8>>,
 ) -> State {
-    run_impl(row, image, inherited, true, true, shared)
+    run_impl(row, image, inherited, true, true, false, shared)
 }
 pub fn run_row(row: &str, initial_image: Option<&[u8]>, inherited: Option<(u64, u32)>) -> State {
     run_impl(
         row,
         initial_image,
         inherited,
+        false,
         false,
         false,
         &BTreeMap::new(),
@@ -172,7 +197,7 @@ pub fn run_native_row(
     inherited: Option<(u64, u32)>,
     shared: &BTreeMap<u64, Vec<u8>>,
 ) -> State {
-    run_impl(row, initial_image, inherited, true, false, shared)
+    run_impl(row, initial_image, inherited, true, false, false, shared)
 }
 fn run_impl(
     row: &str,
@@ -180,6 +205,7 @@ fn run_impl(
     inherited: Option<(u64, u32)>,
     native_gate: bool,
     native_tables: bool,
+    native_engine: bool,
     shared: &BTreeMap<u64, Vec<u8>>,
 ) -> State {
     let f = row.split_whitespace().collect::<Vec<_>>();
@@ -205,14 +231,21 @@ fn run_impl(
     }
     s.memory.blocks.insert(stack, hex(f[4]));
     let mut replay = Replay {
-        events: f[7].split('|').map(str::to_string).collect(),
+        events: if f[7] == "-" {
+            vec![]
+        } else {
+            f[7].split('|').map(str::to_string).collect()
+        },
         position: 0,
         expected_settings_word: shared
             .iter()
             .find(|(_, bytes)| bytes.len() == 4)
             .map(|(p, _)| *p),
     };
-    if native_tables {
+    if native_engine {
+        ui_fifth_refresh::refresh_image(&mut image, &mut s, &mut EngineReplay(&mut replay))
+            .unwrap();
+    } else if native_tables {
         ui_fifth_refresh::refresh_image(&mut image, &mut s, &mut TableReplay(&mut replay)).unwrap();
     } else if native_gate {
         ui_fifth_refresh::refresh_image(&mut image, &mut s, &mut NativeReplay(&mut replay))

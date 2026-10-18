@@ -306,6 +306,7 @@ struct Host {
     resource_available: bool,
     native_predicate: bool,
     native_tables: bool,
+    native_engine: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -539,7 +540,15 @@ impl factory::Services for Host {
             let event = self.replay.event();
             let row = event[1..].join("~").replace('!', " ").replace('^', "|");
             assert_eq!(num(row.split_whitespace().nth(1).unwrap()), p);
-            let runtime = if self.native_tables {
+            let runtime = if self.native_engine {
+                assert_eq!(self.shared_settings.len(), 3);
+                fifth_replay::run_engine_row(
+                    &row,
+                    Some(&s.blocks[&p]),
+                    Some((self.active_global, self.resource_index)),
+                    &self.shared_settings,
+                )
+            } else if self.native_tables {
                 assert_eq!(
                     self.shared_settings.len(),
                     3,
@@ -612,10 +621,11 @@ fn native_factory_with_actual_fifth_gate_and_shared_root_settings() {
         118,
         true,
         false,
+        false,
     );
 }
 fn replay_factory(env: &str, expected_cases: usize) {
-    replay_factory_mode(env, expected_cases, false, false);
+    replay_factory_mode(env, expected_cases, false, false, false);
 }
 #[test]
 #[ignore = "requires native fifth table chain via OPENXPLANE_UI_FACTORY_FIFTH_TABLES_VECTORS"]
@@ -625,6 +635,18 @@ fn native_factory_with_real_fifth_record_tables() {
         118,
         true,
         true,
+        false,
+    );
+}
+#[test]
+#[ignore = "requires actual fifth query/table factory corpus via OPENXPLANE_UI_FACTORY_FIFTH_ENGINE_VECTORS"]
+fn native_factory_with_actual_fifth_query_and_record_tables() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_FIFTH_ENGINE_VECTORS",
+        118,
+        true,
+        true,
+        true,
     );
 }
 fn replay_factory_mode(
@@ -632,6 +654,7 @@ fn replay_factory_mode(
     expected_cases: usize,
     native_predicate: bool,
     native_tables: bool,
+    native_engine: bool,
 ) {
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
@@ -657,6 +680,7 @@ fn replay_factory_mode(
             resource_available: true,
             native_predicate,
             native_tables,
+            native_engine,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);

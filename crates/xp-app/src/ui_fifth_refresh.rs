@@ -1,6 +1,7 @@
 //! Fifth dialog child refresh141139460 and hash clear14062b900.
 //! Version-bound provider identities are data, never executable host pointers.
 use crate::{
+    ui_engine_query,
     ui_indexed_records::{self, Kind},
     ui_payload_move,
 };
@@ -21,6 +22,10 @@ pub trait Services {
         function: u64,
         args: &[u64],
     ) -> Result<u64, &'static str>;
+    /// Read-only original1417fb320. Legacy traces override the controlled endpoint.
+    fn engine_query(&mut self, state: &mut State) -> Result<u64, &'static str> {
+        ui_engine_query::query(&state.memory)
+    }
     /// Original indexed table access. Callers supply mapped table descriptors.
     fn resource_record(&mut self, state: &mut State, index: u32) -> Result<u64, &'static str> {
         ui_indexed_records::lookup(&state.memory, Kind::Resource, index as u64)
@@ -112,7 +117,7 @@ fn clear_hash(s: &mut State, h: &mut impl Services, table: u64) -> Result<(), &'
 /// Predicate14113b9a0 reloads index after each provider call; AL controls engine
 /// acceptance and the settings mode is compared as a full32-bit zero test.
 pub fn payload_available(s: &mut State, h: &mut impl Services) -> Result<bool, &'static str> {
-    if call(s, h, 0x1417fb320, &[0x142f2d770])? as u8 == 0 || s.active_global != 0 {
+    if h.engine_query(s)? as u8 == 0 || s.active_global != 0 {
         return Ok(false);
     }
     let resource = h.resource_record(s, s.resource_index)?;
@@ -133,7 +138,7 @@ pub fn refresh(s: &mut State, h: &mut impl Services) -> Result<(), &'static str>
     if begin != s.q(vector + 8)? {
         s.putq(vector + 8, begin)?;
     }
-    if call(s, h, 0x1417fb320, &[0x142f2d770])? as u8 != 0 && s.active_global == 0 {
+    if h.engine_query(s)? as u8 != 0 && s.active_global == 0 {
         let resource = h.resource_record(s, s.resource_index)?;
         if s.q(resource + 0x6188)? != 0 {
             let manager = call(s, h, 0x14193ae40, &[])?;

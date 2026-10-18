@@ -12,7 +12,7 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False):
+def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
  fifth_scope=None
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
@@ -106,7 +106,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   def fifth_begin(p,h):
    case=v['case'];profile=dict(seed=v['seed'],engine=v['engine'],active=e.read_u64(ACTIVE),index=e.read_u32(0x142640504),available=int(e.read_u64(resource+0x6188)!=0),items=[0,1,3][case%3],variant=[0,255][case%2],mutate=case%2,listeners=0,override=[0,1,0x80000000][case%3],bits=[0x80000000,0x3f800000,0x7fc12345][case%3])
    h.prepare(p,case,profile,dict(blocks),mutate=False)
-  fifth_scope=install_fifth(e,resource,before=fifth_begin,on_finish=lambda row:events.append('W~'+row.replace(' ','!').replace('|','^')),native_predicate=native_predicate,settings=root_harness.get('settings') if root_harness else None,tables=root_harness.get('tables') if root_harness and native_tables else None);top=e.heap_top
+  fifth_scope=install_fifth(e,resource,before=fifth_begin,on_finish=lambda row:events.append('W~'+row.replace(' ','!').replace('|','^')),native_predicate=native_predicate,settings=root_harness.get('settings') if root_harness else None,tables=root_harness.get('tables') if root_harness and native_tables else None,native_engine=native_engine);top=e.heap_top
  if native_tables:
   def constructor_record_return(uc,a,size,user):
    if v['kind']==-1 and (not fifth_scope or not fifth_scope.active):v['constructor_returns']+=1
