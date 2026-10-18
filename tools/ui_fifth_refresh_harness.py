@@ -7,9 +7,11 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_R9,UC_X86_REG_RSP
 ACTIVE,INDEX,OVERRIDE,BITS=0x145a10798,0x142640504,0x142f069a0,0x142f069a4
 COUNTS={0x1406215a0:3,0x1417fb320:1,0x141a64260:2,0x14193ae40:0,0x141660c60:2,0x1405dcc70:3,0x1406999d0:1,0x1422e7c2c:2,0x1407925b0:4,0x14113b9a0:0,0x1417f71d0:3,0x1410fac50:2,0x1405ddae0:1,0x1408ace50:1,0x1410d2f10:3,0x1410c9d10:1}
-def install(e,resource=None,before=None,on_finish=None):
+def install(e,resource=None,before=None,on_finish=None,native_predicate=False,settings=None):
  resource=resource or e.alloc(0x6190);vec=e.alloc(64);grown=e.alloc(128);payload=e.alloc(32);records=[e.alloc(128)for _ in range(3)];tree=e.alloc(32);tnodes=[e.alloc(32)for _ in range(3)];tree2=e.alloc(32);hnodes=[e.alloc(32)for _ in range(3)];hhead2=e.alloc(32);buckets=e.alloc(1024);targets=[e.alloc(32)for _ in range(3)];listeners=[e.alloc(120)for _ in range(3)];head2=e.alloc(120)
+ if native_predicate:settings=settings or e.alloc(0xdb0)
  external={resource+0x6188:8,vec:64,grown:128,payload:32,tree:32,tree2:32,hhead2:32,buckets:1024,head2:120,**{p:128 for p in records},**{p:32 for p in tnodes+hnodes+targets},**{p:120 for p in listeners}}
+ if native_predicate:external[settings+0xdac]=4
  h=SimpleNamespace(active=False,enabled=False,before=before,on_finish=on_finish,obj=0,events=[],ranges={},v={},row=None,stack=0,in_clear=False);old=e.stubs.copy();writes=[];reads=[]
  def snap():return '/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(h.ranges.items()))+f';{e.read_u64(ACTIVE)};{e.read_u32(INDEX)};{e.read_u32(OVERRIDE)};{e.read_u32(BITS)}'
  def chunks(xs):return '/'.join(f'{p}:{b.hex()}'for p,b in xs)or'-'
@@ -20,9 +22,9 @@ def install(e,resource=None,before=None,on_finish=None):
  def q(p):return int.from_bytes(read(p,8),'little')
  def put(p,n):write(p,(n&((1<<64)-1)).to_bytes(8,'little'))
  def prepare(p,case,v,owned,mutate=False):
-  h.obj=p;h.v=dict(v);h.v.update(case=case,position=0,lookup=0);h.events.clear();h.ranges={**owned,**external};h.stack=0;h.enabled=True;h.in_clear=False;seed=v['seed'];h.row=None
+  h.obj=p;h.v=dict(v);h.v.update(case=case,position=0,lookup=0,engine_calls=0,resource_calls=0);h.events.clear();h.ranges={**owned,**external};h.stack=0;h.enabled=True;h.in_clear=False;seed=v['seed'];h.row=None
   for a,n in external.items():
-   if a!=resource+0x6188:e.write(a,bytes([seed^0x33])*n)
+   if a!=resource+0x6188 and (not native_predicate or a!=settings+0xdac):e.write(a,bytes([seed^0x33])*n)
   for i,record in enumerate(records):
    index=[-1,0,2][case%3];e.write_u64(record+(index+5)*8,[9,7,9][i])
   def chain(head,nodes,n):
@@ -30,6 +32,7 @@ def install(e,resource=None,before=None,on_finish=None):
    for i,a in enumerate(nodes):e.write_u64(a,nodes[i+1]if i+1<n else head);e.write_u64(a+8,nodes[i-1]if i else head)
   chain(tree,tnodes,[0,1,3][case%3]);chain(tree2,[],0);chain(hhead2,[],0);chain(head2,[],0)
   if mutate:e.write_u32(OVERRIDE,0x12345678);e.write_u32(BITS,0x11112222)
+  if mutate and native_predicate:e.write_u32(settings+0xdac,0 if v['variant']&255 else [1,7,0xffffffff][case%3])
   if mutate:
    count=[0,1+2*(case%2),3][v['hash']];bucket_count=64 if v['hash']==2 else 8;head=e.read_u64(p+0x58);chain(head,hnodes,count)
    e.write_u64(p+0x60,count);e.write_u64(p+0x68,buckets);e.write_u64(p+0x70,buckets+bucket_count*16);e.write_u64(p+0x78,buckets+bucket_count*16);e.write_u64(p+0x80,bucket_count-1);e.write_u64(p+0x88,bucket_count)
@@ -45,8 +48,14 @@ def install(e,resource=None,before=None,on_finish=None):
   if fn==0x1406215a0:
    table,first,head=args;assert first==e.read_u64(head);e.write_u64(head,head);e.write_u64(head+8,head);e.write_u64(table+16,0)
    for a in range(e.read_u64(table+24),e.read_u64(table+32),8):e.write_u64(a,head)
-  elif fn==0x1417fb320:e.write_u64(ACTIVE,v['active']);e.write_u32(INDEX,v['index']);result=v['engine']
-  elif fn==0x141a64260:assert args==[0x146124398,e.read_u32(INDEX)];result=resource
+  elif fn==0x1417fb320:
+   v['engine_calls']+=1;gate=native_predicate and v['engine_calls']>1
+   e.write_u64(ACTIVE,v.get('gate_active',v['active']) if gate else v['active']);e.write_u32(INDEX,v.get('gate_index',v['index']) if gate else v['index']);result=v.get('gate_engine',v['engine']) if gate else v['engine']
+   if native_predicate:e.write_u32(OVERRIDE,v['override']);e.write_u32(BITS,v['bits'])
+  elif fn==0x141a64260:
+   assert args==[0x146124398,e.read_u32(INDEX)];result=resource;v['resource_calls']+=1
+   if native_predicate and v['mutate']:e.write_u32(INDEX,(e.read_u32(INDEX)+1)&0xffffffff)
+  elif fn==0x141a64250:assert args==[0x1461243b0,e.read_u32(INDEX)];result=settings
   elif fn==0x14193ae40:result=12345
   elif fn==0x141660c60:
    assert args==[sp+0x20,12345];raw=bytearray([v['seed']^0x77]*64);raw[:8]=(records[0]if v['items']else 0).to_bytes(8,'little');raw[8:12]=([-1,0,2][v['case']%3]&0xffffffff).to_bytes(4,'little');raw[0x30:0x38]=tree.to_bytes(8,'little');write(sp+0x20,bytes(raw))
@@ -86,7 +95,11 @@ def install(e,resource=None,before=None,on_finish=None):
    if v['listeners']==2 and p==listeners[0]:e.write_u64(o+8,head2);e.write_u64(p,head2)
   else:raise AssertionError(hex(fn))
   h.events.append(f'I~{fn},{",".join(map(str,args))or"-"}~{before}~{snap()}~{result}~{chunks(reads)}~{chunks(writes)}');e.uc.reg_write(UC_X86_REG_RAX,result&((1<<64)-1))
- for fn,n in COUNTS.items():
+ providers=dict(COUNTS)
+ if native_predicate:
+  assert 0x14113b9a0 not in e.stubs
+  providers.pop(0x14113b9a0);providers[0x141a64250]=2
+ for fn,n in providers.items():
   def dispatch(emu,fn=fn,n=n):
    if h.active:leaf(fn,[emu.reg(r)for r in [UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_R9][:n]])
    elif fn in old:return old[fn](emu)

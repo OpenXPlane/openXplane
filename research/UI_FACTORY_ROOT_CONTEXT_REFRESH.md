@@ -97,3 +97,6 @@ visual capture was performed.
 
 
 2026-10-18: [fifth refresh and full chain](UI_FIFTH_REFRESH.md) now has528 standalone native cases and118 whole-factory calls containing actual root/context/fifth bodies. Range erase and other providers remain controlled; selection/weather refreshes and full dialog/live GPU are next. Estimates unchanged.
+
+
+2026-10-18: [actual payload gate and shared settings](UI_FIFTH_PAYLOAD_GATE.md) now has528 new whole-fifth and118 whole-factory native comparisons with14113b9a0 executing originally. Root/fifth settings identity and bytes are checked; original lookup/provider production and live GPU remain pending. Earlier opaque-predicate evidence retains its explicit scope. Estimates unchanged.

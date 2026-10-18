@@ -13,3 +13,17 @@ fn native_whole_fifth_refresh_hash_clear_iterators_cleanup_and_live_listeners() 
     }
     assert_eq!(cases, 528);
 }
+
+#[test]
+#[ignore = "requires actual predicate corpus via OPENXPLANE_UI_FIFTH_GATE_VECTORS"]
+fn native_fifth_refresh_with_actual_payload_availability_gate() {
+    let corpus =
+        std::fs::read_to_string(std::env::var("OPENXPLANE_UI_FIFTH_GATE_VECTORS").unwrap())
+            .unwrap();
+    let mut cases = 0;
+    for row in corpus.lines().filter(|r| r.starts_with("C ")) {
+        replay::run_native_row(row, None, None, &Default::default());
+        cases += 1;
+    }
+    assert_eq!(cases, 528);
+}

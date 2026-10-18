@@ -122,3 +122,6 @@ pass explicitly. The earlier118 factory/root/context replay still passes and its
 C rows regenerate byte-for-byte unchanged. Formatting, Python syntax,
 all-test-target compilation and diff checks pass. No live viewer/GPU run or paired
 visual capture was performed.
+
+
+2026-10-18: [actual payload gate and shared settings](UI_FIFTH_PAYLOAD_GATE.md) now has528 new whole-fifth and118 whole-factory native comparisons with14113b9a0 executing originally. Root/fifth settings identity and bytes are checked; original lookup/provider production and live GPU remain pending. Earlier opaque-predicate evidence retains its explicit scope. Estimates unchanged.

@@ -67,8 +67,12 @@ fn compare(a: &str, b: &str, label: &str) {
 struct Replay {
     events: Vec<String>,
     position: usize,
+    expected_settings_word: Option<u64>,
 }
 impl Services for Replay {
+    fn payload_available(&mut self, s: &mut State) -> Result<bool, &'static str> {
+        Ok(self.invoke(s, 0x14113b9a0, &[])? as u8 != 0)
+    }
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         let f = self.events[self.position].split('~').collect::<Vec<_>>();
         self.position += 1;
@@ -96,6 +100,15 @@ impl Services for Replay {
                 );
             }
         }
+        if function == 0x141a64250 {
+            if let Some(address) = self.expected_settings_word {
+                assert_eq!(
+                    num(f[4]) + 0xdac,
+                    address,
+                    "settings identity must match root record"
+                );
+            }
+        }
         let scratch = s.memory.blocks.remove(&s.stack).unwrap();
         *s = parse(f[3], s.identity, s.stack);
         s.memory.blocks.insert(s.stack, scratch);
@@ -107,13 +120,44 @@ impl Services for Replay {
         Ok(num(f[4]))
     }
 }
+/// This adapter intentionally inherits the production gate implementation.
+struct NativeReplay<'a>(&'a mut Replay);
+impl Services for NativeReplay<'_> {
+    fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
+        self.0.invoke(s, function, args)
+    }
+}
 pub fn run_row(row: &str, initial_image: Option<&[u8]>, inherited: Option<(u64, u32)>) -> State {
+    run_impl(row, initial_image, inherited, false, &BTreeMap::new())
+}
+pub fn run_native_row(
+    row: &str,
+    initial_image: Option<&[u8]>,
+    inherited: Option<(u64, u32)>,
+    shared: &BTreeMap<u64, Vec<u8>>,
+) -> State {
+    run_impl(row, initial_image, inherited, true, shared)
+}
+fn run_impl(
+    row: &str,
+    initial_image: Option<&[u8]>,
+    inherited: Option<(u64, u32)>,
+    native_gate: bool,
+    shared: &BTreeMap<u64, Vec<u8>>,
+) -> State {
     let f = row.split_whitespace().collect::<Vec<_>>();
     assert_eq!(f.len(), 8);
     assert_eq!(f[5], "->");
     let id = num(f[1]);
     let stack = num(f[2]);
     let mut s = parse(f[3], id, stack);
+    for (p, bytes) in shared {
+        assert_eq!(
+            s.memory.read(*p, bytes.len()).unwrap(),
+            *bytes,
+            "shared settings at{p:x}"
+        );
+    }
     let mut image = s.memory.read(id, 0xb0).unwrap();
     if let Some(expected) = initial_image {
         assert_eq!(image, expected);
@@ -126,8 +170,14 @@ pub fn run_row(row: &str, initial_image: Option<&[u8]>, inherited: Option<(u64, 
     let mut replay = Replay {
         events: f[7].split('|').map(str::to_string).collect(),
         position: 0,
+        expected_settings_word: shared.keys().next().copied(),
     };
-    ui_fifth_refresh::refresh_image(&mut image, &mut s, &mut replay).unwrap();
+    if native_gate {
+        ui_fifth_refresh::refresh_image(&mut image, &mut s, &mut NativeReplay(&mut replay))
+            .unwrap();
+    } else {
+        ui_fifth_refresh::refresh_image(&mut image, &mut s, &mut replay).unwrap();
+    }
     assert_eq!(image, s.memory.read(id, 0xb0).unwrap());
     compare(&snapshot(&s), f[6], "final fifth refresh");
     assert_eq!(replay.position, replay.events.len());

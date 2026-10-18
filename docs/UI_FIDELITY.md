@@ -382,3 +382,15 @@ nested/payload/context/fifth bodies and649 retained entries; fresh fifth lists
 apply there. Next recover selection/weather refreshes/providers and full dialog/
 layout/menu/teardown. Live Alt/Esc/GPU and paired captures remain unverified;
 shares reviewed and unchanged.
+
+
+## Fifth payload predicate uses shared root settings (2026-10-18)
+
+[Payload-gate evidence](../research/UI_FIFTH_PAYLOAD_GATE.md):528 complete fifth
+refreshes and118 whole factory calls now execute actual14113b9a0, including repeated
+engine/global gating, fresh resource-index loads and full32-bit mode checks.
+Root/fifth getter identities and inherited settings bytes are checked;17 fifth
+payload branches occur in the shared composition. Old opaque-predicate records
+are unchanged and replay under an explicit controlled seam. Engine/resource/
+settings lookup bodies, other dependencies, full dialog/menu/live Alt/Esc/GPU and
+paired captures remain unverified. Shares reviewed and unchanged.
