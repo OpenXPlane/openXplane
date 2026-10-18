@@ -38,6 +38,14 @@ pub trait Services: ui_input_construct::Services + ui_callback_list::Services {
     fn selection_value(&mut self, state: &mut State) -> u64;
     fn selected_index(&mut self, state: &mut State, token: u64) -> i32;
     fn changed(&mut self, state: &mut State);
+    fn changed_checked(
+        &mut self,
+        state: &mut State,
+        _base_sentinel: &mut Block,
+    ) -> Result<(), &'static str> {
+        self.changed(state);
+        Ok(())
+    }
     fn reset(&mut self, state: &mut State, argument: u32);
     fn finish(&mut self, state: &mut State);
 }
@@ -213,7 +221,7 @@ pub fn construct(
             if mode != 0 {
                 state.image[0xb8] = 0;
             }
-            services.changed(state);
+            services.changed_checked(state, &mut base)?;
         }
     }
     for (off, temp) in [

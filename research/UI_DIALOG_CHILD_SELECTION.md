@@ -100,3 +100,9 @@ GIF/video remain missing; Esc still exits the viewer. Overall rubric remains
 
 
 2026-10-18: [factory with actual root refresh chain](UI_FACTORY_ROOT_REFRESH_CHAIN.md) now has118 complete native calls, all four constructors and actual root/nested/payload bodies. Shared-state execution exposed and fixed the selection resource-index constant (now reloads77/88). Other child/fifth refreshes and full dialog/live GPU remain pending; estimates unchanged.
+
+
+The later [actual selection-change composition](UI_SELECTION_CHANGED.md) replaces
+that opaque endpoint in95 reached constructor paths and matches601 retained
+entries over118 factories. The earlier649-entry cohorts above keep their
+controlled-change scope and regenerate unchanged.

@@ -449,3 +449,14 @@ entries. Computed weather/context/CLI/notification providers remain controlled;
 real data producers/lifetime, remaining selection/full dialog/menu/viewer/GPU and
 paired visual evidence remain unverified. See
 [UI_WEATHER_REFRESH](../research/UI_WEATHER_REFRESH.md). Estimates unchanged.
+
+
+Selection changed14113ba10 now matches348 original calls (547 notification
+requests), including callback-preserved dirty bytes and nodes appended during
+traversal.118 complete factories execute the actual body in95 fresh receivers.
+Removing the previous opaque second-parent effect produces601 retained entries,
+matching original code under these profiles; older649-entry controlled cohorts
+retain their scope. The checked bridge validates/publishes the source sentinel
+and image. See [UI_SELECTION_CHANGED](../research/UI_SELECTION_CHANGED.md).
+Actual callbacks/remaining selection/providers/full menu/viewer/GPU and paired
+visual evidence remain unverified. Estimates unchanged.

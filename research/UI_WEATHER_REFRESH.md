@@ -104,3 +104,9 @@ was produced. Estimates reviewed and unchanged:41.4% implemented/28.2% verified
 overall, Rendering/UI verified0. Complete the remaining providers/selection and
 dialog construction, connect actual menu state/resources to live rendering and
 obtain paired captures before claiming graphical parity.
+
+
+The later [actual selection-change composition](UI_SELECTION_CHANGED.md) replaces
+that opaque endpoint in95 reached constructor paths and matches601 retained
+entries over118 factories. The earlier649-entry cohorts above keep their
+controlled-change scope and regenerate unchanged.

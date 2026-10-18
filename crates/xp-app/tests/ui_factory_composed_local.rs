@@ -1,3 +1,5 @@
+#[path = "support/ui_selection_changed_replay.rs"]
+mod change_replay;
 #[path = "support/context_refresh_replay.rs"]
 mod context_replay;
 #[path = "support/ui_fifth_replay.rs"]
@@ -137,6 +139,7 @@ impl openxplane::ui_callback_list::Services for Replay {
 struct Provider<'a> {
     native_child_tables: bool,
     native_weather: bool,
+    native_changed: bool,
     resources: openxplane::ui_payload_move::State,
     replay: &'a mut Replay,
     id: u64,
@@ -247,6 +250,24 @@ impl selection::Services for Provider<'_> {
     fn changed(&mut self, s: &mut selection::State) {
         self.effect(&mut s.image, 0x14113ba10, &[self.id]);
     }
+    fn changed_checked(
+        &mut self,
+        s: &mut selection::State,
+        base: &mut Block,
+    ) -> Result<(), &'static str> {
+        if !self.native_changed {
+            self.changed(s);
+            return Ok(());
+        }
+        let event = self.replay.event();
+        assert_eq!(event[0], "N");
+        let row = event[1..].join("~").replace('!', " ").replace('^', "|");
+        assert_eq!(num(row.split_whitespace().nth(1).unwrap()), self.id);
+        let runtime = change_replay::run_row(&row, Some(&s.image), Some(base));
+        s.image = runtime.memory.read(self.id, 0x2d0)?;
+        base.bytes = runtime.memory.read(base.address, base.bytes.len())?;
+        Ok(())
+    }
     fn reset(&mut self, s: &mut selection::State, arg: u32) {
         self.effect(&mut s.image, 0x14113a460, &[self.id, arg as u64]);
     }
@@ -356,6 +377,7 @@ struct Host {
     native_root_tables: bool,
     native_child_tables: bool,
     native_weather: bool,
+    native_changed: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -398,6 +420,7 @@ impl factory::Services for Host {
         let mut provider = Provider {
             native_child_tables: self.native_child_tables,
             native_weather: self.native_weather,
+            native_changed: self.native_changed,
             resources: openxplane::ui_payload_move::State {
                 blocks: self.shared_settings.clone(),
             },
@@ -770,6 +793,15 @@ fn native_factory_with_actual_weather_refresh_and_all_record_tables() {
         ReplayMode::Weather,
     );
 }
+#[test]
+#[ignore = "requires actual selection changed factory corpus via OPENXPLANE_UI_FACTORY_SELECTION_CHANGED_VECTORS"]
+fn native_factory_with_actual_selection_change_and_weather_chain() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_SELECTION_CHANGED_VECTORS",
+        118,
+        ReplayMode::Changed,
+    );
+}
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 enum ReplayMode {
     Controlled,
@@ -779,6 +811,7 @@ enum ReplayMode {
     RootTables,
     ChildTables,
     Weather,
+    Changed,
 }
 fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_predicate = mode >= ReplayMode::Predicate;
@@ -786,7 +819,8 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_engine = mode >= ReplayMode::Engine;
     let native_root_tables = mode >= ReplayMode::RootTables;
     let native_child_tables = mode >= ReplayMode::ChildTables;
-    let native_weather = mode == ReplayMode::Weather;
+    let native_weather = mode >= ReplayMode::Weather;
+    let native_changed = mode >= ReplayMode::Changed;
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
@@ -815,6 +849,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
             native_root_tables,
             native_child_tables,
             native_weather,
+            native_changed,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);
