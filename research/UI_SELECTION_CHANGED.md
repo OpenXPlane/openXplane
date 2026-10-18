@@ -86,3 +86,9 @@ callback RB backing and complete dialog/layout/widget/singleton/menu lifecycle
 remain controlled or unfinished. No live viewer/GPU run, original Alt/Esc opening
 or paired screenshots/GIF/video evidence was produced. Estimates reviewed and
 unchanged:41.4% implemented/28.2% verified overall, Rendering/UI verified0.
+
+
+The subsequent [whole alternate comparison](UI_SELECTION_ALTERNATE.md) executes
+that original body in the remaining23 factory paths. Both exits now compose
+with590 retained entries under the new supplied effects. The earlier601/649
+controlled-alternate cohorts retain their scope and regenerate unchanged.

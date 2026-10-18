@@ -109,3 +109,5 @@ pub mod ui_indexed_records;
 pub mod ui_weather_refresh;
 
 pub mod ui_selection_changed;
+
+pub mod ui_selection_alternate;

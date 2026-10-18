@@ -35,6 +35,10 @@ pub trait Services: ui_input_construct::Services + ui_callback_list::Services {
         crate::ui_indexed_records::resource_present(self.resource_memory()?, index)
     }
     fn alternate(&mut self, state: &mut State);
+    fn alternate_checked(&mut self, state: &mut State) -> Result<(), &'static str> {
+        self.alternate(state);
+        Ok(())
+    }
     fn selection_value(&mut self, state: &mut State) -> u64;
     fn selected_index(&mut self, state: &mut State, token: u64) -> i32;
     fn changed(&mut self, state: &mut State);
@@ -173,7 +177,7 @@ pub fn construct(
         && state.active_global == 0
         && services.resource_present(state, state.resource_index)?
     {
-        services.alternate(state);
+        services.alternate_checked(state)?;
     } else {
         let max = state
             .catalog_values

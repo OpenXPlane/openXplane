@@ -460,3 +460,13 @@ retain their scope. The checked bridge validates/publishes the source sentinel
 and image. See [UI_SELECTION_CHANGED](../research/UI_SELECTION_CHANGED.md).
 Actual callbacks/remaining selection/providers/full menu/viewer/GPU and paired
 visual evidence remain unverified. Estimates unchanged.
+
+
+Selection alternate14111bb90 now matches528 complete original calls across both
+major paths/all valid tags, with1324 actual settings returns, raw coordinate and
+stack operands, live vector/result reloads, aligned frees and the real temporary
+destructor.118 factories execute23 actual alternate and95 actual changed bodies;
+590 retained entries match after removing the remaining opaque second-parent
+effect. Real providers/registry/reset/final/full dialog/viewer/GPU and paired
+visuals remain unverified. See
+[UI_SELECTION_ALTERNATE](../research/UI_SELECTION_ALTERNATE.md). Estimates unchanged.

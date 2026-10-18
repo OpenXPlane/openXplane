@@ -106,3 +106,9 @@ The later [actual selection-change composition](UI_SELECTION_CHANGED.md) replace
 that opaque endpoint in95 reached constructor paths and matches601 retained
 entries over118 factories. The earlier649-entry cohorts above keep their
 controlled-change scope and regenerate unchanged.
+
+
+The subsequent [whole alternate comparison](UI_SELECTION_ALTERNATE.md) executes
+that original body in the remaining23 factory paths. Both exits now compose
+with590 retained entries under the new supplied effects. The earlier601/649
+controlled-alternate cohorts retain their scope and regenerate unchanged.
