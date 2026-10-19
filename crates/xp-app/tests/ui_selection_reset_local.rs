@@ -13,3 +13,19 @@ fn whole_original_reset_catalog_strings_variants_live_listeners_and_tail_finish(
     }
     assert_eq!(cases, 528);
 }
+
+#[test]
+#[ignore = "requires composed local corpus via OPENXPLANE_UI_SELECTION_RESET_INITIAL_VECTORS"]
+fn whole_reset_with_actual_initial_callback_and_read_only_helpers() {
+    let corpus = std::fs::read_to_string(
+        std::env::var("OPENXPLANE_UI_SELECTION_RESET_INITIAL_VECTORS").unwrap(),
+    )
+    .unwrap();
+    let mut cases = 0;
+    for row in corpus.lines().filter(|r| r.starts_with("C ")) {
+        assert!(row.split_whitespace().nth(7).unwrap().starts_with("K~C@"));
+        replay::run_row(row, None, None, &Default::default());
+        cases += 1;
+    }
+    assert_eq!(cases, 528);
+}

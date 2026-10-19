@@ -10,6 +10,10 @@ pub struct State {
 }
 pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn initial_callback(&mut self, s: &mut State) -> Result<(), &'static str> {
+        self.invoke(s, 0x1410fe0f0, &[s.identity + 0x38, 0x1e1b9, 0])?;
+        Ok(())
+    }
     fn skip_reset(&mut self, s: &mut State) -> Result<bool, &'static str> {
         let mut g = gate::State {
             identity: s.identity,
@@ -93,7 +97,7 @@ fn free_string(s: &mut State, h: &mut impl Services, p: u64) -> Result<(), &'sta
 pub fn reset(s: &mut State, h: &mut impl Services, argument: u32) -> Result<(), &'static str> {
     let o = s.identity;
     let sp = s.stack;
-    h.invoke(s, 0x1410fe0f0, &[o + 0x38, 0x1e1b9, 0])?;
+    h.initial_callback(s)?;
     if !h.skip_reset(s)? {
         if ui_engine_query::query(&s.memory)? as u8 == 0
             || gate::variant_is_two_or_three(&s.memory, o + 0x50)? != 0

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Complete original reset through tail finish with actual gate/query/tag/primary/getter."""
 from unicorn import UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP
+from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP,UC_X86_REG_RIP
 BEGIN,END,INDEX,ENGINE,TABLE=0x145e4dab8,0x145e4dac0,0x142640504,0x142f2dc95,0x146124398
 FUNCS={0x1410fe0f0:3,0x140d776a0:2,0x140d77340:3,0x1414cf5e0:0,0x1414cce40:2,0x1405dd5c0:2,0x14163b530:1,0x1405df240:3,0x1414cd660:2,0x1410d3690:3,0x1405de1d0:1,0x141146740:3,0x1422e7c2c:2,0x1410c9d10:1,0x14113d660:1,0x14113ff10:1,0x1423c0180:3}
-def install(e,tables=None,before=None,on_finish=None):
+def install(e,tables=None,before=None,on_finish=None,native_initial=False):
  obj=0;old=e.stubs.copy();receiver=e.alloc(0x90);resource=e.alloc(0x6668);external=e.alloc(32);variant=e.alloc(0x70)
  catalogs=[e.alloc(168*3)for _ in range(3)];heaps=[e.alloc(4200)for _ in range(4)];head=e.alloc(120);head2=e.alloc(120);nodes=[e.alloc(120)for _ in range(3)]
  base_ranges={receiver:0x90,resource+0x6178:32,external:32,variant:0x70,BEGIN:8,END:8,INDEX:4,ENGINE:1,TABLE:8,head:120,head2:120,**{p:120 for p in nodes},**{p:168*3 for p in catalogs},**{p:128 for p in heaps}}
@@ -101,9 +101,19 @@ def install(e,tables=None,before=None,on_finish=None):
    for i,p in enumerate(nodes):e.write_u64(p,nodes[i+1]if i+1<count else head);e.write_u64(p+8,nodes[i-1]if i else head)
  h['prepare']=prepare
  def begin(uc,a,size,user):
+  # Another scope may have returned from a controlled nested request already.
+  if e.reg(UC_X86_REG_RIP)!=a:return
   if before:before(e.reg(UC_X86_REG_RCX),h)
   if h['enabled']:h['active']=True
  e.uc.hook_add(UC_HOOK_CODE,begin,begin=0x14113a460,end=0x14113a460)
  e.stubs.pop(0x14113a460,None)
+ if native_initial:
+  from ui_selection_initial_harness import install as install_initial
+  def initial_begin(receiver,scope):
+   assert h['active'] and receiver==obj+0x38
+   v=h['v'];i=v['case'];profile=dict(seed=v['seed'],controlled=0,first=[0,1,256,257][i%4],second=1,float=i%8,float_alias=(i//3)%3,mutate=False,force=i%3==1,secondary=i%2)
+   scope['prepare'](obj,i,profile,dict(h['ranges']))
+  initial_scope=install_initial(e,before=initial_begin,on_finish=lambda row:h['events'].append('K~'+row.replace(' ','@').replace('|','%')))
+  h['initial_stats']=initial_scope['stats'];h['initial_totals']=initial_scope['totals']
  h['stats']=stats
  return h

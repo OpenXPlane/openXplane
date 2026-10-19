@@ -1,5 +1,7 @@
 //! Strict whole reset caller replay. Provider bodies remain controlled.
 #![allow(dead_code)]
+#[path = "ui_selection_initial_replay.rs"]
+mod initial_replay;
 use openxplane::{
     ui_payload_move,
     ui_selection_reset::{self, Services, State},
@@ -34,6 +36,28 @@ struct Replay {
     position: usize,
 }
 impl Services for Replay {
+    fn initial_callback(&mut self, s: &mut State) -> Result<(), &'static str> {
+        if !self.events[self.position].starts_with("K~") {
+            self.invoke(s, 0x1410fe0f0, &[s.identity + 0x38, 0x1e1b9, 0])?;
+            return Ok(());
+        }
+        let row = self.events[self.position][2..]
+            .replace('@', " ")
+            .replace('%', "|");
+        self.position += 1;
+        let fields = row.split_whitespace().collect::<Vec<_>>();
+        assert_eq!(fields.len(), 9);
+        assert_eq!(fields[4], "0", "composed callback must use actual helpers");
+        assert_eq!(fields[1].parse::<u64>().unwrap(), s.identity);
+        assert_eq!(fields[2].parse::<u64>().unwrap(), s.stack - 0xa0);
+        assert_eq!(fields[3].parse::<u64>().unwrap(), 0x1e1b9);
+        let image = s.memory.read(s.identity, 0x2d0)?;
+        let runtime = initial_replay::run_row(&row, Some(&image), &s.memory.blocks);
+        for (p, b) in &mut s.memory.blocks {
+            *b = runtime.memory.read(*p, b.len())?;
+        }
+        Ok(())
+    }
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         let event = self
             .events

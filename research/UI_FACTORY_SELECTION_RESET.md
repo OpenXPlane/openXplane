@@ -7,6 +7,10 @@ provider bodies, not a live simulator/UI/GPU capture.
 
 ## Composition
 
+This is the reset-only checkpoint. The subsequent
+[initial callback proof](UI_SELECTION_INITIAL.md) includes actual1410fe0f0;
+finish and recursive reset effects remain controlled there.
+
 118 complete original1410d6ca0 calls now execute all four child constructors,
 root/nested/payload/context/weather/fifth refreshes, both selection exits
 (alternate14111bb90 or changed14113ba10), and the whole reset14113a460 with
@@ -61,8 +65,9 @@ in use. The inherited catalog's first names are empty in this factory template;
 fallback forwards the actual zero length, whereas standalone reset proofs also
 cover nonempty names and live base changes.
 
-The constructor leaves selection+c0 zero, so the gate's early-skip branch is
-not reached here.54 zero-engine cases enter catalog handling directly;16 of64
+Reset-entry selection+c0 is0 in95 cases and1 in23. The early-skip branch is
+not reached in this cohort; the earlier always-zero explanation was incorrect
+and has been corrected from the actual input snapshots.54 zero-engine cases enter catalog handling directly;16 of64
 nonzero-engine cases pass the actual tag test, and48 go directly to notifying.
 Fresh selection receiver lists remain empty, so no actual notification request
 is reached in this cohort. The separate528-call reset corpus retains its817

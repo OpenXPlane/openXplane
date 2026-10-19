@@ -934,6 +934,15 @@ fn native_factory_with_actual_selection_reset_and_all_refresh_chains() {
         ReplayMode::Reset,
     );
 }
+#[test]
+#[ignore = "requires whole initial/reset factory corpus via OPENXPLANE_UI_FACTORY_SELECTION_INITIAL_VECTORS"]
+fn native_factory_with_actual_initial_callback_reset_and_all_refresh_chains() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_SELECTION_INITIAL_VECTORS",
+        118,
+        ReplayMode::Initial,
+    );
+}
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 enum ReplayMode {
     Controlled,
@@ -946,6 +955,7 @@ enum ReplayMode {
     Changed,
     Alternate,
     Reset,
+    Initial,
 }
 fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_predicate = mode >= ReplayMode::Predicate;
@@ -962,6 +972,13 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
         let v = row.split_whitespace().collect::<Vec<_>>();
         assert_eq!(v.len(), 10);
+        if mode >= ReplayMode::Initial {
+            assert!(
+                v[9].split('|')
+                    .any(|e| e.starts_with("S~") && e.contains("K~C@")),
+                "actual initial callback subrow required"
+            );
+        }
         assert_eq!(v[4], "->");
         let seed = num(v[1]) as u8;
         let mut host = Host {

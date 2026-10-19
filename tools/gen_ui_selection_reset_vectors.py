@@ -6,9 +6,9 @@ from unicorn.x86_const import UC_X86_REG_RIP
 from emulate_xp import Emulator,RET_ADDR
 from extract_commands import REFERENCE_SHA256
 from ui_selection_reset_harness import install
-def main(path):
+def main(path,native_initial=False):
  assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==REFERENCE_SHA256
- e=Emulator(path);obj=e.alloc(0x2d0);h=install(e)
+ e=Emulator(path);obj=e.alloc(0x2d0);h=install(e,native_initial=native_initial)
  tags=[255,0,1,2,3,4];rows=[]
  for tag,cli,alias,kind,ix in itertools.product(tags,[0,255],range(3),range(4),[-1,1,99]):
   i=len(rows);rows.append(dict(tag=tag,cli=cli,alias=alias,kind=kind,index=ix,seed=[0,0xa5,255][i%3],path=i%5,variant_alias=i%3,returned_tag=tags[(i//3)%6],listeners=i%5,mutate=i%2,argument=[0,1,0xffffffff,0x123456789abcdef0][i%4],receiver=0))
@@ -21,5 +21,6 @@ def main(path):
   e.call(0x14113a460,ints=[obj,v['argument']],max_instructions=100000)
   assert e.reg(UC_X86_REG_RIP)==RET_ADDR and h['row']
   print(h['row'])
+ if native_initial:print('# actual initial callback stats/helper returns',h['initial_stats'],h['initial_totals'])
  print('# cases',len(rows));print('# stats',h['stats']);print('# actual_returns',h['totals'])
-if __name__=='__main__':main(sys.argv[1])
+if __name__=='__main__':main(sys.argv[1],'--native-initial' in sys.argv[2:])
