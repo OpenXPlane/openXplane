@@ -143,3 +143,7 @@ default.528 recursive outer calls/55 nested bodies,118 factories/11 nested
 bodies and504 catalog boundary cases passed explicitly. All four reset replay
 modes and the prior controlled-recursion factory replay passed. Workspace/all-
 targets Clippy with warnings denied passed.
+
+Subsequent direct finish caller evidence is documented in
+[UI_SELECTION_FINISH.md](UI_SELECTION_FINISH.md). That proof does not replace
+the controlled finish endpoints in these recursive/factory cohorts.
