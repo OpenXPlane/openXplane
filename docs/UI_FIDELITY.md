@@ -470,3 +470,14 @@ destructor.118 factories execute23 actual alternate and95 actual changed bodies;
 effect. Real providers/registry/reset/final/full dialog/viewer/GPU and paired
 visuals remain unverified. See
 [UI_SELECTION_ALTERNATE](../research/UI_SELECTION_ALTERNATE.md). Estimates unchanged.
+
+
+Whole selection finish14113d660 now matches560 complete original caller runs
+with actual gate/query/primary/resource getters and explicit controlled leaf
+boundaries. Production scalar values separately match1452 SSE instruction
+results under Rosetta and the ordinary native x86_64 Linux and Windows CI tests. Raw whole-
+caller replay uses an explicit Unicorn2.1.4 NaN override in test code only.
+See [UI_SELECTION_FINISH](../research/UI_SELECTION_FINISH.md). Finish still
+needs composition into recursive reset/callback/factory callers. Full dialog,
+Alt/Esc live integration and paired original screenshots/GIF/video are unfinished;
+this CPU evidence leaves rendering verified coverage at zero.

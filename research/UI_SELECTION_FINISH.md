@@ -102,8 +102,14 @@ the caller constants. Production scalar values match all1452 results locally.
 This process was compiled for x86_64 and executed under **Rosetta on macOS ARM**;
 it is not execution on the original Windows PC. An ordinary x86_64-only Rust
 unit test repeats the1452 comparisons against inline SSE instructions with
-masked, nearest MXCSR and restores the prior MXCSR afterward. Its hosted result
-must be checked separately before claiming physical-x86 evidence. Exception
+masked, nearest MXCSR and restores the prior MXCSR afterward. The [hosted x86_64 Linux job](https://github.com/OpenXPlane/openXplane/actions/runs/39289045864/job/118184560786)
+completed successfully, and its log explicitly records this test as passed on
+`stable-x86_64-unknown-linux-gnu` (Rust1.99.1). This is separate native x86
+instruction evidence. The [Windows x86_64 job](https://github.com/OpenXPlane/openXplane/actions/runs/39289045864/job/118184560784)
+also completed with the same test explicitly passed on
+`stable-x86_64-pc-windows-msvc`. Neither job executes the complete original
+simulator. All three platform test jobs and warnings-denied lint passed for
+commit88c5b3cff093d2b0d1a9be63913d059157a72744. Exception
 flags, non-default rounding, DAZ/FTZ and broader NaN-sensitive oracles remain
 outside this value-only verification.
 
@@ -126,11 +132,22 @@ OPENXPLANE_UI_SELECTION_SSE_VECTORS=/tmp/selection-sse.txt cargo test --offline 
 Local validation:560 full callers and1452 independent scalar results passed;
 204 ordinary xp-app tests passed,89 local-proof tests ignored by default.
 Workspace/all-targets Clippy with warnings denied passed. The new inline-assembly
-unit test is excluded on the local ARM host; hosted x86 execution is a separate
-check, not inferred from the local204 count.
+unit test is excluded on the local ARM host. The completed Linux and Windows CI logs prove
+its separate native x86 runs, rather than inferring it from the local204 count.
 
 Next: compose actual finish with recursive reset, initial callback and all
 factory refreshes, then recover controlled providers and real state producers.
 Full dialog/widgets/Main Menu, Alt/Esc live integration, GPU and paired screenshot/
 GIF/video acceptance remain unfinished. Compatibility estimates were reviewed
 and remain unchanged; whole-game1:1 parity is unproven.
+
+Integration constraints for the next stage: reset's tail JMP reaches finish at
+finish-frame=reset-frame-570; a normal callback call reaches it at callback-
+frame-650. Finish must inherit current parent/catalog/table/owner state, suspend
+ancestor gate/helper observers while its own scope is active, and publish all
+caller regions only after its real RET. A normal callback finish must not be
+misclassified as reset tail completion. Recursive reset and suspended callback
+frames must then resume in LIFO order. Constructor composition additionally
+needs a fallible finish bridge carrying current image/sentinel/callback state.
+These are implementation constraints from the recovered callers, not claims
+that this composition already executes.
