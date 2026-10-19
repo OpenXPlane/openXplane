@@ -4,10 +4,11 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_RSP
 FUNCS={0x141a3cbc0:2,0x1411363f0:2,0x14113d660:1,0x1405de1d0:1,0x14113ff10:1,0x14113a460:2,0x1417fb370:1,0x1417f8940:1}
 PAIRS=[(0,0x80000000),(0x3f800000,0x3f800000),(0x3f800000,0x40000000),(0x7fc12345,0),(0x7fa00001,0x3f800000),(0x7f800000,0x7f800000),(0x7f800000,0xff800000),(0x80000000,0)]
-def install(e,before=None,on_finish=None):
+def install(e,before=None,on_finish=None,native_recursive=False):
  old=e.stubs.copy();parents=[e.alloc(0x3e0)for _ in range(2)];value=e.alloc(4);record=e.alloc(64);obj=0
  external={**{p:0x3e0 for p in parents},value:4,record:64}
  h=dict(active=False,enabled=False,stack=0,ranges={},events=[],row=None,v={},compare=0,entries={},returns={},totals={})
+ suspended=[];recursive_stats=dict(calls=0,max_depth=0)
  stats=dict(cases=0,compare_first=0,compare_second=0,float=0,finish=0,cleanup=0,secondary=0,reset=0,copies=0)
  def snap():return '/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(h['ranges'].items()))
  def leaf(fn,args):
@@ -42,6 +43,9 @@ def install(e,before=None,on_finish=None):
  for fn in FUNCS:
   def dispatch(emu,fn=fn):
    if not h['active']:return old[fn](emu)if fn in old else True
+   if native_recursive and fn==0x14113a460:
+    assert emu.reg(UC_X86_REG_RCX)==obj and emu.reg(UC_X86_REG_RDX)==1 and e.read(obj+0xc0,1)==b'\0'
+    return True
    if not h['v']['controlled']and fn in[0x1417fb370,0x1417f8940]:return True
    leaf(fn,[emu.reg(r)for r in[UC_X86_REG_RCX,UC_X86_REG_RDX][:FUNCS[fn]]])
   e.stubs[fn]=dispatch
@@ -71,4 +75,13 @@ def install(e,before=None,on_finish=None):
   if fn:h['returns'][fn]=h['returns'].get(fn,0)+1;h['totals'][fn]=h['totals'].get(fn,0)+1
   else:h['entries'][a]=h['entries'].get(a,0)+1
  for a,hook in [(0x1410fe0f0,begin),(0x1410fe105,frame),(0x1410fe27c,finish),*[(a,observe)for a in[0x1417fb370,0x1417fb377,0x1417f8940,0x1417f894a,0x1410fe214,0x1410fe29f]]]:e.uc.hook_add(UC_HOOK_CODE,hook,begin=a,end=a)
+ def suspend():
+  assert h['active']
+  fields=['active','enabled','stack','ranges','events','row','v','compare','entries','returns','initial','key']
+  suspended.append({k:h[k]for k in fields if k in h});h['active']=False;h['enabled']=False
+  recursive_stats['calls']+=1;recursive_stats['max_depth']=max(recursive_stats['max_depth'],len(suspended))
+ def resume(row):
+  assert not h['active'] and suspended
+  h.update(suspended.pop());h['events'].append('R~'+row.encode().hex())
+ h['suspend']=suspend;h['resume']=resume;h['suspended']=suspended;h['recursive_stats']=recursive_stats
  e.stubs.pop(0x1410fe0f0,None);h['stats']=stats;return h

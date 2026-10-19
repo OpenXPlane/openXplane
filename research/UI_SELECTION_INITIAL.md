@@ -7,6 +7,10 @@ synthetic inputs and controlled dependencies. There is no live UI/GPU capture.
 
 ## Complete1410fe0f0 caller
 
+This is the controlled-recursion checkpoint. The subsequent
+[actual recursive-reset proof](UI_SELECTION_RECURSIVE_RESET.md) executes those
+requested bodies while keeping the remaining provider limits explicit.
+
 The callback receiver is selection owner+38. It tests the full64-bit key against
 0x1e1b9; every other key returns without reading object state or allocating its
 frame. The third incoming integer argument is not used. The source returns a

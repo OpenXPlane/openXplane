@@ -7,6 +7,10 @@ mapped state, not an observation of the running simulator or rendered UI.
 
 ## Recovered14113a460
 
+The subsequent [recursive composition](UI_SELECTION_RECURSIVE_RESET.md) removes
+the old catalog range validation and verifies the original signed/wrapping
+calculation, including zero, negative and partial distances with mapped backing.
+
 The source first invokes1410fe0f0(owner+38,0x1e1b9,0), then the actual recovered
 reset gate14114d330. The gate's default uses actual engine-query1417fb320,
 primary comparison14113fff0 and resource getter141a64260. Secondary14113ff10

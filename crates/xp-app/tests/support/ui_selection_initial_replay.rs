@@ -29,10 +29,12 @@ fn compare(s: &State, expected: &str, label: &str) {
         );
     }
 }
+pub type RecursiveReset = fn(&str, &mut State);
 struct Replay {
     events: Vec<String>,
     position: usize,
     controlled: bool,
+    recursive: Option<RecursiveReset>,
 }
 impl Services for Replay {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
@@ -41,6 +43,18 @@ impl Services for Replay {
             .get(self.position)
             .expect("unexpected callback dependency");
         self.position += 1;
+        if let Some(encoded) = event.strip_prefix("R~") {
+            assert_eq!(function, 0x14113a460);
+            assert_eq!(args, [s.identity, 1]);
+            let bytes = (0..encoded.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap())
+                .collect::<Vec<_>>();
+            let row = String::from_utf8(bytes).unwrap();
+            self.recursive
+                .expect("actual recursive reset handler required")(&row, s);
+            return Ok(0); // Callback ignores reset's unspecified RAX.
+        }
         let f = event.split('~').collect::<Vec<_>>();
         assert_eq!(f.len(), 5);
         assert_eq!(f[0], "I");
@@ -80,6 +94,14 @@ impl Services for Replay {
     }
 }
 pub fn run_row(row: &str, image: Option<&[u8]>, shared: &BTreeMap<u64, Vec<u8>>) -> State {
+    run_row_with_reset(row, image, shared, None)
+}
+pub fn run_row_with_reset(
+    row: &str,
+    image: Option<&[u8]>,
+    shared: &BTreeMap<u64, Vec<u8>>,
+    recursive: Option<RecursiveReset>,
+) -> State {
     let v = row.split_whitespace().collect::<Vec<_>>();
     assert_eq!(v.len(), 9);
     assert_eq!(v[6], "->");
@@ -108,6 +130,7 @@ pub fn run_row(row: &str, image: Option<&[u8]>, shared: &BTreeMap<u64, Vec<u8>>)
         },
         position: 0,
         controlled: v[4] == "1",
+        recursive,
     };
     ui_selection_initial::callback(&mut s, &mut h, v[3].parse().unwrap()).unwrap();
     compare(&s, v[7], "final callback");

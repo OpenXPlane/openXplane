@@ -131,12 +131,11 @@ pub fn reset(s: &mut State, h: &mut impl Services, argument: u32) -> Result<(), 
             let mut index = h.invoke(s, 0x14163b530, &[copied])? as u32 as i32;
             let end = s.q(CATALOG_END)?;
             let begin = s.q(CATALOG_BEGIN)?;
-            let bytes = end.checked_sub(begin).ok_or("invalid catalog")?;
-            if bytes == 0 || bytes % 168 != 0 || bytes / 168 > i32::MAX as u64 {
-                return Err("nonempty aligned bounded catalog required");
-            }
-            let count = (bytes / 168) as i32;
-            if index < 0 || index > count - 1 {
+            // Original signed division truncates toward zero; its comparison
+            // consumes low32 of count-1, without a range/alignment validation.
+            let distance = end.wrapping_sub(begin) as i64;
+            let last = ((distance / 168) as u32).wrapping_sub(1) as i32;
+            if index < 0 || index > last {
                 index = 0;
                 let name = begin + 0x58;
                 let mut n = 0;

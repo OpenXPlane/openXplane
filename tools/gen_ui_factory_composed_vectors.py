@@ -12,7 +12,7 @@ HEAD,BEGIN,END,ACTIVE=0x14588f558,0x145e4dab8,0x145e4dac0,0x145a10798
 CTORS=[0x1410d6a40,0x1410d6fc0,0x1410d7490,0x1410d75a0]
 SIZES=[0x3e0,0x2d0,0x60,0x3e8]
 RETURNS=[0x1410d6cd7,0x1410d6d0a,0x1410d6d3d,0x1410d6d76]
-def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False,native_weather=False,native_changed=False,native_alternate=False,native_reset=False,native_initial=False):
+def install(e,root_harness=None,native_context=False,native_fifth=False,native_predicate=False,native_tables=False,native_engine=False,native_child_tables=False,native_weather=False,native_changed=False,native_alternate=False,native_reset=False,native_initial=False,native_recursive=False):
  bundle=e.alloc(40);catalog=e.alloc(168*3);resource=root_harness['resource'] if root_harness else e.alloc(0x6190);selected=e.alloc(32);top=e.heap_top;v={};events=[];blocks={};objects=[];temps=[];original_stubs=e.stubs.copy()
  fifth_scope=None;weather_scope=None;changed_scope=None;alternate_scope=None;reset_scope=None;context_totals={};selection_totals={}
  def ret(x):e.uc.reg_write(UC_X86_REG_RAX,x&((1<<64)-1))
@@ -146,7 +146,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
    profile=dict(seed=v['seed'],tag=tags[(case//3)%6],cli=255 if case%2 else 0,alias=case%3,kind=(case//3)%4,index=[-1,1,99][case%3],variant_alias=(case//2)%3,returned_tag=tags[(case//2)%6],listeners=0,mutate=False,argument=0,engine=v['engine'])
    h['prepare'](p,case,profile,dict(blocks))
   def reset_finish(row):v['reset_returns']+=1;events.append('S~'+row.replace(' ','!').replace('|','^'))
-  reset_scope=install_reset(e,tables=root_harness['tables'],before=reset_begin,on_finish=reset_finish,native_initial=native_initial);top=e.heap_top
+  reset_scope=install_reset(e,tables=root_harness['tables'],before=reset_begin,on_finish=reset_finish,native_initial=native_initial,native_recursive=native_recursive);top=e.heap_top
  if native_tables:
   def constructor_record_return(uc,a,size,user):
    if v['kind']==-1 and (not fifth_scope or not fifth_scope.active):v['constructor_returns']+=1
@@ -187,6 +187,7 @@ def install(e,root_harness=None,native_context=False,native_fifth=False,native_p
   if native_alternate:assert v['alternate_returns']+v['changed_returns']==1
   if native_reset:assert v['reset_returns']==1
   return ' '.join(map(str,['C',seed,catalog,','.join(map(str,temps)),'->',snap(),graph(parents),lists,e.read_u64(HEAD),'|'.join(events)]))
+ run_case.native_recursive_totals=lambda:(reset_scope['recursive_stats'],reset_scope['recursive_callback_stats'])if native_recursive else None
  run_case.native_initial_totals=lambda:(reset_scope['initial_stats'],reset_scope['initial_totals'])if native_initial else None
  run_case.native_reset_totals=lambda:(reset_scope['stats'],reset_scope['totals'])if reset_scope else None
  run_case.native_alternate_totals=lambda:(alternate_scope.total_returns,alternate_scope.get_totals,alternate_scope.temp_dtor_calls)if alternate_scope else None

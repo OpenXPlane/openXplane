@@ -52,7 +52,12 @@ impl Services for Replay {
         assert_eq!(fields[2].parse::<u64>().unwrap(), s.stack - 0xa0);
         assert_eq!(fields[3].parse::<u64>().unwrap(), 0x1e1b9);
         let image = s.memory.read(s.identity, 0x2d0)?;
-        let runtime = initial_replay::run_row(&row, Some(&image), &s.memory.blocks);
+        let runtime = initial_replay::run_row_with_reset(
+            &row,
+            Some(&image),
+            &s.memory.blocks,
+            Some(reset_from_callback),
+        );
         for (p, b) in &mut s.memory.blocks {
             *b = runtime.memory.read(*p, b.len())?;
         }
@@ -128,4 +133,22 @@ pub fn run_row(
     compare(&s, v[6], "final reset");
     assert_eq!(h.position, h.events.len());
     s
+}
+
+fn reset_from_callback(row: &str, s: &mut openxplane::ui_selection_initial::State) {
+    let fields = row.split_whitespace().collect::<Vec<_>>();
+    assert_eq!(fields.len(), 8);
+    assert_eq!(fields[1].parse::<u64>().unwrap(), s.identity);
+    assert_eq!(fields[2].parse::<u64>().unwrap(), s.stack - 0xe0);
+    assert_eq!(fields[3], "1");
+    assert_eq!(s.memory.read(s.identity + 0xc0, 1).unwrap(), [0]);
+    assert!(
+        fields[7].starts_with("K~C@"),
+        "nested reset must execute real callback"
+    );
+    let image = s.memory.read(s.identity, 0x2d0).unwrap();
+    let runtime = run_row(row, Some(&image), None, &s.memory.blocks);
+    for (p, b) in &mut s.memory.blocks {
+        *b = runtime.memory.read(*p, b.len()).unwrap();
+    }
 }

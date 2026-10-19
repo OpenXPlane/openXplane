@@ -943,6 +943,15 @@ fn native_factory_with_actual_initial_callback_reset_and_all_refresh_chains() {
         ReplayMode::Initial,
     );
 }
+#[test]
+#[ignore = "requires recursive factory corpus via OPENXPLANE_UI_FACTORY_SELECTION_RECURSIVE_VECTORS"]
+fn native_factory_with_actual_recursive_selection_reset_and_all_refresh_chains() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_SELECTION_RECURSIVE_VECTORS",
+        118,
+        ReplayMode::Recursive,
+    );
+}
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 enum ReplayMode {
     Controlled,
@@ -956,6 +965,7 @@ enum ReplayMode {
     Alternate,
     Reset,
     Initial,
+    Recursive,
 }
 fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_predicate = mode >= ReplayMode::Predicate;
@@ -969,6 +979,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_reset = mode >= ReplayMode::Reset;
     let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
+    let mut recursive_rows = 0;
     for row in corpus.lines().filter(|r| r.starts_with("C ")) {
         let v = row.split_whitespace().collect::<Vec<_>>();
         assert_eq!(v.len(), 10);
@@ -980,6 +991,12 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
             );
         }
         assert_eq!(v[4], "->");
+        if mode >= ReplayMode::Recursive {
+            recursive_rows += usize::from(
+                v[9].split('|')
+                    .any(|e| e.starts_with("S~") && e.contains("%R~")),
+            );
+        }
         let seed = num(v[1]) as u8;
         let mut host = Host {
             replay: Replay {
@@ -1037,4 +1054,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
         count += 1;
     }
     assert_eq!(count, expected_cases);
+    if mode >= ReplayMode::Recursive {
+        assert_eq!(recursive_rows, 11);
+    }
 }
