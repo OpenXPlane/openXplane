@@ -491,3 +491,12 @@ Unicorn2.1.4-specific; leaf/provider/producer/lifetime and full dialog/menu/live
 Alt/Esc/GPU/paired captures remain unfinished. See
 [UI_SELECTION_FINISH_COMPOSED](../research/UI_SELECTION_FINISH_COMPOSED.md).
 Compatibility estimates are reviewed and unchanged.
+
+
+Record equality141a3c910/negation141a3cbc0 now matches1500 complete original
+calls; new560-finish/712-callback cohorts execute284/1143 actual predicates and
+match inherited state/provider boundaries. Production caller defaults use the
+recovered body; derived strings/CRT/free remain controlled. Recursive/factory
+predicate binding is still pending. This adds no live UI or paired pixels;
+full dialog/menu/Alt/Esc/viewer/GPU/captures remain unverified. See
+[UI_RECORD_COMPARE](../research/UI_RECORD_COMPARE.md). Estimates unchanged.

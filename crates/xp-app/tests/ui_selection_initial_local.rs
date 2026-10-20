@@ -38,3 +38,30 @@ fn whole_original_initial_callback_float_alias_type_transition_and_recursive_res
     }
     assert_eq!((cases, pairs), (712, 768));
 }
+
+#[test]
+#[ignore = "requires composed comparison corpus via OPENXPLANE_UI_SELECTION_INITIAL_COMPARE_VECTORS"]
+fn whole_initial_with_actual_record_comparison_before_and_after_finish() {
+    use std::io::BufRead;
+    let file = std::fs::File::open(
+        std::env::var("OPENXPLANE_UI_SELECTION_INITIAL_COMPARE_VECTORS").unwrap(),
+    )
+    .unwrap();
+    let (mut count, mut predicates) = (0, 0);
+    for row in std::io::BufReader::new(file).lines() {
+        let row = row.unwrap();
+        if !row.starts_with("C ") {
+            continue;
+        }
+        predicates += row
+            .split_whitespace()
+            .nth(8)
+            .unwrap()
+            .split('|')
+            .filter(|e| e.starts_with("P~"))
+            .count();
+        replay::run_row(&row, None, &Default::default());
+        count += 1;
+    }
+    assert_eq!((count, predicates), (712, 1143));
+}

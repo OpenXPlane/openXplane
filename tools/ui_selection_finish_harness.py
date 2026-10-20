@@ -5,9 +5,10 @@ from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X8
 ENGINE,INDEX,TABLE,BEGIN,END,DENOM=0x142f2dc95,0x142640504,0x146124398,0x145e4dab8,0x145e4dac0,0x142650450
 FP=[0,0x80000000,0x3f800000,0xbf800000,0x7f800000,0xff800000,0x7fc12345,0xffc54321,0x7fa00001,0xffa12345,1,0x7f7fffff,0x3f9e0652,0xc2f6e979,0x3eaaaaab,0x00800001,0x4b000001]
 FUNCS={0x1417f9060:1,0x1410d6520:2,0x141a3c750:1,0x1414cf5e0:0,0x1406d4ba0:1,0x141a3cbc0:2,0x1411363f0:2,0x1410fa970:2,0x140c8ef70:2,0x141100d80:2,0x1405de3d0:2,0x1405ddde0:1,0x1423c0280:3,0x1405e6a10:3,0x1423c0920:3,0x141bae6d0:1,0x141b9e840:2,0x141ba6df0:2,0x141ba63a0:2,0x141a66550:5,0x141a664d0:3,0x14111da80:8,0x14113ff10:1,0x1423c0180:3}
-def install(e,before=None,on_finish=None):
+def install(e,before=None,on_finish=None,native_compare=False):
  import unicorn
  assert unicorn.__version__=='2.1.4','raw finish scope requires audited Unicorn2.1.4 NaN semantics'
+ record_scope=None
  old=e.stubs.copy();obj=0;parents=[e.alloc(0x3e0)for _ in range(2)];controls=[e.alloc(168)for _ in range(2)];catalog=e.alloc(168*3);buffers=[e.alloc(512)for _ in range(5)];external_record=e.alloc(0x198);external_float=e.alloc(4);arrays=[e.alloc(21*0x6668)for _ in range(2)]
  maps={**{p:0x3e0 for p in parents},**{p:168 for p in controls},catalog:168*3,**{p:512 for p in buffers},external_record:0x198,external_float:4,ENGINE:1,INDEX:4,TABLE:8,BEGIN:8,END:8,DENOM:4,**{p+i*0x6668+0x6178:32 for p in arrays for i in[0,20]}}
  h=dict(active=False,enabled=False,stack=0,row=None,v={},ranges={},events=[],ready_calls=0,manager_calls=0,float_calls=0,grows=0,inactive=False,prepop=False,entries={},returns={},totals={})
@@ -20,9 +21,12 @@ def install(e,before=None,on_finish=None):
   o=obj;s=h['stack'];v=h['v'];initial=snap();result=0;t=s+0x50;p=s+0x1f0;work=s+0x390
   if fn==0x1417f9060:assert args==[o+0x50];result=controls[0]if v['token']else 0
   elif fn==0x1410d6520:
-   assert args[0]in[t,p] and args[1]==e.read_u64(o+0xc8)+0x20;e.write(args[0],pattern(v['seed']^0x33,0x198));result=args[0]
+   assert args[0]in[t,p] and args[1]==e.read_u64(o+0xc8)+0x20;e.write(args[0],e.read(args[1],0x198)if native_compare else pattern(v['seed']^0x33,0x198));result=args[0]
   elif fn==0x141a3c750:
-   assert args[0]in[t,p];e.write(args[0],pattern(v['seed']^0x44,0x198));e.write(external_record,pattern(v['seed']^0x66,0x198));result=external_record if v['case']%2 else args[0]
+   assert args[0]in[t,p];e.write(args[0],pattern(v['seed']^0x44,0x198));e.write(external_record,pattern(v['seed']^0x66,0x198))
+   if native_compare:
+    for dst in[args[0],external_record]:record_scope['record'](dst,0,dict(kind=1))
+   result=external_record if v['case']%2 else args[0]
   elif fn==0x1414cf5e0:assert args==[];result=12345+h['manager_calls'];h['manager_calls']+=1
   elif fn==0x1406d4ba0:
    assert args==[12345+h['ready_calls']];i=h['ready_calls'];h['ready_calls']+=1;assert i<2;result=v['ready1'if i==0 else'ready2']
@@ -97,6 +101,7 @@ def install(e,before=None,on_finish=None):
  def prepare(identity,case,v,owned=None,preserve=False):
   nonlocal obj
   obj=identity;h.update(active=False,enabled=True,stack=0,row=None,v={**v,'case':case},ranges={**maps,**(owned or {obj:0x2d0})},events=[],ready_calls=0,manager_calls=0,float_calls=0,grows=0,inactive=False,prepop=False,entries={},returns={})
+  if native_compare:h['ranges'].update(record_scope['private'])
   if owned is not None:
    # Only new provider storage is initialized at the outer scenario boundary.
    # At actual nested entry, preserve every inherited physical region.
@@ -123,6 +128,9 @@ def install(e,before=None,on_finish=None):
   for i in range(8):e.write_u64(buffers[0]+i*8,catalog+(i%3)*168)
   for off in[0xd8,0xf0]:e.write_u64(obj+off,buffers[0]);e.write_u64(obj+off+8,buffers[0]+16)
   e.write_u64(obj+0x108,buffers[0]);e.write_u64(obj+0x110,buffers[0]+v['items']*8);e.write_u64(obj+0x118,buffers[0]+v['capacity']*8);e.write_u64(obj+0x120,0x12345678);e.write_u32(obj+0x2c8,FP[v['fp']]);e.write(obj+0xc0,bytes([v['pending']]));e.write_u64(obj+0xc8,parents[0]if v['parent']else 0);e.write_u64(obj+0xd0,parents[1]if v['secondary_parent']else 0)
+  if native_compare:
+   for dst in[obj+0x130,*[p+0x20 for p in parents]]:record_scope['record'](dst,0,dict(kind=1))
+   e.write_u32(obj+0x1d0,0x87654321+case%2)
  h['prepare']=prepare
  def begin(uc,a,size,user):
   if before:before(e.reg(UC_X86_REG_RCX),h)
@@ -142,4 +150,11 @@ def install(e,before=None,on_finish=None):
   if fn:h['returns'][fn]=h['returns'].get(fn,0)+1;h['totals'][fn]=h['totals'].get(fn,0)+1
   else:h['entries'][a]=h['entries'].get(a,0)+1
  for a,hook in[(0x14113d660,begin),(0x14113d688,frame),(0x14113db48,finish),*[(a,observe)for a in[0x14113d8b3,0x14113d928,0x14113d9bc,0x14114d330,0x14114d390,0x14114d39d,0x1417fb320,0x1417fb327,0x14113fff0,0x141140047,0x14114004f,0x141a64260,0x141a6426d]]]:e.uc.hook_add(UC_HOOK_CODE,hook,begin=a,end=a)
+ if native_compare:
+  from ui_record_compare_harness import install as install_compare
+  def compare_begin(left,right,scope):
+   assert h['active'];case=h['v']['case']
+   scope['prepare'](left,right,case,dict(seed=h['v']['seed'],stage=case%10,temp_kind=[1,3,4,5,6][case%5],alias=(case//5)%3,override=None,mutate=False),dict(h['ranges']))
+  record_scope=install_compare(e,before=compare_begin,on_finish=lambda row:h['events'].append('P~'+row.encode().hex()))
+  h['compare_stats']=record_scope['stats']
  e.stubs.pop(0x14113d660,None);h['stats']=stats;return h

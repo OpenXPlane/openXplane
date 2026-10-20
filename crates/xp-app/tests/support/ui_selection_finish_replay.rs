@@ -1,6 +1,8 @@
 //! Raw Unicorn caller replay; NaN propagation is explicitly oracle-specific.
 //! Production scalar policy is checked independently against actual SSE instructions.
 #![allow(dead_code)]
+#[path = "ui_record_compare_replay.rs"]
+pub mod record_compare_replay;
 use openxplane::{
     ui_payload_move,
     ui_selection_finish::{self, Services, State},
@@ -39,6 +41,17 @@ struct Replay {
     position: usize,
 }
 impl Services for Replay {
+    fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
+        if let Some(encoded) = self.events[self.position].strip_prefix("P~") {
+            let result =
+                record_compare_replay::from_caller(encoded, left, right, s.stack, &mut s.memory);
+            self.position += 1;
+            Ok(result)
+        } else {
+            Ok(self.invoke(s, 0x141a3cbc0, &[left, right])? as u8 != 0)
+        }
+    }
+
     fn scalar(&mut self, a: u32, b: u32, op: ui_selection_finish::ScalarOp) -> u32 {
         let is_nan = |v: u32| v & 0x7f800000 == 0x7f800000 && v & 0x7fffff != 0;
         if is_nan(a) && is_nan(b) {

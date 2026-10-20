@@ -1,5 +1,6 @@
-//! Whole selection callback1410fe0f0 for key0x1e1b9. Compare/float/finish,
-//! cleanup, secondary predicate and recursive-reset bodies remain services.
+//! Whole selection callback1410fe0f0 for key0x1e1b9. Record comparison uses
+//! a recovered default; float/finish/cleanup/secondary/recursive-reset bodies
+//! remain services.
 use crate::ui_payload_move;
 pub struct State {
     pub memory: ui_payload_move::State,
@@ -38,6 +39,30 @@ pub fn payload_if_three(
 }
 pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
+        let identity = s.identity;
+        let stack = s.stack;
+        let mut memory = std::mem::take(&mut s.memory);
+        let result = crate::ui_record_compare::different_with(
+            &mut memory,
+            stack - 0xa0,
+            left,
+            right,
+            |memory, f, args| {
+                let mut caller = State {
+                    memory: std::mem::take(memory),
+                    identity,
+                    stack,
+                };
+                let result = self.invoke(&mut caller, f, args);
+                *memory = caller.memory;
+                result
+            },
+        );
+        s.memory = memory;
+        result
+    }
+
     fn tag_is_three(&mut self, s: &mut State, receiver: u64) -> Result<bool, &'static str> {
         tag_is_three(&s.memory, receiver)
     }
@@ -53,7 +78,7 @@ pub fn callback(s: &mut State, h: &mut impl Services, key: u64) -> Result<(), &'
     let sp = s.stack;
     let parent = s.q(r + 0x90)?;
     if parent != 0 {
-        let different = h.invoke(s, 0x141a3cbc0, &[r + 0xf8, parent + 0x20])? as u8 != 0;
+        let different = h.different(s, r + 0xf8, parent + 0x20)?;
         let changed = if different {
             true
         } else {
@@ -75,10 +100,7 @@ pub fn callback(s: &mut State, h: &mut impl Services, key: u64) -> Result<(), &'
         }
     }
     let parent = s.q(r + 0x90)?;
-    if parent != 0
-        && h.invoke(s, 0x141a3cbc0, &[r + 0xf8, parent + 0x20])? as u8 != 0
-        && h.tag_is_three(s, r + 0x18)?
-    {
+    if parent != 0 && h.different(s, r + 0xf8, parent + 0x20)? && h.tag_is_three(s, r + 0x18)? {
         let p = h.payload(s, r + 0x18)?;
         let third = s.memory.read(p + 0x20, 16)?;
         let mut tail = s.memory.read(p + 0x30, 8)?;

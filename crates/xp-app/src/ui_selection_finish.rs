@@ -19,6 +19,30 @@ pub enum ScalarOp {
 pub trait Services {
     /// Float operands/results are raw low32 words, not converted host doubles.
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
+        let identity = s.identity;
+        let stack = s.stack;
+        let mut memory = std::mem::take(&mut s.memory);
+        let result = crate::ui_record_compare::different_with(
+            &mut memory,
+            stack - 0xa0,
+            left,
+            right,
+            |memory, f, args| {
+                let mut caller = State {
+                    memory: std::mem::take(memory),
+                    identity,
+                    stack,
+                };
+                let result = self.invoke(&mut caller, f, args);
+                *memory = caller.memory;
+                result
+            },
+        );
+        s.memory = memory;
+        result
+    }
+
     fn scalar(&mut self, a: u32, b: u32, op: ScalarOp) -> u32 {
         scalar_sse(a, b, op)
     }
@@ -140,7 +164,7 @@ pub fn finish(s: &mut State, h: &mut impl Services) -> Result<(), &'static str> 
     let manager = h.invoke(s, 0x1414cf5e0, &[])?;
     let ready = h.invoke(s, 0x1406d4ba0, &[manager])? as u8 != 0;
     if ready {
-        let different = h.invoke(s, 0x141a3cbc0, &[primary, o + 0x130])? as u8 != 0;
+        let different = h.different(s, primary, o + 0x130)?;
         let update = if different {
             true
         } else {

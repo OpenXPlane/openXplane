@@ -41,3 +41,30 @@ fn default_scalar_values_match_independent_x86_instruction_oracle() {
     }
     assert_eq!(cases, 1452);
 }
+
+#[test]
+#[ignore = "requires composed comparison corpus via OPENXPLANE_UI_SELECTION_FINISH_COMPARE_VECTORS"]
+fn whole_finish_with_actual_record_comparison_and_cleanup() {
+    use std::io::BufRead;
+    let file = std::fs::File::open(
+        std::env::var("OPENXPLANE_UI_SELECTION_FINISH_COMPARE_VECTORS").unwrap(),
+    )
+    .unwrap();
+    let (mut count, mut predicates) = (0, 0);
+    for row in std::io::BufReader::new(file).lines() {
+        let row = row.unwrap();
+        if !row.starts_with("C ") {
+            continue;
+        }
+        predicates += row
+            .split_whitespace()
+            .nth(7)
+            .unwrap()
+            .split('|')
+            .filter(|e| e.starts_with("P~"))
+            .count();
+        replay::run_row(&row, None, &Default::default());
+        count += 1;
+    }
+    assert_eq!((count, predicates), (560, 284));
+}

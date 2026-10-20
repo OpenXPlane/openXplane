@@ -38,6 +38,22 @@ struct Replay {
     recursive: Option<RecursiveReset>,
 }
 impl Services for Replay {
+    fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
+        if let Some(encoded) = self.events[self.position].strip_prefix("P~") {
+            let result = crate::finish_replay::record_compare_replay::from_caller(
+                encoded,
+                left,
+                right,
+                s.stack,
+                &mut s.memory,
+            );
+            self.position += 1;
+            Ok(result)
+        } else {
+            Ok(self.invoke(s, 0x141a3cbc0, &[left, right])? as u8 != 0)
+        }
+    }
+
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         let event = self
             .events

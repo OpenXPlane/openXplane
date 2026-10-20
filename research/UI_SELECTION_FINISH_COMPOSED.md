@@ -157,3 +157,8 @@ by default. Both new full-chain replays and the prior118-case controlled-finish
 recursive factory replay passed explicitly. Workspace/all-targets Clippy with
 warnings denied passed; formatting and diff whitespace checks passed. These
 local original-dependent corpora are not present in hosted CI.
+
+Subsequent predicate evidence: [UI_RECORD_COMPARE.md](UI_RECORD_COMPARE.md)
+ports equality/negation and binds it in new direct finish/callback cohorts.
+Earlier controlled comparisons, including recursive/factory cohorts, retain
+their explicitly separate scope.

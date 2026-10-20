@@ -119,3 +119,5 @@ pub mod ui_selection_reset;
 pub mod ui_selection_initial;
 
 pub mod ui_selection_finish;
+
+pub mod ui_record_compare;

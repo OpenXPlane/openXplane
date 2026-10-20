@@ -155,3 +155,8 @@ that this composition already executes.
 Subsequent composition: [UI_SELECTION_FINISH_COMPOSED.md](UI_SELECTION_FINISH_COMPOSED.md)
 executes actual finish through recursive reset/callback and whole factories in
 a new explicit mode. Earlier controlled endpoint cohorts keep their own scope.
+
+Subsequent predicate evidence: [UI_RECORD_COMPARE.md](UI_RECORD_COMPARE.md)
+ports equality/negation and binds it in new direct finish/callback cohorts.
+Earlier controlled comparisons, including recursive/factory cohorts, retain
+their explicitly separate scope.

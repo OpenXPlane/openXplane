@@ -148,3 +148,8 @@ by default.712 callback calls plus768 helper pairs,528 callback/reset calls and
 118 initial/reset factories passed explicitly. Legacy528 reset and118 reset-
 factory replays also passed; their regenerated corpus files are byte-identical.
 Workspace/all-targets Clippy with warnings denied passed.
+
+Subsequent predicate evidence: [UI_RECORD_COMPARE.md](UI_RECORD_COMPARE.md)
+ports equality/negation and binds it in new direct finish/callback cohorts.
+Earlier controlled comparisons, including recursive/factory cohorts, retain
+their explicitly separate scope.
