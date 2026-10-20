@@ -1,5 +1,5 @@
-//! Whole equality141a3c910 and negated wrapper141a3cbc0. Derived-string,
-//! memcmp and deallocation bodies remain explicit services.
+//! Whole equality141a3c910 and negated wrapper141a3cbc0. Derived-string uses
+//! a recovered default; memcmp and deallocation remain explicit services.
 use crate::ui_payload_move;
 pub struct State {
     pub memory: ui_payload_move::State,
@@ -7,6 +7,27 @@ pub struct State {
 }
 pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn derived(&mut self, s: &mut State, record: u64, out: u64) -> Result<u64, &'static str> {
+        let stack = s.stack;
+        let mut memory = std::mem::take(&mut s.memory);
+        let result = crate::ui_record_class_string::build_with(
+            &mut memory,
+            stack - 0xa0,
+            record,
+            out,
+            |memory, f, args| {
+                let mut caller = State {
+                    memory: std::mem::take(memory),
+                    stack,
+                };
+                let result = self.invoke(&mut caller, f, args);
+                *memory = caller.memory;
+                result
+            },
+        );
+        s.memory = memory;
+        result
+    }
 }
 impl State {
     fn q(&self, p: u64) -> Result<u64, &'static str> {
@@ -83,9 +104,9 @@ pub fn equal(
             return Ok(false);
         }
     }
-    let a = h.invoke(s, 0x141a3df30, &[left, sp + 0x40])?;
+    let a = h.derived(s, left, sp + 0x40)?;
     s.memory.write(sp + 0x70, &1u32.to_le_bytes())?;
-    let b = h.invoke(s, 0x141a3df30, &[right, sp + 0x20])?;
+    let b = h.derived(s, right, sp + 0x20)?;
     // Both return pointers may alias either physical temporary or caller data.
     let mut result = strings(s, h, a, b, false)?;
     if result {
@@ -179,6 +200,12 @@ mod caller_defaults {
         for off in [0, 0x20, 0x40, 0x60, 0x80, 0xa8, 0xc8, 0xe8, 0x108] {
             record[off + 24..off + 32].copy_from_slice(&15u64.to_le_bytes());
         }
+        let sentinel = 0x40000u64;
+        record[0x180..0x188].copy_from_slice(&sentinel.to_le_bytes());
+        let mut head = vec![0; 40];
+        head[8..16].copy_from_slice(&sentinel.to_le_bytes());
+        head[0x19] = 1;
+        memory.blocks.insert(sentinel, head);
         memory.blocks.insert(LEFT, record.clone());
         memory.blocks.insert(RIGHT, record);
         memory
@@ -186,15 +213,11 @@ mod caller_defaults {
     struct Host;
     fn provider(m: &mut ui_payload_move::State, f: u64, a: &[u64]) -> Result<u64, &'static str> {
         match f {
-            0x1423c0180 => Ok(u64::from(
-                m.read(a[0], a[2] as usize)? != m.read(a[1], a[2] as usize)?,
-            )),
-            0x141a3df30 => {
-                let mut value = [0; 32];
-                value[24..].copy_from_slice(&15u64.to_le_bytes());
-                m.write(a[1], &value)?;
+            0x1423c0180 => {
+                let result =
+                    u64::from(m.read(a[0], a[2] as usize)? != m.read(a[1], a[2] as usize)?);
                 m.write(LEFT + 0xa4, &[0x7e])?;
-                Ok(a[1])
+                Ok(result)
             }
             _ => Err("unexpected comparison service"),
         }
@@ -227,7 +250,7 @@ mod caller_defaults {
             stack: 0x100000,
         };
         assert!(!finish::Services::different(&mut Host, &mut s, LEFT, RIGHT).unwrap());
-        assert_eq!(s.memory.blocks.len(), 2);
+        assert_eq!(s.memory.blocks.len(), 3);
         assert_eq!(s.memory.read(LEFT + 0xa4, 1).unwrap(), [0x7e]);
     }
     #[test]
@@ -238,7 +261,7 @@ mod caller_defaults {
             stack: 0x100000,
         };
         assert!(!initial::Services::different(&mut Host, &mut s, LEFT, RIGHT).unwrap());
-        assert_eq!(s.memory.blocks.len(), 2);
+        assert_eq!(s.memory.blocks.len(), 3);
         assert_eq!(s.memory.read(LEFT + 0xa4, 1).unwrap(), [0x7e]);
     }
 }

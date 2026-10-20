@@ -153,3 +153,7 @@ Subsequent predicate evidence: [UI_RECORD_COMPARE.md](UI_RECORD_COMPARE.md)
 ports equality/negation and binds it in new direct finish/callback cohorts.
 Earlier controlled comparisons, including recursive/factory cohorts, retain
 their explicitly separate scope.
+
+Subsequent class-string evidence: [UI_RECORD_CLASS_STRING.md](UI_RECORD_CLASS_STRING.md)
+executes actual derived/label/reached-resize bodies in new equality/finish/callback
+cohorts. Earlier controlled-derived and recursive/factory cohorts keep their scope.

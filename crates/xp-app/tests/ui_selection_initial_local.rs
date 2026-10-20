@@ -65,3 +65,30 @@ fn whole_initial_with_actual_record_comparison_before_and_after_finish() {
     }
     assert_eq!((count, predicates), (712, 1143));
 }
+
+#[test]
+#[ignore = "requires composed class-string corpus via OPENXPLANE_UI_SELECTION_INITIAL_CLASS_VECTORS"]
+fn whole_initial_with_actual_comparison_class_tree_label_and_resize() {
+    use std::io::BufRead;
+    let file = std::fs::File::open(
+        std::env::var("OPENXPLANE_UI_SELECTION_INITIAL_CLASS_VECTORS").unwrap(),
+    )
+    .unwrap();
+    let (mut count, mut predicates, mut classes) = (0, 0, 0);
+    for row in std::io::BufReader::new(file).lines() {
+        let row = row.unwrap();
+        if !row.starts_with("C ") {
+            continue;
+        }
+        for event in row.split_whitespace().nth(8).unwrap().split('|') {
+            if let Some(encoded) = event.strip_prefix("P~") {
+                predicates += 1;
+                classes +=
+                    finish_replay::record_compare_replay::actual_classes_in_encoded_row(encoded);
+            }
+        }
+        replay::run_row(&row, None, &Default::default());
+        count += 1;
+    }
+    assert_eq!((count, predicates, classes), (712, 1143, 2286));
+}

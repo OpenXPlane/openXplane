@@ -121,3 +121,5 @@ pub mod ui_selection_initial;
 pub mod ui_selection_finish;
 
 pub mod ui_record_compare;
+
+pub mod ui_record_class_string;

@@ -1,5 +1,7 @@
 //! Strict comparison replay; leaf effects remain controlled.
 #![allow(dead_code)]
+#[path = "ui_record_class_string_replay.rs"]
+mod class_string_replay;
 use openxplane::{
     ui_payload_move,
     ui_record_compare::{self, Services, State},
@@ -32,6 +34,17 @@ struct Replay {
     position: usize,
 }
 impl Services for Replay {
+    fn derived(&mut self, s: &mut State, record: u64, out: u64) -> Result<u64, &'static str> {
+        if let Some(encoded) = self.events[self.position].strip_prefix("D~") {
+            let result =
+                class_string_replay::from_caller(encoded, record, out, s.stack, &mut s.memory);
+            self.position += 1;
+            Ok(result)
+        } else {
+            self.invoke(s, 0x141a3df30, &[record, out])
+        }
+    }
+
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         let event = self
             .events
@@ -116,4 +129,18 @@ pub fn from_caller(
         *b = runtime.memory.read(*p, b.len()).unwrap();
     }
     fields[8] == "1"
+}
+
+pub fn actual_classes_in_encoded_row(encoded: &str) -> usize {
+    let bytes = (0..encoded.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap())
+        .collect::<Vec<_>>();
+    let row = String::from_utf8(bytes).unwrap();
+    let fields = row.split_whitespace().collect::<Vec<_>>();
+    assert_eq!(fields.len(), 10);
+    fields[9]
+        .split('|')
+        .filter(|event| event.starts_with("D~"))
+        .count()
 }

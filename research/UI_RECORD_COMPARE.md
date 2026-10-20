@@ -137,3 +137,7 @@ substitute for these explicit local runs.
 
 The prior560-finish and712-callback controlled-predicate replays also passed
 explicitly after switching production defaults; their own scope is unchanged.
+
+Subsequent class-string evidence: [UI_RECORD_CLASS_STRING.md](UI_RECORD_CLASS_STRING.md)
+executes actual derived/label/reached-resize bodies in new equality/finish/callback
+cohorts. Earlier controlled-derived and recursive/factory cohorts keep their scope.

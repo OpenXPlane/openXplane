@@ -4,7 +4,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP
 EQUAL,DIFFERENT=0x141a3c910,0x141a3cbc0
 OFFSETS=[0,0x20,0x40,0x60,0x80,0xa8,0xc8,0xe8,0x108]
-def install(e,before=None,on_finish=None):
+def install(e,before=None,on_finish=None,native_derived=False):
+ class_scope=None
  old=e.stubs.copy();heaps=[e.alloc(4200)for _ in range(22)]
  private={p:128 for p in heaps}
  h=dict(active=False,enabled=False,row=None,ranges={},events=[],stack=0,v={},records=[],compares=0,derived=0)
@@ -21,10 +22,12 @@ def install(e,before=None,on_finish=None):
  def record(p,which,v):
   for i,off in enumerate(OFFSETS):string(p+off,v.get('text',b'value'),v['kind'],which*9+i)
   e.write_u32(p+0xa0,0x87654321)
+  if native_derived:e.write_u64(p+0x180,class_scope['heads'][which%2])
  def prepare(left,right,case,v,owned=None):
   h.update(active=False,enabled=True,row=None,ranges={**private,**(owned or {left:0x198,right:0x198})},events=[],stack=0,v={**v,'case':case},records=[left,right],compares=0,derived=0)
   if owned is not None:return
-  for p,n in h['ranges'].items():e.write(p,bytes([v['seed']])*n)
+  for p,n in h['ranges'].items():
+   if p!=0x142505110:e.write(p,bytes([v['seed']])*n)
   record(left,0,v);record(right,1,v)
   stage=v['stage'];fields={1:0,2:0x20,3:0x60,6:0xa8,7:0x80,8:0x108}
   if stage in fields:
@@ -33,6 +36,10 @@ def install(e,before=None,on_finish=None):
   elif stage==9:
    # Explicitly ignored record storage, not a bytewise full-record comparison.
    e.write(right+0x128,bytes([v['seed']^0x11])*0x70);string(right+0x40,b'other',v['kind'],11)
+  if native_derived:
+   mask=(case*137)&0xfff;other=mask^0x555
+   class_scope['seed'](left,mask,other,case%3,[1,255][case%2])
+   e.write_u64(right+0x180,class_scope['heads'][int(v['stage']==4)])
  h['prepare']=prepare;h['record']=record;h['private']=private
  def leaf(fn,args):
   initial=snap();v=h['v'];sp=h['stack'];left,right=h['records'];result=0
@@ -81,4 +88,17 @@ def install(e,before=None,on_finish=None):
   h['active']=False;h['enabled']=False
   if on_finish:on_finish(h['row'])
  for a,f in[(EQUAL,enter),(DIFFERENT,enter),(0x141a3c924,frame),(0x141a3cba7,finish),(0x141a3cbcf,finish)]:e.uc.hook_add(UC_HOOK_CODE,f,begin=a,end=a)
+ if native_derived:
+  from ui_record_class_string_harness import install as install_class
+  def class_begin(record,out,scope):
+   assert h['active'];v=h['v'];case=v['case'];h['derived']+=1;stats['derived']+=1
+   scope['prepare'](record,out,case,dict(seed=v['seed'],mutate=v['mutate'],dirty=case%2,grow_alias=(case//2)%2,tail=case%4),dict(h['ranges']))
+   h['active']=False
+  def class_done(row):h['events'].append('D~'+row.encode().hex());h['active']=True
+  class_scope=install_class(e,before=class_begin,on_finish=class_done);private.update(class_scope['private']);h['class_stats']=class_scope['stats']
+  def seed_class(case):
+   mask=(case*137)&0xfff
+   for slot,bits in enumerate([mask,mask^0x555]):class_scope['tree'](slot,bits,case%3,[1,255][case%2])
+  h['seed_class']=seed_class
+
  e.stubs.pop(EQUAL,None);e.stubs.pop(DIFFERENT,None);h['stats']=stats;return h

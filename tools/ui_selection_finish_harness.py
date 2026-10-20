@@ -5,7 +5,8 @@ from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X8
 ENGINE,INDEX,TABLE,BEGIN,END,DENOM=0x142f2dc95,0x142640504,0x146124398,0x145e4dab8,0x145e4dac0,0x142650450
 FP=[0,0x80000000,0x3f800000,0xbf800000,0x7f800000,0xff800000,0x7fc12345,0xffc54321,0x7fa00001,0xffa12345,1,0x7f7fffff,0x3f9e0652,0xc2f6e979,0x3eaaaaab,0x00800001,0x4b000001]
 FUNCS={0x1417f9060:1,0x1410d6520:2,0x141a3c750:1,0x1414cf5e0:0,0x1406d4ba0:1,0x141a3cbc0:2,0x1411363f0:2,0x1410fa970:2,0x140c8ef70:2,0x141100d80:2,0x1405de3d0:2,0x1405ddde0:1,0x1423c0280:3,0x1405e6a10:3,0x1423c0920:3,0x141bae6d0:1,0x141b9e840:2,0x141ba6df0:2,0x141ba63a0:2,0x141a66550:5,0x141a664d0:3,0x14111da80:8,0x14113ff10:1,0x1423c0180:3}
-def install(e,before=None,on_finish=None,native_compare=False):
+def install(e,before=None,on_finish=None,native_compare=False,native_derived=False):
+ native_compare=native_compare or native_derived
  import unicorn
  assert unicorn.__version__=='2.1.4','raw finish scope requires audited Unicorn2.1.4 NaN semantics'
  record_scope=None
@@ -118,7 +119,8 @@ def install(e,before=None,on_finish=None,native_compare=False):
    base=e.read_u64(TABLE)
    h['ranges'].update({base+i*0x6668+0x6178:32 for i in[0,20]})
    h['ranges']=merged(h['ranges']);return
-  for p,n in h['ranges'].items():e.write(p,bytes([v['seed']])*n)
+  for p,n in h['ranges'].items():
+   if p!=0x142505110:e.write(p,bytes([v['seed']])*n)
   for parent in parents:string(parent+0x20,b'parent')
   for p in arrays:
    for i in[0,20]:string(p+i*0x6668+0x6178,b'parent'if v['equal']else b'other')
@@ -129,6 +131,7 @@ def install(e,before=None,on_finish=None,native_compare=False):
   for off in[0xd8,0xf0]:e.write_u64(obj+off,buffers[0]);e.write_u64(obj+off+8,buffers[0]+16)
   e.write_u64(obj+0x108,buffers[0]);e.write_u64(obj+0x110,buffers[0]+v['items']*8);e.write_u64(obj+0x118,buffers[0]+v['capacity']*8);e.write_u64(obj+0x120,0x12345678);e.write_u32(obj+0x2c8,FP[v['fp']]);e.write(obj+0xc0,bytes([v['pending']]));e.write_u64(obj+0xc8,parents[0]if v['parent']else 0);e.write_u64(obj+0xd0,parents[1]if v['secondary_parent']else 0)
   if native_compare:
+   if native_derived:record_scope['seed_class'](case)
    for dst in[obj+0x130,*[p+0x20 for p in parents]]:record_scope['record'](dst,0,dict(kind=1))
    e.write_u32(obj+0x1d0,0x87654321+case%2)
  h['prepare']=prepare
@@ -155,6 +158,7 @@ def install(e,before=None,on_finish=None,native_compare=False):
   def compare_begin(left,right,scope):
    assert h['active'];case=h['v']['case']
    scope['prepare'](left,right,case,dict(seed=h['v']['seed'],stage=case%10,temp_kind=[1,3,4,5,6][case%5],alias=(case//5)%3,override=None,mutate=False),dict(h['ranges']))
-  record_scope=install_compare(e,before=compare_begin,on_finish=lambda row:h['events'].append('P~'+row.encode().hex()))
+  record_scope=install_compare(e,before=compare_begin,on_finish=lambda row:h['events'].append('P~'+row.encode().hex()),native_derived=native_derived)
   h['compare_stats']=record_scope['stats']
+  if native_derived:h['class_stats']=record_scope['class_stats']
  e.stubs.pop(0x14113d660,None);h['stats']=stats;return h

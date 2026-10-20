@@ -4,7 +4,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_RSP
 FUNCS={0x141a3cbc0:2,0x1411363f0:2,0x14113d660:1,0x1405de1d0:1,0x14113ff10:1,0x14113a460:2,0x1417fb370:1,0x1417f8940:1}
 PAIRS=[(0,0x80000000),(0x3f800000,0x3f800000),(0x3f800000,0x40000000),(0x7fc12345,0),(0x7fa00001,0x3f800000),(0x7f800000,0x7f800000),(0x7f800000,0xff800000),(0x80000000,0)]
-def install(e,before=None,on_finish=None,native_recursive=False,native_compare=False):
+def install(e,before=None,on_finish=None,native_recursive=False,native_compare=False,native_derived=False):
+ native_compare=native_compare or native_derived
  record_scope=None
  old=e.stubs.copy();parents=[e.alloc(0x3e0)for _ in range(2)];value=e.alloc(4);record=e.alloc(64);obj=0
  external={**{p:0x3e0 for p in parents},value:4,record:64}
@@ -55,10 +56,11 @@ def install(e,before=None,on_finish=None,native_recursive=False,native_compare=F
   obj=identity;h.update(active=False,enabled=True,stack=0,row=None,v={**v,'case':case},compare=0,events=[],entries={},returns={},ranges={**(owned or {obj:0x2d0}),**external})
   if native_compare:h['ranges'].update(record_scope['private'])
   for p,n in h['ranges'].items():
-   if not owned or p not in owned:e.write(p,bytes([v['seed']])*n)
+   if p!=0x142505110 and(not owned or p not in owned):e.write(p,bytes([v['seed']])*n)
   if not owned:
    r=obj+0x38;e.write_u64(r+0x90,parents[0]if v['parent']else 0);e.write_u64(r+0xd0,0x1000);e.write_u64(r+0xd8,0x1000 if case%2 else 0x2000);e.write_u32(r+0x290,PAIRS[v['float']][0]);e.write(r+0x80,bytes([v['tag']]));e.write(r+0x78,bytes([v['optional']]));e.write(r+0x88,bytes([v['pending']]));e.write(r+0x48,bytes([v['tail']]))
   if native_compare and not owned:
+   if native_derived:record_scope['seed_class'](case)
    for dst in[obj+0x130,*[p+0x20 for p in parents]]:record_scope['record'](dst,0,dict(kind=1))
    e.write_u32(obj+0x1d0,0x87654321+case%2)
   h['initial']=snap()
@@ -94,6 +96,7 @@ def install(e,before=None,on_finish=None,native_recursive=False,native_compare=F
   def compare_begin(left,right,scope):
    assert h['active'];case=h['v']['case']
    scope['prepare'](left,right,case,dict(seed=h['v']['seed'],stage=case%10,temp_kind=[1,3,4,5,6][case%5],alias=(case//5)%3,override=None,mutate=False),dict(h['ranges']))
-  record_scope=install_compare(e,before=compare_begin,on_finish=lambda row:h['events'].append('P~'+row.encode().hex()))
+  record_scope=install_compare(e,before=compare_begin,on_finish=lambda row:h['events'].append('P~'+row.encode().hex()),native_derived=native_derived)
   h['compare_stats']=record_scope['stats']
+  if native_derived:h['class_stats']=record_scope['class_stats']
  e.stubs.pop(0x1410fe0f0,None);h['stats']=stats;return h

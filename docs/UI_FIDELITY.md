@@ -500,3 +500,12 @@ recovered body; derived strings/CRT/free remain controlled. Recursive/factory
 predicate binding is still pending. This adds no live UI or paired pixels;
 full dialog/menu/Alt/Esc/viewer/GPU/captures remain unverified. See
 [UI_RECORD_COMPARE](../research/UI_RECORD_COMPARE.md). Estimates unchanged.
+
+
+Derived class-string141a3df30 and labels141a3cd30 now execute by default in
+record comparison.960 derived/60 label calls,1500 composed comparisons,560
+finish and712 callback callers cover actual class production/reached shrink
+branches;146 overlap cases corrected XMM copy ordering. Allocation/append/growth/
+free and real producer/lifetime/factory binding remain unproved or controlled.
+No live menu, GPU or paired capture is claimed. See
+[UI_RECORD_CLASS_STRING](../research/UI_RECORD_CLASS_STRING.md). Estimates unchanged.
