@@ -1,5 +1,6 @@
 //! Strict whole reset caller replay. Provider bodies remain controlled.
 #![allow(dead_code)]
+use crate::finish_replay;
 #[path = "ui_selection_initial_replay.rs"]
 mod initial_replay;
 use openxplane::{
@@ -69,6 +70,19 @@ impl Services for Replay {
             .get(self.position)
             .expect("unexpected provider request");
         self.position += 1;
+        if let Some(encoded) = event.strip_prefix("F~") {
+            assert_eq!(function, 0x14113d660);
+            assert_eq!(args, [s.identity]);
+            finish_replay::from_caller(
+                encoded,
+                s.identity,
+                s.stack,
+                0x570,
+                &[(s.stack + 0x20, 0xb0), (s.stack + 0xe0, 8)],
+                &mut s.memory,
+            );
+            return Ok(0); // Both callers ignore this void call's unspecified RAX.
+        }
         let f = event.split('~').collect::<Vec<_>>();
         assert_eq!(f.len(), 5);
         assert_eq!(f[0], "I");

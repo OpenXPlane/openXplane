@@ -151,3 +151,7 @@ frames must then resume in LIFO order. Constructor composition additionally
 needs a fallible finish bridge carrying current image/sentinel/callback state.
 These are implementation constraints from the recovered callers, not claims
 that this composition already executes.
+
+Subsequent composition: [UI_SELECTION_FINISH_COMPOSED.md](UI_SELECTION_FINISH_COMPOSED.md)
+executes actual finish through recursive reset/callback and whole factories in
+a new explicit mode. Earlier controlled endpoint cohorts keep their own scope.

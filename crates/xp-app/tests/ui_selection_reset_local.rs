@@ -1,3 +1,5 @@
+#[path = "support/ui_selection_finish_replay.rs"]
+mod finish_replay;
 #[path = "support/ui_selection_reset_replay.rs"]
 mod replay;
 #[test]
@@ -60,4 +62,26 @@ fn original_catalog_signed_division_low32_last_index_and_fallback() {
         cases += 1;
     }
     assert_eq!(cases, 504);
+}
+
+#[test]
+#[ignore = "requires composed local corpus via OPENXPLANE_UI_SELECTION_RESET_FINISH_VECTORS"]
+fn whole_recursive_reset_callback_and_real_finish_publish_inherited_state() {
+    use std::io::BufRead;
+    let file =
+        std::fs::File::open(std::env::var("OPENXPLANE_UI_SELECTION_RESET_FINISH_VECTORS").unwrap())
+            .unwrap();
+    let mut cases = 0;
+    for row in std::io::BufReader::new(file).lines() {
+        let row = row.unwrap();
+        if !row.starts_with("C ") {
+            continue;
+        }
+        let events = row.split_whitespace().nth(7).unwrap();
+        assert!(events.starts_with("K~C@"));
+        assert!(events.split('|').next_back().unwrap().starts_with("F~"));
+        replay::run_row(&row, None, None, &Default::default());
+        cases += 1;
+    }
+    assert_eq!(cases, 528);
 }

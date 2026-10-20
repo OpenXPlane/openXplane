@@ -123,3 +123,39 @@ pub fn run_row(row: &str, image: Option<&[u8]>, shared: &BTreeMap<u64, Vec<u8>>)
     assert_eq!(h.position, h.events.len());
     s
 }
+
+/// Execute the recovered child, checking every live inherited region. A tail
+/// jump ends the reset frame lifetime; its overwritten scratch is published
+/// afterward, but is not compared as live input after the finish prologue.
+pub fn from_caller(
+    encoded: &str,
+    identity: u64,
+    caller_stack: u64,
+    frame_delta: u64,
+    dead: &[(u64, usize)],
+    memory: &mut ui_payload_move::State,
+) {
+    let bytes = (0..encoded.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap())
+        .collect::<Vec<_>>();
+    let row = String::from_utf8(bytes).unwrap();
+    let fields = row.split_whitespace().collect::<Vec<_>>();
+    assert_eq!(fields.len(), 8);
+    assert_eq!(fields[1].parse::<u64>().unwrap(), identity);
+    assert_eq!(
+        fields[2].parse::<u64>().unwrap(),
+        caller_stack - frame_delta
+    );
+    let shared = memory
+        .blocks
+        .iter()
+        .filter(|(p, b)| !dead.contains(&(**p, b.len())))
+        .map(|(p, b)| (*p, b.clone()))
+        .collect();
+    let image = memory.read(identity, 0x2d0).unwrap();
+    let runtime = run_row(&row, Some(&image), &shared);
+    for (p, b) in &mut memory.blocks {
+        *b = runtime.memory.read(*p, b.len()).unwrap();
+    }
+}

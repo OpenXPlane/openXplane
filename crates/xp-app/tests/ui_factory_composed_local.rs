@@ -6,6 +6,8 @@ mod change_replay;
 mod context_replay;
 #[path = "support/ui_fifth_replay.rs"]
 mod fifth_replay;
+#[path = "support/ui_selection_finish_replay.rs"]
+mod finish_replay;
 #[path = "support/ui_selection_reset_replay.rs"]
 mod reset_replay;
 #[path = "support/ui_root_replay.rs"]
@@ -141,12 +143,14 @@ impl openxplane::ui_callback_list::Services for Replay {
     }
 }
 struct Provider<'a> {
+    finish_memory: Option<openxplane::ui_payload_move::State>,
     inherited: BTreeMap<u64, Vec<u8>>,
     native_child_tables: bool,
     native_weather: bool,
     native_changed: bool,
     native_alternate: bool,
     native_reset: bool,
+    native_finish: bool,
     resources: openxplane::ui_payload_move::State,
     replay: &'a mut Replay,
     id: u64,
@@ -367,10 +371,64 @@ impl selection::Services for Provider<'_> {
         s.image = runtime.memory.read(self.id, 0x2d0)?;
         base.bytes = runtime.memory.read(base.address, base.bytes.len())?;
         tree.bytes = runtime.memory.read(tree.address, tree.bytes.len())?;
+        if self.native_finish {
+            let mut live = runtime.memory;
+            // Local harness stack lifetimes ended at the tail return. Keep all
+            // owner/global/provider backing; new constructor scratch is separate.
+            live.blocks
+                .retain(|p, _| !(0x7ff000000000..0x7ff000200000).contains(p));
+            self.finish_memory = Some(live);
+        }
         Ok(())
     }
     fn finish(&mut self, s: &mut selection::State) {
         self.effect(&mut s.image, 0x14113d660, &[self.id]);
+    }
+    fn finish_checked(
+        &mut self,
+        s: &mut selection::State,
+        base: &mut Block,
+        tree: &mut Block,
+        context: &selection::Context<'_>,
+    ) -> Result<(), &'static str> {
+        if !self.native_finish {
+            self.finish(s);
+            return Ok(());
+        }
+        let event = self.replay.event();
+        assert_eq!(event[0], "F");
+        assert_eq!(event.len(), 2);
+        let row = String::from_utf8(hex(&event[1])).unwrap();
+        let mut memory = self
+            .finish_memory
+            .take()
+            .expect("actual reset memory required");
+        let mut published = factory::State::new([0; 40]);
+        published.blocks = self.inherited.clone();
+        published.blocks.insert(self.id, s.image.clone());
+        published.blocks.insert(base.address, base.bytes.clone());
+        published.blocks.insert(tree.address, tree.bytes.clone());
+        factory::publish_callback_links(&mut published, context.callbacks, context.parents)?;
+        for (p, b) in published.blocks {
+            assert_eq!(
+                memory.read(p, b.len())?,
+                b,
+                "live constructor finish input at{p:x}"
+            );
+        }
+        // Every inherited live region is checked before executing the Rust body.
+        let runtime = finish_replay::run_row(&row, Some(&s.image), &memory.blocks);
+        for (p, b) in &mut memory.blocks {
+            *b = runtime.memory.read(*p, b.len())?;
+        }
+        s.image = memory.read(self.id, 0x2d0)?;
+        base.bytes = memory.read(base.address, base.bytes.len())?;
+        tree.bytes = memory.read(tree.address, tree.bytes.len())?;
+        for (p, b) in &mut self.resources.blocks {
+            *b = memory.read(*p, b.len())?;
+        }
+        self.finish_memory = Some(memory);
+        Ok(())
     }
 }
 impl context::Services for Provider<'_> {
@@ -478,6 +536,7 @@ struct Host {
     native_changed: bool,
     native_alternate: bool,
     native_reset: bool,
+    native_finish: bool,
     shared_settings: BTreeMap<u64, Vec<u8>>,
 }
 impl Host {
@@ -530,6 +589,8 @@ impl factory::Services for Host {
             native_changed: self.native_changed,
             native_alternate: self.native_alternate,
             native_reset: self.native_reset,
+            native_finish: self.native_finish,
+            finish_memory: None,
             resources: openxplane::ui_payload_move::State {
                 blocks: self.shared_settings.clone(),
             },
@@ -966,6 +1027,7 @@ enum ReplayMode {
     Reset,
     Initial,
     Recursive,
+    Finish,
 }
 fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_predicate = mode >= ReplayMode::Predicate;
@@ -977,12 +1039,29 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     let native_changed = mode >= ReplayMode::Changed;
     let native_alternate = mode >= ReplayMode::Alternate;
     let native_reset = mode >= ReplayMode::Reset;
-    let corpus = std::fs::read_to_string(std::env::var(env).unwrap()).unwrap();
+    let native_finish = mode >= ReplayMode::Finish;
+    use std::io::BufRead;
+    let file = std::fs::File::open(std::env::var(env).unwrap()).unwrap();
     let mut count = 0;
     let mut recursive_rows = 0;
-    for row in corpus.lines().filter(|r| r.starts_with("C ")) {
+    for row in std::io::BufReader::new(file).lines() {
+        let row = row.unwrap();
+        if !row.starts_with("C ") {
+            continue;
+        }
         let v = row.split_whitespace().collect::<Vec<_>>();
         assert_eq!(v.len(), 10);
+        if native_finish {
+            assert!(
+                v[9].split('|').any(|e| e.starts_with("F~")),
+                "actual constructor finish required"
+            );
+            assert!(
+                v[9].split('|')
+                    .any(|e| e.starts_with("S~") && e.contains("^F~")),
+                "actual reset tail finish required"
+            );
+        }
         if mode >= ReplayMode::Initial {
             assert!(
                 v[9].split('|')
@@ -1022,6 +1101,7 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
             native_changed,
             native_alternate,
             native_reset,
+            native_finish,
             shared_settings: BTreeMap::new(),
         };
         let mut state = factory::State::new([seed; 40]);
@@ -1057,4 +1137,14 @@ fn replay_factory_mode(env: &str, expected_cases: usize, mode: ReplayMode) {
     if mode >= ReplayMode::Recursive {
         assert_eq!(recursive_rows, 11);
     }
+}
+
+#[test]
+#[ignore = "requires full finish factory corpus via OPENXPLANE_UI_FACTORY_SELECTION_FINISH_VECTORS"]
+fn native_factory_with_actual_recursive_reset_callback_finish_and_all_refresh_chains() {
+    replay_factory_mode(
+        "OPENXPLANE_UI_FACTORY_SELECTION_FINISH_VECTORS",
+        118,
+        ReplayMode::Finish,
+    );
 }

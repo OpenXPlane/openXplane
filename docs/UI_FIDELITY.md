@@ -481,3 +481,13 @@ See [UI_SELECTION_FINISH](../research/UI_SELECTION_FINISH.md). Finish still
 needs composition into recursive reset/callback/factory callers. Full dialog,
 Alt/Esc live integration and paired original screenshots/GIF/video are unfinished;
 this CPU evidence leaves rendering verified coverage at zero.
+
+
+Actual finish now composes in528 outer reset cases (55 nested resets,627 finish
+bodies) and118 complete factories (11 nested resets,351 finish bodies,590 retained
+entries). The checked constructor bridge preserves live input publication and
+returns child changes before enclosing callers resume. Raw NaN replay remains
+Unicorn2.1.4-specific; leaf/provider/producer/lifetime and full dialog/menu/live
+Alt/Esc/GPU/paired captures remain unfinished. See
+[UI_SELECTION_FINISH_COMPOSED](../research/UI_SELECTION_FINISH_COMPOSED.md).
+Compatibility estimates are reviewed and unchanged.

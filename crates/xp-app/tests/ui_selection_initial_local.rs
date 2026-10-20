@@ -1,3 +1,5 @@
+#[path = "support/ui_selection_finish_replay.rs"]
+mod finish_replay;
 #[path = "support/ui_selection_initial_replay.rs"]
 mod replay;
 use openxplane::{ui_payload_move, ui_selection_initial};

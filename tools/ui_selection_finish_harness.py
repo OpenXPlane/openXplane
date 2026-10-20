@@ -6,6 +6,8 @@ ENGINE,INDEX,TABLE,BEGIN,END,DENOM=0x142f2dc95,0x142640504,0x146124398,0x145e4da
 FP=[0,0x80000000,0x3f800000,0xbf800000,0x7f800000,0xff800000,0x7fc12345,0xffc54321,0x7fa00001,0xffa12345,1,0x7f7fffff,0x3f9e0652,0xc2f6e979,0x3eaaaaab,0x00800001,0x4b000001]
 FUNCS={0x1417f9060:1,0x1410d6520:2,0x141a3c750:1,0x1414cf5e0:0,0x1406d4ba0:1,0x141a3cbc0:2,0x1411363f0:2,0x1410fa970:2,0x140c8ef70:2,0x141100d80:2,0x1405de3d0:2,0x1405ddde0:1,0x1423c0280:3,0x1405e6a10:3,0x1423c0920:3,0x141bae6d0:1,0x141b9e840:2,0x141ba6df0:2,0x141ba63a0:2,0x141a66550:5,0x141a664d0:3,0x14111da80:8,0x14113ff10:1,0x1423c0180:3}
 def install(e,before=None,on_finish=None):
+ import unicorn
+ assert unicorn.__version__=='2.1.4','raw finish scope requires audited Unicorn2.1.4 NaN semantics'
  old=e.stubs.copy();obj=0;parents=[e.alloc(0x3e0)for _ in range(2)];controls=[e.alloc(168)for _ in range(2)];catalog=e.alloc(168*3);buffers=[e.alloc(512)for _ in range(5)];external_record=e.alloc(0x198);external_float=e.alloc(4);arrays=[e.alloc(21*0x6668)for _ in range(2)]
  maps={**{p:0x3e0 for p in parents},**{p:168 for p in controls},catalog:168*3,**{p:512 for p in buffers},external_record:0x198,external_float:4,ENGINE:1,INDEX:4,TABLE:8,BEGIN:8,END:8,DENOM:4,**{p+i*0x6668+0x6178:32 for p in arrays for i in[0,20]}}
  h=dict(active=False,enabled=False,stack=0,row=None,v={},ranges={},events=[],ready_calls=0,manager_calls=0,float_calls=0,grows=0,inactive=False,prepop=False,entries={},returns={},totals={})
@@ -49,13 +51,13 @@ def install(e,before=None,on_finish=None):
     if v['mutate']:e.write_u64(s+0x658,controls[1]if v['case']%3 else 0)
   elif fn==0x1423c0280:
    d,src,n=args;assert n<=512;e.write(d,e.read(src,n));stats['shift']+=1;result=d
-   if v['mutate']:e.write_u64(END,catalog);e.write_u32(catalog+168+0x88,0xfedc1234)
+   if v['mutate']:e.write_u64(END,e.read_u64(BEGIN));e.write_u32(e.read_u64(BEGIN)+168+0x88,0xfedc1234)
   elif fn==0x1405e6a10:
    assert args[0]==o+0x108 and args[2]==s+0x650;stats['grow']+=1
    b=e.read_u64(o+0x108);end=e.read_u64(o+0x110);position=args[1];offset=position-b;assert 0<=offset<=end-b and (end-b)%8==0
    n=end-b;assert n+8<=512;new=buffers[1+h['grows']];h['grows']+=1;assert h['grows']<=4
    data=e.read(b,n);e.write(new,data[:offset]+e.read(args[2],8)+data[offset:]);e.write_u64(o+0x108,new);e.write_u64(o+0x110,new+n+8);e.write_u64(o+0x118,new+8*8);result=new+offset
-   if v['mutate']:e.write_u64(END,catalog);e.write_u32(catalog+168+0x88,0xabcd4321)
+   if v['mutate']:e.write_u64(END,e.read_u64(BEGIN));e.write_u32(e.read_u64(BEGIN)+168+0x88,0xabcd4321)
   elif fn==0x1423c0920:assert args==[work,0,0x258];e.write(work,bytes(0x258));result=work;stats['work']+=1
   elif fn==0x141bae6d0:assert args==[work];e.write(work,pattern(v['seed']^0x77,32))
   elif fn==0x141b9e840:assert args==[work,e.read_u64(o+0xd0)+0x230];e.write(work+32,pattern(v['seed']^0x88,64))
@@ -64,7 +66,7 @@ def install(e,before=None,on_finish=None):
    assert args[0]==work;result=FP[(v['fp']+3)%len(FP)];e.uc.reg_write(UC_X86_REG_XMM0,result)
    if v['mutate']:e.write_u32(DENOM,FP[(v['fp']+4)%len(FP)])
   elif fn==0x141a66550:
-   assert args[0]in[arrays[0]+v['target_index']*0x6668,arrays[1]+v['target_index']*0x6668]and args[1]==s+0x658 and args[2]==h['cached_base'];e.write_u32(args[1],FP[(v['fp']+5)%len(FP)])
+   assert args[0]==e.read_u64(TABLE)+v['target_index']*0x6668 and args[1]==s+0x658 and args[2]==h['cached_base'];e.write_u32(args[1],FP[(v['fp']+5)%len(FP)])
    if v['mutate']:e.write_u64(TABLE,arrays[1]);e.write_u32(h['cached_token']+0x48,0x12345678)
   elif fn==0x141a664d0:
    assert args==[e.read_u64(TABLE)+v['target_index']*0x6668,s+0x650,h['cached_base']];e.write_u32(args[1],FP[(v['fp']+6)%len(FP)])
@@ -84,9 +86,33 @@ def install(e,before=None,on_finish=None):
    else:args=[emu.reg(r)for r in[UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8][:FUNCS[fn]]]
    leaf(fn,args)
   e.stubs[fn]=dispatch
- def prepare(identity,case,v):
+ def merged(ranges):
+  out={}
+  for p,n in sorted(ranges.items()):
+   if out:
+    last=next(reversed(out));end=last+out[last]
+    if p<end:out[last]=max(end,p+n)-last;continue
+   out[p]=n
+  return out
+ def prepare(identity,case,v,owned=None,preserve=False):
   nonlocal obj
-  obj=identity;h.update(active=False,enabled=True,stack=0,row=None,v={**v,'case':case},ranges={obj:0x2d0,**maps},events=[],ready_calls=0,manager_calls=0,float_calls=0,grows=0,inactive=False,prepop=False,entries={},returns={})
+  obj=identity;h.update(active=False,enabled=True,stack=0,row=None,v={**v,'case':case},ranges={**maps,**(owned or {obj:0x2d0})},events=[],ready_calls=0,manager_calls=0,float_calls=0,grows=0,inactive=False,prepop=False,entries={},returns={})
+  if owned is not None:
+   # Only new provider storage is initialized at the outer scenario boundary.
+   # At actual nested entry, preserve every inherited physical region.
+   if not preserve:
+    for p,n in maps.items():
+     if any(b<=p and p+n<=b+m for b,m in owned.items()):continue
+     if p in[ENGINE,INDEX,TABLE,BEGIN,END]:continue
+     e.write(p,bytes([v['seed']])*n)
+    for parent in parents:string(parent+0x20,b'parent')
+    for a in arrays:
+     for i in[0,20]:string(a+i*0x6668+0x6178,b'parent')
+    for i,p in enumerate(controls):e.write_u32(p+0x48,FP[(v['fp']+i+case)%len(FP)])
+    if DENOM not in owned:e.write_u32(DENOM,0x4ba83308)
+   base=e.read_u64(TABLE)
+   h['ranges'].update({base+i*0x6668+0x6178:32 for i in[0,20]})
+   h['ranges']=merged(h['ranges']);return
   for p,n in h['ranges'].items():e.write(p,bytes([v['seed']])*n)
   for parent in parents:string(parent+0x20,b'parent')
   for p in arrays:
@@ -102,7 +128,7 @@ def install(e,before=None,on_finish=None):
   if before:before(e.reg(UC_X86_REG_RCX),h)
   if h['enabled']:assert e.reg(UC_X86_REG_RCX)==obj;h['active']=True
  def frame(uc,a,size,user):
-  if h['active']:h['stack']=e.reg(UC_X86_REG_RSP);h['ranges'].update({h['stack']+0x20:0x5c8,h['stack']+0x650:24});h['initial']=snap()
+  if h['active']:h['stack']=e.reg(UC_X86_REG_RSP);h['ranges'].update({h['stack']+0x20:0x5c8,h['stack']+0x650:24});h['ranges']=merged(h['ranges']);h['initial']=snap()
  def finish(uc,a,size,user):
   if not h['active']:return
   assert h['entries']==h['returns'];h['row']=' '.join(map(str,['C',obj,h['stack'],'U214',h['initial'],'->',snap(),'|'.join(h['events'])]));h['active']=False;h['enabled']=False;stats['cases']+=1

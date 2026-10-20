@@ -147,3 +147,7 @@ targets Clippy with warnings denied passed.
 Subsequent direct finish caller evidence is documented in
 [UI_SELECTION_FINISH.md](UI_SELECTION_FINISH.md). That proof does not replace
 the controlled finish endpoints in these recursive/factory cohorts.
+
+Subsequent composition: [UI_SELECTION_FINISH_COMPOSED.md](UI_SELECTION_FINISH_COMPOSED.md)
+executes actual finish through recursive reset/callback and whole factories in
+a new explicit mode. Earlier controlled endpoint cohorts keep their own scope.

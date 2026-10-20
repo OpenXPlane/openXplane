@@ -4,14 +4,14 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP,UC_X86_REG_RIP
 BEGIN,END,INDEX,ENGINE,TABLE=0x145e4dab8,0x145e4dac0,0x142640504,0x142f2dc95,0x146124398
 FUNCS={0x1410fe0f0:3,0x140d776a0:2,0x140d77340:3,0x1414cf5e0:0,0x1414cce40:2,0x1405dd5c0:2,0x14163b530:1,0x1405df240:3,0x1414cd660:2,0x1410d3690:3,0x1405de1d0:1,0x141146740:3,0x1422e7c2c:2,0x1410c9d10:1,0x14113d660:1,0x14113ff10:1,0x1423c0180:3}
-def install(e,tables=None,before=None,on_finish=None,native_initial=False,native_recursive=False):
- obj=0;old=e.stubs.copy();receiver=e.alloc(0x90);resource=e.alloc(0x6668);external=e.alloc(32);variant=e.alloc(0x70)
+def install(e,tables=None,before=None,on_finish=None,native_initial=False,native_recursive=False,native_finish=False,outer_finish_before=None,outer_finish_done=None):
+ obj=0;old=e.stubs.copy();receiver=e.alloc(0x90);resource=e.alloc((21 if native_finish else 1)*0x6668);external=e.alloc(32);variant=e.alloc(0x70)
  catalogs=[e.alloc(168*3)for _ in range(3)];heaps=[e.alloc(4200)for _ in range(4)];head=e.alloc(120);head2=e.alloc(120);nodes=[e.alloc(120)for _ in range(3)]
  base_ranges={receiver:0x90,resource+0x6178:32,external:32,variant:0x70,BEGIN:8,END:8,INDEX:4,ENGINE:1,TABLE:8,head:120,head2:120,**{p:120 for p in nodes},**{p:168*3 for p in catalogs},**{p:128 for p in heaps}}
  if tables:
   base_ranges.pop(resource+0x6178);base_ranges.update(tables.maps);base_ranges[0x145a10798]=8
  h=dict(active=False,enabled=False,stack=0,ranges={},events=[],v={},native_entry={},native_return={},totals={})
- contexts=[];initial_scope=None;recursive_stats=dict(calls=0,max_reset_depth=1)
+ contexts=[];initial_scope=None;finish_scope=None;finish_parent=None;recursive_stats=dict(calls=0,max_reset_depth=1)
  stats=dict(cases=0,assign=0,fallback=0,cleanup=0,notify=0,finish=0,free=0)
  def snap():return '/'.join(f'{p}:{e.read(p,n).hex()}'for p,n in sorted(h['ranges'].items()))
  def string(p,kind,which,text=b'input'):
@@ -40,10 +40,14 @@ def install(e,tables=None,before=None,on_finish=None,native_initial=False,native
   elif fn==0x1410d3690:
    assert args[1:]==[s+0xe0,[t,variant,o+0x50][v['variant_alias']]];assert e.read_u64(args[1])==o+0x50
    tag=e.read(args[2]+0x68,1)[0];selector=(tag if tag<128 else tag-256)+1;assert args[0]==selector&((1<<64)-1)
-   if v['mutate']:e.write_u64(BEGIN,catalogs[1]);e.write(t+0x68,b'\0');e.write(t+0x60,b'\x01')
+   if v['mutate']:
+    e.write_u64(BEGIN,catalogs[1]);e.write(t+0x68,b'\0');e.write(t+0x60,b'\x01')
+    if native_finish:e.write_u64(END,catalogs[1]+3*168)
   elif fn==0x1405de1d0:
    assert args==[t+0x20];stats['cleanup']+=1
-   if v['mutate']:e.write_u64(BEGIN,catalogs[2])
+   if v['mutate']:
+    e.write_u64(BEGIN,catalogs[2])
+    if native_finish:e.write_u64(END,catalogs[2]+3*168)
   elif fn==0x141146740:
    assert args[0:2]==[o,v['argument']&0xffffffff];assert args[2]in[e.read_u64(BEGIN)+i*168 for i in range(3)];stats['assign']+=1
    if v['mutate'] and v['case']%3==0:string(a,(v['kind']+1)%4,2,b'changed')
@@ -68,15 +72,17 @@ def install(e,tables=None,before=None,on_finish=None,native_initial=False,native
    if fn not in FUNCS:return True
    leaf(fn,[emu.reg(r)for r in[UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8][:FUNCS[fn]]])
    if fn==0x14113d660:
-    assert h['native_entry']==h['native_return'] and h['native_return'][0x14114d330]==1
-    h['row']=' '.join(map(str,['C',obj,h['stack'],h['v']['argument'],h['initial'],'->',snap(),'|'.join(h['events'])]))
-    stats['cases']+=1;h['active']=False;h['enabled']=False
-    if contexts:
-     completed=h['row'];initial_scope['resume'](completed);h.update(contexts.pop())
-    else:
-     if native_recursive:assert not initial_scope['suspended'] and not initial_scope['active']
-     if on_finish:on_finish(h['row'])
+    complete()
   e.stubs[fn]=dispatch
+ def complete():
+  assert h['native_entry']==h['native_return'] and h['native_return'][0x14114d330]==1
+  h['row']=' '.join(map(str,['C',obj,h['stack'],h['v']['argument'],h['initial'],'->',snap(),'|'.join(h['events'])]))
+  stats['cases']+=1;h['active']=False;h['enabled']=False
+  if contexts:
+   completed=h['row'];initial_scope['resume'](completed);h.update(contexts.pop())
+  else:
+   if native_recursive:assert not initial_scope['suspended'] and not initial_scope['active']
+   if on_finish:on_finish(h['row'])
  def frame(uc,a,size,user):
   if not h['active']:return
   s=e.reg(UC_X86_REG_RSP);h['stack']=s;h['ranges'].update({s+0x20:0xb0,s+0xe0:8});h['initial']=snap()
@@ -106,6 +112,12 @@ def install(e,tables=None,before=None,on_finish=None,native_initial=False,native
    e.write_u64(BEGIN,catalogs[0]);e.write_u64(END,catalogs[0]+3*168);e.write_u32(INDEX,0);e.write_u64(TABLE,resource);e.write(ENGINE,bytes([0 if v['path']==2 else 255]));e.write(obj+0xc0,bytes([int(v['path']==0)]));e.write_u64(obj+0xc8,receiver if v['receiver']else 0);e.write(obj+0xb8,bytes([1 if v['path']==1 else 2 if v['path']==3 else 3]));string(receiver+0x20,0,0,b'gate');string(resource+0x6178,0,0,b'gate'if case%3 else b'other')
    count=[0,1,3,3,1][v['listeners']];e.write_u64(obj+8,head);e.write_u64(obj+16,count);e.write_u64(head,nodes[0]if count else head);e.write_u64(head+8,nodes[count-1]if count else head);e.write_u64(head2,head2);e.write_u64(head2+8,head2)
    for i,p in enumerate(nodes):e.write_u64(p,nodes[i+1]if i+1<count else head);e.write_u64(p+8,nodes[i-1]if i else head)
+  if native_finish and not preserve:
+   fv=finish_profile(case,v);finish_scope['prepare'](obj,case,fv,dict(h['ranges']))
+   h['ranges'].update(finish_scope['ranges']);finish_scope['active']=False;finish_scope['enabled']=False
+   if not owned:
+    # Explicit valid empty vectors in standalone scenario input, before reset.
+    for off in[0xd8,0xe0,0xf0,0xf8,0x108,0x110,0x118,0xd0]:e.write_u64(obj+off,0)
  h['prepare']=prepare
  def begin(uc,a,size,user):
   # Another scope may have returned from a controlled nested request already.
@@ -131,6 +143,34 @@ def install(e,tables=None,before=None,on_finish=None,native_initial=False,native
    scope['prepare'](obj,i,profile,dict(h['ranges']))
   initial_scope=install_initial(e,before=initial_begin,on_finish=lambda row:h['events'].append('K~'+row.replace(' ','@').replace('|','%')),native_recursive=native_recursive)
   h['recursive_callback_stats']=initial_scope['recursive_stats'];h['initial_stats']=initial_scope['stats'];h['initial_totals']=initial_scope['totals']
+ if native_finish:
+  assert native_initial and native_recursive
+  from ui_selection_finish_harness import install as install_finish
+  def finish_profile(case,v):
+   return dict(seed=v['seed'],token=int(case%3!=0),ready1=[0,255,256,257][case%4],ready2=[0,1,255][(case//4)%3],different=[0,1,256,257][(case//3)%4],fp=case%17,float_alias=(case//3)%3,items=0,mutate=v['mutate'],secondary=case%2)
+  def finish_begin(identity,scope):
+   nonlocal finish_parent
+   assert identity==obj and finish_parent is None
+   if not h['active']:
+    assert outer_finish_before and outer_finish_done
+    owned=outer_finish_before(identity)
+    scope['prepare'](obj,h['v']['case'],finish_profile(h['v']['case'],h['v']),owned,preserve=True)
+    finish_parent=(None,False);return
+   callback=bool(initial_scope['active']);parent=initial_scope if callback else h
+   finish_parent=(parent,callback)
+   scope['prepare'](obj,h['v']['case'],finish_profile(h['v']['case'],h['v']),dict(parent['ranges']),preserve=True)
+   h['active']=False
+   if callback:initial_scope['active']=False
+  def finish_done(row):
+   nonlocal finish_parent
+   parent,callback=finish_parent;finish_parent=None
+   if parent is None:outer_finish_done(row);return
+   parent['events'].append('F~'+row.encode().hex());h['active']=True
+   if callback:initial_scope['active']=True
+   else:complete()
+  finish_scope=install_finish(e,before=finish_begin,on_finish=finish_done)
+  h['finish_stats']=finish_scope['stats'];h['finish_totals']=finish_scope['totals']
+ h['busy']=lambda:h['active']or bool(finish_scope and finish_scope['active'])
  h['recursive_stats']=recursive_stats;h['contexts']=contexts
  h['stats']=stats
  return h

@@ -1,5 +1,6 @@
 //! Strict whole initial callback replay with explicit helper scope.
 #![allow(dead_code)]
+use crate::finish_replay;
 use openxplane::{
     ui_payload_move,
     ui_selection_initial::{self, Services, State},
@@ -43,6 +44,12 @@ impl Services for Replay {
             .get(self.position)
             .expect("unexpected callback dependency");
         self.position += 1;
+        if let Some(encoded) = event.strip_prefix("F~") {
+            assert_eq!(function, 0x14113d660);
+            assert_eq!(args, [s.identity]);
+            finish_replay::from_caller(encoded, s.identity, s.stack, 0x650, &[], &mut s.memory);
+            return Ok(0); // Both callers ignore this void call's unspecified RAX.
+        }
         if let Some(encoded) = event.strip_prefix("R~") {
             assert_eq!(function, 0x14113a460);
             assert_eq!(args, [s.identity, 1]);
