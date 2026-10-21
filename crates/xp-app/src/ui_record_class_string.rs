@@ -1,18 +1,71 @@
 //! Whole class-string141a3df30 and class-label141a3cd30. Successful allocation,
-//! append/growth/free remain services; reached resize uses its recovered shrink branch.
-use crate::ui_payload_move;
+//! move/free remain services; append/growth and reached shrink use recovered bodies.
+use crate::{ui_payload_move, ui_string_append};
 pub struct State {
     pub memory: ui_payload_move::State,
     pub stack: u64,
 }
 pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn append(
+        &mut self,
+        s: &mut State,
+        out: u64,
+        data: u64,
+        length: u64,
+    ) -> Result<u64, &'static str> {
+        string_call(
+            s,
+            self,
+            s.stack - 0x40,
+            ui_string_append::Operation::Append {
+                object: out,
+                source: data,
+                count: length,
+            },
+        )
+    }
+    fn grow_separator(
+        &mut self,
+        s: &mut State,
+        out: u64,
+        opaque: u64,
+    ) -> Result<u64, &'static str> {
+        string_call(
+            s,
+            self,
+            s.stack - 0x50,
+            ui_string_append::Operation::Grow {
+                object: out,
+                amount: 1,
+                opaque,
+                source: 0x142505110,
+                count: 1,
+            },
+        )
+    }
     fn label(&mut self, s: &mut State, out: u64, index: u64) -> Result<u64, &'static str> {
         label(s, self, out, index)
     }
     fn shrink(&mut self, s: &mut State, out: u64, length: u64) -> Result<(), &'static str> {
         shrink(&mut s.memory, out, length)
     }
+}
+fn string_call<H: Services + ?Sized>(
+    s: &mut State,
+    h: &mut H,
+    stack: u64,
+    operation: ui_string_append::Operation,
+) -> Result<u64, &'static str> {
+    let mut memory = std::mem::take(&mut s.memory);
+    let result = ui_string_append::with_memory(&mut memory, stack, operation, |memory, f, a| {
+        std::mem::swap(&mut s.memory, memory);
+        let result = h.invoke(s, f, a);
+        std::mem::swap(&mut s.memory, memory);
+        result
+    });
+    s.memory = memory;
+    result
 }
 impl State {
     fn q(&self, p: u64) -> Result<u64, &'static str> {
@@ -157,7 +210,7 @@ pub fn build(
             s.memory.write(data.wrapping_add(length), &[b'/', 0])?;
         } else {
             s.putq(sp + 0x20, 1)?;
-            p = h.invoke(s, 0x1405eca90, &[p, 1, selector as u64, 0x142505110, 1])?;
+            p = h.grow_separator(s, p, selector as u64)?;
         }
         // Preserve the two native XMM loads/stores in order, including overlap
         // between a provider-returned descriptor and the physical destination.
@@ -179,7 +232,7 @@ pub fn build(
         } else {
             sp + 0x38
         };
-        h.invoke(s, 0x140624040, &[out, data, length])?;
+        h.append(s, out, data, length)?;
         free(s, h, sp + 0x38)?;
         free(s, h, sp + 0x58)?;
     }

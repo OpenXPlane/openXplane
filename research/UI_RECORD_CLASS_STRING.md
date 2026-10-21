@@ -126,9 +126,19 @@ on return. The two ordinary default tests now use actual empty-tree class
 production, keep a comparison-provider change to live memory, and verify nested
 scratch expires.
 
+## Subsequent actual string-body binding
+
+The production default now uses recovered append140624040/growth1405eca90.
+A separate960+60 original class/label cohort with4390 actual string subrows
+passes, together with3936 standalone string cases and an ordinary nonempty-tree
+production test. [String evidence and limits](UI_STRING_APPEND.md) describes
+the exact scope. The controlled-string cohorts above retain their original
+boundaries and adversarial provider profiles.
+
 ## Limits and next work
 
-Allocation, append, string growth, free and memcmp bodies remain controlled.
+Allocation, move, free and memcmp bodies remain controlled. The older cohorts
+above also keep controlled append/growth; only the new explicit mode removes them.
 Only normal successful calls with declared mapped backing are proved. Real
 record initialization/copy/assignment and registry/tree producers, mutation/
 ownership/lifetime, secondary14113ff10 and float1411363f0 remain unfinished.
@@ -150,7 +160,7 @@ Numeric corpora, executable and resources stay local:
 set -e
 python tools/gen_ui_record_class_string_vectors.py /path/to/X-Plane.exe > /tmp/classes-new.txt
 mv /tmp/classes-new.txt /tmp/classes.txt
-OPENXPLANE_UI_RECORD_CLASS_STRING_VECTORS=/tmp/classes.txt cargo test --offline --locked -p xp-app --test ui_record_class_string_local -- --ignored
+OPENXPLANE_UI_RECORD_CLASS_STRING_VECTORS=/tmp/classes.txt cargo test --offline --locked -p xp-app --test ui_record_class_string_local whole_derived_class_string_tree_reload_labels_growth_cleanup_and_final_shrink -- --ignored
 python tools/gen_ui_record_compare_vectors.py /path/to/X-Plane.exe --native-derived > /tmp/compare-class-new.txt
 mv /tmp/compare-class-new.txt /tmp/compare-class.txt
 OPENXPLANE_UI_RECORD_COMPARE_CLASS_VECTORS=/tmp/compare-class.txt cargo test --offline --locked -p xp-app --test ui_record_compare_local whole_equality_with_actual_class_tree_label_and_resize_callers -- --ignored

@@ -5,6 +5,8 @@ use openxplane::{
     ui_record_class_string::{self, Services, State},
 };
 use std::collections::BTreeMap;
+#[path = "ui_string_append_replay.rs"]
+mod string_replay;
 fn memory(encoded: &str) -> BTreeMap<u64, Vec<u8>> {
     encoded
         .split('/')
@@ -32,6 +34,48 @@ struct Replay {
     position: usize,
 }
 impl Services for Replay {
+    fn append(
+        &mut self,
+        s: &mut State,
+        out: u64,
+        data: u64,
+        length: u64,
+    ) -> Result<u64, &'static str> {
+        if let Some(encoded) = self.events[self.position].strip_prefix("S~") {
+            let result = string_replay::from_caller(
+                encoded,
+                "A",
+                &[out, data, length],
+                s.stack - 0x40,
+                &mut s.memory,
+            );
+            self.position += 1;
+            Ok(result)
+        } else {
+            self.invoke(s, 0x140624040, &[out, data, length])
+        }
+    }
+    fn grow_separator(
+        &mut self,
+        s: &mut State,
+        out: u64,
+        opaque: u64,
+    ) -> Result<u64, &'static str> {
+        if let Some(encoded) = self.events[self.position].strip_prefix("S~") {
+            let result = string_replay::from_caller(
+                encoded,
+                "G",
+                &[out, 1, opaque, 0x142505110, 1],
+                s.stack - 0x50,
+                &mut s.memory,
+            );
+            self.position += 1;
+            Ok(result)
+        } else {
+            self.invoke(s, 0x1405eca90, &[out, 1, opaque, 0x142505110, 1])
+        }
+    }
+
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str> {
         let event = self
             .events

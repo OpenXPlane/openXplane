@@ -4,7 +4,7 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_R9,UC_X86_REG_RSP
 BUILD,LABEL,RESIZE=0x141a3df30,0x141a3cd30,0x14064e290
 LABEL_RETS=[0x141a3cd8a,0x141a3cdcc,0x141a3ce02,0x141a3ce3a,0x141a3ce74,0x141a3cea4,0x141a3ced4,0x141a3cf21,0x141a3cf56,0x141a3cf7f,0x141a3cfb9,0x141a3cff2,0x141a3d02a]
-def install(e,before=None,on_finish=None):
+def install(e,before=None,on_finish=None,native_strings=False):
  old=e.stubs.copy();heads=[e.alloc(40)for _ in range(2)];nodes=[[e.alloc(40)for _ in range(20)]for _ in range(2)];label_heap=e.alloc(64);grow_heap=e.alloc(64);extra=e.alloc(4200);alias=e.alloc(32);outputs=[e.alloc(1024)for _ in range(2)]
  private={**{p:40 for p in heads},**{p:40 for group in nodes for p in group},label_heap:64,grow_heap:64,extra:128,alias:32,**{p:1024 for p in outputs},0x142505110:1}
  h=dict(active=False,enabled=False,mode='D',ranges={},events=[],row=None,stack=0,record=0,out=0,index=0,v={},labels=0,label_returns=0,resizes=0,resize_returns=0)
@@ -31,6 +31,7 @@ def install(e,before=None,on_finish=None):
  h.update(private=private,heads=heads,seed=seed,tree=tree)
  def prepare(record,out,case,v,owned=None,mode='D',index=0):
   h.update(active=False,enabled=True,mode=mode,ranges={**private,**(owned or {record:0x198,out:32})},events=[],row=None,stack=0,record=record,out=out,index=index,v={**v,'case':case},labels=0,label_returns=0,resizes=0,resize_returns=0,selector=out&255,label_out=0)
+  if native_strings:strings['reset']()
   if owned is not None:return
   for p,n in h['ranges'].items():
    if p!=0x142505110:e.write(p,bytes([v['seed']])*n)
@@ -99,4 +100,15 @@ def install(e,before=None,on_finish=None):
   else:raise AssertionError('unverified growing resize branch')
  for a,f in[(BUILD,entry),(LABEL,entry),(RESIZE,entry),(0x141a3df50,frame),*[(a,returns)for a in[LABEL_RETS[0],*LABEL_RETS[1:],0x14064e2b3,0x14064e305,0x14064e325,0x141a3e180]]]:e.uc.hook_add(UC_HOOK_CODE,f,begin=a,end=a)
  for fn in[BUILD,LABEL,RESIZE]:e.stubs.pop(fn,None)
+ if native_strings:
+  from ui_string_append_harness import install as install_strings
+  def strings_before(mode,args,child):
+   assert h['active'] and h['mode']=='D'
+   child['prepare'](mode,args,h['v']['case'],dict(seed=h['v']['seed'],mutate=False),owned=h['ranges'])
+   h['active']=False
+  def strings_done(row,child):
+   for p in child['pools']:h['ranges'][p]=child['ranges'][p]
+   h['events'].append('S~'+row.encode().hex());h['active']=True
+  strings=install_strings(e,before=strings_before,on_finish=strings_done)
+  private.update(strings['private']);h['strings']=strings
  h['stats']=stats;return h
