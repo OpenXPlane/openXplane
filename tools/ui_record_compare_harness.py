@@ -4,7 +4,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RAX,UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_RSP
 EQUAL,DIFFERENT=0x141a3c910,0x141a3cbc0
 OFFSETS=[0,0x20,0x40,0x60,0x80,0xa8,0xc8,0xe8,0x108]
-def install(e,before=None,on_finish=None,native_derived=False):
+def install(e,before=None,on_finish=None,native_derived=False,native_strings=False):
+ native_derived=native_derived or native_strings
  class_scope=None
  old=e.stubs.copy();heaps=[e.alloc(4200)for _ in range(22)]
  private={p:128 for p in heaps}
@@ -25,6 +26,7 @@ def install(e,before=None,on_finish=None,native_derived=False):
   if native_derived:e.write_u64(p+0x180,class_scope['heads'][which%2])
  def prepare(left,right,case,v,owned=None):
   h.update(active=False,enabled=True,row=None,ranges={**private,**(owned or {left:0x198,right:0x198})},events=[],stack=0,v={**v,'case':case},records=[left,right],compares=0,derived=0)
+  if native_strings and owned is None:class_scope['strings']['reset']()
   if owned is not None:return
   for p,n in h['ranges'].items():
    if p!=0x142505110:e.write(p,bytes([v['seed']])*n)
@@ -92,10 +94,27 @@ def install(e,before=None,on_finish=None,native_derived=False):
   from ui_record_class_string_harness import install as install_class
   def class_begin(record,out,scope):
    assert h['active'];v=h['v'];case=v['case'];h['derived']+=1;stats['derived']+=1
-   scope['prepare'](record,out,case,dict(seed=v['seed'],mutate=v['mutate'],dirty=case%2,grow_alias=(case//2)%2,tail=case%4),dict(h['ranges']))
+   profile=dict(seed=v['seed'],mutate=v['mutate'],dirty=case%2,grow_alias=(case//2)%2,tail=case%4)
+   if native_strings:profile.update(dirty=0,grow_alias=0,tail=0)
+   scope['prepare'](record,out,case,profile,dict(h['ranges']))
    h['active']=False
-  def class_done(row):h['events'].append('D~'+row.encode().hex());h['active']=True
-  class_scope=install_class(e,before=class_begin,on_finish=class_done);private.update(class_scope['private']);h['class_stats']=class_scope['stats']
+  def class_done(row):
+   if native_strings:
+    for p in class_scope['strings']['pools']:h['ranges'][p]=class_scope['ranges'][p]
+    if h['derived']==1:
+     out=h['stack']+0x40;raw=e.read(out,32);length=e.read_u64(out+16);data=e.read_u64(out)if e.read_u64(out+24)>15 else out
+     h['first_output']=(out,raw,data,e.read(data,length))
+    else:
+     assert h['derived']==2
+     out,raw,data,text=h['first_output'];assert e.read(out,32)==raw and e.read(data,len(text))==text
+     stats['preserved_first_output']+=1
+     second=h['stack']+0x20
+     if e.read_u64(out+24)>15 and e.read_u64(second+24)>15:
+      assert data!=e.read_u64(second);stats['distinct_output_heap']+=1
+   h['events'].append('D~'+row.encode().hex());h['active']=True
+  class_scope=install_class(e,before=class_begin,on_finish=class_done,native_strings=native_strings);private.update(class_scope['private']);h['class_stats']=class_scope['stats']
+  if native_strings:
+   h['string_stats']=class_scope['strings']['stats'];stats.update(preserved_first_output=0,distinct_output_heap=0)
   def seed_class(case):
    mask=(case*137)&0xfff
    for slot,bits in enumerate([mask,mask^0x555]):class_scope['tree'](slot,bits,case%3,[1,255][case%2])

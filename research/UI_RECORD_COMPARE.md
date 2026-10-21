@@ -141,3 +141,16 @@ explicitly after switching production defaults; their own scope is unchanged.
 Subsequent class-string evidence: [UI_RECORD_CLASS_STRING.md](UI_RECORD_CLASS_STRING.md)
 executes actual derived/label/reached-resize bodies in new equality/finish/callback
 cohorts. Earlier controlled-derived and recursive/factory cohorts keep their scope.
+
+
+## Subsequent actual-string composition
+
+A separate1500-comparison cohort now executes1458 actual class-string bodies
+and8932 actual append/direct-growth subrows; its4899 total growth returns include
+nested append growth. Strict replay passes with all provider boundaries and
+memory, together with an ordinary nonempty-tree production/ownership test.
+[Actual-string equality evidence](UI_RECORD_COMPARE_STRINGS.md) describes the
+729 preserved first outputs,720 distinct heap-result pairs and allocator-pool
+lifetime/expanded-map publication. Earlier controlled-string cohorts retain
+their original scope. Finish/callback/recursive-factory actual-string composition,
+real CRT/producer/lifetime and all live Alt/Esc/GPU/pixel claims remain unverified.

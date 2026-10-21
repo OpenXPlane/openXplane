@@ -31,7 +31,7 @@ def install(e,before=None,on_finish=None,native_strings=False):
  h.update(private=private,heads=heads,seed=seed,tree=tree)
  def prepare(record,out,case,v,owned=None,mode='D',index=0):
   h.update(active=False,enabled=True,mode=mode,ranges={**private,**(owned or {record:0x198,out:32})},events=[],row=None,stack=0,record=record,out=out,index=index,v={**v,'case':case},labels=0,label_returns=0,resizes=0,resize_returns=0,selector=out&255,label_out=0)
-  if native_strings:strings['reset']()
+  if native_strings and owned is None:strings['reset']()
   if owned is not None:return
   for p,n in h['ranges'].items():
    if p!=0x142505110:e.write(p,bytes([v['seed']])*n)

@@ -144,3 +144,14 @@ pub fn actual_classes_in_encoded_row(encoded: &str) -> usize {
         .filter(|event| event.starts_with("D~"))
         .count()
 }
+
+pub fn actual_strings_in_row(row: &str) -> usize {
+    let fields = row.split_whitespace().collect::<Vec<_>>();
+    assert_eq!(fields.len(), 10);
+    assert_eq!(fields[0], "C");
+    fields[9]
+        .split('|')
+        .filter_map(|event| event.strip_prefix("D~"))
+        .map(class_string_replay::actual_strings_in_encoded_row)
+        .sum()
+}

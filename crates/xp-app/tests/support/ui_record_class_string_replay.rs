@@ -158,9 +158,33 @@ pub fn from_caller(
     assert_eq!(fields[1].parse::<u64>().unwrap(), record);
     assert_eq!(fields[2].parse::<u64>().unwrap(), out);
     assert_eq!(fields[3].parse::<u64>().unwrap(), stack - 0xa0);
+    let pools = fields[8]
+        .split('|')
+        .find_map(|event| event.strip_prefix("S~"))
+        .map(string_replay::pools_in_encoded_row)
+        .unwrap_or_default();
     let runtime = run_row(&row, &memory.blocks);
     for (p, b) in &mut memory.blocks {
-        *b = runtime.memory.read(*p, b.len()).unwrap();
+        *b = if pools.contains(p) {
+            runtime.memory.blocks.get(p).unwrap().clone()
+        } else {
+            runtime.memory.read(*p, b.len()).unwrap()
+        };
     }
     out
+}
+
+pub fn actual_strings_in_encoded_row(encoded: &str) -> usize {
+    let bytes = (0..encoded.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap())
+        .collect::<Vec<_>>();
+    let row = String::from_utf8(bytes).unwrap();
+    let fields = row.split_whitespace().collect::<Vec<_>>();
+    assert_eq!(fields.len(), 9);
+    assert_eq!(fields[0], "D");
+    fields[8]
+        .split('|')
+        .filter(|event| event.starts_with("S~"))
+        .count()
 }

@@ -133,3 +133,9 @@ bodies; complete dialog/widget/layout/menu rendering and viewer key integration.
 Alt/Esc UI, GPU and paired original screenshots/GIF/video remain unverified.
 No visual change is claimed. Compatibility estimates were reviewed and left
 unchanged: isolated instruction proofs do not establish whole-simulator parity.
+
+
+Subsequent equality composition is now checked:1500 whole comparisons execute
+1458 class builds and8932 actual string subrows, preserving729 first results
+across the second build. [Evidence and limits](UI_RECORD_COMPARE_STRINGS.md).
+The earlier finish/callback/factory cohorts still retain their stated boundaries.

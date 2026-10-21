@@ -138,3 +138,16 @@ pub fn from_caller(
     }
     fields[9].parse().unwrap()
 }
+
+/// Only these declared allocation pools may grow across a callee boundary.
+pub fn pools_in_encoded_row(encoded: &str) -> Vec<u64> {
+    let bytes = (0..encoded.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap())
+        .collect::<Vec<_>>();
+    let row = String::from_utf8(bytes).unwrap();
+    let fields = row.split_whitespace().collect::<Vec<_>>();
+    assert_eq!(fields.len(), 11);
+    assert_eq!(fields[0], "S");
+    fields[5].split(',').map(|p| p.parse().unwrap()).collect()
+}
