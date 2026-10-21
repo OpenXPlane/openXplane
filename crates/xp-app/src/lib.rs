@@ -125,3 +125,5 @@ pub mod ui_record_compare;
 pub mod ui_record_class_string;
 
 pub mod ui_string_append;
+
+pub mod ui_record_class_membership;
