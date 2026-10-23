@@ -10,6 +10,19 @@ pub struct State {
 }
 pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn secondary(&mut self, s: &mut State, receiver: u64) -> Result<u64, &'static str> {
+        let mut memory = std::mem::take(&mut s.memory);
+        let result =
+            crate::ui_selection_secondary::with_memory(&mut memory, receiver, |memory, f, args| {
+                std::mem::swap(&mut s.memory, memory);
+                let result = self.invoke(s, f, args);
+                std::mem::swap(&mut s.memory, memory);
+                result
+            });
+        s.memory = memory;
+        result
+    }
+
     fn initial_callback(&mut self, s: &mut State) -> Result<(), &'static str> {
         self.invoke(s, 0x1410fe0f0, &[s.identity + 0x38, 0x1e1b9, 0])?;
         Ok(())
@@ -60,7 +73,14 @@ impl<H: Services + ?Sized> gate::Services for GateBridge<'_, H> {
         Ok(self.call(g, 0x1423c0180, &[left, right, bytes])? as i32)
     }
     fn secondary(&mut self, g: &mut gate::State, receiver: u64) -> Result<u64, &'static str> {
-        self.call(g, 0x14113ff10, &[receiver])
+        let mut caller = State {
+            memory: std::mem::take(&mut g.memory),
+            identity: g.identity,
+            stack: self.stack,
+        };
+        let result = self.host.secondary(&mut caller, receiver);
+        g.memory = caller.memory;
+        result
     }
 }
 impl State {

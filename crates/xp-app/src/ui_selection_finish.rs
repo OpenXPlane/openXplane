@@ -19,6 +19,19 @@ pub enum ScalarOp {
 pub trait Services {
     /// Float operands/results are raw low32 words, not converted host doubles.
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn secondary(&mut self, s: &mut State, receiver: u64) -> Result<u64, &'static str> {
+        let mut memory = std::mem::take(&mut s.memory);
+        let result =
+            crate::ui_selection_secondary::with_memory(&mut memory, receiver, |memory, f, args| {
+                std::mem::swap(&mut s.memory, memory);
+                let result = self.invoke(s, f, args);
+                std::mem::swap(&mut s.memory, memory);
+                result
+            });
+        s.memory = memory;
+        result
+    }
+
     fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
         let identity = s.identity;
         let stack = s.stack;
@@ -92,7 +105,14 @@ impl<H: Services + ?Sized> gate::Services for GateBridge<'_, H> {
         Ok(self.call(g, 0x1423c0180, &[l, r, n])? as i32)
     }
     fn secondary(&mut self, g: &mut gate::State, p: u64) -> Result<u64, &'static str> {
-        self.call(g, 0x14113ff10, &[p])
+        let mut caller = State {
+            memory: std::mem::take(&mut g.memory),
+            identity: g.identity,
+            stack: self.stack,
+        };
+        let result = self.host.secondary(&mut caller, p);
+        g.memory = caller.memory;
+        result
     }
 }
 impl State {

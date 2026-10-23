@@ -1,6 +1,6 @@
 //! Selection reset predicate14114d330, primary string comparison14113fff0
-//! and variant-tag query1417fb390. Version-bound mapped state; secondary
-//! predicate14113ff10 remains a dependency. This does not implement reset itself.
+//! and variant-tag query1417fb390. Version-bound mapped state; secondary is
+//! supplied by the caller. Default parent bindings use ui_selection_secondary.
 use crate::{ui_engine_query, ui_indexed_records, ui_payload_move};
 
 pub const RESOURCE_INDEX: u64 = 0x142640504;

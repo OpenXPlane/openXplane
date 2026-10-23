@@ -104,8 +104,10 @@ results cannot be cached across calls. Reads of DWORDs145899fd8/fdc and
 145899fd0/fd4 are conditional and ordered. The final path reads secondary
 index142640508, caches the resource address across header-getter1411222e0,
 then negates string-equality14073ba40 against resource+6178. Primary instead
-uses index142640504. This is static evidence only: actual providers/header
-production and the composed secondary body remain unported/unverified.
+uses index142640504. That initial trace now has a recovered secondary body with7128 original-code
+comparisons and ordinary production bindings; see [secondary evidence](UI_SELECTION_SECONDARY.md).
+Actual singleton/predicate/header/CRT bodies and whole parent/factory composition
+remain unverified.
 
 Real CRT/allocator/free bodies, record/tree/header producers, arbitrary lifetime,
 exception/unwind and fault semantics remain unverified. Float/secondary/provider

@@ -41,6 +41,11 @@ struct Replay {
     position: usize,
 }
 impl Services for Replay {
+    fn secondary(&mut self, s: &mut State, receiver: u64) -> Result<u64, &'static str> {
+        // Historical cohorts explicitly keep their controlled secondary endpoint.
+        self.invoke(s, 0x14113ff10, &[receiver])
+    }
+
     fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
         if let Some(encoded) = self.events[self.position].strip_prefix("P~") {
             let result =

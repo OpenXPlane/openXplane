@@ -37,6 +37,11 @@ struct Replay {
     position: usize,
 }
 impl Services for Replay {
+    fn secondary(&mut self, s: &mut State, receiver: u64) -> Result<u64, &'static str> {
+        // Historical cohorts explicitly keep their controlled secondary endpoint.
+        self.invoke(s, 0x14113ff10, &[receiver])
+    }
+
     fn initial_callback(&mut self, s: &mut State) -> Result<(), &'static str> {
         if !self.events[self.position].starts_with("K~") {
             self.invoke(s, 0x1410fe0f0, &[s.identity + 0x38, 0x1e1b9, 0])?;

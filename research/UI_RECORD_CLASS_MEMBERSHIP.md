@@ -67,3 +67,8 @@ that caller is not upgraded by this isolated proof. Existing class-string
 builders retain their own directly recovered ordered search sequence.
 Whole dialog/layout/widgets/Main Menu, Alt/Esc live viewer/GPU and paired
 screenshots/GIF/video remain unverified. Estimates reviewed and unchanged.
+
+
+The subsequent [secondary predicate proof](UI_SELECTION_SECONDARY.md) now uses
+this membership body at key2 in6930 actual original calls. Its full parent/
+factory composition and header/provider production remain unverified.

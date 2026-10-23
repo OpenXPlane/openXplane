@@ -108,3 +108,16 @@ tests ignored by default; the new2304-case opt-in replay and prior118-case
 whole-factory alternate/changed/weather replay passed explicitly. Workspace
 Clippy with all targets and warnings denied passed. The new gate is not yet
 composed into that prior factory replay.
+
+
+## Subsequent actual secondary binding
+
+[Secondary evidence](UI_SELECTION_SECONDARY.md) now covers2016 complete original
+gates with actual secondary, primary, membership, resource getter, equality and
+engine query; it compares gate AL and every declared non-stack byte/provider
+boundary. Reset/finish/callback production defaults use recovered secondary.
+The earlier cohorts in this report explicitly retain their controlled secondary
+endpoint. The index words142640504/508 are read-only reference constants0/1;
+index changes in fixtures are synthetic operand probes, not mutable-engine proof.
+Whole parent/factory composition, true providers/producers and live GPU/pixels
+remain unverified.

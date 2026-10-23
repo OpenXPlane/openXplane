@@ -1,5 +1,5 @@
-//! Whole selection callback1410fe0f0 for key0x1e1b9. Record comparison uses
-//! a recovered default; float/finish/cleanup/secondary/recursive-reset bodies
+//! Whole selection callback1410fe0f0 for key0x1e1b9. Record comparison and secondary
+//! use recovered defaults; float/finish/cleanup/recursive-reset bodies
 //! remain services.
 use crate::ui_payload_move;
 pub struct State {
@@ -39,6 +39,19 @@ pub fn payload_if_three(
 }
 pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
+    fn secondary(&mut self, s: &mut State, receiver: u64) -> Result<u64, &'static str> {
+        let mut memory = std::mem::take(&mut s.memory);
+        let result =
+            crate::ui_selection_secondary::with_memory(&mut memory, receiver, |memory, f, args| {
+                std::mem::swap(&mut s.memory, memory);
+                let result = self.invoke(s, f, args);
+                std::mem::swap(&mut s.memory, memory);
+                result
+            });
+        s.memory = memory;
+        result
+    }
+
     fn different(&mut self, s: &mut State, left: u64, right: u64) -> Result<bool, &'static str> {
         let identity = s.identity;
         let stack = s.stack;
@@ -136,7 +149,7 @@ pub fn callback(s: &mut State, h: &mut impl Services, key: u64) -> Result<(), &'
     }
     if s.byte(r + 0x88)? != 0 {
         let parent = s.q(r + 0x90)?;
-        if h.invoke(s, 0x14113ff10, &[parent])? as u8 != 0 {
+        if h.secondary(s, parent)? as u8 != 0 {
             s.memory.write(s.identity + 0xc0, &[0])?;
             h.invoke(s, 0x14113a460, &[s.identity, 1])?;
         }

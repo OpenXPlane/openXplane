@@ -127,3 +127,5 @@ pub mod ui_record_class_string;
 pub mod ui_string_append;
 
 pub mod ui_record_class_membership;
+
+pub mod ui_selection_secondary;
