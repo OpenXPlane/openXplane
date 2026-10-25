@@ -1,5 +1,26 @@
 # Plan for a full implementation
 
+The active completion criteria and mandatory commit/push workflow are in
+[GOAL.md](GOAL.md). Each completed coherent change must be checked, committed
+and pushed; partial ports do not complete the full-game goal.
+
+## Selection dependency composition (2026-10-25)
+
+[Dependency evidence](../research/UI_SELECTION_DEPENDENCIES.md):1988 original
+calls verify mode1414cedd0, header1411222e0, singleton1414cc7f0 and their actual
+secondary/gate callers. Full results, provider order, declared memory, local
+operands and live cleanup reloads match. Reset/finish/callback defaults now use
+the recovered dependency bridge; five ordinary tests cover integration and
+scratch lifetime. Settings/accessor/header-string/catalog bodies and real
+ownership remain controlled. Next remove these producer boundaries and compose
+the new actual dependencies through full original parent/factory calls, then
+dialog/layout/menu/Alt/Esc/viewer/GPU and paired captures. Estimates reviewed
+and unchanged; there is no visible menu change.
+REA verification completed2026-10-26: three bounded GNU objdump Evidence
+records cover all752 original bytes without truncation through a disclosed
+range adapter. Ghidra decompilation remains unavailable; its redundant full-PE
+run was stopped after the bounded static review completed.
+
 The goal is an engine that loads original X-Plane 12 content and behaves like the original. This plan orders
 the work by dependency. Each phase has an exit check against the original (emulator vectors, content loads, or a
 recorded trajectory), not only unit tests. Shares refer to the weights in [COMPATIBILITY.md](COMPATIBILITY.md).

@@ -21,13 +21,17 @@ pub trait Services {
     fn invoke(&mut self, s: &mut State, function: u64, args: &[u64]) -> Result<u64, &'static str>;
     fn secondary(&mut self, s: &mut State, receiver: u64) -> Result<u64, &'static str> {
         let mut memory = std::mem::take(&mut s.memory);
-        let result =
-            crate::ui_selection_secondary::with_memory(&mut memory, receiver, |memory, f, args| {
+        let result = crate::ui_selection_secondary::with_dependencies(
+            &mut memory,
+            s.stack - 0x60,
+            receiver,
+            |memory, f, args| {
                 std::mem::swap(&mut s.memory, memory);
                 let result = self.invoke(s, f, args);
                 std::mem::swap(&mut s.memory, memory);
                 result
-            });
+            },
+        );
         s.memory = memory;
         result
     }

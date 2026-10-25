@@ -1,5 +1,6 @@
 //! Whole secondary predicate14113ff10, including recovered primary/membership/
-//! resource/equality bodies. Singleton, mode, header and CRT leaves remain services.
+//! resource/equality bodies. `with_dependencies` also composes singleton/mode/header;
+//! their settings/catalog producers, allocation/free and CRT remain services.
 use crate::{
     ui_indexed_records::{self, Kind},
     ui_payload_move, ui_record_class_membership,
@@ -21,6 +22,17 @@ pub trait Services {
         function: u64,
         args: &[u64],
     ) -> Result<u64, &'static str>;
+    fn query(&mut self, m: &mut ui_payload_move::State) -> Result<u64, &'static str> {
+        let singleton = self.invoke(m, 0x1414cc7f0, &[])?;
+        self.invoke(m, 0x1414cedd0, &[singleton])
+    }
+    fn header(
+        &mut self,
+        m: &mut ui_payload_move::State,
+        receiver: u64,
+    ) -> Result<u64, &'static str> {
+        self.invoke(m, 0x1411222e0, &[receiver])
+    }
     fn primary(
         &mut self,
         m: &mut ui_payload_move::State,
@@ -114,13 +126,6 @@ pub fn equal<H: Services + ?Sized>(
     let result = h.invoke(m, 0x1423c0180, &[left_data, right_data, left_length])?;
     Ok(al(result, u8::from(result as u32 == 0)))
 }
-fn query<H: Services + ?Sized>(
-    m: &mut ui_payload_move::State,
-    h: &mut H,
-) -> Result<u64, &'static str> {
-    let singleton = h.invoke(m, 0x1414cc7f0, &[])?;
-    h.invoke(m, 0x1414cedd0, &[singleton])
-}
 pub fn secondary(
     m: &mut ui_payload_move::State,
     h: &mut impl Services,
@@ -134,20 +139,20 @@ pub fn secondary(
     if result as u8 == 0 {
         return Ok(al(result, 0));
     }
-    let result = query(m, h)?;
+    let result = h.query(m)?;
     if result as u8 != 0 && (d(m, 0x145899fd8)? != 0 || d(m, 0x145899fdc)? != 0) {
         return Ok(al(result, 1));
     }
-    let result = query(m, h)?;
+    let result = h.query(m)?;
     if result as u8 == 0 && (d(m, 0x145899fd0)? != 0 || d(m, 0x145899fd4)? != 0) {
         return Ok(al(result, 1));
     }
-    let result = query(m, h)?;
+    let result = h.query(m)?;
     if result as u8 == 0 {
         return Ok(al(result, 0));
     }
     let record = ui_indexed_records::lookup(m, Kind::Resource, d(m, INDEX)? as u64)?;
-    let header = h.invoke(m, 0x1411222e0, &[receiver])?;
+    let header = h.header(m, receiver)?;
     let result = h.equal(m, header, record.wrapping_add(0x6178))?;
     Ok(al(result, u8::from(result as u8 == 0)))
 }
@@ -174,4 +179,88 @@ where
         }
     }
     secondary(m, &mut Bridge(invoke), receiver)
+}
+
+/// Execute actual singleton/mode/header bodies too. `stack` is the secondary
+/// caller's RSP after its prologue; inherited local maps remain observable.
+/// Settings and catalog providers, allocation/free and CRT remain explicit.
+pub fn with_dependencies<F>(
+    m: &mut ui_payload_move::State,
+    stack: u64,
+    receiver: u64,
+    invoke: F,
+) -> Result<u64, &'static str>
+where
+    F: FnMut(&mut ui_payload_move::State, u64, &[u64]) -> Result<u64, &'static str>,
+{
+    use crate::ui_selection_dependencies as deps;
+    struct Bridge<F> {
+        invoke: F,
+        stack: u64,
+    }
+    impl<F> deps::Services for Bridge<F>
+    where
+        F: FnMut(&mut ui_payload_move::State, u64, &[u64]) -> Result<u64, &'static str>,
+    {
+        fn invoke(&mut self, s: &mut deps::State, f: u64, a: &[u64]) -> Result<u64, &'static str> {
+            (self.invoke)(&mut s.memory, f, a)
+        }
+    }
+    impl<F> Services for Bridge<F>
+    where
+        F: FnMut(&mut ui_payload_move::State, u64, &[u64]) -> Result<u64, &'static str>,
+    {
+        fn invoke(
+            &mut self,
+            m: &mut ui_payload_move::State,
+            f: u64,
+            a: &[u64],
+        ) -> Result<u64, &'static str> {
+            (self.invoke)(m, f, a)
+        }
+        fn query(&mut self, m: &mut ui_payload_move::State) -> Result<u64, &'static str> {
+            let mut s = deps::State {
+                memory: std::mem::take(m),
+                stack: self.stack - 0x90,
+            };
+            let result = deps::singleton(&mut s, self).and_then(|_| deps::mode(&mut s, self));
+            *m = s.memory;
+            result
+        }
+        fn header(
+            &mut self,
+            m: &mut ui_payload_move::State,
+            receiver: u64,
+        ) -> Result<u64, &'static str> {
+            let mut s = deps::State {
+                memory: std::mem::take(m),
+                stack: self.stack - 0x60,
+            };
+            let result = deps::header(&mut s, self, receiver);
+            *m = s.memory;
+            result
+        }
+    }
+    let mut created = Vec::new();
+    for p in [stack - 0x70, stack - 0x50, stack - 0x30] {
+        if m.read(p, 32).is_ok() {
+            continue;
+        }
+        if m.blocks
+            .iter()
+            .any(|(&base, b)| base < p + 32 && base + b.len() as u64 > p)
+        {
+            for p in created {
+                m.blocks.remove(&p);
+            }
+            return Err("partially mapped selection dependency scratch unverified");
+        }
+        m.blocks.insert(p, vec![0; 32]);
+        created.push(p);
+    }
+    let result = secondary(m, &mut Bridge { invoke, stack }, receiver);
+    for p in created {
+        m.blocks.remove(&p);
+    }
+    result
 }

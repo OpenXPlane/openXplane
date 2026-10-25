@@ -1,5 +1,12 @@
 # Actual secondary selection predicate and full-RAX string predicates
 
+Update2026-10-25: [mode/header/singleton dependency evidence](UI_SELECTION_DEPENDENCIES.md)
+adds actual bodies and1664 whole secondary executions (1536 direct and128
+through the gate). Standard parent bridges now compose these dependencies;
+the historical corpus and controlled endpoints described below keep their
+original scope. Settings/header/catalog producers and CRT/ownership remain
+controlled, and full native parent/factory composition is still pending.
+
 Reference X-Plane.exe12.4.3.11 SHA256
 `2ca099b7c6b218e78d02bdbe298be2aebf670b67c5adff827449b065e1107936`.
 Static evidence: LLVM disassembly of secondary14113ff10..14113ffe4 (212 bytes),

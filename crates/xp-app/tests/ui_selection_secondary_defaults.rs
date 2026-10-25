@@ -1,4 +1,4 @@
-//! Production reset/finish gate and callback-secondary bridges use the actual bodies.
+//! Production reset/finish/callback bridges include actual mode/header/singleton bodies.
 use openxplane::{
     ui_payload_move, ui_selection_finish as finish, ui_selection_initial as initial,
     ui_selection_reset as reset,
@@ -22,6 +22,8 @@ fn input() -> ui_payload_move::State {
         (0x145899fd0, 16),
         (0x146124398, 8),
         (0x142f2dc95, 1),
+        (0x145a12340, 8),
+        (0x1424ff288, 1),
     ] {
         m.blocks.insert(p, vec![0; n]);
     }
@@ -44,11 +46,51 @@ fn input() -> ui_payload_move::State {
     m.write(0x146124398, &BASE.to_le_bytes()).unwrap();
     m.write(0x142640508, &1u32.to_le_bytes()).unwrap();
     m.write(0x142f2dc95, &[1]).unwrap();
+    m.write(0x145a12340, &0x90000u64.to_le_bytes()).unwrap();
+    m.write(0x1424ff288, b"1").unwrap();
     m
+}
+#[test]
+fn recovered_dependencies_remove_owned_scratch_on_provider_error() {
+    let mut memory = input();
+    let keys = memory.blocks.keys().copied().collect::<Vec<_>>();
+    let mut host = Host::default();
+    let result = openxplane::ui_selection_secondary::with_dependencies(
+        &mut memory,
+        0x100000,
+        RECEIVER,
+        |m, f, a| {
+            if f == 0x1414d45e0 {
+                m.write(OWNER + 0xc0, &[0x42])?;
+                Err("settings unavailable")
+            } else {
+                host.invoke(m, f, a)
+            }
+        },
+    );
+    assert_eq!(result, Err("settings unavailable"));
+    assert_eq!(memory.blocks.keys().copied().collect::<Vec<_>>(), keys);
+    assert_eq!(memory.read(OWNER + 0xc0, 1).unwrap(), [0x42]);
+}
+#[test]
+fn recovered_dependencies_reject_partial_scratch_without_leaking_prior_regions() {
+    let mut memory = input();
+    memory.blocks.insert(0x100000 - 0x40, vec![0xa5; 8]);
+    let before = memory.blocks.clone();
+    let result = openxplane::ui_selection_secondary::with_dependencies(
+        &mut memory,
+        0x100000,
+        RECEIVER,
+        |_, _, _| panic!("partial scratch reached provider"),
+    );
+    assert_eq!(
+        result,
+        Err("partially mapped selection dependency scratch unverified")
+    );
+    assert_eq!(memory.blocks, before);
 }
 #[derive(Default)]
 struct Host {
-    singletons: usize,
     queries: usize,
     compares: usize,
     headers: usize,
@@ -62,6 +104,10 @@ impl Host {
     ) -> Result<u64, &'static str> {
         match f {
             0x1423c0180 => {
+                if a[1] == 0x1424ff288 {
+                    assert_eq!(a[2], 1);
+                    return Ok(u64::from(m.read(a[0], 1)? != b"1"));
+                }
                 self.compares += 1;
                 if a[2] != 0 {
                     assert_eq!(m.read(a[0], a[2] as usize)?, m.read(a[1], a[2] as usize)?);
@@ -70,19 +116,32 @@ impl Host {
                 m.write(OWNER + 0xc0, &[255])?;
                 Ok(0xcafe000000000000)
             }
-            0x1414cc7f0 => {
+            0x1414d45e0 => {
                 assert!(a.is_empty());
-                self.singletons += 1;
-                Ok(0x90000 + self.singletons as u64 * 0x100)
+                Ok(0x90000)
             }
-            0x1414cedd0 => {
+            0x1414d45f0 => {
                 self.queries += 1;
-                assert_eq!(a, [0x90000 + self.queries as u64 * 0x100]);
-                Ok(0x1234567800000000 | u64::from(self.queries != 2))
+                assert_eq!(a[0], 0x90000);
+                assert_eq!(m.read(a[2], 12)?, b"_glider_tow\0");
+                assert_eq!(m.read(a[3], 2)?, b"1\0");
+                m.write(a[1], &[0; 32])?;
+                m.write(a[1], if self.queries == 2 { b"0" } else { b"1" })?;
+                m.write(a[1] + 16, &1u64.to_le_bytes())?;
+                m.write(a[1] + 24, &15u64.to_le_bytes())?;
+                Ok(a[1])
             }
-            0x1411222e0 => {
+            0x1414ccc80 => {
+                assert_eq!(a[0], 0x90000);
+                assert_eq!(a[2], RECEIVER + 0x20);
+                m.write(a[1], &[0; 32])?;
+                m.write(a[1] + 24, &15u64.to_le_bytes())?;
+                Ok(a[1])
+            }
+            0x1417e9f50 => Ok(0x91000),
+            0x1417e8a60 => {
                 self.headers += 1;
-                assert_eq!(a, [RECEIVER]);
+                assert_eq!(a[0], 0x91000);
                 m.write(SECOND, b"new")?;
                 // The cached resource must survive this table replacement.
                 m.write(0x146124398, &0x80000u64.to_le_bytes())?;
@@ -93,8 +152,8 @@ impl Host {
     }
     fn checked(&self, m: &ui_payload_move::State, compares: usize, keys: &[u64]) {
         assert_eq!(
-            (self.singletons, self.queries, self.headers, self.compares),
-            (3, 3, 1, compares)
+            (self.queries, self.headers, self.compares),
+            (3, 1, compares)
         );
         assert_eq!(m.blocks.keys().copied().collect::<Vec<_>>(), keys);
         assert_eq!(m.read(OWNER + 0xc0, 1).unwrap(), [255]);
