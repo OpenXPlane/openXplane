@@ -43,6 +43,10 @@ The numbers are indexes of the original's table (0 frame rates, 3 speeds, 4 Mach
 13 trims and flaps, 17 attitude, 18 angle of attack and flight path, 20 altitude, 21 position and velocity,
 25 throttle). The values come from the approximate flight model.
 
+For `fly-render`, line 0 is omitted: offscreen exports do not measure live FPS,
+CPU or GPU timings. Other selected rows use the scripted model state. Exported
+images must not be presented as measurements from the reference simulator.
+
 ## Discord
 
 While a window is open, openXplane shows what you are doing as your Discord status, through the local Discord

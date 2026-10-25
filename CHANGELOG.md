@@ -9,6 +9,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Installed scenery compatibility
 
+- Offscreen flight exports no longer display fixed frame-rate/CPU/GPU values
+  copied from a reference photograph. Unmeasured line0 is omitted; other selected
+  data rows still show the current approximate flight model.
+  ![Offscreen output with actual model rows and no fabricated timing row](site/assets/offscreen-data-20261026.png)
+
 - Airport loading now accepts the existing typed apt.dat subset from versions
   1000/1050/1100/1130 as well as1200. Mixed older custom packs no longer abort
   lookup before a modern Global Airports entry. Confirmed by loading KSEA and

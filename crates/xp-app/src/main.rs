@@ -406,7 +406,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             camera.distance = 24.0;
             let lines = dout::selected_lines();
             if !lines.is_empty() {
-                // line 0 shows the sample values of the reference photograph, to compare the layout
+                // Offscreen frames have no measured live frame/CPU/GPU timings.
                 let (fw, fh) = offscreen.size();
                 let mut hud = hud::Hud::new(fw, fh);
                 let scale = (fh as f32 / 800.0).clamp(0.7, 1.6);
@@ -418,16 +418,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                         telemetry: &telemetry,
                         controls: &c,
                         state: &session.model.state,
-                        frame: Some([
-                            Some(10.462),
-                            Some(19.9),
-                            None,
-                            Some(0.0956),
-                            Some(0.0698),
-                            Some(0.0956),
-                            Some(1.0),
-                            Some(1.0),
-                        ]),
+                        frame: None,
                     },
                     scale,
                 );
