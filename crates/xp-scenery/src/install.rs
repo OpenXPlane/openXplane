@@ -222,7 +222,7 @@ mod tests {
         );
         write(
             &root.join("Custom Scenery/Mine/Earth nav data/apt.dat"),
-            &apt("KAAA", "Custom Field"),
+            &apt("KAAA", "Custom Field").replacen("1200", "1130", 1),
         );
         write(
             &root.join("Custom Scenery/Off/Earth nav data/apt.dat"),

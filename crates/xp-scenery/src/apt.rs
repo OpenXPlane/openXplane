@@ -1,4 +1,4 @@
-//! Streaming apt.dat (format 1200) reader for one airport at a time.
+//! Streaming apt.dat (formats 1000/1050/1100/1130/1200) reader for one airport at a time.
 //! Airport headers (1/16/17), land runways (100), metadata (1302) and pavement outlines
 //! (110 with nodes 111-114) are typed; every other row code is counted, not interpreted.
 use std::collections::BTreeMap;
@@ -177,7 +177,9 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
         }
         let fields: Vec<&str> = text.split_whitespace().collect();
         if !seen_version {
-            if fields[0] != "1200" {
+            // These documented revisions keep the runway/pavement/header fields
+            // typed here in the same positions. Other rows remain uninterpreted.
+            if !matches!(fields[0], "1000" | "1050" | "1100" | "1130" | "1200") {
                 return Err(format!("unsupported apt.dat version '{}'", fields[0]));
             }
             seen_version = true;
@@ -287,8 +289,18 @@ mod tests {
 
     #[test]
     fn rejects_bad_version_and_short_runway() {
-        assert!(find_airport("I\n1100 x\n".as_bytes(), "A").is_err());
+        assert!(find_airport("I\n9999 x\n".as_bytes(), "A").is_err());
         let short = "I\n1200 x\n1 0 0 0 AAAA N\n100 30 1 0 0 0 1 0 09 1 2\n";
         assert!(find_airport(short.as_bytes(), "AAAA").is_err());
+    }
+
+    #[test]
+    fn prior_versions_preserve_supported_airport_fields() {
+        let expected = find_airport(SAMPLE.as_bytes(), "AAAA").unwrap();
+        for version in ["1000", "1050", "1100", "1130"] {
+            let text = SAMPLE.replacen("1200", version, 1);
+            assert_eq!(find_airport(text.as_bytes(), "AAAA").unwrap(), expected);
+            assert!(find_airport(text.as_bytes(), "ZZZZ").unwrap().is_none());
+        }
     }
 }

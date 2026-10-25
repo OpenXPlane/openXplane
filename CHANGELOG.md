@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Installed scenery compatibility
+
+- Airport loading now accepts the existing typed apt.dat subset from versions
+  1000/1050/1100/1130 as well as1200. Mixed older custom packs no longer abort
+  lookup before a modern Global Airports entry. Confirmed by loading KSEA and
+  rendering the stock Cessna from the installed reference content.
+  [Evidence and limits](research/INSTALLED_RUNTIME_BASELINE.md).
+  ![New installed-content KSEA render](site/assets/scenery-legacy-20261026.png)
+
 ### Flight model
 
 - Ported the original 49-pass wing grouping scan and connected its aspect/centroid
