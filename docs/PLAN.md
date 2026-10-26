@@ -4,6 +4,16 @@ The active completion criteria and mandatory commit/push workflow are in
 [GOAL.md](GOAL.md). Each completed coherent change must be checked, committed
 and pushed; partial ports do not complete the full-game goal.
 
+## Real reference window baseline (2026-10-26)
+
+Computer Use recovered after kernel reset. New original Cirrus cockpit and
+top-bar captures exist, with native replay/settings caveats and JPEG/resolution
+metadata in [the baseline](../research/REFERENCE_WINDOW_BASELINE.md). A native
+QA plan generator preserves hashes and avoids the reference's drive-qualified
+path failure. Native export and a matched Cessna/KSEA comparison remain pending.
+Next recover object flag/attachment selection for content-driven rendering and
+obtain same-scene still/motion/menu evidence. No visual parity share is added.
+
 ## Selection dependency composition (2026-10-25)
 
 [Dependency evidence](../research/UI_SELECTION_DEPENDENCIES.md):1988 original

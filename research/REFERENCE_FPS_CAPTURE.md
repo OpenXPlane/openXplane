@@ -1,5 +1,9 @@
 # Reference runtime and automatic capture investigation
 
+Update2026-10-26: new original window captures now exist through Computer Use
+after resetting its JavaScript kernel. See [the capture baseline](REFERENCE_WINDOW_BASELINE.md).
+Native QA/picture export and a matched original/port scenario remain unresolved.
+
 Date2026-10-26. Reference executable SHA256 matches [BASELINE.md](BASELINE.md).
 The running log identifies itself as X-Plane12.4.3-r2-15ff1e4d, build124311,
 compiled2026-06-24. This is a runtime label from the installed reference, not a

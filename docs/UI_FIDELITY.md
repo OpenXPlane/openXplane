@@ -1,5 +1,17 @@
 # Original UI and graphics fidelity acceptance
 
+## New original captures (2026-10-26)
+
+[Reference window evidence](../research/REFERENCE_WINDOW_BASELINE.md) now includes
+new original Cirrus cockpit and top-bar captures. Computer Use recovered after
+a JavaScript kernel reset. The1281x801 JPEG window images came from the real
+FPS replay, with safe-mode overlay; aircraft XLua still loaded. Escape was
+followed by a visible bar, Alt retained it and a Flight click did not open a
+dropdown in that mode. Timing/mouse effects and benchmark suppression are not
+isolated, so normal menu behavior and motion remain unproven. Port Cessna/KSEA
+frames are not a matched scenario. UI/graphics parity and the original exact
+layout/behavior integration remain unfinished; verified shares stay zero.
+
 The active goal requires X-Plane UI and graphics 1:1, including Alt/Esc menus. Fonts, dimensions, spacing, icons, transitions, animations, lighting and materials are part of the requirement. A redesigned prototype does not establish parity.
 
 ## Current authoritative state (2026-10-13)
