@@ -20,8 +20,8 @@ pub struct Install {
 }
 
 impl Install {
-    /// Preview library index: first matching export wins. Region/season/random
-    /// selection and EXPORT_BACKUP/EXTEND semantics are not yet reproduced.
+    /// Preview library: export replacement/extension/exclusion and backup fallback.
+    /// Region/season/dataref predicates and random/ratio sampling remain approximate.
     pub fn preview_library(&self) -> Result<std::collections::BTreeMap<String, PathBuf>, String> {
         let mut packs = self.scenery_packs()?;
         let defaults = self.root.join("Resources/default scenery");
@@ -34,34 +34,13 @@ impl Install {
             paths.sort();
             packs.extend(paths);
         }
-        let mut index = std::collections::BTreeMap::new();
+        let mut index = crate::library::Index::default();
         for pack in packs {
-            let Ok(text) = fs::read_to_string(pack.join("library.txt")) else {
-                continue;
-            };
-            for line in text.lines() {
-                let mut fields = line.split_whitespace();
-                let Some(command) = fields.next() else {
-                    continue;
-                };
-                if !["EXPORT", "EXPORT_EXCLUDE", "EXPORT_BACKUP", "EXPORT_EXTEND"]
-                    .contains(&command)
-                {
-                    continue;
-                }
-                let Some(virtual_path) = fields.next() else {
-                    continue;
-                };
-                let path = fields.collect::<Vec<_>>().join(" ");
-                if !path.is_empty() {
-                    let target = pack.join(path.replace('\\', "/"));
-                    if target.is_file() {
-                        index.entry(virtual_path.into()).or_insert(target);
-                    }
-                }
+            if let Ok(text) = fs::read_to_string(pack.join("library.txt")) {
+                index.add_pack(&pack, &text);
             }
         }
-        Ok(index)
+        Ok(index.first_choices())
     }
 
     /// Available global base-mesh tiles, in deterministic package order.

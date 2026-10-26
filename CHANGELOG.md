@@ -7,6 +7,17 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Scenery library export selection
+
+- Corrected preview resource selection so BACKUP yields to ordinary exports,
+  EXTEND retains lower-package candidates and EXCLUDE blocks later definitions.
+  Sibling variants are retained; the renderer still picks the first one.
+  Region/season/dataref conditions and random/weighted selection remain unfinished.
+  Repeated scenery now shares geometry through GPU instances: corrected resource
+  selection had exposed a 4.78GB expanded-buffer failure at KSEA.
+  [Evidence and limits](research/LIBRARY_PRECEDENCE.md).
+  ![KSEA library selection preview](site/assets/ksea-library-20261026.png)
+
 ### Autogen point object groups
 
 - Airport scenes now expand object annotations in installed AG_POINT packages,

@@ -4,4 +4,5 @@ pub mod agp;
 pub mod apt;
 pub mod dsf;
 pub mod install;
+pub mod library;
 pub mod world;

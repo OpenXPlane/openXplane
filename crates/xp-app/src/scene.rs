@@ -12,6 +12,8 @@ use std::{
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
     pub texture: image::RgbaImage,
+    /// World translation and Y-axis angle in radians; identity for baked geometry.
+    pub instances: Vec<[f32; 4]>,
     pub glass: bool,
     pub center: Vec3,
     animation: Option<AnimatedObject>,
@@ -236,6 +238,7 @@ fn load_aircraft(aircraft_path: &Path, animate: bool) -> Result<Scene, Box<dyn s
             texture,
             glass: object.glass || flags & 2 != 0,
             center: (mesh_low + mesh_high) * 0.5,
+            instances: vec![[0.0; 4]],
             animation: animate.then_some(AnimatedObject {
                 object,
                 rotation,
@@ -423,26 +426,35 @@ fn airport_objects(
             } else {
                 solid_texture([255; 4])
             };
-            let mut vertices = Vec::new();
             let mut low = Vec3::splat(f32::INFINITY);
             let mut high = Vec3::splat(f32::NEG_INFINITY);
+            let mut base_low = Vec3::splat(f32::INFINITY);
+            let mut base_high = Vec3::splat(f32::NEG_INFINITY);
+            for v in &base {
+                base_low = base_low.min(Vec3::from_array(v.position));
+                base_high = base_high.max(Vec3::from_array(v.position));
+            }
+            let mut instances = Vec::with_capacity(poses.len());
             for (position, heading) in &poses {
-                let rotation = glam::Mat3::from_rotation_y(-heading.to_radians());
-                for b in &base {
-                    let mut v = *b;
-                    let p = rotation * Vec3::from_array(b.position) + *position;
-                    v.position = p.to_array();
-                    v.normal = (rotation * Vec3::from_array(b.normal)).to_array();
-                    low = low.min(p);
-                    high = high.max(p);
-                    vertices.push(v);
+                let angle = -heading.to_radians();
+                instances.push([position.x, position.y, position.z, angle]);
+                let rotation = glam::Mat3::from_rotation_y(angle);
+                for x in [base_low.x, base_high.x] {
+                    for y in [base_low.y, base_high.y] {
+                        for z in [base_low.z, base_high.z] {
+                            let p = rotation * Vec3::new(x, y, z) + *position;
+                            low = low.min(p);
+                            high = high.max(p);
+                        }
+                    }
                 }
             }
             Ok(Mesh {
-                vertices,
+                vertices: base,
                 texture,
                 glass: object.glass,
                 center: (low + high) * 0.5,
+                instances,
                 animation: None,
             })
         })();
@@ -517,6 +529,7 @@ fn xp_scenery_raster(
         texture: solid_texture([85, 105, 65, 255]),
         glass: false,
         center: Vec3::ZERO,
+        instances: vec![[0.0; 4]],
         animation: None,
     })
 }
@@ -617,6 +630,7 @@ pub fn airport_flight(
             texture: solid_texture(layer.color),
             glass: false,
             center: (low + high) * 0.5,
+            instances: vec![[0.0; 4]],
             animation: None,
         });
     }

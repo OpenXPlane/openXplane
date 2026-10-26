@@ -45,6 +45,8 @@ impl Camera {
 
 struct GpuMesh {
     vertex: wgpu::Buffer,
+    instances: wgpu::Buffer,
+    instance_count: u32,
     count: u32,
     material: wgpu::BindGroup,
     glass: bool,
@@ -149,6 +151,7 @@ impl Renderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
         let attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2];
+        let instance_attributes = wgpu::vertex_attr_array![3 => Float32x4];
         let pipeline = |glass| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(if glass { "glass" } else { "opaque" }),
@@ -157,11 +160,18 @@ impl Renderer {
                     module: &shader,
                     entry_point: Some("vs"),
                     compilation_options: Default::default(),
-                    buffers: &[wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<Vertex>() as u64,
-                        step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &attributes,
-                    }],
+                    buffers: &[
+                        wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<Vertex>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &attributes,
+                        },
+                        wgpu::VertexBufferLayout {
+                            array_stride: 16,
+                            step_mode: wgpu::VertexStepMode::Instance,
+                            attributes: &instance_attributes,
+                        },
+                    ],
                 },
                 primitive: wgpu::PrimitiveState {
                     cull_mode: None,
@@ -309,10 +319,22 @@ impl Renderer {
         });
         let mut meshes = Vec::new();
         for mesh in &scene.meshes {
+            let vertex_bytes = std::mem::size_of_val(mesh.vertices.as_slice()) as u64;
+            let instance_bytes = std::mem::size_of_val(mesh.instances.as_slice()) as u64;
+            if vertex_bytes > device.limits().max_buffer_size
+                || instance_bytes > device.limits().max_buffer_size
+            {
+                return Err(format!("scene mesh exceeds GPU buffer limit: {vertex_bytes} vertex bytes, {instance_bytes} instance bytes").into());
+            }
             let vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("OBJ8 triangles"),
                 contents: bytemuck::cast_slice(&mesh.vertices),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            });
+            let instances = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("object placement instances"),
+                contents: bytemuck::cast_slice(&mesh.instances),
+                usage: wgpu::BufferUsages::VERTEX,
             });
             let size = wgpu::Extent3d {
                 width: mesh.texture.width(),
@@ -361,6 +383,8 @@ impl Renderer {
             });
             meshes.push(GpuMesh {
                 vertex,
+                instances,
+                instance_count: mesh.instances.len().try_into()?,
                 count: mesh.vertices.len().try_into()?,
                 material,
                 glass: mesh.glass,
@@ -511,7 +535,8 @@ impl Renderer {
             });
             pass.set_bind_group(1, &mesh.material, &[]);
             pass.set_vertex_buffer(0, mesh.vertex.slice(..));
-            pass.draw(0..mesh.count, 0..1);
+            pass.set_vertex_buffer(1, mesh.instances.slice(..));
+            pass.draw(0..mesh.count, 0..mesh.instance_count);
         }
         if self.hud_count > 0 {
             pass.set_pipeline(&self.hud_pipeline);

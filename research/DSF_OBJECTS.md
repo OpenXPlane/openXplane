@@ -35,7 +35,9 @@ openxplane scenery-render "<X-Plane>" KSEA "<aircraft.acf>" scenery.png
 
 Objects currently use flat airport-relative height and zero-dataref animation
 state. Optional object elevation/AGL state, exclusions, density, filters,
-regional/seasonal/random exports and exact BACKUP/EXTEND rules are unresolved.
+regional/seasonal/random exports and native library selection remain unresolved.
+Unconditional BACKUP/EXTEND/EXCLUDE candidate rules were subsequently corrected;
+see [LIBRARY_PRECEDENCE.md](LIBRARY_PRECEDENCE.md).
 Only the Global Airports overlay tile is instantiated; custom overlay ordering,
 adjacent tiles, complete AGP, facades and networks remain missing. Terminal buildings
 and terrain materials are visibly incomplete. The raster preview and central
