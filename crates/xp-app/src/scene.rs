@@ -613,6 +613,13 @@ fn airport_objects(
         }
     }
     let mut meshes = airport_facades(&features.polygons, &pack, &library, frame, ground);
+    meshes.extend(airport_polygons(
+        &features.polygons,
+        &pack,
+        &library,
+        frame,
+        ground,
+    ));
     let facade_batches = meshes.len();
     let mut instances = 0;
     let mut failed = 0;
@@ -737,6 +744,127 @@ fn airport_objects(
         meshes.len() - facade_batches
     );
     Ok(meshes)
+}
+
+fn airport_polygons(
+    polygons: &[openxplane::dsf::PolygonPlacement],
+    pack: &Path,
+    library: &BTreeMap<String, PathBuf>,
+    frame: &openxplane::world::Frame,
+    ground: Option<&openxplane::ground::Ground>,
+) -> Vec<Mesh> {
+    let mut grouped = BTreeMap::<PathBuf, Vec<&openxplane::dsf::PolygonPlacement>>::new();
+    let mut skipped = 0;
+    let mut placed = 0;
+    for polygon in polygons {
+        if !polygon.resource.ends_with(".pol") {
+            continue;
+        }
+        let Some(p) = polygon.windings.first().and_then(|w| w.first()) else {
+            continue;
+        };
+        let [x, z] = frame.to_local(p[1], p[0]);
+        if x.abs() > 6000.0 || z.abs() > 6000.0 {
+            continue;
+        }
+        let direct = pack.join(&polygon.resource);
+        let resource = if direct.is_file() {
+            Some(direct)
+        } else {
+            library.get(&polygon.resource).cloned()
+        };
+        if let Some(resource) = resource {
+            grouped.entry(resource).or_default().push(polygon);
+        } else {
+            skipped += 1;
+        }
+    }
+    let mut meshes = Vec::new();
+    for (path, polygons) in grouped {
+        let loaded = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
+            let material = openxplane::polygon::Material::parse(&fs::read_to_string(&path)?)?;
+            let mut texture = image::imageops::flip_vertical(
+                &image::open(texture_path(&path, &material.texture).ok_or("POL texture missing")?)?
+                    .to_rgba8(),
+            );
+            if material.no_alpha {
+                for p in texture.pixels_mut() {
+                    p.0[3] = 255;
+                }
+            }
+            let mut vertices = Vec::new();
+            for polygon in polygons {
+                let explicit = polygon.parameter == 65535;
+                if polygon.windings.len() != 1
+                    || polygon.windings[0]
+                        .iter()
+                        .any(|p| p.len() != if explicit { 4 } else { 2 })
+                {
+                    skipped += 1;
+                    continue;
+                }
+                let mut points = polygon.windings[0]
+                    .iter()
+                    .map(|p| frame.to_local(p[1], p[0]))
+                    .collect::<Vec<_>>();
+                let mut st = explicit.then(|| {
+                    polygon.windings[0]
+                        .iter()
+                        .map(|p| [p[2] as f32, p[3] as f32])
+                        .collect::<Vec<_>>()
+                });
+                if points.len() > 2 && points.first() == points.last() {
+                    points.pop();
+                    if let Some(st) = &mut st {
+                        st.pop();
+                    }
+                }
+                match material.vertices(&points, st.as_deref(), polygon.parameter, ground) {
+                    Ok(v) => {
+                        placed += 1;
+                        vertices.extend(v.into_iter().map(|v| Vertex {
+                            position: [v[0], v[1], v[2]],
+                            normal: [v[3], v[4], v[5]],
+                            uv: [v[6], v[7]],
+                        }));
+                    }
+                    Err(e) => {
+                        skipped += 1;
+                        eprintln!("POL footprint skipped {}: {e}", path.display());
+                    }
+                }
+            }
+            println!(
+                "POL {}: layer={} offset={}, unsupported={:?}",
+                path.display(),
+                material.layer,
+                material.offset,
+                material.unsupported
+            );
+            Ok(Mesh {
+                vertices,
+                texture,
+                instances: vec![[0.0; 4]],
+                glass: !material.no_alpha,
+                repeat_texture: material.repeat,
+                center: Vec3::ZERO,
+                animation: None,
+            })
+        })();
+        match loaded {
+            Ok(mesh) if !mesh.vertices.is_empty() => meshes.push(mesh),
+            Ok(_) => {}
+            Err(e) => {
+                skipped += 1;
+                eprintln!("POL resource skipped {}: {e}", path.display());
+            }
+        }
+    }
+    println!(
+        "POL preview: {placed} polygons, {} resource batches, {skipped} skipped footprints/resources; straight single contours, approximate layer bias/draping, no normal/decal/night/surface physics",
+        meshes.len()
+    );
+    meshes
 }
 
 fn airport_facades(

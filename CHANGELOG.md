@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Installed draped polygon textures
+
+- Airport scenes now load straight single-contour POL pavement and ground-sign
+  textures from installed libraries, including AEP exports. KSEA builds752
+  polygons in16 batches; holes, curves, exact layer/material handling and POL
+  surface physics remain unfinished.
+  [Evidence and limits](research/DRAPED_POLYGONS.md).
+  ![KSEA POL preview](site/assets/ksea-pol-20261026.jpg)
+
 ### Source terrain in the flight scene
 
 - Airport and flight scenes now share source DSF terrain and TER base textures,

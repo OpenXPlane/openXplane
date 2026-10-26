@@ -11,6 +11,12 @@ pub struct Ground {
 }
 
 impl Ground {
+    /// Source terrain beneath added airport surfaces, for visual layer draping.
+    pub fn terrain_sample(&self, x: f32, z: f32) -> Option<(f32, [f32; 3])> {
+        self.base
+            .as_ref()
+            .map_or_else(|| self.sample(x, z), |g| g.terrain_sample(x, z))
+    }
     const CELL: f32 = 256.0;
     pub fn new(triangles: Vec<[[f32; 3]; 3]>) -> Self {
         let mut out = Self {

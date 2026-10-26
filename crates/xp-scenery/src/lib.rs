@@ -7,5 +7,6 @@ pub mod facade;
 pub mod ground;
 pub mod install;
 pub mod library;
+pub mod polygon;
 pub mod terrain;
 pub mod world;
