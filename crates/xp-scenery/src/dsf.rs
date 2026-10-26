@@ -1,4 +1,5 @@
-//! DSF raster-height subset from the public DSF specification. Not native parity.
+//! DSF raster, object, polygon and terrain subsets from the public specification.
+//! Successful decoding does not establish native loader or rendering parity.
 //! Reads original files in place; 7z members are decoded only into memory.
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -47,40 +48,47 @@ pub struct HeightRaster {
     values: Vec<f32>,
 }
 
+pub fn read_bytes(path: &Path) -> Result<Vec<u8>, String> {
+    let raw = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let data = if raw.starts_with(b"7z\xbc\xaf\x27\x1c") {
+        let mut archive = sevenz_rust2::ArchiveReader::new(
+            std::io::Cursor::new(raw),
+            sevenz_rust2::Password::empty(),
+        )
+        .map_err(|e| e.to_string())?;
+        let mut payload = None;
+        archive
+            .for_each_entries(|entry, reader| {
+                if entry.is_directory {
+                    return Ok(true);
+                }
+                if payload.is_some() || entry.size > LIMIT as u64 {
+                    return Err(sevenz_rust2::Error::Other(
+                        "DSF archive must contain one bounded member".into(),
+                    ));
+                }
+                let mut bytes = Vec::new();
+                reader.take(LIMIT as u64 + 1).read_to_end(&mut bytes)?;
+                if bytes.len() > LIMIT {
+                    return Err(sevenz_rust2::Error::Other("DSF member too large".into()));
+                }
+                payload = Some(bytes);
+                Ok(true)
+            })
+            .map_err(|e| e.to_string())?;
+        payload.ok_or("empty DSF archive")?
+    } else {
+        raw
+    };
+    if data.len() > LIMIT {
+        return Err("DSF exceeds size limit".into());
+    }
+    Ok(data)
+}
+
 impl HeightRaster {
     pub fn read(path: &Path) -> Result<Self, String> {
-        let raw = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let data = if raw.starts_with(b"7z\xbc\xaf\x27\x1c") {
-            let mut archive = sevenz_rust2::ArchiveReader::new(
-                std::io::Cursor::new(raw),
-                sevenz_rust2::Password::empty(),
-            )
-            .map_err(|e| e.to_string())?;
-            let mut payload = None;
-            archive
-                .for_each_entries(|entry, reader| {
-                    if entry.is_directory {
-                        return Ok(true);
-                    }
-                    if payload.is_some() || entry.size > LIMIT as u64 {
-                        return Err(sevenz_rust2::Error::Other(
-                            "DSF archive must contain one bounded member".into(),
-                        ));
-                    }
-                    let mut bytes = Vec::new();
-                    reader.take(LIMIT as u64 + 1).read_to_end(&mut bytes)?;
-                    if bytes.len() > LIMIT {
-                        return Err(sevenz_rust2::Error::Other("DSF member too large".into()));
-                    }
-                    payload = Some(bytes);
-                    Ok(true)
-                })
-                .map_err(|e| e.to_string())?;
-            payload.ok_or("empty DSF archive")?
-        } else {
-            raw
-        };
-        Self::parse(&data)
+        Self::parse(&read_bytes(path)?)
     }
 
     pub fn parse(data: &[u8]) -> Result<Self, String> {
@@ -317,10 +325,18 @@ pub struct PolygonPlacement {
     pub windings: Vec<Vec<Vec<f64>>>,
 }
 
+pub struct TerrainTriangle {
+    pub resource: String,
+    pub flags: u8,
+    pub lod: [f32; 2],
+    pub points: [Vec<f64>; 3],
+}
+
 #[derive(Default)]
 pub struct Features {
     pub objects: Vec<ObjectPlacement>,
     pub polygons: Vec<PolygonPlacement>,
+    pub terrain: Vec<TerrainTriangle>,
 }
 
 pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
@@ -328,11 +344,21 @@ pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
 }
 
 pub fn features(data: &[u8]) -> Result<Features, String> {
+    features_with_terrain(data, None)
+}
+
+/// Optional terrain extraction in west/south/east/north bounds. Triangles that
+/// intersect the box by their geographic AABB are retained without clipping.
+pub fn features_with_terrain(data: &[u8], bounds: Option<[f64; 4]>) -> Result<Features, String> {
+    if bounds.is_some_and(|b| b.iter().any(|v| !v.is_finite()) || b[0] > b[2] || b[1] > b[3]) {
+        return Err("invalid terrain extraction bounds".into());
+    }
     if data.len() < 28 || &data[..8] != b"XPLNEDSF" || data[8..12] != 1u32.to_le_bytes() {
         return Err("unsupported object DSF header".into());
     }
     let mut definitions = Vec::new();
     let mut polygon_definitions = Vec::new();
+    let mut terrain_definitions = Vec::new();
     let mut pools = Vec::new();
     let mut scales = Vec::new();
     let mut commands = None;
@@ -342,6 +368,9 @@ pub fn features(data: &[u8]) -> Result<Features, String> {
                 for (t, b) in atoms(body)? {
                     if t == *b"TJBO" {
                         definitions = strings(b)?;
+                    }
+                    if t == *b"TRET" {
+                        terrain_definitions = strings(b)?;
                     }
                     if t == *b"YLOP" {
                         polygon_definitions = strings(b)?;
@@ -394,6 +423,9 @@ pub fn features(data: &[u8]) -> Result<Features, String> {
     let mut pool = None;
     let mut definition = None;
     let mut out = Features::default();
+    let mut flags = 0;
+    let mut lod = [0.0, -1.0];
+    let mut patch = None;
     while c.pos < c.bytes.len() {
         let at = c.pos;
         let op = c.u8()?;
@@ -509,23 +541,100 @@ pub fn features(data: &[u8]) -> Result<Features, String> {
                     windings,
                 });
             }
-            16 => {}
-            17 => {
-                c.take(1)?;
+            16..=18 => {
+                if op >= 17 {
+                    flags = c.u8()?;
+                }
+                if op == 18 {
+                    for v in &mut lod {
+                        *v = f32::from_le_bytes(c.take(4)?.try_into().unwrap());
+                    }
+                    if lod.iter().any(|v| !v.is_finite()) {
+                        return Err("nonfinite patch LOD".into());
+                    }
+                }
+                patch = definition;
             }
-            18 => {
-                c.take(9)?;
-            }
-            23 | 26 | 29 => {
-                let n = c.u8()? as usize;
-                c.take(n * 2)?;
-            }
-            24 | 27 | 30 => {
-                let n = c.u8()? as usize;
-                c.take(n * 4)?;
-            }
-            25 | 28 | 31 => {
-                c.take(4)?;
+            23..=31 => {
+                let family = (op - 23) / 3;
+                let form = (op - 23) % 3;
+                let mut indices = Vec::new();
+                if form == 2 {
+                    let first = c.u16()? as usize;
+                    let end = c.u16()? as usize;
+                    if end < first {
+                        return Err("reversed terrain range".into());
+                    }
+                    indices.extend((first..end).map(|i| (pool, i)));
+                } else {
+                    let n = c.u8()?;
+                    for _ in 0..n {
+                        let p = if form == 1 {
+                            Some(c.u16()? as usize)
+                        } else {
+                            pool
+                        };
+                        indices.push((p, c.u16()? as usize));
+                    }
+                }
+                if let Some(bounds) = bounds {
+                    let name = terrain_definitions
+                        .get(patch.ok_or("terrain primitive before patch")?)
+                        .ok_or("terrain definition out of range")?;
+                    let points = indices
+                        .into_iter()
+                        .map(|(p, i)| point(p.ok_or("missing terrain pool")?, i))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if points
+                        .iter()
+                        .any(|p| p.len() < 5 || p.iter().any(|v| !v.is_finite()))
+                    {
+                        return Err("invalid terrain coordinates".into());
+                    }
+                    let mut emit = |a: usize, b: usize, d: usize| {
+                        let tri = [&points[a], &points[b], &points[d]];
+                        let west = tri.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min);
+                        let east = tri.iter().map(|p| p[0]).fold(f64::NEG_INFINITY, f64::max);
+                        let south = tri.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+                        let north = tri.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max);
+                        if east >= bounds[0]
+                            && north >= bounds[1]
+                            && west <= bounds[2]
+                            && south <= bounds[3]
+                        {
+                            out.terrain.push(TerrainTriangle {
+                                resource: name.clone(),
+                                flags,
+                                lod,
+                                points: [points[a].clone(), points[b].clone(), points[d].clone()],
+                            });
+                        }
+                    };
+                    match family {
+                        0 => {
+                            if !points.len().is_multiple_of(3) {
+                                return Err("incomplete terrain triangle list".into());
+                            }
+                            for i in (0..points.len()).step_by(3) {
+                                emit(i, i + 1, i + 2);
+                            }
+                        }
+                        1 => {
+                            for i in 2..points.len() {
+                                if i % 2 == 0 {
+                                    emit(i - 2, i - 1, i);
+                                } else {
+                                    emit(i - 2, i, i - 1);
+                                }
+                            }
+                        }
+                        _ => {
+                            for i in 2..points.len() {
+                                emit(0, i - 1, i);
+                            }
+                        }
+                    }
+                }
             }
             32..=34 => {
                 let n = match op {
@@ -624,6 +733,107 @@ mod object_tests {
         assert_eq!(decode_pool(&raw).unwrap(), vec![vec![9, 9, 9]]);
         raw[6] = 0;
         assert!(decode_pool(&raw).is_err());
+    }
+    #[test]
+    fn terrain_primitive_forms_preserve_winding_pools_and_patch_state() {
+        fn fixture(command: &[u8]) -> Vec<u8> {
+            let mut geo = Vec::new();
+            for offset in [0u16, 100] {
+                let mut pool = 4u32.to_le_bytes().to_vec();
+                pool.push(5);
+                for values in [
+                    [offset, offset + 1, offset + 2, offset + 3],
+                    [0, 0, 1, 1],
+                    [10, 10, 10, 10],
+                    [0; 4],
+                    [0; 4],
+                ] {
+                    pool.push(0);
+                    for v in values {
+                        pool.extend(v.to_le_bytes());
+                    }
+                }
+                geo.extend(atom(b"LOOP", &pool));
+                geo.extend(atom(b"LACS", &[0; 40]));
+            }
+            let mut data = b"XPLNEDSF".to_vec();
+            data.extend(1u32.to_le_bytes());
+            data.extend(atom(b"NFED", &atom(b"TRET", b"test.ter\0other.ter\0")));
+            data.extend(atom(b"DOEG", &geo));
+            let mut commands = vec![1, 0, 0, 3, 0, 18, 3];
+            commands.extend(100f32.to_le_bytes());
+            commands.extend(1000f32.to_le_bytes());
+            commands.extend([3, 1]); // definition changes do not change an open patch
+            commands.extend(command);
+            commands.push(16); // next patch inherits flags/LOD, uses current definition
+            commands.extend([25, 0, 0, 3, 0]);
+            data.extend(atom(b"SDMC", &commands));
+            data.extend([0; 16]);
+            data
+        }
+        for op in 23u8..=31 {
+            let count = if op <= 25 { 3 } else { 4 };
+            let mut command = vec![op];
+            match (op - 23) % 3 {
+                0 => {
+                    command.push(count);
+                    for i in 0..count {
+                        command.extend((i as u16).to_le_bytes());
+                    }
+                }
+                1 => {
+                    command.push(count);
+                    for i in 0..count {
+                        command.extend(((i % 2) as u16).to_le_bytes());
+                        command.extend((i as u16).to_le_bytes());
+                    }
+                }
+                _ => {
+                    command.extend([0, 0, count, 0]);
+                }
+            }
+            let data = fixture(&command);
+            let f = features_with_terrain(&data, Some([-1.0, -1.0, 200.0, 2.0])).unwrap();
+            let expected = if count == 3 { 1 } else { 2 };
+            assert_eq!(f.terrain.len(), expected + 1);
+            assert_eq!(f.terrain[0].resource, "test.ter");
+            assert_eq!(f.terrain[expected].resource, "other.ter");
+            assert!(
+                f.terrain
+                    .iter()
+                    .all(|t| t.flags == 3 && t.lod == [100.0, 1000.0])
+            );
+            let base = if (op - 23) % 3 == 1 { 101.0 } else { 1.0 };
+            assert_eq!(f.terrain[0].points[1][0], base);
+            if count == 4 {
+                let t = &f.terrain[1];
+                if op <= 28 {
+                    assert_eq!(t.points[0][0], base);
+                    assert_eq!(t.points[2][0], 2.0);
+                } else {
+                    assert_eq!(t.points[0][0], 0.0);
+                    assert_eq!(t.points[1][0], 2.0);
+                }
+            }
+            assert!(
+                features_with_terrain(&data, Some([300.0, 300.0, 301.0, 301.0]))
+                    .unwrap()
+                    .terrain
+                    .is_empty()
+            );
+        }
+        assert!(features_with_terrain(&fixture(&[25, 3, 0, 0, 0]), Some([-1.0; 4])).is_err());
+        assert!(
+            features_with_terrain(
+                &fixture(&[23, 3, 0, 0, 1, 0, 9, 0]),
+                Some([-1.0, -1.0, 200.0, 2.0])
+            )
+            .is_err()
+        );
+        assert!(
+            features_with_terrain(&fixture(&[25, 0, 0, 2, 0]), Some([-1.0, -1.0, 200.0, 2.0]))
+                .is_err()
+        );
     }
     #[test]
     fn object_range_uses_pool_scale_and_definition() {

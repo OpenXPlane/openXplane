@@ -19,6 +19,19 @@ fn frame_size() -> (u32, u32) {
 
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 4 && args[0] == "mesh-render" {
+        let scene = scene::terrain_mesh(
+            Path::new(&args[1]),
+            args[2].to_str().ok_or("invalid airport argument")?,
+        )?;
+        let (w, h) = frame_size();
+        let mut renderer = pollster::block_on(gpu::Offscreen::new(&scene, w, h))?;
+        let mut camera = gpu::Camera::new(&scene);
+        camera.distance = 19000.0;
+        camera.pitch = 0.9;
+        renderer.render(&scene, 0, &camera, Path::new(&args[3]))?;
+        return Ok(true);
+    }
     if args.len() == 5 && args[0] == "fac-render" {
         let floor = args[2]
             .to_str()

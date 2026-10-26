@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Source terrain mesh inspection
+
+- Added terrain patch/list/strip/fan decoding and `mesh-render` against installed
+  compressed DSF tiles. KSEA's inspection shows39303 source triangles, including
+  coastlines and inland water. It uses diagnostic colors; playable airport scenes
+  still use the previous raster/slab preview pending materials and collision.
+  [Evidence and remaining integration](research/DSF_MESH.md).
+  ![KSEA source DSF topology](site/assets/ksea-source-mesh-20261026.png)
+
 ### Installed facade roofs
 
 - KSEA facade previews now draw ROOF_HEIGHT layers with the declared roof base

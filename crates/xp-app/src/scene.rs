@@ -37,6 +37,99 @@ pub struct Scene {
 /// Clear colour of the aircraft-only preview.
 pub const PREVIEW_BACKGROUND: [f64; 3] = [0.028, 0.045, 0.07];
 
+/// Source-topology inspection before terrain material/physics integration.
+pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error::Error>> {
+    let install = openxplane::install::Install::open(root)?;
+    let (airport, _) = install.find_airport(icao)?.ok_or("airport not found")?;
+    let (frame, _) = openxplane::world::airport_layers(&airport, 8000.0)?;
+    let origin = frame.origin();
+    let path = install
+        .terrain_tile(origin[0], origin[1])
+        .ok_or("base DSF tile not found")?;
+    let bytes = openxplane::dsf::read_bytes(&path)?;
+    let raster = openxplane::dsf::HeightRaster::parse(&bytes)?;
+    let features = openxplane::dsf::features_with_terrain(
+        &bytes,
+        Some([
+            origin[1] - 0.15,
+            origin[0] - 0.1,
+            origin[1] + 0.15,
+            origin[0] + 0.1,
+        ]),
+    )?;
+    let mut grouped = BTreeMap::<String, Vec<Vertex>>::new();
+    let mut physical = 0;
+    let mut overlay = 0;
+    for triangle in &features.terrain {
+        if triangle.flags & 1 != 0 {
+            physical += 1;
+        }
+        if triangle.flags & 2 != 0 {
+            overlay += 1;
+        }
+        let water = triangle.resource == "terrain_Water";
+        let positions = triangle.points.each_ref().map(|p| {
+            let [x, z] = frame.to_local(p[1], p[0]);
+            let height = if p[2] == -32768.0 || water {
+                raster.sample(p[1], p[0])
+            } else {
+                p[2] as f32
+            };
+            Vec3::new(x, height - airport.elevation_ft * 0.3048, z)
+        });
+        let face_normal = (positions[1] - positions[0])
+            .cross(positions[2] - positions[0])
+            .normalize_or_zero();
+        for (p, position) in triangle.points.iter().zip(positions) {
+            let normal = if p[3] == 0.0 && p[4] == 0.0 {
+                face_normal
+            } else {
+                Vec3::new(
+                    p[3] as f32,
+                    (1.0 - p[3] * p[3] - p[4] * p[4]).max(0.0).sqrt() as f32,
+                    p[4] as f32,
+                )
+            };
+            grouped
+                .entry(triangle.resource.clone())
+                .or_default()
+                .push(Vertex {
+                    position: position.to_array(),
+                    normal: normal.to_array(),
+                    uv: [0.5, 0.5],
+                });
+        }
+    }
+    println!(
+        "DSF source mesh {}: {} intersecting triangles, {physical} physical, {overlay} overlay, {} terrain definitions; source topology with elevation raster, diagnostic colors only, all LODs, no collision integration",
+        path.display(),
+        features.terrain.len(),
+        grouped.len()
+    );
+    let meshes = grouped
+        .into_iter()
+        .map(|(name, vertices)| Mesh {
+            vertices,
+            texture: solid_texture(if name == "terrain_Water" {
+                [35, 80, 125, 255]
+            } else {
+                [85, 105, 65, 255]
+            }),
+            repeat_texture: false,
+            glass: false,
+            center: Vec3::ZERO,
+            instances: vec![[0.0; 4]],
+            animation: None,
+        })
+        .collect();
+    Ok(Scene {
+        meshes,
+        center: Vec3::ZERO,
+        radius: 30000.0,
+        background: [0.30, 0.52, 0.80],
+    })
+}
+
 /// Inspect one actual type-2 facade segment in its unchanged file coordinates.
 pub fn facade_segment(
     path: &Path,
