@@ -14,6 +14,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
   and preserved earlier command examples and development notes in `docs/DEVELOPMENT_NOTES.md`.
   The compatibility generator now keeps the README summary compact.
 
+### Aircraft attachments
+
+- Recovered common ACF object-attachment reads, coordinate scaling and CG subtraction,
+  and legacy part-index migration against the original machine code. `aircraft-info`
+  now reports attachment loader coordinates and indices. The renderer still uses its
+  Cessna subset; visibility and final attachment transforms remain incomplete.
+  [Evidence and limits](research/OBJECT_ATTACHMENTS.md).
+
 ### Installed scenery compatibility
 
 - Offscreen flight exports no longer display fixed frame-rate/CPU/GPU values

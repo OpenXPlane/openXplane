@@ -1,6 +1,7 @@
 //! The ACF aircraft file: a property reader that preserves unknown properties rather than guessing their
 //! meaning, typed parameters confirmed in the reference build, and the lifting surfaces.
 pub mod aircraft;
+pub mod attachment;
 pub mod object;
 pub mod wing;
 use std::path::{Path, PathBuf};

@@ -1,6 +1,6 @@
 //! The `openxplane` facade over the workspace crates: one place to name everything the application and the
 //! tests use.
-pub use xp_acf::{Aircraft, Property, aircraft, reference_candidates, wing};
+pub use xp_acf::{Aircraft, Property, aircraft, attachment, reference_candidates, wing};
 pub use xp_airfoil::{
     aero, airflow, airfoil, atmosphere, attitude, binding, blend, body, buffet, callees, controls,
     element_force, engine, engine_env, engine_small, flight_init, flight_state, flight_step,

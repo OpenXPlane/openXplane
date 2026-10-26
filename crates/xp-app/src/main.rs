@@ -499,6 +499,24 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             p.cg_y_acf_m, p.cg_z_acf_m
         );
         println!("  Engines: {}", p.engine_count);
+        println!("Object attachments (loader coordinates; visibility and rotation not evaluated):");
+        for property in aircraft
+            .references()
+            .filter(|p| p.key.ends_with("/_v10_att_file_stl"))
+        {
+            let prefix = property.key.trim_end_matches("_v10_att_file_stl");
+            match openxplane::attachment::Attachment::from_explicit(
+                &aircraft,
+                prefix,
+                [p.cg_y_acf_m, p.cg_z_acf_m],
+            ) {
+                Ok(a) => println!(
+                    "  {prefix}{}: targets={:?}, position_m={:?}, psi_the_phi={:?}",
+                    a.file, a.targets, a.position, a.angles,
+                ),
+                Err(e) => println!("  {prefix}unresolved: {e}"),
+            }
+        }
         println!("No physics, loading defaults or axis transformations are implied.");
         return Ok(true);
     }
