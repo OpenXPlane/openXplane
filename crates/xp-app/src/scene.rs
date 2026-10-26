@@ -358,7 +358,62 @@ fn airport_objects(
     let mut meshes = Vec::new();
     let mut instances = 0;
     let mut failed = 0;
+    let mut expanded = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
+    let mut agp_count = 0;
     for (path, poses) in grouped {
+        if path.extension().and_then(|s| s.to_str()) != Some("agp") {
+            expanded.entry(path).or_default().extend(poses);
+            continue;
+        }
+        let point = fs::read_to_string(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|s| openxplane::agp::parse_preview(&s));
+        match point {
+            Ok(point) => {
+                agp_count += poses.len();
+                eprintln!(
+                    "AGP preview {}: first of {} tiles; {} facade/vegetation annotations omitted; flat ground, full density, no base tile",
+                    path.display(),
+                    point.tiles,
+                    point.omitted_features
+                );
+                for child in point.objects {
+                    let direct = path.parent().unwrap().join(&child.resource);
+                    let resource = if direct.is_file() {
+                        Some(direct)
+                    } else {
+                        library.get(&child.resource).cloned()
+                    };
+                    let Some(resource) = resource else {
+                        eprintln!(
+                            "AGP resource unresolved in {}: {}",
+                            path.display(),
+                            child.resource
+                        );
+                        unresolved += poses.len();
+                        continue;
+                    };
+                    for (position, heading) in &poses {
+                        // Tile rotation is CCW; object heading offsets are CW.
+                        let rotation =
+                            glam::Mat3::from_rotation_y((point.rotation - heading).to_radians());
+                        expanded.entry(resource.clone()).or_default().push((
+                            *position + rotation * Vec3::from_array(child.offset),
+                            heading - point.rotation + child.heading,
+                        ));
+                    }
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                eprintln!("Scenery AGP skipped {}: {e}", path.display());
+            }
+        }
+    }
+    println!(
+        "AGP preview: {agp_count} grouped placements expanded; tile surfaces/facades/vegetation not drawn."
+    );
+    for (path, poses) in expanded {
         let loaded = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
             let object = Object::parse(&fs::read_to_string(&path)?)?;
             let base = object.baked_vertices();

@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Autogen point object groups
+
+- Airport scenes now expand object annotations in installed AG_POINT packages,
+  including anchor, scale, rotation and delta height. KSEA expands 192 groups,
+  bringing the preview to 4107 nearby instances. First-tile/full-density/flat-ground
+  policies remain approximations; tile surfaces, facades and vegetation are not
+  drawn. [Evidence and limits](research/DSF_OBJECTS.md#ag_point-object-annotations).
+  ![KSEA AGP preview](site/assets/ksea-agp-20261026.png)
+
 ### Installed airport objects
 
 - Airport scenes now instantiate nearby OBJ8 placements from the original

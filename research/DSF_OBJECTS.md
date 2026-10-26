@@ -37,7 +37,7 @@ Objects currently use flat airport-relative height and zero-dataref animation
 state. Optional object elevation/AGL state, exclusions, density, filters,
 regional/seasonal/random exports and exact BACKUP/EXTEND rules are unresolved.
 Only the Global Airports overlay tile is instantiated; custom overlay ordering,
-adjacent tiles, AGP, facades and networks remain missing. Terminal buildings
+adjacent tiles, complete AGP, facades and networks remain missing. Terminal buildings
 and terrain materials are visibly incomplete. The raster preview and central
 slab limitations in [DSF_TERRAIN.md](DSF_TERRAIN.md) still apply.
 
@@ -49,3 +49,30 @@ library lookup and integrated instances; verified scenery remains 0%.
 
 Next: support AGP and facade structures, original library/overlay selection,
 source terrain mesh/materials and consistent placement/collision heights.
+
+## AG_POINT object annotations
+
+The subsequent AGP preview reads object definitions, tile bounds, pixel scale,
+anchor, quarter-turn tile rotation and OBJ_DRAPED/GRADED/DELTA/SCRAPER
+annotations. Scale uses square pixels, including when texture width and height
+differ. Referenced OBJ paths resolve relative to the AGP or through the preview
+library index. DELTA adds its meter offset to the flat preview ground.
+
+This follows the [published autogen format](https://developer.x-plane.com/article/x-plane-10-autogen-scenery-file-format/),
+not a native loader comparison. First tile and full object density are explicit
+preview policies. Random tile/density choices, slope screening, ground-point
+sampling, base tile rendering, facade and vegetation annotations are unfinished.
+Orientation and placement still require matched original runtime captures.
+Tests cover noncentral anchors, square-pixel scaling, delta height, invalid
+indices/nonfinite dimensions and first-tile selection. Native replay tests are
+not part of this new parser's evidence. Estimates remain unchanged: this extends
+the existing preliminary instance loader and does not prove mod or visual parity.
+
+The actual KSEA GPU run expanded 192 AGP placements. Total nearby rendered
+instances rose from 2370 to 4107 in 156 resource batches. One child resource
+remained unresolved; one empty OBJ placeholder failed parsing. The image still
+shows missing terminal/facade geometry and solid-color terrain. It cannot prove
+original-equivalent placement or rendering. Workspace fmt, Clippy and tests
+cover this implementation; the native/original visual comparisons remain absent.
+
+![KSEA with AGP object annotations](../site/assets/ksea-agp-20261026.png)
