@@ -7,5 +7,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+earcutr = "0.5.0"
 image.workspace = true
 sevenz-rust2 = { version = "0.23.0", default-features = false }

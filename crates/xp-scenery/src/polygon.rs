@@ -1,5 +1,5 @@
-//! POL base-texture subset and bounded straight-contour draping. Native layer
-//! ordering, Bezier/holes, material extensions and surface physics are pending.
+//! POL base-texture subset with holes and bounded Bezier/drape tessellation.
+//! Native tessellation/layer ordering, material extensions and physics are pending.
 pub struct Material {
     pub texture: String,
     pub scale: Option<[f32; 2]>,
@@ -8,6 +8,85 @@ pub struct Material {
     pub layer: String,
     pub offset: i32,
     pub unsupported: std::collections::BTreeSet<String>,
+}
+
+pub struct Footprint {
+    pub points: Vec<[f32; 2]>,
+    pub holes: Vec<usize>,
+    pub st: Option<Vec<[f32; 2]>>,
+}
+
+/// Interpret DSF straight/Bezier coordinate layouts. Fixed eight subdivisions
+/// per curved side follow the existing port preview, not native tessellation.
+pub fn footprint(
+    windings: &[Vec<Vec<f64>>],
+    frame: &crate::world::Frame,
+    explicit: bool,
+) -> Result<Footprint, String> {
+    let mut out = Footprint {
+        points: Vec::new(),
+        holes: Vec::new(),
+        st: explicit.then(Vec::new),
+    };
+    for (ring_index, winding) in windings.iter().enumerate() {
+        let mut n = winding.len();
+        if n > 1 && winding[0].get(..2) == winding[n - 1].get(..2) {
+            n -= 1;
+        }
+        if n < 3 {
+            return Err("POL ring too short".into());
+        }
+        let dimensions = winding[0].len();
+        let (flat, curved) = if explicit { (4, 8) } else { (2, 4) };
+        if ![flat, curved].contains(&dimensions)
+            || winding
+                .iter()
+                .any(|p| p.len() != dimensions || p.iter().any(|v| !v.is_finite()))
+        {
+            return Err("unsupported POL coordinate layout".into());
+        }
+        if ring_index > 0 {
+            out.holes.push(out.points.len());
+        }
+        for i in 0..n {
+            let a = &winding[i];
+            let b = &winding[(i + 1) % n];
+            let steps = if dimensions == curved { 8 } else { 1 };
+            for step in 0..steps {
+                let t = step as f64 / steps as f64;
+                let u = 1.0 - t;
+                let cubic = |start: f64, c0: f64, c1: f64, end: f64| {
+                    u * u * u * start
+                        + 3.0 * u * u * t * c0
+                        + 3.0 * u * t * t * c1
+                        + t * t * t * end
+                };
+                let coordinate = |axis: usize| {
+                    if dimensions == curved {
+                        cubic(a[axis], a[axis + 2], 2.0 * b[axis] - b[axis + 2], b[axis])
+                    } else {
+                        a[axis]
+                    }
+                };
+                out.points
+                    .push(frame.to_local(coordinate(1), coordinate(0)));
+                if let Some(st) = &mut out.st {
+                    st.push(if dimensions == curved {
+                        [
+                            cubic(a[4], a[6], 2.0 * b[4] - b[6], b[4]) as f32,
+                            cubic(a[5], a[7], 2.0 * b[5] - b[7], b[5]) as f32,
+                        ]
+                    } else {
+                        [a[2] as f32, a[3] as f32]
+                    });
+                }
+            }
+        }
+    }
+    if out.points.is_empty() {
+        return Err("POL has no contours".into());
+    }
+    Ok(out)
 }
 
 impl Material {
@@ -83,6 +162,17 @@ impl Material {
         parameter: u16,
         ground: Option<&crate::ground::Ground>,
     ) -> Result<Vec<[f32; 8]>, String> {
+        self.vertices_with_holes(points, &[], st, parameter, ground)
+    }
+
+    pub fn vertices_with_holes(
+        &self,
+        points: &[[f32; 2]],
+        holes: &[usize],
+        st: Option<&[[f32; 2]]>,
+        parameter: u16,
+        ground: Option<&crate::ground::Ground>,
+    ) -> Result<Vec<[f32; 8]>, String> {
         if points.len() < 3 || points.iter().flatten().any(|v| !v.is_finite()) {
             return Err("invalid POL footprint".into());
         }
@@ -106,10 +196,41 @@ impl Material {
                 })
                 .collect()
         };
-        let triangles = crate::world::triangulate(points);
-        if triangles.len() != points.len() - 2 {
-            return Err("POL triangulation incomplete".into());
+        if holes.windows(2).any(|w| w[0] >= w[1])
+            || holes.iter().any(|&i| i < 3 || i >= points.len())
+        {
+            return Err("invalid POL hole indices".into());
         }
+        let mut first = 0;
+        for end in holes.iter().copied().chain(std::iter::once(points.len())) {
+            if end - first < 3 {
+                return Err("POL ring needs three points".into());
+            }
+            first = end;
+        }
+        let coordinates = points
+            .iter()
+            .flat_map(|p| p.map(f64::from))
+            .collect::<Vec<_>>();
+        let indices = earcutr::earcut(&coordinates, holes, 2)
+            .map_err(|e| format!("POL triangulation: {e}"))?;
+        let deviation = earcutr::deviation(&coordinates, holes, 2, &indices);
+        if indices.is_empty() || !deviation.is_finite() || deviation > 1e-5 {
+            return Err(format!("POL triangulation area mismatch: {deviation}"));
+        }
+        let triangles = indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|t| {
+                let mut t = *t;
+                let [a, b, c] = t.map(|i| points[i]);
+                if (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0.0 {
+                    t.swap(1, 2);
+                }
+                t
+            })
+            .collect::<Vec<_>>();
         let mut pending = triangles
             .into_iter()
             .map(|t| {
@@ -157,6 +278,70 @@ impl Material {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn holes_keep_area_and_empty_centers_with_explicit_st() {
+        let m = Material::parse("A\n850\nDRAPED_POLYGON\nTEXTURE ground.png\nSCALE 1 1\n").unwrap();
+        let points = [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 10.0],
+            [0.0, 10.0],
+            [3.0, 3.0],
+            [3.0, 7.0],
+            [7.0, 7.0],
+            [7.0, 3.0],
+        ];
+        let st = points.map(|p| [p[0] / 10.0, p[1] / 10.0]);
+        let vertices = m
+            .vertices_with_holes(&points, &[4], Some(&st), 65535, None)
+            .unwrap();
+        let area: f32 = vertices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|t| {
+                let x = (t[0][0] + t[1][0] + t[2][0]) / 3.0;
+                let z = (t[0][2] + t[1][2] + t[2][2]) / 3.0;
+                assert!(!(x > 3.0 && x < 7.0 && z > 3.0 && z < 7.0));
+                let area = ((t[1][2] - t[0][2]) * (t[2][0] - t[0][0])
+                    - (t[1][0] - t[0][0]) * (t[2][2] - t[0][2]))
+                    * 0.5;
+                assert!(area > 0.0);
+                area
+            })
+            .sum();
+        assert!((area - 84.0).abs() < 1e-4);
+        assert!(
+            vertices
+                .iter()
+                .all(|v| (v[6] - v[0] / 10.0).abs() < 1e-5 && (v[7] - v[2] / 10.0).abs() < 1e-5)
+        );
+        assert!(m.vertices_with_holes(&points, &[2], None, 0, None).is_err());
+        assert!(
+            m.vertices_with_holes(&points, &[4, 4], None, 0, None)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn bezier_geometry_and_uv_follow_the_same_parameterization() {
+        let frame = crate::world::Frame::new(0.0, 0.0);
+        let winding = vec![
+            vec![0.0, 0.0, 0.00003, 0.0, 0.0, 0.0, 0.3, 0.0],
+            vec![0.0001, 0.0, 0.0001, 0.00003, 1.0, 0.0, 1.0, 0.3],
+            vec![0.0, 0.0001, -0.00003, 0.0001, 0.0, 1.0, -0.3, 1.0],
+        ];
+        let f = footprint(&[winding], &frame, true).unwrap();
+        assert_eq!(f.points.len(), 24);
+        assert!(f.holes.is_empty());
+        let meters = frame.to_local(0.0, 0.0001)[0];
+        for (p, st) in f.points.iter().zip(f.st.unwrap()) {
+            assert!((p[0] / meters - st[0]).abs() < 1e-5);
+            assert!((-p[1] / meters - st[1]).abs() < 1e-5);
+        }
+        assert!(footprint(&[vec![vec![0.0; 7]; 3]], &frame, true).is_err());
+    }
     #[test]
     fn explicit_uv_scale_heading_and_terrain_draping() {
         let text = "A\n850\nDRAPED_POLYGON\nTEXTURE_NOWRAP pavement.png\nSCALE 10 20\nNO_ALPHA\nLAYER_GROUP taxiways 1\nSURFACE concrete\n";

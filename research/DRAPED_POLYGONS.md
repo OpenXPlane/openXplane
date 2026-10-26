@@ -45,3 +45,36 @@ material transitions, repeated/grainy textures and remaining untextured areas.
 It is a port-only inspection of the integrated airport scene, not paired proof.
 
 ![KSEA with installed POL resources](../site/assets/ksea-pol-20261026.jpg)
+
+## Holes and curved contours
+
+The subsequent loader retains every DSF winding, with later windings treated as
+holes. Earcutr0.5 triangulates the flattened coordinates; its relative area
+deviation must be finite and at most1e-5. Hole starts must be ordered and each
+ring needs at least three points. This is a port-side triangulator, not recovered
+native tessellation or a general proof that self-intersecting inputs are valid.
+[Dependency API and limitations](https://docs.rs/earcutr/0.5.0/earcutr/).
+
+DSF Bezier coordinate layouts are also interpreted, with eight fixed subdivisions
+per side. Incoming control handles mirror the next node's handle, following the
+existing preview convention. Explicit ST uses its own cubic controls at the same
+curve parameter. Repeated closing endpoints are removed; special UV seams at a
+duplicated closing endpoint remain unverified. Native adaptive curve precision,
+corner behaviour and texture parameterization still require reference evidence.
+
+Tests check rectangle-minus-hole area, upward winding, no triangle centroid in
+the hole, preserved ST through triangulation/subdivision, invalid hole starts,
+and a Bezier fixture whose geometric and texture coordinates follow the same
+affine relationship. Source assets and native code are not distributed. Estimates
+are reviewed and unchanged; broader material and physics limitations above apply.
+
+The new KSEA build reports797 polygons/20 batches, up from752/16; one footprint
+still fails the area check (AEP Asphalt/Patched_3_D1.pol). Its underlying contour
+validity/native handling is unresolved. Do not count it as supported or silently
+fill it. Subsequent diagnostics include the numerical area deviation.
+
+The new1280x800 RTX2080/Vulkan render completed and was inspected: additional
+curved pavement outlines appear, while sharp terrain transitions, grainy
+materials and missing scene features remain. It is still a port-only capture.
+
+![KSEA with POL holes and sampled curves](../site/assets/ksea-pol-contours-20261026.jpg)

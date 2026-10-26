@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### POL holes and Bezier contours
+
+- Airport POL loading now preserves holes and samples curved geometry and ST
+  controls. KSEA builds797 polygons in20 batches; one contour still fails area
+  validation. Native adaptive tessellation and exact material/layer handling
+  remain unfinished. [Evidence and limitations](research/DRAPED_POLYGONS.md#holes-and-curved-contours).
+  ![KSEA curved POL preview](site/assets/ksea-pol-contours-20261026.jpg)
+
 ### Installed draped polygon textures
 
 - Airport scenes now load straight single-contour POL pavement and ground-sign

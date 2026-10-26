@@ -794,32 +794,25 @@ fn airport_polygons(
             }
             let mut vertices = Vec::new();
             for polygon in polygons {
-                let explicit = polygon.parameter == 65535;
-                if polygon.windings.len() != 1
-                    || polygon.windings[0]
-                        .iter()
-                        .any(|p| p.len() != if explicit { 4 } else { 2 })
-                {
-                    skipped += 1;
-                    continue;
-                }
-                let mut points = polygon.windings[0]
-                    .iter()
-                    .map(|p| frame.to_local(p[1], p[0]))
-                    .collect::<Vec<_>>();
-                let mut st = explicit.then(|| {
-                    polygon.windings[0]
-                        .iter()
-                        .map(|p| [p[2] as f32, p[3] as f32])
-                        .collect::<Vec<_>>()
-                });
-                if points.len() > 2 && points.first() == points.last() {
-                    points.pop();
-                    if let Some(st) = &mut st {
-                        st.pop();
+                let footprint = match openxplane::polygon::footprint(
+                    &polygon.windings,
+                    frame,
+                    polygon.parameter == 65535,
+                ) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        skipped += 1;
+                        eprintln!("POL contour skipped {}: {e}", path.display());
+                        continue;
                     }
-                }
-                match material.vertices(&points, st.as_deref(), polygon.parameter, ground) {
+                };
+                match material.vertices_with_holes(
+                    &footprint.points,
+                    &footprint.holes,
+                    footprint.st.as_deref(),
+                    polygon.parameter,
+                    ground,
+                ) {
                     Ok(v) => {
                         placed += 1;
                         vertices.extend(v.into_iter().map(|v| Vertex {
@@ -861,7 +854,7 @@ fn airport_polygons(
         }
     }
     println!(
-        "POL preview: {placed} polygons, {} resource batches, {skipped} skipped footprints/resources; straight single contours, approximate layer bias/draping, no normal/decal/night/surface physics",
+        "POL preview: {placed} polygons, {} resource batches, {skipped} skipped footprints/resources; holes/Bezier preview, approximate layer bias/draping, no normal/decal/night/surface physics",
         meshes.len()
     );
     meshes
