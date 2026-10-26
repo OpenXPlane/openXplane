@@ -21,8 +21,17 @@ pub struct Install {
 
 impl Install {
     /// Preview library: export replacement/extension/exclusion and backup fallback.
-    /// Region/season/dataref predicates and random/ratio sampling remain approximate.
+    /// Geographic predicates are applied when supplied; season/dataref and random
+    /// selection remain incomplete.
     pub fn preview_library(&self) -> Result<std::collections::BTreeMap<String, PathBuf>, String> {
+        self.preview_library_at(None)
+    }
+
+    /// Geographic DSF lookup; None retains a location-free catalog preview.
+    pub fn preview_library_at(
+        &self,
+        location: Option<[f64; 2]>,
+    ) -> Result<std::collections::BTreeMap<String, PathBuf>, String> {
         let mut packs = self.scenery_packs()?;
         let defaults = self.root.join("Resources/default scenery");
         if let Ok(entries) = fs::read_dir(defaults) {
@@ -37,7 +46,7 @@ impl Install {
         let mut index = crate::library::Index::default();
         for pack in packs {
             if let Ok(text) = fs::read_to_string(pack.join("library.txt")) {
-                index.add_pack(&pack, &text);
+                index.add_pack_at(&pack, &text, location);
             }
         }
         Ok(index.first_choices())

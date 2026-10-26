@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Geographic scenery library selection
+
+- Airport library lookup now evaluates REGION_RECT, REGION_ALL and REGION_BITMAP
+  against the airport's DSF cell, preserving fallback exports outside a region.
+  REGION_DREF conditions remain unsupported and are excluded from the preview;
+  season/random selection and per-tile boundary handling remain unfinished.
+  [Evidence and limits](research/LIBRARY_PRECEDENCE.md#geographic-dsf-lookup).
+  ![KSEA geographic library preview](site/assets/ksea-regions-20261026.png)
+
 ### Scenery library export selection
 
 - Corrected preview resource selection so BACKUP yields to ordinary exports,

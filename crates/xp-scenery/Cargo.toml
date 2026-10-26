@@ -7,4 +7,5 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+image.workspace = true
 sevenz-rust2 = { version = "0.23.0", default-features = false }

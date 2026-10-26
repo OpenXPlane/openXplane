@@ -2678,6 +2678,7 @@ dependencies = [
 name = "xp-scenery"
 version = "0.1.0"
 dependencies = [
+ "image",
  "sevenz-rust2",
 ]
 

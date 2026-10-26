@@ -335,7 +335,7 @@ fn airport_objects(
     }
     let placements =
         openxplane::dsf::object_placements(&fs::read(&path).map_err(|e| e.to_string())?)?;
-    let library = install.preview_library()?;
+    let library = install.preview_library_at(Some(origin))?;
     let mut grouped = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
     let mut unresolved = 0;
     for p in &placements {
