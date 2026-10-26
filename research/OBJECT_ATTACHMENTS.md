@@ -68,8 +68,8 @@ must not be committed.
 
 `aircraft-info` and the scene renderer use this port. The renderer now reads ACF
 object records and translations; [preliminary draw-gate evidence](OBJECT_DRAW_GATE.md)
-records the new Cirrus/Cessna renders and remaining visibility limits. It still
-rejects nonzero rotations and parent-part attachment transforms. The enclosing object-array loader,
+records the new Cirrus/Cessna renders and remaining visibility limits. The [affine matrix port](ATTACHMENT_MATRIX.md) now handles unattached rotations;
+parent-part attachment transforms remain unsupported. The enclosing object-array loader,
 object visibility/flags, kill datarefs, attached-part transforms, rotation
 composition and final CG integration into the renderer are still required.
 Workspace formatting, Clippy with warnings denied, and the complete workspace

@@ -170,16 +170,18 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
             )
             .into());
         }
-        if attachment.angles != [0.0; 3] {
-            return Err(format!("Attachment rotation not yet supported: {}", p.key).into());
-        }
+        let m = openxplane::attachment::affine_matrix(attachment.position, attachment.angles);
+        let rotation = glam::Mat3::from_cols_array(&[
+            m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2],
+        ]);
         let path = dir.join("objects").join(name.replace('\\', "/"));
         let object = Object::parse(&fs::read_to_string(&path)?)?;
         let mut vertices = object.baked_vertices();
         for vertex in &mut vertices {
-            vertex.position = (Vec3::from_array(vertex.position)
+            vertex.position = (rotation * Vec3::from_array(vertex.position)
                 + Vec3::from_array(attachment.position))
             .to_array();
+            vertex.normal = (rotation * Vec3::from_array(vertex.normal)).to_array();
         }
         if vertices.is_empty() {
             println!(
@@ -432,6 +434,17 @@ mod tests {
             [2.0 * scale, -3.0 * scale, 4.0 * scale]
         );
         assert_eq!(scene.meshes[0].vertices[1].position[0], 1.0 + 2.0 * scale);
+        let rotated = props.replace("_v10_att_phi_ref 0", "_v10_att_phi_ref 90");
+        fs::write(
+            &acf,
+            format!("I\n1200 Version\nACF\nPROPERTIES_BEGIN\n{rotated}PROPERTIES_END\n"),
+        )
+        .unwrap();
+        let rotated_scene = load(&acf).unwrap();
+        let vertices = &rotated_scene.meshes[0].vertices;
+        let expected = Vec3::new(2.0 * scale, -3.0 * scale - 1.0, 4.0 * scale);
+        assert!((Vec3::from_array(vertices[1].position) - expected).length() < 1e-6);
+        assert!((Vec3::from_array(vertices[1].normal) - Vec3::X).length() < 1e-6);
         fs::remove_dir_all(dir).unwrap();
     }
 }

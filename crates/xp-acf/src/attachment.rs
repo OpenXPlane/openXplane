@@ -1,6 +1,38 @@
-//! Common OBJ attachment reads, recovered from reference function 0x141aaa610.
-//! This is the read-mode loader, not a constructor or a renderer transform.
+//! Common OBJ attachment reads, preliminary draw gating and affine construction.
+//! Constructor defaults and live parent-part pose production remain outside this module.
 use crate::{Aircraft, aircraft::ACF_FT_TO_M};
+
+/// Row-major affine matrix built by 0x141775d10. Angles are psi/theta/phi
+/// in degrees; translation is already in the caller's coordinate frame.
+pub fn affine_matrix(position: [f32; 3], angles: [f32; 3]) -> [[f32; 4]; 3] {
+    let trig = angles.map(|angle| {
+        let radians = angle * f32::from_bits(0x3c8efa36);
+        [radians.sin(), radians.cos()]
+    });
+    affine_matrix_with_trig(position, trig)
+}
+
+fn affine_matrix_with_trig(position: [f32; 3], trig: [[f32; 2]; 3]) -> [[f32; 4]; 3] {
+    let [[spsi, cpsi], [sthe, cthe], [sphi, cphi]] = trig;
+    // Keep the original scalar multiply/add order, including signed zero.
+    let cphi_sthe = cphi * sthe;
+    let sphi_sthe = sphi * sthe;
+    [
+        [
+            sphi_sthe * spsi + cphi * cpsi,
+            sphi * cpsi - cphi_sthe * spsi,
+            -cthe * spsi,
+            position[0],
+        ],
+        [-sphi * cthe, cphi * cthe, -sthe, position[1]],
+        [
+            cphi * spsi - sphi_sthe * cpsi,
+            cphi_sthe * cpsi + sphi * spsi,
+            cthe * cpsi,
+            position[2],
+        ],
+    ]
+}
 
 const FIELDS: [&str; 11] = [
     "_v10_steers_with_gear",
@@ -172,6 +204,42 @@ impl Attachment {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn matches_original_affine_builder() {
+        for line in include_str!("../data/attachment_matrix_vectors.tsv")
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+        {
+            let c: Vec<Vec<u32>> = line
+                .split('\t')
+                .map(|s| {
+                    s.split(',')
+                        .map(|v| u32::from_str_radix(v, 16).unwrap())
+                        .collect()
+                })
+                .collect();
+            let position = std::array::from_fn(|i| f32::from_bits(c[0][i]));
+            let angles = std::array::from_fn(|i| f32::from_bits(c[0][i + 3]));
+            let trig = std::array::from_fn(|i| {
+                [f32::from_bits(c[1][i * 2]), f32::from_bits(c[1][i * 2 + 1])]
+            });
+            let replay = affine_matrix_with_trig(position, trig);
+            let actual: Vec<_> = replay.into_iter().flatten().map(f32::to_bits).collect();
+            assert_eq!(actual, c[2], "original trig replay at {angles:?}");
+            let native_trig = affine_matrix(position, angles);
+            for (i, value) in native_trig.into_iter().flatten().enumerate() {
+                let expected = f32::from_bits(c[2][i]);
+                assert!(
+                    (value - expected).abs() <= 8.0 * f32::EPSILON,
+                    "platform trig at {angles:?}, element{i}: {value} != {expected}"
+                );
+                if i % 4 == 3 {
+                    assert_eq!(value.to_bits(), c[2][i]);
+                }
+            }
+        }
+    }
 
     #[test]
     fn matches_original_preliminary_draw_gate() {

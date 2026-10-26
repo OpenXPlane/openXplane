@@ -14,6 +14,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
   and preserved earlier command examples and development notes in `docs/DEVELOPMENT_NOTES.md`.
   The compatibility generator now keeps the README summary compact.
 
+### Attachment rotations
+
+- Aircraft previews now apply nonzero unattached object rotations to geometry and
+  normals using the recovered original affine builder. Parent-part transforms remain
+  unsupported.128 native matrix cases and an end-to-end rotated scene test pass.
+  [Evidence and limits](research/ATTACHMENT_MATRIX.md).
+  ![Controlled Cirrus attachment pose; synthetic angles, port only](site/assets/cirrus-rotation-probe-20261026.png)
+
 ### ACF-driven aircraft previews
 
 - Progress totals now show one decimal place. The evidence-backed rubric review

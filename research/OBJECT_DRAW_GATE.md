@@ -50,8 +50,9 @@ scheduling. A file existing is not a native loaded-object lifetime proof.
 
 The common attachment loader now supplies translation in the ACF frame (zero CG
 at this stage). `FlightModel::to_world` already subtracts the real CG, avoiding a
-second subtraction. Nonzero rotation or attachment to a parent part is rejected;
-the corresponding rotation/part runtime still needs recovery and integration.
+second subtraction. [Attachment rotations](ATTACHMENT_MATRIX.md) are now integrated using the native
+affine builder. Attachment to a parent part is still rejected; the live pose
+producer and part runtime still need recovery and integration.
 Empty triangle batches are reported and skipped; absent base-texture declarations
 use white for this preview. Dynamic cockpit textures, lights and materials remain
 incomplete. Object bit0x2 feeds the preview transparent-mesh path; this does not
