@@ -57,7 +57,45 @@ pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error
             origin[0] + 0.1,
         ]),
     )?;
+    let season = std::env::var("OPENXPLANE_SCENERY_SEASON").unwrap_or_else(|_| "sum".into());
+    println!(
+        "Terrain library season={season}; explicit preview policy, not simulator calendar/climate selection"
+    );
+    let library = install.preview_library_for(Some(origin), Some(&season))?;
+    let mut materials = BTreeMap::new();
+    for triangle in &features.terrain {
+        let name = &triangle.resource;
+        if name == "terrain_Water" || materials.contains_key(name) {
+            continue;
+        }
+        let parsed = (|| -> Result<_, Box<dyn std::error::Error>> {
+            let resource = library.get(name).ok_or("terrain library path unresolved")?;
+            let material =
+                openxplane::scenery_terrain::Material::parse(&fs::read_to_string(resource)?)?;
+            let texture = image::imageops::flip_vertical(
+                &image::open(
+                    texture_path(resource, &material.base).ok_or("terrain base texture missing")?,
+                )?
+                .to_rgba8(),
+            );
+            println!(
+                "TER {name}: projected={:?}, unsupported={:?}",
+                material.projected, material.unsupported
+            );
+            Ok((material, texture))
+        })();
+        match parsed {
+            Ok(m) => {
+                materials.insert(name.clone(), Some(m));
+            }
+            Err(e) => {
+                eprintln!("TER material fallback {name}: {e}");
+                materials.insert(name.clone(), None);
+            }
+        }
+    }
     let mut grouped = BTreeMap::<String, Vec<Vertex>>::new();
+    let mut uv_failures = BTreeMap::<String, String>::new();
     let mut physical = 0;
     let mut overlay = 0;
     for triangle in &features.terrain {
@@ -96,32 +134,63 @@ pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error
                 .push(Vertex {
                     position: position.to_array(),
                     normal: normal.to_array(),
-                    uv: [0.5, 0.5],
+                    uv: materials
+                        .get(&triangle.resource)
+                        .and_then(Option::as_ref)
+                        .and_then(|(m, _)| match m.uv([position.x, position.z], p) {
+                            Ok(uv) => Some(uv),
+                            Err(e) => {
+                                uv_failures.insert(triangle.resource.clone(), e);
+                                None
+                            }
+                        })
+                        .unwrap_or([0.5, 0.5]),
                 });
         }
     }
     println!(
-        "DSF source mesh {}: {} intersecting triangles, {physical} physical, {overlay} overlay, {} terrain definitions; source topology with elevation raster, diagnostic colors only, all LODs, no collision integration",
+        "DSF source mesh {}: {} intersecting triangles, {physical} physical, {overlay} overlay, {} terrain definitions; source topology with elevation raster, base-material preview, all LODs, no collision integration",
         path.display(),
         features.terrain.len(),
         grouped.len()
     );
+    let mut textured = 0;
     let meshes = grouped
         .into_iter()
-        .map(|(name, vertices)| Mesh {
-            vertices,
-            texture: solid_texture(if name == "terrain_Water" {
-                [35, 80, 125, 255]
-            } else {
-                [85, 105, 65, 255]
-            }),
-            repeat_texture: false,
-            glass: false,
-            center: Vec3::ZERO,
-            instances: vec![[0.0; 4]],
-            animation: None,
+        .map(|(name, vertices)| {
+            let (texture, repeat_texture) =
+                if let Some(Some((material, mut texture))) = materials.remove(&name) {
+                    if material.no_alpha {
+                        for pixel in texture.pixels_mut() {
+                            pixel.0[3] = 255;
+                        }
+                    }
+                    textured += 1;
+                    (texture, material.repeat)
+                } else {
+                    (
+                        solid_texture(if name == "terrain_Water" {
+                            [35, 80, 125, 255]
+                        } else {
+                            [85, 105, 65, 255]
+                        }),
+                        false,
+                    )
+                };
+            Mesh {
+                vertices,
+                texture,
+                repeat_texture,
+                glass: false,
+                center: Vec3::ZERO,
+                instances: vec![[0.0; 4]],
+                animation: None,
+            }
         })
         .collect();
+    println!(
+        "TER base preview: {textured} textured resource batches; no border/composite/water shaders, explicit library season only, local projection phase, all LODs; unsupported UV cases use a constant sample: {uv_failures:?}"
+    );
     Ok(Scene {
         meshes,
         center: Vec3::ZERO,

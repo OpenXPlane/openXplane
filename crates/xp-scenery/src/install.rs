@@ -32,6 +32,17 @@ impl Install {
         &self,
         location: Option<[f64; 2]>,
     ) -> Result<std::collections::BTreeMap<String, PathBuf>, String> {
+        self.preview_library_for(location, None)
+    }
+
+    pub fn preview_library_for(
+        &self,
+        location: Option<[f64; 2]>,
+        season: Option<&str>,
+    ) -> Result<std::collections::BTreeMap<String, PathBuf>, String> {
+        if season.is_some_and(|s| !["spr", "sum", "fal", "win"].contains(&s)) {
+            return Err("invalid library season token".into());
+        }
         let mut packs = self.scenery_packs()?;
         let defaults = self.root.join("Resources/default scenery");
         if let Ok(entries) = fs::read_dir(defaults) {
@@ -46,7 +57,7 @@ impl Install {
         let mut index = crate::library::Index::default();
         for pack in packs {
             if let Ok(text) = fs::read_to_string(pack.join("library.txt")) {
-                index.add_pack_at(&pack, &text, location);
+                index.add_pack_for(&pack, &text, location, season);
             }
         }
         Ok(index.first_choices())

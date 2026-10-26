@@ -6,4 +6,5 @@ pub mod dsf;
 pub mod facade;
 pub mod install;
 pub mod library;
+pub mod terrain;
 pub mod world;

@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Terrain base materials and seasonal exports
+
+- Source mesh inspection now loads installed TER base textures, explicit/projected
+  UVs, repeat/nowrap and NO_ALPHA. Added explicit seasonal library exports so the
+  summer KSEA inspection resolves77 textured materials. Border/composite shaders,
+  climate selection, water effects and live airport terrain integration remain
+  unfinished. [Evidence and limitations](research/TERRAIN_MATERIALS.md).
+  ![KSEA TER base preview](site/assets/ksea-ter-base-20261026.jpg)
+
 ### Source terrain mesh inspection
 
 - Added terrain patch/list/strip/fan decoding and `mesh-render` against installed

@@ -49,6 +49,18 @@ impl Index {
     }
 
     pub fn add_pack_at(&mut self, pack: &Path, text: &str, location: Option<[f64; 2]>) {
+        self.add_pack_for(pack, text, location, None);
+    }
+
+    /// Season tokens follow library.txt: spr, sum, fal, win. Without a season,
+    /// seasonal commands are excluded instead of merging incompatible artwork.
+    pub fn add_pack_for(
+        &mut self,
+        pack: &Path,
+        text: &str,
+        location: Option<[f64; 2]>,
+        season: Option<&str>,
+    ) {
         let mut replace = BTreeSet::new();
         let mut exclude = BTreeSet::new();
         let mut defining: Option<String> = None;
@@ -105,6 +117,20 @@ impl Index {
             {
                 continue;
             }
+            let command = if let Some(base) = command.strip_suffix("_SEASON") {
+                if !["EXPORT", "EXPORT_RATIO", "EXPORT_EXTEND", "EXPORT_EXCLUDE"].contains(&base) {
+                    continue;
+                }
+                let Some(tokens) = fields.next() else {
+                    continue;
+                };
+                if !season.is_some_and(|s| tokens.split(',').any(|t| t == s)) {
+                    continue;
+                }
+                base
+            } else {
+                command
+            };
             if ![
                 "EXPORT",
                 "EXPORT_RATIO",
@@ -248,6 +274,19 @@ mod tests {
             "EXPORT_RATIO 2.5 lib/ratio a\nEXPORT lib/ratio b # sibling variant\n",
         );
         assert_eq!(i.candidates("lib/ratio"), paths(&["a", "b"]));
+        let seasonal = "EXPORT_SEASON spr,sum lib/season a\nEXPORT_EXCLUDE_SEASON fal,win lib/season b\nEXPORT_RATIO_SEASON win 2 lib/ratio-season c\nEXPORT_EXTEND_SEASON sum lib/extend a\n";
+        let mut summer = Index::default();
+        summer.add_pack_for(&root, seasonal, None, Some("sum"));
+        summer.add_pack(&root, "EXPORT lib/extend d\n");
+        assert_eq!(summer.candidates("lib/season"), paths(&["a"]));
+        assert_eq!(summer.candidates("lib/extend"), paths(&["a", "d"]));
+        let mut winter = Index::default();
+        winter.add_pack_for(&root, seasonal, None, Some("win"));
+        assert_eq!(winter.candidates("lib/season"), paths(&["b"]));
+        assert_eq!(winter.candidates("lib/ratio-season"), paths(&["c"]));
+        let mut unknown = Index::default();
+        unknown.add_pack(&root, seasonal);
+        assert!(unknown.candidates("lib/season").is_empty());
         std::fs::remove_dir_all(root).unwrap();
     }
 }
