@@ -208,6 +208,7 @@ impl Renderer {
             label: Some("color"),
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
             ..Default::default()
         });
         let repeating_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -216,7 +217,42 @@ impl Renderer {
             address_mode_v: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
             ..Default::default()
+        });
+        let mip_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("mipmap reduction"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("mipmap.wgsl").into()),
+        });
+        let mip_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("mipmap reduction"),
+            bind_group_layouts: &[Some(&texture_layout)],
+            immediate_size: 0,
+        });
+        let mip_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("mipmap reduction"),
+            layout: Some(&mip_layout),
+            vertex: wgpu::VertexState {
+                module: &mip_shader,
+                entry_point: Some("vs"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &mip_shader,
+                entry_point: Some("fs"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            multiview_mask: None,
+            cache: None,
         });
         // screen-space interface: font atlas, pipeline and a dynamic vertex buffer
         let atlas =
@@ -326,6 +362,11 @@ impl Renderer {
             mapped_at_creation: false,
         });
         let mut meshes = Vec::new();
+        let mipmaps = std::env::var("OPENXPLANE_MIPMAPS").as_deref() != Ok("0");
+        let mut mip_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("scene mipmap generation"),
+        });
+        let mut generated_levels = 0;
         for mesh in &scene.meshes {
             let vertex_bytes = std::mem::size_of_val(mesh.vertices.as_slice()) as u64;
             let instance_bytes = std::mem::size_of_val(mesh.instances.as_slice()) as u64;
@@ -349,14 +390,21 @@ impl Renderer {
                 height: mesh.texture.height(),
                 depth_or_array_layers: 1,
             };
+            let levels = if mipmaps {
+                size.width.max(size.height).ilog2() + 1
+            } else {
+                1
+            };
             let texture = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("base color"),
                 size,
-                mip_level_count: 1,
+                mip_level_count: levels,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             });
             queue.write_texture(
@@ -374,6 +422,52 @@ impl Renderer {
                 },
                 size,
             );
+            for level in 1..levels {
+                let source = texture.create_view(&wgpu::TextureViewDescriptor {
+                    base_mip_level: level - 1,
+                    mip_level_count: Some(1),
+                    ..Default::default()
+                });
+                let destination = texture.create_view(&wgpu::TextureViewDescriptor {
+                    base_mip_level: level,
+                    mip_level_count: Some(1),
+                    ..Default::default()
+                });
+                let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("mipmap source"),
+                    layout: &texture_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&source),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&sampler),
+                        },
+                    ],
+                });
+                let mut pass = mip_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("mipmap level"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &destination,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                pass.set_pipeline(&mip_pipeline);
+                pass.set_bind_group(0, &group, &[]);
+                pass.draw(0..3, 0..1);
+                generated_levels += 1;
+            }
             let view = texture.create_view(&Default::default());
             let material = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("material"),
@@ -403,6 +497,10 @@ impl Renderer {
                 center: mesh.center,
             });
         }
+        queue.submit([mip_encoder.finish()]);
+        println!(
+            "Texture filtering: mipmaps={mipmaps}, {generated_levels} generated levels; trilinear minification, no original filtering parity claimed"
+        );
         Ok(Self {
             device,
             queue,

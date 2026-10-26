@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Texture minification
+
+- Scene textures now receive GPU-generated mip chains and trilinear minification,
+  reducing the fine-grained noise in distant KSEA terrain. Controlled captures
+  use the same mesh/camera with mipmaps off/on. Native filtering, source DDS mip
+  preservation, alpha coverage and missing terrain mask/composite shaders remain
+  unfinished. [Evidence and limitations](research/TEXTURE_FILTERING.md).
+  ![KSEA with mipmaps](site/assets/ksea-filter-after-20261026.jpg)
+
 ### POL holes and Bezier contours
 
 - Airport POL loading now preserves holes and samples curved geometry and ST
