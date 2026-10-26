@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Type-2 facade mesh inspection
+
+- Added typed FAC floor/segment/mesh/wall/spelling loading and `fac-render` to
+  inspect original mesh coordinates and base textures. A KSEA terminal segment
+  now renders directly from its installed FAC; airport wall fitting, roofs,
+  attachments and original materials remain unfinished.
+  [Evidence and next work](research/FACADE_MESHES.md).
+  ![KSEA terminal FAC segment](site/assets/ksea-fac-segment-20261026.png)
+
 ### DSF polygon inspection
 
 - Retained DSF polygon contours, parameters and all coordinate planes instead

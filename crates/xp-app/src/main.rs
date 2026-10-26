@@ -19,6 +19,24 @@ fn frame_size() -> (u32, u32) {
 
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 5 && args[0] == "fac-render" {
+        let floor = args[2]
+            .to_str()
+            .ok_or("invalid FAC floor argument")?
+            .parse()?;
+        let segment = args[3]
+            .to_str()
+            .ok_or("invalid FAC segment argument")?
+            .parse()?;
+        let scene = scene::facade_segment(Path::new(&args[1]), floor, segment)?;
+        let (w, h) = frame_size();
+        let mut renderer = pollster::block_on(gpu::Offscreen::new(&scene, w, h))?;
+        let mut camera = gpu::Camera::new(&scene);
+        camera.yaw = 1.0;
+        camera.distance = scene.radius * 3.2;
+        renderer.render(&scene, 0, &camera, Path::new(&args[4]))?;
+        return Ok(true);
+    }
     if args.len() == 2 && args[0] == "dsf-info" {
         let features = openxplane::dsf::features(&fs::read(&args[1])?)?;
         let mut resources = std::collections::BTreeMap::<String, (usize, usize)>::new();

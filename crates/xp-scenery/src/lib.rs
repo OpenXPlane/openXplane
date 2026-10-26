@@ -3,6 +3,7 @@
 pub mod agp;
 pub mod apt;
 pub mod dsf;
+pub mod facade;
 pub mod install;
 pub mod library;
 pub mod world;

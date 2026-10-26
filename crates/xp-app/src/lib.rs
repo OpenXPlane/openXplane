@@ -10,7 +10,7 @@ pub use xp_airfoil::{
 pub use xp_dataref::{commands, dataref, flight_map, keymap};
 pub use xp_discord as discord;
 pub use xp_obj as obj8;
-pub use xp_scenery::{agp, apt, dsf, install, world};
+pub use xp_scenery::{agp, apt, dsf, facade, install, world};
 pub use xp_sim::{flight, pilot};
 
 pub mod ui_resources;

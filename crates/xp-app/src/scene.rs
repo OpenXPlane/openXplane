@@ -36,6 +36,80 @@ pub struct Scene {
 /// Clear colour of the aircraft-only preview.
 pub const PREVIEW_BACKGROUND: [f64; 3] = [0.028, 0.045, 0.07];
 
+/// Inspect one actual type-2 facade segment in its unchanged file coordinates.
+pub fn facade_segment(
+    path: &Path,
+    floor_index: usize,
+    segment_index: usize,
+) -> Result<Scene, Box<dyn std::error::Error>> {
+    let facade = openxplane::facade::parse(&fs::read_to_string(path)?)?;
+    let floor = facade
+        .floors
+        .get(floor_index)
+        .ok_or("FAC floor index out of range")?;
+    let segment = floor
+        .segments
+        .iter()
+        .filter(|s| !s.curved)
+        .nth(segment_index)
+        .ok_or("FAC segment index out of range")?;
+    let texture = if let Some(name) = &facade.wall_texture {
+        let texture = texture_path(path, name).ok_or("missing FAC wall texture")?;
+        image::imageops::flip_vertical(&image::open(texture)?.to_rgba8())
+    } else {
+        solid_texture([180, 180, 180, 255])
+    };
+    let mut meshes = Vec::new();
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    let mut ordered = segment.meshes.iter().collect::<Vec<_>>();
+    ordered.sort_by_key(|m| m.group);
+    for mesh in ordered {
+        let vertices = mesh
+            .indices
+            .iter()
+            .map(|&i| {
+                let v = mesh.vertices[i];
+                let p = Vec3::new(v[0], v[1], v[2]);
+                low = low.min(p);
+                high = high.max(p);
+                Vertex {
+                    position: [v[0], v[1], v[2]],
+                    normal: [v[3], v[4], v[5]],
+                    uv: [v[6], v[7]],
+                }
+            })
+            .collect::<Vec<_>>();
+        if !vertices.is_empty() {
+            meshes.push(Mesh {
+                vertices,
+                texture: texture.clone(),
+                instances: vec![[0.0; 4]],
+                glass: false,
+                center: Vec3::ZERO,
+                animation: None,
+            });
+        }
+    }
+    let center = (low + high) * 0.5;
+    let radius = (high - low).length() * 0.5;
+    if !radius.is_finite() || radius <= 0.0 {
+        return Err("empty FAC segment bounds".into());
+    }
+    println!(
+        "FAC floor {floor_index} '{}', segment {segment_index}: {} meshes, bounds {low:?} .. {high:?}; file-space inspection only, all LOD groups, no wall fitting/roof/attachments. Unimplemented directives: {:?}",
+        floor.name,
+        meshes.len(),
+        facade.unsupported
+    );
+    Ok(Scene {
+        meshes,
+        center,
+        radius,
+        background: PREVIEW_BACKGROUND,
+    })
+}
+
 pub fn texture_path(object: &Path, name: &str) -> Option<PathBuf> {
     let path = object.parent()?.join(name.replace('\\', "/"));
     // X-Plane assets commonly declare PNG while shipping a DDS with the same stem.
