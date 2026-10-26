@@ -30,6 +30,16 @@ openxplane fly <X-Plane> KSEA "<path to the .acf>"                              
 their original meaning back); `Delete` resets, `Esc` quits. The complete list is in the
 [keyboard reference](KEYBOARD.md).
 
+## Aircraft preview coverage
+
+`view` and `render` enumerate the aircraft's ACF object records. The installed
+Cessna172 SP and Cirrus Vision SF50 have been rendered with this path. Preview
+animation and kill datarefs are zero, and final visibility, cockpit textures,
+lighting and materials remain incomplete. Unattached object translations are
+supported; nonzero attachment rotations and parent-part transforms currently
+report an error. See [the draw-gate evidence](../research/OBJECT_DRAW_GATE.md).
+This does not establish flight-model support for additional aircraft.
+
 ## Data output
 
 X-Plane can print rows of numbers over the scene (its Data Output settings). openXplane draws the same rows,

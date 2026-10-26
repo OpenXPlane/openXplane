@@ -16,8 +16,10 @@ fn main() -> ExitCode {
         "singleton" => ("0x1414cc7f0", "0x1414cc814"),
         "fps-pics" => ("0x140e6d3c1", "0x140e6d44b"),
         "attachment" => ("0x141aaa610", "0x141aaaac1"),
+        "attachment-gate" => ("0x141a7b6a0", "0x141a7b72c"),
+        "attachment-view" => ("0x1407b4780", "0x1407b47f7"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view");
             return ExitCode::from(2);
         }
     };

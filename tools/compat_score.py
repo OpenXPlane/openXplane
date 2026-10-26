@@ -50,7 +50,7 @@ def readme_block(data):
 The goal is a complete game with 1:1 X-Plane 12 behaviour. The current engine loads original
 content, renders aircraft and airports, and flies an approximate flight model.
 
-**About {impl:.0f}% implemented and {ver:.0f}% verified identical**, according to a self-assessed
+**About {impl:.1f}% implemented and {ver:.1f}% verified identical**, according to a self-assessed
 weighted rubric, not a measurement of whole-game equivalence. See the
 [compatibility estimate and roadmap](docs/COMPATIBILITY.md) for evidence and limitations.
 {END}'''
@@ -79,7 +79,7 @@ def main():
     nxt = '\n'.join(f'- {n}' for n in data['next'])
     doc = f'''# Compatibility estimate
 
-Updated {data['updated']}. **About {impl:.0f}% implemented, about {ver:.0f}% verified identical to the original.**
+Updated {data['updated']}. **About {impl:.1f}% implemented, about {ver:.1f}% verified identical to the original.**
 
 {data['method']}
 

@@ -16,6 +16,43 @@ const FIELDS: [&str; 11] = [
     "_v10_att_phi_ref",
 ];
 
+/// Inputs to the preliminary draw gate at 0x141a7b6a0. These are runtime
+/// values, not inferred camera state or attachment constructor defaults.
+pub struct DrawContext {
+    pub pass: u32,
+    pub mode: i32,
+    pub loaded: bool,
+    pub selected_cockpit_loaded: bool,
+    pub cockpit_enabled: bool,
+    pub main_view_enabled: bool,
+}
+
+/// The original gate's accept/skip boundary. Acceptance does not establish
+/// final visibility: later pass classification, kill datarefs and draw state remain.
+pub fn preliminary_draw_gate(flags: u32, context: &DrawContext) -> bool {
+    if !context.loaded
+        || flags & 0x200 != 0
+        || (flags & 0x100 != 0 && context.pass & 0x100 == 0)
+        || (flags & 2 != 0 && context.pass & 0x18 == 0)
+    {
+        return false;
+    }
+    if flags & 0x1800 != 0 {
+        context.selected_cockpit_loaded
+            && match context.mode {
+                0 => context.cockpit_enabled,
+                1 | 4 => true,
+                _ => false,
+            }
+    } else {
+        match context.mode {
+            0 => context.main_view_enabled,
+            1 | 4 => true,
+            _ => false,
+        }
+    }
+}
+
 /// Caller-supplied object state. Missing properties preserve earlier words before
 /// the loader's coordinate conversion. Constructor defaults are not inferred.
 #[derive(Clone, Debug)]
@@ -135,6 +172,29 @@ impl Attachment {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn matches_original_preliminary_draw_gate() {
+        for line in include_str!("../data/attachment_gate_vectors.tsv")
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+        {
+            let c: Vec<i32> = line.split('\t').map(|v| v.parse().unwrap()).collect();
+            let context = DrawContext {
+                pass: c[1] as u32,
+                mode: c[2],
+                loaded: c[3] != 0,
+                selected_cockpit_loaded: c[4] != 0,
+                cockpit_enabled: c[5] != 0,
+                main_view_enabled: c[6] != 0,
+            };
+            assert_eq!(
+                preliminary_draw_gate(c[0] as u32, &context),
+                c[7] != 0,
+                "{line}"
+            );
+        }
+    }
 
     #[test]
     fn matches_original_loader_words() {

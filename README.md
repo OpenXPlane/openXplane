@@ -43,7 +43,7 @@ See the [user guide](docs/USER_GUIDE.md) for aircraft viewing, airport scenes an
 The goal is a complete game with 1:1 X-Plane 12 behaviour. The current engine loads original
 content, renders aircraft and airports, and flies an approximate flight model.
 
-**About 41% implemented and 28% verified identical**, according to a self-assessed
+**About 41.7% implemented and 28.3% verified identical**, according to a self-assessed
 weighted rubric, not a measurement of whole-game equivalence. See the
 [compatibility estimate and roadmap](docs/COMPATIBILITY.md) for evidence and limitations.
 <!-- compat:end -->

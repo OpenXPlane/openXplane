@@ -105,72 +105,99 @@ pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
 pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
     let acf = Aircraft::parse(&fs::read_to_string(aircraft_path)?)?;
     let dir = aircraft_path.parent().ok_or("ACF needs parent directory")?;
-    // A deliberate exterior subset; broken variants and full cockpit devices need runtime state. The
-    // landing gear object has an alternative in the seaplane variant (floats).
-    let wanted: [&[&str]; 7] = [
-        &["fuselage.obj"],
-        &["fuselage_gear.obj", "fuselage_floats.obj"],
-        &["fuselage_prop.obj"],
-        &["wings.obj"],
-        &["cockpit_seats_front.obj"],
-        &["cockpit_seats_rear.obj"],
-        &["glass_out.obj"],
-    ];
-    let mut names = Vec::new();
-    for alternatives in wanted {
-        let found = alternatives.iter().find(|n| {
-            acf.properties
-                .iter()
-                .any(|p| p.key.ends_with("/_v10_att_file_stl") && p.value == **n)
-        });
-        names.push(*found.ok_or_else(|| {
-            format!(
-                "Preview subset requires one of the ACF objects: {}",
-                alternatives.join(", ")
-            )
-        })?);
+    // Static preview policy: the union of the normal surface/transparent passes,
+    // mode4 and zero animation/kill datarefs. This uses the recovered preliminary
+    // gate; it is not the original complete render pipeline.
+    let mut attachments = acf
+        .properties
+        .iter()
+        .filter_map(|p| {
+            let index = p
+                .key
+                .strip_prefix("_obja/")?
+                .strip_suffix("/_v10_att_file_stl")?
+                .parse::<u32>()
+                .ok()?;
+            (!p.value.is_empty()).then_some((index, p))
+        })
+        .collect::<Vec<_>>();
+    attachments.sort_by_key(|(index, _)| *index);
+    let flags_for = |p: &openxplane::Property| -> Result<u32, Box<dyn std::error::Error>> {
+        acf.unique_property(&p.key)?;
+        let prefix = p.key.trim_end_matches("_v10_att_file_stl");
+        let value = acf
+            .unique_property(&format!("{prefix}_obj_flags"))?
+            .value
+            .parse::<i32>()?;
+        Ok(value as u32)
+    };
+    let mut selected_cockpit_loaded = false;
+    for (_, p) in &attachments {
+        if flags_for(p)? & 0x1800 != 0 {
+            selected_cockpit_loaded = dir
+                .join("objects")
+                .join(p.value.replace('\\', "/"))
+                .is_file();
+            break;
+        }
     }
     let mut meshes = Vec::new();
     let mut low = Vec3::splat(f32::INFINITY);
     let mut high = Vec3::splat(f32::NEG_INFINITY);
-    for name in names {
-        let p = acf
-            .properties
-            .iter()
-            .find(|p| p.key.ends_with("/_v10_att_file_stl") && p.value == name)
-            .ok_or_else(|| format!("Preview subset requires ACF object: {name}"))?;
+    for (_, p) in attachments {
+        let name = p.value.as_str();
+        let flags = flags_for(p)?;
+        let context = openxplane::attachment::DrawContext {
+            pass: 0x19,
+            mode: 4,
+            loaded: true,
+            selected_cockpit_loaded,
+            cockpit_enabled: true,
+            main_view_enabled: true,
+        };
+        if !openxplane::attachment::preliminary_draw_gate(flags, &context) {
+            println!("Skipped ACF object {name}: preliminary draw gate, flags={flags:#x}");
+            continue;
+        }
         let prefix = p.key.trim_end_matches("_v10_att_file_stl");
-        for field in [
-            "_v10_att_x_acf_prt_ref",
-            "_v10_att_y_acf_prt_ref",
-            "_v10_att_z_acf_prt_ref",
-            "_v10_att_phi_ref",
-            "_v10_att_psi_ref",
-            "_v10_att_the_ref",
-        ] {
-            let key = format!("{prefix}{field}");
-            if let Some(p) = acf.properties.iter().find(|p| p.key == key)
-                && p.value.parse::<f32>()? != 0.0
-            {
-                return Err(
-                    format!("Non-zero attachment pose not yet supported: {}", p.key).into(),
-                );
-            }
+        // Vertices stay in the ACF frame here. FlightModel::to_world subtracts
+        // the CG later, so use a zero CG for this loader-stage translation.
+        let attachment = openxplane::attachment::Attachment::from_explicit(&acf, prefix, [0.0; 2])?;
+        if attachment.targets != [-1; 3] {
+            return Err(format!(
+                "Parent-part attachment transform not yet supported: {}",
+                p.key
+            )
+            .into());
         }
-        let path = dir.join("objects").join(name);
+        if attachment.angles != [0.0; 3] {
+            return Err(format!("Attachment rotation not yet supported: {}", p.key).into());
+        }
+        let path = dir.join("objects").join(name.replace('\\', "/"));
         let object = Object::parse(&fs::read_to_string(&path)?)?;
-        let texture_name = object
-            .texture
-            .as_ref()
-            .ok_or("Preview object has no base texture")?;
-        let texture_path = texture_path(&path, texture_name)
-            .ok_or_else(|| format!("Missing texture for {name}: {texture_name}"))?;
-        let texture = image::open(&texture_path)?.to_rgba8();
-        let texture = image::imageops::flip_vertical(&texture);
-        let vertices = object.baked_vertices();
-        if vertices.is_empty() {
-            return Err(format!("No visible preview geometry: {name}").into());
+        let mut vertices = object.baked_vertices();
+        for vertex in &mut vertices {
+            vertex.position = (Vec3::from_array(vertex.position)
+                + Vec3::from_array(attachment.position))
+            .to_array();
         }
+        if vertices.is_empty() {
+            println!(
+                "Skipped ACF object {name}: no triangles at zero datarefs (lights and other commands may remain unsupported)"
+            );
+            continue;
+        }
+        let texture = match object.texture.as_ref() {
+            Some(texture_name) => {
+                let texture_path = texture_path(&path, texture_name)
+                    .ok_or_else(|| format!("Missing texture for {name}: {texture_name}"))?;
+                image::imageops::flip_vertical(&image::open(&texture_path)?.to_rgba8())
+            }
+            None => {
+                println!("ACF object {name}: no declared base texture; preview uses white");
+                solid_texture([255, 255, 255, 255])
+            }
+        };
         let mut mesh_low = Vec3::splat(f32::INFINITY);
         let mut mesh_high = Vec3::splat(f32::NEG_INFINITY);
         for vertex in &vertices {
@@ -190,7 +217,7 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
         meshes.push(Mesh {
             vertices,
             texture,
-            glass: object.glass || name.starts_with("glass"),
+            glass: object.glass || flags & 2 != 0,
             center: (mesh_low + mesh_high) * 0.5,
         });
     }
@@ -200,7 +227,7 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
         return Err("Invalid scene bounds".into());
     }
     println!(
-        "Static exterior preview: all animation datarefs = 0; no flight simulation. Bounds: {low:?} .. {high:?}"
+        "Static ACF preview: preliminary object gate, mode4/pass0x19; all animation/kill datarefs = 0; final visibility and materials incomplete. Bounds: {low:?} .. {high:?}"
     );
     Ok(Scene {
         meshes,
@@ -351,4 +378,60 @@ pub fn airport(
     aircraft_path: &Path,
 ) -> Result<Scene, Box<dyn std::error::Error>> {
     Ok(airport_flight(root, icao, aircraft_path)?.scene)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_arbitrary_acf_objects_with_offsets_and_skips_gated_missing_files() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "openxplane-attachment-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        fs::create_dir(dir.join("objects")).unwrap();
+        fs::write(dir.join("objects/custom-shape.obj"), "A\n800\nOBJ\nPOINT_COUNTS 3 0 0 3\nVT 0 0 0 0 1 0 0 0\nVT 1 0 0 0 1 0 1 0\nVT 0 0 1 0 1 0 0 1\nIDX 0\nIDX 1\nIDX 2\nTRIS 0 3\n").unwrap();
+        let mut props = String::from(
+            "P _obja/2/_v10_att_file_stl missing-broken.obj\nP _obja/2/_obj_flags 512\n",
+        );
+        for (field, value) in [
+            ("_v10_att_file_stl", "custom-shape.obj"),
+            ("_obj_flags", "0"),
+            ("_v10_steers_with_gear", "0"),
+            ("_v10_is_internal", "0"),
+            ("_v10_att_wing", "-1"),
+            ("_v10_att_body", "-1"),
+            ("_v10_att_gear", "-1"),
+            ("_v10_att_x_acf_prt_ref", "2"),
+            ("_v10_att_y_acf_prt_ref", "-3"),
+            ("_v10_att_z_acf_prt_ref", "4"),
+            ("_v10_att_psi_ref", "0"),
+            ("_v10_att_the_ref", "0"),
+            ("_v10_att_phi_ref", "0"),
+        ] {
+            props.push_str(&format!("P _obja/7/{field} {value}\n"));
+        }
+        let acf = dir.join("synthetic.acf");
+        fs::write(
+            &acf,
+            format!("I\n1200 Version\nACF\nPROPERTIES_BEGIN\n{props}PROPERTIES_END\n"),
+        )
+        .unwrap();
+        let scene = load(&acf).unwrap();
+        assert_eq!(scene.meshes.len(), 1);
+        assert_eq!(scene.meshes[0].vertices.len(), 3);
+        let scale = openxplane::aircraft::ACF_FT_TO_M;
+        assert_eq!(
+            scene.meshes[0].vertices[0].position,
+            [2.0 * scale, -3.0 * scale, 4.0 * scale]
+        );
+        assert_eq!(scene.meshes[0].vertices[1].position[0], 1.0 + 2.0 * scale);
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

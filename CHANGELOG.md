@@ -14,6 +14,20 @@ Every entry that changes what you can see carries a screenshot or an animation (
   and preserved earlier command examples and development notes in `docs/DEVELOPMENT_NOTES.md`.
   The compatibility generator now keeps the README summary compact.
 
+### ACF-driven aircraft previews
+
+- Progress totals now show one decimal place. The evidence-backed rubric review
+  updates the weighted estimates to41.7% implemented /28.3% verified; this remains
+  a self-assessment, not a measurement of game readiness or visual parity.
+
+- Aircraft previews now enumerate ACF object records instead of seven fixed Cessna
+  filenames, apply the recovered preliminary draw gate and load attachment translations.
+  The installed Cirrus SF50 now renders. Final visibility, materials, rotation and
+  parent-part transforms remain incomplete; these are port renders, not parity pairs.
+  [Native checks and runtime limits](research/OBJECT_DRAW_GATE.md).
+  ![Cirrus SF50 loaded from its ACF object records](site/assets/cirrus-acf-20261026.png)
+  ![Cessna regression render with its ACF objects](site/assets/cessna-acf-20261026.png)
+
 ### Aircraft attachments
 
 - Recovered common ACF object-attachment reads, coordinate scaling and CG subtraction,

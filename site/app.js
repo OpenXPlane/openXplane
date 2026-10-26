@@ -139,7 +139,7 @@ function renderHome() {
     if (!c || !chip) return;
     const t = totals(c);
     chip.querySelector("span:last-child").textContent =
-      `≈${t.implemented.toFixed(0)}% implemented · ≈${Math.round(t.verified)}% verified identical`;
+      `≈${t.implemented.toFixed(1)}% implemented · ≈${t.verified.toFixed(1)}% verified identical`;
     chip.hidden = false;
   });
 }
@@ -151,7 +151,7 @@ async function renderStatus() {
   if (!c) { view.querySelector("#status-summary").textContent = "Could not load the status data."; return; }
   const t = totals(c);
   view.querySelector("#status-summary").innerHTML =
-    `<b>About ${t.implemented.toFixed(0)}% implemented, about ${Math.round(t.verified)}% verified identical to the original.</b> ` +
+    `<b>About ${t.implemented.toFixed(1)}% implemented, about ${t.verified.toFixed(1)}% verified identical to the original.</b> ` +
     "<i>Implemented</i> counts work that exists in any form, including approximations; <i>verified identical</i> counts only what " +
     "is supported by comparisons with the original code. Evidence distinguishes exact matches, controlled inputs and platform tolerances; whole-game equivalence is not established. This is a self-assessed rubric, not a measurement.";
   view.querySelector("#status-method").textContent = c.method;
