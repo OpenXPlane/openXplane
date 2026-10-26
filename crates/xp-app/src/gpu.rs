@@ -210,6 +210,14 @@ impl Renderer {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+        let repeating_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("tiled roof color"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
         // screen-space interface: font atlas, pipeline and a dynamic vertex buffer
         let atlas =
             image::load_from_memory(include_bytes!("../assets/font/roboto-mono-atlas.png"))?
@@ -377,7 +385,11 @@ impl Renderer {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
+                        resource: wgpu::BindingResource::Sampler(if mesh.repeat_texture {
+                            &repeating_sampler
+                        } else {
+                            &sampler
+                        }),
                     },
                 ],
             });

@@ -46,6 +46,71 @@ pub struct Facade {
 }
 
 impl Facade {
+    fn floor_for_height(&self, height: f32) -> Result<&Floor, String> {
+        self.floors
+            .iter()
+            .filter(|f| !f.roofs.is_empty())
+            .min_by(|a, b| {
+                let delta = |f: &Floor| {
+                    (f.roofs.iter().copied().fold(f32::NEG_INFINITY, f32::max) - height).abs()
+                };
+                delta(a).total_cmp(&delta(b))
+            })
+            .ok_or_else(|| "FAC has no roof-height floor".into())
+    }
+
+    /// Flat type-2 roof layers. UV origin follows the first wall's midpoint;
+    /// projection follows the official WED preview, not native-verified placement.
+    pub fn roofs(&self, points: &[[f32; 2]], height: f32) -> Result<Vec<[f32; 8]>, String> {
+        if self.no_roof_mesh || !self.ring {
+            return Ok(Vec::new());
+        }
+        if points.len() < 3
+            || !height.is_finite()
+            || points.iter().flatten().any(|v| !v.is_finite())
+        {
+            return Err("invalid FAC roof footprint".into());
+        }
+        let floor = self.floor_for_height(height)?;
+        let [sx, sy] = self.roof_scale.ok_or("FAC roof scale missing")?;
+        let dx = points[1][0] - points[0][0];
+        let dz = points[1][1] - points[0][1];
+        let length = dx.hypot(dz);
+        if length < 0.001 {
+            return Err("degenerate FAC first roof edge".into());
+        }
+        let (ux, uz) = (dx / length, dz / length);
+        let origin = [
+            (points[0][0] + points[1][0]) * 0.5,
+            (points[0][1] + points[1][1]) * 0.5,
+        ];
+        let triangles = crate::world::triangulate(points);
+        if triangles.len() != points.len() - 2 {
+            return Err("FAC roof triangulation incomplete".into());
+        }
+        let mut out = Vec::new();
+        for &roof in &floor.roofs {
+            for tri in &triangles {
+                // world::triangulate returns CCW in x/z, which faces downward in 3D.
+                for i in [tri[0], tri[2], tri[1]] {
+                    let p = points[i];
+                    let (x, z) = (p[0] - origin[0], p[1] - origin[1]);
+                    out.push([
+                        p[0],
+                        roof,
+                        p[1],
+                        0.0,
+                        1.0,
+                        0.0,
+                        (x * ux + z * uz) / sx,
+                        (x * uz - z * ux) / sy,
+                    ]);
+                }
+            }
+        }
+        Ok(out)
+    }
+
     /// Straight-wall preview in x-east/z-south coordinates. Selection is
     /// deterministic; original random fits, corner miters and curves are pending.
     pub fn straight_walls(
@@ -61,17 +126,7 @@ impl Facade {
         {
             return Err("invalid FAC footprint".into());
         }
-        let floor = self
-            .floors
-            .iter()
-            .filter(|f| !f.roofs.is_empty())
-            .min_by(|a, b| {
-                let delta = |f: &Floor| {
-                    (f.roofs.iter().copied().fold(f32::NEG_INFINITY, f32::max) - height).abs()
-                };
-                delta(a).total_cmp(&delta(b))
-            })
-            .ok_or("FAC has no roof-height floor")?;
+        let floor = self.floor_for_height(height)?;
         let segments = floor
             .segments
             .iter()
@@ -417,5 +472,49 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        f.ring = true;
+        let roof = f
+            .roofs(&[[0.0, 0.0], [4.0, 0.0], [4.0, 2.0], [0.0, 2.0]], 3.0)
+            .unwrap();
+        assert_eq!(roof.len(), 6);
+        let area: f32 = roof
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|t| {
+                let ux = t[1][0] - t[0][0];
+                let uz = t[1][2] - t[0][2];
+                let vx = t[2][0] - t[0][0];
+                let vz = t[2][2] - t[0][2];
+                let upward = uz * vx - ux * vz;
+                assert!(upward > 0.0);
+                upward * 0.5
+            })
+            .sum();
+        assert_eq!(area, 8.0);
+        assert!(
+            roof.iter()
+                .all(|v| v[1] == 3.0 && v[3..6] == [0.0, 1.0, 0.0])
+        );
+        let p = roof.iter().find(|v| v[0] == 0.0 && v[2] == 0.0).unwrap();
+        assert_eq!(&p[6..8], &[-0.2, 0.0]);
+        let concave = f
+            .roofs(
+                &[[0.0, 0.0], [4.0, 0.0], [4.0, 2.0], [2.0, 1.0], [0.0, 2.0]],
+                3.0,
+            )
+            .unwrap();
+        assert_eq!(concave.len(), 9);
+        f.no_roof_mesh = true;
+        assert!(
+            f.roofs(&[[0.0, 0.0], [4.0, 0.0], [0.0, 2.0]], 3.0)
+                .unwrap()
+                .is_empty()
+        );
+        let f = parse(&(text.to_owned() + "FLOOR two\nROOF_HEIGHT 7\nROOF_HEIGHT 8\n")).unwrap();
+        let layers = f.roofs(&[[0.0, 0.0], [4.0, 0.0], [0.0, 2.0]], 8.0).unwrap();
+        assert_eq!(layers.len(), 6);
+        assert_eq!(layers[0][1], 7.0);
+        assert_eq!(layers[3][1], 8.0);
     }
 }

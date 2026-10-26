@@ -15,6 +15,7 @@ pub struct Mesh {
     /// World translation and Y-axis angle in radians; identity for baked geometry.
     pub instances: Vec<[f32; 4]>,
     pub glass: bool,
+    pub repeat_texture: bool,
     pub center: Vec3,
     animation: Option<AnimatedObject>,
 }
@@ -85,6 +86,7 @@ pub fn facade_segment(
                 vertices,
                 texture: texture.clone(),
                 instances: vec![[0.0; 4]],
+                repeat_texture: false,
                 glass: false,
                 center: Vec3::ZERO,
                 animation: None,
@@ -310,6 +312,7 @@ fn load_aircraft(aircraft_path: &Path, animate: bool) -> Result<Scene, Box<dyn s
         meshes.push(Mesh {
             vertices,
             texture,
+            repeat_texture: false,
             glass: object.glass || flags & 2 != 0,
             center: (mesh_low + mesh_high) * 0.5,
             instances: vec![[0.0; 4]],
@@ -527,6 +530,7 @@ fn airport_objects(
             Ok(Mesh {
                 vertices: base,
                 texture,
+                repeat_texture: false,
                 glass: object.glass,
                 center: (low + high) * 0.5,
                 instances,
@@ -583,8 +587,10 @@ fn airport_facades(
     }
     let mut meshes = Vec::new();
     let mut placed = 0;
+    let mut roofed = 0;
+    let mut roof_skipped = 0;
     for (path, polygons) in grouped {
-        let result = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
+        let result = (|| -> Result<Vec<Mesh>, Box<dyn std::error::Error>> {
             let facade = openxplane::facade::parse(&fs::read_to_string(&path)?)?;
             let texture = if let Some(name) = &facade.wall_texture {
                 image::imageops::flip_vertical(
@@ -594,6 +600,18 @@ fn airport_facades(
             } else {
                 solid_texture([180, 180, 180, 255])
             };
+            let roof_texture = if let Some(name) = facade
+                .roof_texture
+                .as_ref()
+                .or(facade.wall_texture.as_ref())
+            {
+                texture_path(&path, name)
+                    .and_then(|p| image::open(p).ok())
+                    .map(|im| image::imageops::flip_vertical(&im.to_rgba8()))
+            } else {
+                Some(solid_texture([180, 180, 180, 255]))
+            };
+            let mut roof_vertices = Vec::new();
             let mut vertices = Vec::new();
             for polygon in polygons {
                 if polygon.windings.len() != 1
@@ -620,6 +638,26 @@ fn airport_facades(
                 match facade.straight_walls(&points, &choices, polygon.parameter as f32) {
                     Ok(wall) => {
                         placed += 1;
+                        if roof_texture.is_some() {
+                            match facade.roofs(&points, polygon.parameter as f32) {
+                                Ok(roof) if !roof.is_empty() => {
+                                    roofed += 1;
+                                    roof_vertices.extend(roof.into_iter().map(|v| Vertex {
+                                        position: [v[0], v[1], v[2]],
+                                        normal: [v[3], v[4], v[5]],
+                                        uv: [v[6], v[7]],
+                                    }));
+                                }
+                                Ok(_) => {}
+                                Err(e) => {
+                                    roof_skipped += 1;
+                                    eprintln!("Facade roof skipped {}: {e}", path.display());
+                                }
+                            }
+                        } else {
+                            roof_skipped += 1;
+                        }
+
                         vertices.extend(wall.into_iter().map(|v| Vertex {
                             position: [v[0], v[1], v[2]],
                             normal: [v[3], v[4], v[5]],
@@ -632,18 +670,31 @@ fn airport_facades(
                     }
                 }
             }
-            Ok(Mesh {
+            let walls = Mesh {
                 vertices,
                 texture,
                 instances: vec![[0.0; 4]],
+                repeat_texture: false,
                 glass: false,
                 center: Vec3::ZERO,
                 animation: None,
-            })
+            };
+            let mut batches = vec![walls];
+            if !roof_vertices.is_empty() {
+                batches.push(Mesh {
+                    vertices: roof_vertices,
+                    texture: roof_texture.unwrap(),
+                    instances: vec![[0.0; 4]],
+                    repeat_texture: true,
+                    glass: false,
+                    center: Vec3::ZERO,
+                    animation: None,
+                });
+            }
+            Ok(batches)
         })();
         match result {
-            Ok(mesh) if !mesh.vertices.is_empty() => meshes.push(mesh),
-            Ok(_) => {}
+            Ok(batches) => meshes.extend(batches.into_iter().filter(|m| !m.vertices.is_empty())),
             Err(e) => {
                 skipped += 1;
                 eprintln!("Facade resource skipped {}: {e}", path.display());
@@ -651,7 +702,7 @@ fn airport_facades(
         }
     }
     println!(
-        "FAC straight-wall preview: {placed} footprints, {} batches, {skipped} skipped footprints/resources; deterministic fits, flat ground, no curved walls/miters/roofs/attachments.",
+        "FAC wall/roof preview: {placed} footprints, {} batches, {skipped} skipped footprints/resources; deterministic fits, flat ground, {roofed} roofed footprints, {roof_skipped} roof failures; no curved walls/miters/attachments.",
         meshes.len()
     );
     meshes
@@ -706,6 +757,7 @@ fn xp_scenery_raster(
     Ok(Mesh {
         vertices,
         texture: solid_texture([85, 105, 65, 255]),
+        repeat_texture: false,
         glass: false,
         center: Vec3::ZERO,
         instances: vec![[0.0; 4]],
@@ -807,6 +859,7 @@ pub fn airport_flight(
         meshes.push(Mesh {
             vertices,
             texture: solid_texture(layer.color),
+            repeat_texture: false,
             glass: false,
             center: (low + high) * 0.5,
             instances: vec![[0.0; 4]],

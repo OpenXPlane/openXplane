@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Installed facade roofs
+
+- KSEA facade previews now draw ROOF_HEIGHT layers with the declared roof base
+  texture and repeating ROOF_SCALE mapping. The installed scene reports67 roofed
+  footprints. Curves, corner miters, roof attachments, terrain alignment and
+  native visual parity remain unfinished.
+  [Evidence and limitations](research/FACADE_ROOFS.md).
+  ![KSEA FAC roofs](site/assets/ksea-fac-roofs-20261026.png)
+
 ### Installed facade walls
 
 - Airport scenes now place straight type-2 FAC wall meshes along supported DSF
