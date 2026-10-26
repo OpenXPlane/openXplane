@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Recovered the XSV6 mapping prefix through REA and added a bounded inspector
+  with malformed-input tests. Corrected the signature description; runtime
+  variant selection remains unresolved.
 - Added a bounded SPIR-V archive inspector and recorded REA evidence for the
   installed terrain shader archive. Candidate resource usage exposes unresolved
   variant and border-channel handling; composite color blending is still not

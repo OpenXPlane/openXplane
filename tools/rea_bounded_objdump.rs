@@ -21,8 +21,11 @@ fn main() -> ExitCode {
         "attachment-matrix" => ("0x141775d10", "0x141775ece"),
         "obj-key-insert" => ("0x1408751b0", "0x1408752b0"),
         "facade-segment-loader" => ("0x141981450", "0x141981650"),
+        "shader-mapping-header" => ("0x14103fafa", "0x14103fb2b"),
+        "shader-mapping-reader" => ("0x14105e350", "0x14105e650"),
+        "shader-mapping-names" => ("0x141060320", "0x1410604b5"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names");
             return ExitCode::from(2);
         }
     };

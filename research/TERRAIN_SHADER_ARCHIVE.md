@@ -8,9 +8,41 @@ provider. The retained local evidence explicitly does not execute the archive or
 establish format-specific shader semantics. Original bytes remain unchanged.
 
 The ZIP contains4614 SPIR-V members totaling204074240 uncompressed bytes.
-The companion terrain_mapping.xsv starts with XSV61 and contains resource names,
+The companion terrain_mapping.xsv starts with the four-byte signature XSV6 and contains resource names,
 including base, composite, border, noise and seasonal variants. Its full mapping
 format and runtime variant selection are not yet recovered.
+
+## Recovered mapping prefix
+
+REA bounded observations against the reference executable identified the header
+check at 0x14103fafa and its call at 0x14103fb21 to reader 0x14105e350.
+The reader skips four bytes and calls 0x141060320. That helper assembles a
+little-endian 16-bit count, then reads one-byte lengths and the corresponding
+string bytes. The reader subsequently assembles two little-endian 32-bit words,
+reads one flag byte and another one-byte-length string. Their complete runtime
+semantics are not established. The older description `XSV61` mistakenly included
+the low byte of the name count in the signature.
+
+The new bounded `tools/inspect_xsv_mapping.py` inspects this prefix without
+interpreting the remaining variant payload. On the installed terrain mapping
+(996152 bytes, SHA256
+`ae0aa1633d7eef4f67699f1d89b5c391a258ea2ca46f2465e3b9a150e23cf4ca`),
+it reports 49 names ending at offset803, words829440 and1, flags3 and entry
+string `main`. The opaque payload starts at817. Independently inspected smaller
+font and SSR-mesh mappings have matching prefix structure.
+These observations do not prove that word829440 is a variant count, identify
+the active KSEA shader or establish shader equivalence.
+
+```sh
+python tools/inspect_xsv_mapping.py "<X-Plane>/Resources/shaders/bin/terrain_mapping.xsv"
+python -m unittest discover -s tools -p test_inspect_xsv_mapping.py
+```
+
+The inspector limits input to64MiB, checks every prefix read and restricts display
+strings to ASCII. Synthetic tests cover byte order, empty and nonempty names,
+payload boundaries, every truncation of a complete prefix, bad signatures and
+unsupported display encoding. This is inspection tooling, not a runtime loader
+or an emulation comparison. Original mappings and REA listings stay local.
 
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
