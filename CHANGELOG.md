@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Traversed complete serialized XSV variants and linked candidate493 to two
+  mapping slots. All95 installed mapping files were structurally consumed;
+  this does not establish active scene selection or shader equivalence.
 - Extended XSV inspection through serialized resource layouts using original
   reader evidence. Added bounds and name-reference tests; active variant and
   backend-dependent resource remapping remain unresolved.

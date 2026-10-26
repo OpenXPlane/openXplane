@@ -70,6 +70,51 @@ layout counts. Real font, SSR-mesh and terrain layouts were read locally.
 Rust workspace formatting, clippy and tests remain required; inspection results
 do not justify increasing implemented or verified renderer percentages.
 
+### Complete serialized variant traversal
+
+The next reader stages consume a 16-bit auxiliary-record count. Each record has
+a kind and item count, followed by key/operation pairs. Operations1 and3 skip
+two additional bytes; operation4 skips three; others skip none. These are
+reported as `conditions` for inspection; their complete runtime semantics are
+not recovered. The observations are at0x14105e8ab..0x14105e9ee.
+
+The first header word bounds the outer loop at0x14105ea88..0x14105f426. Each
+slot begins with a presence byte. Present slots contain a 32-bit layout index
+and four16-bit auxiliary indices, with65535 as the absent sentinel. With flags
+bit0 set, a count byte and four bytes per attribute follow. For every repetition
+bounded by the second header word, the reader then consumes as many stage
+records as the population count of the flags byte. This happens on the bit0
+path too: its native state construction falls through to the stage-ID reader.
+Stage kinds1 and2 carry one32-bit word; kind4 carries four. All these words are
+little-endian. The relevant reads are at0x14105eac6,0x14105ebc0,
+0x14105ecbb and0x14105f1c0..0x14105f29b.
+
+`--variants` traverses this structure; `--module ID` filters the displayed live
+samples by their first stage word. Inspection of terrain consumes all996152
+bytes:829440 slots,4618 present,132 auxiliary records and4614 distinct primary
+stage IDs covering0..4613. The archive has4614 correspondingly numbered members.
+This supports interpreting the primary stage words as archive module IDs;
+it is not a live draw observation.
+
+For candidate493, two slots reference stage kind2 ID493:13465 and39385.
+They pair it with kind1 IDs103 and968 respectively and share auxiliary indices
+3,67,65535,65535. Neither slot is established as active for KSEA. The inspector
+does not reproduce native resource remapping, auxiliary expansion, bit0 state
+construction or the caller's selection of a slot.
+
+```sh
+python tools/inspect_xsv_mapping.py "<X-Plane>/Resources/shaders/bin/terrain_mapping.xsv" --variants --module 493 --limit 3
+```
+
+A local survey traversed all95 top-level `*_mapping.xsv` files in the installed
+shader bin directory without errors or trailing bytes. Font and SSR-mesh yield
+six and three unique IDs respectively, matching their archive member counts and
+number ranges. This is structural consistency evidence, not a shader execution
+comparison. Synthetic tests now include absent/live slots, both graphics and
+compute stage records, auxiliary extra-byte lengths, sample filtering and limits,
+unknown stage rejection and every truncation of a complete variant fixture.
+Rendering estimates remain unchanged pending runtime integration and comparison.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.
