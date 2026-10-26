@@ -19,6 +19,31 @@ paired screenshots and, when useful, GIF/video captures, investigate differences
 and retain reproducible evidence. A single-engine render is not a paired visual
 comparison. Keep large/private reference artifacts under ignored local research.
 
+## Original mod compatibility is mandatory
+
+User requirement added on 2026-10-26: the implementation must support mods
+made for the original X-Plane. This is a completion requirement, not an optional
+future feature. Target the reference X-Plane 12 version and record each tested
+add-on's version and dependencies.
+
+- Load original aircraft add-ons, liveries and their models, textures, sounds,
+  systems and configuration from user-installed packages without port-specific
+  conversion or author changes.
+- Load original scenery packages, airports, overlays and libraries with their
+  dependency resolution, ordering and resource selection behaviour.
+- Run original scripts and plugins through compatible APIs, datarefs, commands,
+  callbacks and lifecycle behaviour. Native plugins require the matching host
+  platform and binary ABI; do not imply that a Windows binary runs on other OSes.
+- Preserve package layouts and observable behaviour. A parser accepting a file,
+  an API name catalog or a rendered object alone does not establish mod support.
+
+Maintain reproducible end-to-end comparisons with representative unmodified
+third-party aircraft, scenery and script/native-plugin packages in the reference
+and port. Record failures and unsupported dependencies explicitly. Compatibility
+remains incomplete while required mod behaviour is missing or unverified; do not
+increase verified percentages merely for adding this requirement. Read installed
+add-ons locally and respect their licences; do not redistribute their contents.
+
 ## Required Git delivery
 
 For every completed coherent change:
