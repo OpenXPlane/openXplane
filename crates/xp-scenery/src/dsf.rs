@@ -309,11 +309,30 @@ impl<'a> Cursor<'a> {
     }
 }
 
+/// Polygon contours retain every coordinate plane (including wall/Bezier data).
+#[derive(Debug)]
+pub struct PolygonPlacement {
+    pub resource: String,
+    pub parameter: u16,
+    pub windings: Vec<Vec<Vec<f64>>>,
+}
+
+#[derive(Default)]
+pub struct Features {
+    pub objects: Vec<ObjectPlacement>,
+    pub polygons: Vec<PolygonPlacement>,
+}
+
 pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
+    Ok(features(data)?.objects)
+}
+
+pub fn features(data: &[u8]) -> Result<Features, String> {
     if data.len() < 28 || &data[..8] != b"XPLNEDSF" || data[8..12] != 1u32.to_le_bytes() {
         return Err("unsupported object DSF header".into());
     }
     let mut definitions = Vec::new();
+    let mut polygon_definitions = Vec::new();
     let mut pools = Vec::new();
     let mut scales = Vec::new();
     let mut commands = None;
@@ -323,6 +342,9 @@ pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
                 for (t, b) in atoms(body)? {
                     if t == *b"TJBO" {
                         definitions = strings(b)?;
+                    }
+                    if t == *b"YLOP" {
+                        polygon_definitions = strings(b)?;
                     }
                 }
             }
@@ -371,7 +393,7 @@ pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
     };
     let mut pool = None;
     let mut definition = None;
-    let mut out = Vec::new();
+    let mut out = Features::default();
     while c.pos < c.bytes.len() {
         let at = c.pos;
         let op = c.u8()?;
@@ -406,7 +428,7 @@ pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
                     if p.len() < 3 {
                         return Err("object pool needs three planes".into());
                     }
-                    out.push(ObjectPlacement {
+                    out.objects.push(ObjectPlacement {
                         resource: name.clone(),
                         lon: p[0],
                         lat: p[1],
@@ -421,26 +443,71 @@ pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
             10 => {
                 c.take(4)?;
             }
-            12 => {
-                c.take(2)?;
-                let n = c.u8()? as usize;
-                c.take(n * 2)?;
-            }
-            13 => {
-                c.take(6)?;
-            }
-            14 => {
-                c.take(2)?;
-                let n = c.u8()?;
-                for _ in 0..n {
-                    let m = c.u8()? as usize;
-                    c.take(m * 2)?;
+            12..=15 => {
+                let parameter = c.u16()?;
+                let mut windings = Vec::new();
+                let mut read_points = |indices: Vec<usize>| -> Result<(), String> {
+                    let points = indices
+                        .into_iter()
+                        .map(|i| point(pool.ok_or("missing polygon pool")?, i))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if points
+                        .iter()
+                        .any(|p| p.len() < 2 || p.iter().any(|v| !v.is_finite()))
+                    {
+                        return Err("invalid polygon coordinates".into());
+                    }
+                    windings.push(points);
+                    Ok(())
+                };
+                match op {
+                    12 => {
+                        let n = c.u8()?;
+                        let indices = (0..n)
+                            .map(|_| c.u16().map(usize::from))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        read_points(indices)?;
+                    }
+                    13 => {
+                        let first = c.u16()? as usize;
+                        let end = c.u16()? as usize;
+                        if end < first {
+                            return Err("reversed polygon range".into());
+                        }
+                        read_points((first..end).collect())?;
+                    }
+                    14 => {
+                        let n = c.u8()?;
+                        for _ in 0..n {
+                            let count = c.u8()?;
+                            let indices = (0..count)
+                                .map(|_| c.u16().map(usize::from))
+                                .collect::<Result<Vec<_>, _>>()?;
+                            read_points(indices)?;
+                        }
+                    }
+                    _ => {
+                        let n = c.u8()?;
+                        let mut first = c.u16()? as usize;
+                        for _ in 0..n {
+                            let end = c.u16()? as usize;
+                            if end < first {
+                                return Err("reversed nested polygon range".into());
+                            }
+                            read_points((first..end).collect())?;
+                            first = end;
+                        }
+                    }
                 }
-            }
-            15 => {
-                c.take(2)?;
-                let n = c.u8()? as usize;
-                c.take((n + 1) * 2)?;
+                let resource = polygon_definitions
+                    .get(definition.ok_or("missing polygon definition")?)
+                    .ok_or("polygon definition out of range")?
+                    .clone();
+                out.polygons.push(PolygonPlacement {
+                    resource,
+                    parameter,
+                    windings,
+                });
             }
             16 => {}
             17 => {
@@ -574,21 +641,44 @@ mod object_tests {
             .collect::<Vec<_>>();
         let mut data = b"XPLNEDSF".to_vec();
         data.extend(1u32.to_le_bytes());
-        data.extend(atom(b"NFED", &atom(b"TJBO", b"test.obj\0")));
+        data.extend(atom(
+            b"NFED",
+            &[atom(b"TJBO", b"test.obj\0"), atom(b"YLOP", b"test.fac\0")].concat(),
+        ));
         data.extend(atom(
             b"DOEG",
             &[atom(b"LOOP", &pool), atom(b"LACS", &scale)].concat(),
         ));
-        data.extend(atom(
-            b"SDMC",
-            &[1, 0, 0, 3, 0, 15, 0, 0, 1, 0, 0, 2, 0, 8, 0, 0, 2, 0],
-        ));
+        for command in [
+            vec![12, 7, 0, 2, 0, 0, 1, 0],
+            vec![13, 7, 0, 0, 0, 2, 0],
+            vec![14, 7, 0, 1, 2, 0, 0, 1, 0],
+            vec![15, 7, 0, 1, 0, 0, 2, 0],
+        ] {
+            let mut data = data.clone();
+            let mut commands = vec![1, 0, 0, 3, 0];
+            commands.extend(command);
+            commands.extend([8, 0, 0, 2, 0]);
+            data.extend(atom(b"SDMC", &commands));
+            data.extend([0; 16]);
+            let features = features(&data).unwrap();
+            assert_eq!(features.polygons.len(), 1);
+            assert_eq!(features.polygons[0].resource, "test.fac");
+            assert_eq!(features.polygons[0].windings[0].len(), 2);
+            assert_eq!(
+                features.polygons[0].windings[0][1],
+                vec![-122.0, 48.0, 360.0 * 32767.0 / 65535.0]
+            );
+            assert_eq!(features.polygons[0].parameter, 7);
+            let objects = features.objects;
+            assert_eq!(objects.len(), 2);
+            assert_eq!(objects[0].resource, "test.obj");
+            assert_eq!(objects[0].lon, -123.0);
+            assert_eq!(objects[1].lat, 48.0);
+        }
+        data.extend(atom(b"SDMC", &[1, 0, 0, 3, 0, 13, 0, 0, 2, 0, 0, 0]));
         data.extend([0; 16]);
-        let objects = object_placements(&data).unwrap();
-        assert_eq!(objects.len(), 2);
-        assert_eq!(objects[0].resource, "test.obj");
-        assert_eq!(objects[0].lon, -123.0);
-        assert_eq!(objects[1].lat, 48.0);
+        assert!(features(&data).is_err());
         data.truncate(data.len() - 17);
         assert!(object_placements(&data).is_err());
     }

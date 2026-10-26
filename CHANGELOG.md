@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### DSF polygon inspection
+
+- Retained DSF polygon contours, parameters and all coordinate planes instead
+  of skipping polygon commands. `dsf-info <tile.dsf>` reports resource groups;
+  the installed Global Airports +47-123 tile decodes 6474 polygons and 13168
+  objects. Facade geometry is still missing from the renderer.
+  [Evidence and next work](research/DSF_POLYGONS.md).
+
 ### Geographic scenery library selection
 
 - Airport library lookup now evaluates REGION_RECT, REGION_ALL and REGION_BITMAP
