@@ -13,7 +13,7 @@ Every entry that changes what you can see carries a screenshot or an animation (
   downloads and live compatibility estimates. The previous documentation interface
   now lives at `/docs/`; earlier hash routes redirect there. Desktop and390px mobile
   navigation, docs loading, gallery images and JavaScript errors were checked in Chrome.
-  ![New presentation homepage](site/assets/website-home-20261026.png)
+  ![New presentation homepage](site/assets/website-home-20261026.jpg)
 
 ### Installed DSF terrain
 
