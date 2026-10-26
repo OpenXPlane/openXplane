@@ -39,6 +39,13 @@ pub const PREVIEW_BACKGROUND: [f64; 3] = [0.028, 0.045, 0.07];
 
 /// Source-topology inspection before terrain material/physics integration.
 pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error::Error>> {
+    Ok(terrain_scene(root, icao)?.0)
+}
+
+fn terrain_scene(
+    root: &Path,
+    icao: &str,
+) -> Result<(Scene, openxplane::ground::Ground), Box<dyn std::error::Error>> {
     let install = openxplane::install::Install::open(root)?;
     let (airport, _) = install.find_airport(icao)?.ok_or("airport not found")?;
     let (frame, _) = openxplane::world::airport_layers(&airport, 8000.0)?;
@@ -96,6 +103,7 @@ pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error
     }
     let mut grouped = BTreeMap::<String, Vec<Vertex>>::new();
     let mut uv_failures = BTreeMap::<String, String>::new();
+    let mut ground_triangles = Vec::new();
     let mut physical = 0;
     let mut overlay = 0;
     for triangle in &features.terrain {
@@ -115,6 +123,9 @@ pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error
             };
             Vec3::new(x, height - airport.elevation_ft * 0.3048, z)
         });
+        if triangle.flags & 1 != 0 {
+            ground_triangles.push(positions.map(|p| p.to_array()));
+        }
         let face_normal = (positions[1] - positions[0])
             .cross(positions[2] - positions[0])
             .normalize_or_zero();
@@ -191,12 +202,15 @@ pub fn terrain_mesh(root: &Path, icao: &str) -> Result<Scene, Box<dyn std::error
     println!(
         "TER base preview: {textured} textured resource batches; no border/composite/water shaders, explicit library season only, local projection phase, all LODs; unsupported UV cases use a constant sample: {uv_failures:?}"
     );
-    Ok(Scene {
-        meshes,
-        center: Vec3::ZERO,
-        radius: 30000.0,
-        background: [0.30, 0.52, 0.80],
-    })
+    Ok((
+        Scene {
+            meshes,
+            center: Vec3::ZERO,
+            radius: 30000.0,
+            background: [0.30, 0.52, 0.80],
+        },
+        openxplane::ground::Ground::new(ground_triangles),
+    ))
 }
 
 /// Inspect one actual type-2 facade segment in its unchanged file coordinates.
@@ -558,6 +572,7 @@ impl AircraftBody {
 fn airport_objects(
     install: &openxplane::install::Install,
     frame: &openxplane::world::Frame,
+    ground: Option<&openxplane::ground::Ground>,
 ) -> Result<Vec<Mesh>, String> {
     let origin = frame.origin();
     let lat = origin[0].floor() as i32;
@@ -597,7 +612,7 @@ fn airport_objects(
             unresolved += 1;
         }
     }
-    let mut meshes = airport_facades(&features.polygons, &pack, &library, frame);
+    let mut meshes = airport_facades(&features.polygons, &pack, &library, frame, ground);
     let facade_batches = meshes.len();
     let mut instances = 0;
     let mut failed = 0;
@@ -615,7 +630,7 @@ fn airport_objects(
             Ok(point) => {
                 agp_count += poses.len();
                 eprintln!(
-                    "AGP preview {}: first of {} tiles; {} facade/vegetation annotations omitted; flat ground, full density, no base tile",
+                    "AGP preview {}: first of {} tiles; {} facade/vegetation annotations omitted; ground-point alignment approximate, full density, no base tile",
                     path.display(),
                     point.tiles,
                     point.omitted_features
@@ -677,12 +692,17 @@ fn airport_objects(
             let mut instances = Vec::with_capacity(poses.len());
             for (position, heading) in &poses {
                 let angle = -heading.to_radians();
+                let position = *position
+                    + Vec3::Y
+                        * ground
+                            .and_then(|g| g.sample(position.x, position.z))
+                            .map_or(0.0, |(y, _)| y);
                 instances.push([position.x, position.y, position.z, angle]);
                 let rotation = glam::Mat3::from_rotation_y(angle);
                 for x in [base_low.x, base_high.x] {
                     for y in [base_low.y, base_high.y] {
                         for z in [base_low.z, base_high.z] {
-                            let p = rotation * Vec3::new(x, y, z) + *position;
+                            let p = rotation * Vec3::new(x, y, z) + position;
                             low = low.min(p);
                             high = high.max(p);
                         }
@@ -712,7 +732,7 @@ fn airport_objects(
         }
     }
     println!(
-        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {unresolved} unresolved placements; {failed} failed resources. Preview libraries/flat placement; partial straight FAC walls, no networks.",
+        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {unresolved} unresolved placements; {failed} failed resources. Preview libraries/terrain height with flat fallback; partial straight FAC walls, no networks.",
         placements.len(),
         meshes.len() - facade_batches
     );
@@ -724,6 +744,7 @@ fn airport_facades(
     pack: &Path,
     library: &BTreeMap<String, PathBuf>,
     frame: &openxplane::world::Frame,
+    ground: Option<&openxplane::ground::Ground>,
 ) -> Vec<Mesh> {
     let mut grouped = BTreeMap::<PathBuf, Vec<&openxplane::dsf::PolygonPlacement>>::new();
     let mut skipped = 0;
@@ -797,6 +818,21 @@ fn airport_facades(
                     points.pop();
                     choices.pop();
                 }
+                let center = points
+                    .first()
+                    .zip(points.get(1))
+                    .map(|(a, b)| [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5])
+                    .unwrap_or([0.0; 2]);
+                let graded_height = ground
+                    .and_then(|g| g.sample(center[0], center[1]))
+                    .map_or(0.0, |(y, _)| y);
+                let height_at = |x: f32, z: f32| {
+                    if facade.graded {
+                        graded_height
+                    } else {
+                        ground.and_then(|g| g.sample(x, z)).map_or(0.0, |(y, _)| y)
+                    }
+                };
                 match facade.straight_walls(&points, &choices, polygon.parameter as f32) {
                     Ok(wall) => {
                         placed += 1;
@@ -805,7 +841,7 @@ fn airport_facades(
                                 Ok(roof) if !roof.is_empty() => {
                                     roofed += 1;
                                     roof_vertices.extend(roof.into_iter().map(|v| Vertex {
-                                        position: [v[0], v[1], v[2]],
+                                        position: [v[0], v[1] + height_at(v[0], v[2]), v[2]],
                                         normal: [v[3], v[4], v[5]],
                                         uv: [v[6], v[7]],
                                     }));
@@ -821,7 +857,7 @@ fn airport_facades(
                         }
 
                         vertices.extend(wall.into_iter().map(|v| Vertex {
-                            position: [v[0], v[1], v[2]],
+                            position: [v[0], v[1] + height_at(v[0], v[2]), v[2]],
                             normal: [v[3], v[4], v[5]],
                             uv: [v[6], v[7]],
                         }));
@@ -864,7 +900,7 @@ fn airport_facades(
         }
     }
     println!(
-        "FAC wall/roof preview: {placed} footprints, {} batches, {skipped} skipped footprints/resources; deterministic fits, flat ground, {roofed} roofed footprints, {roof_skipped} roof failures; no curved walls/miters/attachments.",
+        "FAC wall/roof preview: {placed} footprints, {} batches, {skipped} skipped footprints/resources; deterministic fits, approximate graded/draped height, {roofed} roofed footprints, {roof_skipped} roof failures; no curved walls/miters/attachments.",
         meshes.len()
     );
     meshes
@@ -927,6 +963,43 @@ fn xp_scenery_raster(
     })
 }
 
+/// Subdivide long airport triangles before projecting vertices onto physical
+/// terrain. This bounded visual approximation is not native mesh draping.
+fn drape_triangles(input: &[[f32; 3]], ground: &openxplane::ground::Ground) -> Vec<[f32; 3]> {
+    let mut pending = input
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .copied()
+        .map(|t| (t, 0))
+        .collect::<Vec<_>>();
+    let mut out = Vec::new();
+    while let Some((t, depth)) = pending.pop() {
+        let distance = |a: [f32; 3], b: [f32; 3]| (a[0] - b[0]).hypot(a[2] - b[2]);
+        let edge = (0..3)
+            .max_by(|&a, &b| {
+                distance(t[a], t[(a + 1) % 3]).total_cmp(&distance(t[b], t[(b + 1) % 3]))
+            })
+            .unwrap();
+        let next = (edge + 1) % 3;
+        let other = (edge + 2) % 3;
+        if depth < 16 && distance(t[edge], t[next]) > 50.0 {
+            let mid = std::array::from_fn(|i| (t[edge][i] + t[next][i]) * 0.5);
+            pending.push(([t[edge], mid, t[other]], depth + 1));
+            pending.push(([mid, t[next], t[other]], depth + 1));
+        } else {
+            out.extend(t.map(|p| {
+                [
+                    p[0],
+                    p[1] + 0.21 + ground.sample(p[0], p[2]).map_or(0.0, |(y, _)| y),
+                    p[2],
+                ]
+            }));
+        }
+    }
+    out
+}
+
 /// An airport scene with the aircraft, its body vertices and a flight model resting on the first runway.
 pub struct FlightSession {
     pub scene: Scene,
@@ -981,27 +1054,44 @@ pub fn airport_flight(
     model.rest_on_ground(low_y, [a[0] + ux * 150.0, a[1] + uz * 150.0], direction);
 
     let mut meshes = Vec::new();
-    let origin = frame.origin();
-    if let Some(path) = install.terrain_tile(origin[0], origin[1]) {
-        match xp_scenery_raster(&path, &frame, model.elevation_m) {
-            Ok(mesh) => {
-                println!(
-                    "Loaded DSF elevation terrain: {} ({} triangles; raster preview, no landclass textures)",
-                    path.display(),
-                    mesh.vertices.len() / 3
-                );
+    let mut ground = match terrain_scene(root, icao) {
+        Ok((terrain, ground)) => {
+            println!(
+                "Live airport source terrain enabled; physical height queries active, airport surface draping remains preview interpolation"
+            );
+            meshes.extend(terrain.meshes);
+            Some(std::sync::Arc::new(ground))
+        }
+        Err(e) => {
+            eprintln!("Source terrain unavailable; flat airport fallback: {e}");
+            let origin = frame.origin();
+            if let Some(path) = install.terrain_tile(origin[0], origin[1])
+                && let Ok(mesh) = xp_scenery_raster(&path, &frame, model.elevation_m)
+            {
                 meshes.push(mesh);
             }
-            Err(error) => eprintln!("DSF terrain unavailable: {}: {error}", path.display()),
+            None
         }
-    }
-    match airport_objects(&install, &frame) {
-        Ok(objects) => meshes.extend(objects),
-        Err(e) => eprintln!("DSF objects unavailable: {e}"),
-    }
+    };
+    let mut airport_surfaces = Vec::new();
     for layer in layers {
-        let vertices = layer
-            .triangles
+        if ground.is_some() && layer.kind == openxplane::world::Kind::Ground {
+            continue;
+        }
+        let triangles = if let Some(ground) = &ground {
+            drape_triangles(&layer.triangles, ground)
+        } else {
+            layer.triangles
+        };
+        if ground.is_some()
+            && matches!(
+                layer.kind,
+                openxplane::world::Kind::Runway | openxplane::world::Kind::Pavement
+            )
+        {
+            airport_surfaces.extend_from_slice(triangles.as_chunks::<3>().0);
+        }
+        let vertices = triangles
             .iter()
             .map(|p| Vertex {
                 position: *p,
@@ -1027,6 +1117,18 @@ pub fn airport_flight(
             instances: vec![[0.0; 4]],
             animation: None,
         });
+    }
+    if let Some(base) = ground.take() {
+        ground = Some(std::sync::Arc::new(
+            openxplane::ground::Ground::with_surfaces(base, airport_surfaces),
+        ));
+    }
+    if let Some(ground) = &ground {
+        model.set_ground(ground.clone());
+    }
+    match airport_objects(&install, &frame, ground.as_deref()) {
+        Ok(objects) => meshes.extend(objects),
+        Err(e) => eprintln!("DSF objects unavailable: {e}"),
     }
     let first_mesh = meshes.len();
     let base: Vec<Vec<Vertex>> = aircraft.meshes.iter().map(|m| m.vertices.clone()).collect();
@@ -1072,6 +1174,35 @@ pub fn airport(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn draped_airport_triangles_follow_physical_plane_without_changing_area() {
+        let ground = openxplane::ground::Ground::new(vec![[
+            [0.0, 10.0, 0.0],
+            [200.0, 30.0, 0.0],
+            [0.0, 10.0, 200.0],
+        ]]);
+        let out = drape_triangles(
+            &[[0.0, -0.03, 0.0], [200.0, -0.03, 0.0], [0.0, -0.03, 200.0]],
+            &ground,
+        );
+        assert!(out.len() > 3);
+        let area: f32 = out
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|t| {
+                for p in t {
+                    assert!((p[1] - (10.18 + p[0] * 0.1)).abs() < 1e-4);
+                }
+                ((t[1][0] - t[0][0]) * (t[2][2] - t[0][2])
+                    - (t[1][2] - t[0][2]) * (t[2][0] - t[0][0]))
+                    .abs()
+                    * 0.5
+            })
+            .sum();
+        assert!((area - 20000.0).abs() < 0.01);
+    }
 
     #[test]
     fn loads_arbitrary_acf_objects_with_offsets_and_skips_gated_missing_files() {

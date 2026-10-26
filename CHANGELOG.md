@@ -7,6 +7,16 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Source terrain in the flight scene
+
+- Airport and flight scenes now share source DSF terrain and TER base textures,
+  without the central slab when loading succeeds. Airport surfaces, nearby objects
+  and supported facades follow physical terrain height; wheels query the same
+  source/runway/pavement surfaces. KSEA's corrected5s GPU run reaches11.8kt.
+  Draping offsets, contact forces, materials and missing-coverage fallback remain
+  approximate. [Evidence and limitations](research/LIVE_TERRAIN.md).
+  ![Cessna on KSEA source terrain](site/assets/ksea-live-terrain-20261026.jpg)
+
 ### Terrain base materials and seasonal exports
 
 - Source mesh inspection now loads installed TER base textures, explicit/projected

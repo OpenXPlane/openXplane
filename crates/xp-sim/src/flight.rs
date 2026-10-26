@@ -4,7 +4,7 @@
 //! mass data of the ACF, the airfoil lookup/stall/blending of `profile::evaluate` (verified bit for
 //! bit, research/VERIFICATION.md), the three-airfoil span weights and the finite-wing factor
 //! structure read from `0x1411b6630` (research/WING_ELEMENT.md). What is openXplane's own
-//! simplification: no wind, a flat ground at height 0, a momentum-style propeller, the control
+//! simplification: no wind, approximate vertical physical-terrain contacts (flat fallback), a momentum-style propeller, the control
 //! surface effectiveness, the fuselage drag area, published Cessna 172 inertias scaled by mass,
 //! and a synthetic stall-buffet noise table. Treat results as plausible, not as agreement with
 //! X-Plane.
@@ -147,6 +147,7 @@ pub struct FlightModel {
     pub state: State,
     pub gears: Vec<Gear>,
     pub elevation_m: f32,
+    ground: Option<std::sync::Arc<xp_scenery::ground::Ground>>,
     wings: Vec<Wing>,
     elements: Vec<ElementData>,
     geoms: Vec<WingGeom>,
@@ -518,6 +519,7 @@ impl FlightModel {
             },
             gears,
             elevation_m: 0.0,
+            ground: None,
             wings,
             elements,
             geoms,
@@ -575,6 +577,24 @@ impl FlightModel {
             time: 0.0,
         };
         self.rest = Some((self.state, self.gears.clone()));
+    }
+
+    /// Attach local physical terrain after spawn. Vertical shift at the spawn
+    /// origin preserves the preview's level resting pose; slope alignment is pending.
+    pub fn set_ground(&mut self, ground: std::sync::Arc<xp_scenery::ground::Ground>) {
+        let previous = self
+            .ground
+            .as_ref()
+            .and_then(|g| g.sample(self.state.position.x, self.state.position.z))
+            .map_or(0.0, |(y, _)| y);
+        let y = ground
+            .sample(self.state.position.x, self.state.position.z)
+            .map_or(0.0, |(y, _)| y);
+        self.state.position.y += y - previous;
+        if let Some((state, _)) = &mut self.rest {
+            state.position.y += y - previous;
+        }
+        self.ground = Some(ground);
     }
 
     /// Puts the aircraft back where `rest_on_ground` placed it, at rest.
@@ -847,7 +867,13 @@ impl FlightModel {
         for g in &mut self.gears {
             let arm = g.tip - self.cg;
             let p = st.position + st.orientation * arm;
-            let penetration = -p.y;
+            let (height, normal) = self
+                .ground
+                .as_ref()
+                .and_then(|g| g.sample(p.x, p.z))
+                .unwrap_or((0.0, [0.0, 1.0, 0.0]));
+            let ground_normal = Vec3::from_array(normal);
+            let penetration = (height - p.y) * ground_normal.y;
             if penetration <= 0.0 {
                 g.compression = 0.0;
                 g.on_ground = false;
@@ -856,7 +882,7 @@ impl FlightModel {
             let v = st.velocity + st.orientation * st.omega.cross(arm);
             g.compression = penetration;
             g.on_ground = true;
-            let normal = (g.stiffness * penetration - g.damping * v.y).max(0.0)
+            let normal = (g.stiffness * penetration - g.damping * v.dot(ground_normal)).max(0.0)
                 + if penetration > 0.35 {
                     g.stiffness * 8.0 * (penetration - 0.35)
                 } else {
@@ -865,8 +891,9 @@ impl FlightModel {
             // wheel heading: the nose direction in the ground plane, steered for the nose wheel
             let steer = -(c.rudder + c.rudder_trim).clamp(-1.0, 1.0) * g.steer_max_rad;
             let heading = st.orientation * (Quat::from_rotation_y(steer) * Vec3::NEG_Z);
-            let long_dir = Vec3::new(heading.x, 0.0, heading.z).normalize_or_zero();
-            let lat_dir = Vec3::new(-long_dir.z, 0.0, long_dir.x);
+            let long_dir =
+                (heading - ground_normal * heading.dot(ground_normal)).normalize_or_zero();
+            let lat_dir = long_dir.cross(ground_normal).normalize_or_zero();
             let (v_long, v_lat) = (v.dot(long_dir), v.dot(lat_dir));
             let rolling = 0.02;
             let brake = if g.brakes {
@@ -883,7 +910,7 @@ impl FlightModel {
                 f_long *= cap / mag;
                 f_lat *= cap / mag;
             }
-            let f_w = Vec3::Y * normal + long_dir * f_long + lat_dir * f_lat;
+            let f_w = ground_normal * normal + long_dir * f_long + lat_dir * f_lat;
             force_w += f_w;
             moment_b += arm.cross(rot_t * f_w);
         }

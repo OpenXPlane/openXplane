@@ -38,6 +38,33 @@ fn run(m: &mut FlightModel, c: &Controls, seconds: f32) {
 }
 
 #[test]
+fn physical_terrain_height_moves_contact_and_reset_together() {
+    let Some(mut m) = model() else { return };
+    let before = m.state.position.y;
+    let ground = std::sync::Arc::new(openxplane::ground::Ground::new(vec![
+        [
+            [-1000.0, 25.0, -1000.0],
+            [1000.0, 25.0, -1000.0],
+            [-1000.0, 25.0, 1000.0],
+        ],
+        [
+            [1000.0, 25.0, -1000.0],
+            [1000.0, 25.0, 1000.0],
+            [-1000.0, 25.0, 1000.0],
+        ],
+    ]));
+    m.set_ground(ground.clone());
+    m.set_ground(ground);
+    assert!((m.state.position.y - before - 25.0).abs() < 1e-4);
+    let raised = m.state.position.y;
+    run(&mut m, &Controls::default(), 5.0);
+    assert!(m.telemetry(&Controls::default()).on_ground);
+    assert!((m.state.position.y - raised).abs() < 0.05);
+    m.reset();
+    assert_eq!(m.state.position.y, raised);
+}
+
+#[test]
 fn rests_on_the_gear_without_drifting() {
     let Some(mut m) = model() else { return };
     let h0 = m.state.position.y;
