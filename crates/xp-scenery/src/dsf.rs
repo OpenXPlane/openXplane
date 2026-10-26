@@ -273,3 +273,323 @@ mod tests {
         assert!(HeightRaster::parse(&d).is_err());
     }
 }
+
+/// Placed OBJ instances from a documented DSF command subset. Other primitive
+/// commands are decoded for stream alignment but are not instantiated here.
+pub struct ObjectPlacement {
+    pub resource: String,
+    pub lon: f64,
+    pub lat: f64,
+    pub heading: f32,
+}
+
+struct Cursor<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+}
+impl<'a> Cursor<'a> {
+    fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
+        let end = self
+            .pos
+            .checked_add(n)
+            .filter(|e| *e <= self.bytes.len())
+            .ok_or("truncated DSF payload")?;
+        let out = &self.bytes[self.pos..end];
+        self.pos = end;
+        Ok(out)
+    }
+    fn u8(&mut self) -> Result<u8, String> {
+        Ok(self.take(1)?[0])
+    }
+    fn u16(&mut self) -> Result<u16, String> {
+        Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
+    }
+    fn u32(&mut self) -> Result<u32, String> {
+        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
+}
+
+pub fn object_placements(data: &[u8]) -> Result<Vec<ObjectPlacement>, String> {
+    if data.len() < 28 || &data[..8] != b"XPLNEDSF" || data[8..12] != 1u32.to_le_bytes() {
+        return Err("unsupported object DSF header".into());
+    }
+    let mut definitions = Vec::new();
+    let mut pools = Vec::new();
+    let mut scales = Vec::new();
+    let mut commands = None;
+    for (tag, body) in atoms(&data[12..data.len() - 16])? {
+        match &tag {
+            b"NFED" => {
+                for (t, b) in atoms(body)? {
+                    if t == *b"TJBO" {
+                        definitions = strings(b)?;
+                    }
+                }
+            }
+            b"DOEG" => {
+                for (t, b) in atoms(body)? {
+                    if t == *b"LOOP" {
+                        pools.push(decode_pool(b)?);
+                    }
+                    if t == *b"LACS" {
+                        scales.push(b);
+                    }
+                }
+            }
+            b"SDMC" => commands = Some(body),
+            _ => {}
+        }
+    }
+    if pools.len() != scales.len() {
+        return Err("DSF pool/scale mismatch".into());
+    }
+    let point = |pool: usize, index: usize| -> Result<Vec<f64>, String> {
+        let planes = pools.get(pool).ok_or("pool index out of range")?;
+        let scale = scales[pool];
+        if scale.len() != planes.len() * 8 {
+            return Err("invalid DSF scaling atom".into());
+        }
+        planes
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let raw = *p.get(index).ok_or("point index out of range")? as f64;
+                let mult = f32::from_le_bytes(scale[i * 8..i * 8 + 4].try_into().unwrap()) as f64;
+                let offset =
+                    f32::from_le_bytes(scale[i * 8 + 4..i * 8 + 8].try_into().unwrap()) as f64;
+                Ok(if mult == 0.0 {
+                    raw
+                } else {
+                    raw * mult / 65535.0 + offset
+                })
+            })
+            .collect()
+    };
+    let mut c = Cursor {
+        bytes: commands.ok_or("missing DSF commands")?,
+        pos: 0,
+    };
+    let mut pool = None;
+    let mut definition = None;
+    let mut out = Vec::new();
+    while c.pos < c.bytes.len() {
+        let at = c.pos;
+        let op = c.u8()?;
+        match op {
+            1 => pool = Some(c.u16()? as usize),
+            2 | 5 => {
+                let v = c.u32()?;
+                if op == 5 {
+                    definition = Some(v as usize);
+                }
+            }
+            3 => definition = Some(c.u8()? as usize),
+            4 => definition = Some(c.u16()? as usize),
+            6 => {
+                c.take(1)?;
+            }
+            7 | 8 => {
+                let first = c.u16()? as usize;
+                let end = if op == 7 {
+                    first + 1
+                } else {
+                    c.u16()? as usize
+                };
+                if end < first {
+                    return Err("reversed object range".into());
+                }
+                let name = definitions
+                    .get(definition.ok_or("missing object definition")?)
+                    .ok_or("object definition out of range")?;
+                for i in first..end {
+                    let p = point(pool.ok_or("missing object pool")?, i)?;
+                    if p.len() < 3 {
+                        return Err("object pool needs three planes".into());
+                    }
+                    out.push(ObjectPlacement {
+                        resource: name.clone(),
+                        lon: p[0],
+                        lat: p[1],
+                        heading: p[2] as f32,
+                    });
+                }
+            }
+            9 | 11 => {
+                let n = c.u8()? as usize;
+                c.take(n * if op == 9 { 2 } else { 4 })?;
+            }
+            10 => {
+                c.take(4)?;
+            }
+            12 => {
+                c.take(2)?;
+                let n = c.u8()? as usize;
+                c.take(n * 2)?;
+            }
+            13 => {
+                c.take(6)?;
+            }
+            14 => {
+                c.take(2)?;
+                let n = c.u8()?;
+                for _ in 0..n {
+                    let m = c.u8()? as usize;
+                    c.take(m * 2)?;
+                }
+            }
+            15 => {
+                c.take(2)?;
+                let n = c.u8()? as usize;
+                c.take((n + 1) * 2)?;
+            }
+            16 => {}
+            17 => {
+                c.take(1)?;
+            }
+            18 => {
+                c.take(9)?;
+            }
+            23 | 26 | 29 => {
+                let n = c.u8()? as usize;
+                c.take(n * 2)?;
+            }
+            24 | 27 | 30 => {
+                let n = c.u8()? as usize;
+                c.take(n * 4)?;
+            }
+            25 | 28 | 31 => {
+                c.take(4)?;
+            }
+            32..=34 => {
+                let n = match op {
+                    32 => c.u8()? as usize,
+                    33 => c.u16()? as usize,
+                    _ => c.u32()? as usize,
+                };
+                c.take(n)?;
+            }
+            _ => return Err(format!("unsupported DSF command {op} at {at}")),
+        }
+    }
+    Ok(out)
+}
+
+fn decode_pool(data: &[u8]) -> Result<Vec<Vec<u16>>, String> {
+    let mut c = Cursor {
+        bytes: data,
+        pos: 0,
+    };
+    let count = c.u32()? as usize;
+    let dimensions = c.u8()? as usize;
+    if count > 2_000_000 || dimensions > 32 {
+        return Err("DSF pool exceeds bounds".into());
+    }
+    let mut planes = Vec::new();
+    for _ in 0..dimensions {
+        let encoding = c.u8()?;
+        if encoding > 3 {
+            return Err("unsupported pool encoding".into());
+        }
+        let mut values = Vec::with_capacity(count);
+        while values.len() < count {
+            let run = if encoding >= 2 { c.u8()? } else { 1 };
+            let n = (run & 127) as usize;
+            if n == 0 || values.len() + n > count {
+                return Err("invalid DSF pool run".into());
+            }
+            if run & 128 != 0 {
+                let v = c.u16()?;
+                values.extend(std::iter::repeat_n(v, n));
+            } else {
+                for _ in 0..n {
+                    values.push(c.u16()?);
+                }
+            }
+        }
+        if encoding & 1 != 0 {
+            let mut prior = 0u16;
+            for v in &mut values {
+                *v = v.wrapping_add(prior);
+                prior = *v;
+            }
+        }
+        planes.push(values);
+    }
+    if c.pos != data.len() {
+        return Err("trailing DSF pool bytes".into());
+    }
+    Ok(planes)
+}
+
+#[cfg(test)]
+mod object_tests {
+    use super::*;
+    fn atom(tag: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        [
+            tag.as_slice(),
+            &((body.len() + 8) as u32).to_le_bytes(),
+            body,
+        ]
+        .concat()
+    }
+    #[test]
+    fn decodes_raw_delta_and_rle_pool_planes() {
+        for encoding in 0..4u8 {
+            let mut raw = 3u32.to_le_bytes().to_vec();
+            raw.push(1);
+            raw.push(encoding);
+            if encoding >= 2 {
+                raw.push(3);
+            }
+            let values = if encoding & 1 != 0 {
+                [4u16, 1, 2]
+            } else {
+                [4u16, 5, 7]
+            };
+            for v in values {
+                raw.extend(v.to_le_bytes());
+            }
+            assert_eq!(decode_pool(&raw).unwrap(), vec![vec![4, 5, 7]]);
+        }
+        let mut raw = 3u32.to_le_bytes().to_vec();
+        raw.extend([1, 2, 131]);
+        raw.extend(9u16.to_le_bytes());
+        assert_eq!(decode_pool(&raw).unwrap(), vec![vec![9, 9, 9]]);
+        raw[6] = 0;
+        assert!(decode_pool(&raw).is_err());
+    }
+    #[test]
+    fn object_range_uses_pool_scale_and_definition() {
+        let mut pool = 2u32.to_le_bytes().to_vec();
+        pool.push(3);
+        for values in [[0u16, 65535], [0, 65535], [0, 32767]] {
+            pool.push(0);
+            for v in values {
+                pool.extend(v.to_le_bytes());
+            }
+        }
+        let scale = [1f32, -123.0, 1.0, 47.0, 360.0, 0.0]
+            .into_iter()
+            .flat_map(f32::to_le_bytes)
+            .collect::<Vec<_>>();
+        let mut data = b"XPLNEDSF".to_vec();
+        data.extend(1u32.to_le_bytes());
+        data.extend(atom(b"NFED", &atom(b"TJBO", b"test.obj\0")));
+        data.extend(atom(
+            b"DOEG",
+            &[atom(b"LOOP", &pool), atom(b"LACS", &scale)].concat(),
+        ));
+        data.extend(atom(
+            b"SDMC",
+            &[1, 0, 0, 3, 0, 15, 0, 0, 1, 0, 0, 2, 0, 8, 0, 0, 2, 0],
+        ));
+        data.extend([0; 16]);
+        let objects = object_placements(&data).unwrap();
+        assert_eq!(objects.len(), 2);
+        assert_eq!(objects[0].resource, "test.obj");
+        assert_eq!(objects[0].lon, -123.0);
+        assert_eq!(objects[1].lat, 48.0);
+        data.truncate(data.len() - 17);
+        assert!(object_placements(&data).is_err());
+    }
+}

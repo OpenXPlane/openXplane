@@ -313,6 +313,104 @@ impl AircraftBody {
     }
 }
 
+fn airport_objects(
+    install: &openxplane::install::Install,
+    frame: &openxplane::world::Frame,
+) -> Result<Vec<Mesh>, String> {
+    let origin = frame.origin();
+    let lat = origin[0].floor() as i32;
+    let lon = origin[1].floor() as i32;
+    let relative = format!(
+        "Earth nav data/{:+03}{:+04}/{lat:+03}{lon:+04}.dsf",
+        lat.div_euclid(10) * 10,
+        lon.div_euclid(10) * 10
+    );
+    let pack = install.global_airports_dir();
+    let path = pack.join(relative);
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+    let placements =
+        openxplane::dsf::object_placements(&fs::read(&path).map_err(|e| e.to_string())?)?;
+    let library = install.preview_library()?;
+    let mut grouped = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
+    let mut unresolved = 0;
+    for p in &placements {
+        let [x, z] = frame.to_local(p.lat, p.lon);
+        if x.abs() > 6000.0 || z.abs() > 6000.0 {
+            continue;
+        }
+        let direct = pack.join(&p.resource);
+        let resource = if direct.is_file() {
+            Some(direct)
+        } else {
+            library.get(&p.resource).cloned()
+        };
+        if let Some(resource) = resource {
+            grouped
+                .entry(resource)
+                .or_default()
+                .push((Vec3::new(x, 0.0, z), p.heading));
+        } else {
+            unresolved += 1;
+        }
+    }
+    let mut meshes = Vec::new();
+    let mut instances = 0;
+    let mut failed = 0;
+    for (path, poses) in grouped {
+        let loaded = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
+            let object = Object::parse(&fs::read_to_string(&path)?)?;
+            let base = object.baked_vertices();
+            let texture = if let Some(name) = &object.texture {
+                let texture = texture_path(&path, name).ok_or("missing scenery texture")?;
+                image::imageops::flip_vertical(&image::open(texture)?.to_rgba8())
+            } else {
+                solid_texture([255; 4])
+            };
+            let mut vertices = Vec::new();
+            let mut low = Vec3::splat(f32::INFINITY);
+            let mut high = Vec3::splat(f32::NEG_INFINITY);
+            for (position, heading) in &poses {
+                let rotation = glam::Mat3::from_rotation_y(-heading.to_radians());
+                for b in &base {
+                    let mut v = *b;
+                    let p = rotation * Vec3::from_array(b.position) + *position;
+                    v.position = p.to_array();
+                    v.normal = (rotation * Vec3::from_array(b.normal)).to_array();
+                    low = low.min(p);
+                    high = high.max(p);
+                    vertices.push(v);
+                }
+            }
+            Ok(Mesh {
+                vertices,
+                texture,
+                glass: object.glass,
+                center: (low + high) * 0.5,
+                animation: None,
+            })
+        })();
+        match loaded {
+            Ok(mesh) if !mesh.vertices.is_empty() => {
+                instances += poses.len();
+                meshes.push(mesh);
+            }
+            Ok(_) => {}
+            Err(e) => {
+                failed += 1;
+                eprintln!("Scenery object skipped {}: {e}", path.display());
+            }
+        }
+    }
+    println!(
+        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {unresolved} unresolved placements; {failed} failed resources. Preview libraries/flat placement; no facade/network support.",
+        placements.len(),
+        meshes.len()
+    );
+    Ok(meshes)
+}
+
 /// A raster-based terrain preview. The original DSF triangle topology, terrain
 /// textures and physical ground are not substituted by this visual approximation.
 fn xp_scenery_raster(
@@ -435,6 +533,10 @@ pub fn airport_flight(
             }
             Err(error) => eprintln!("DSF terrain unavailable: {}: {error}", path.display()),
         }
+    }
+    match airport_objects(&install, &frame) {
+        Ok(objects) => meshes.extend(objects),
+        Err(e) => eprintln!("DSF objects unavailable: {e}"),
     }
     for layer in layers {
         let vertices = layer

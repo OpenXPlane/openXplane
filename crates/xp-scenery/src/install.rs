@@ -20,6 +20,50 @@ pub struct Install {
 }
 
 impl Install {
+    /// Preview library index: first matching export wins. Region/season/random
+    /// selection and EXPORT_BACKUP/EXTEND semantics are not yet reproduced.
+    pub fn preview_library(&self) -> Result<std::collections::BTreeMap<String, PathBuf>, String> {
+        let mut packs = self.scenery_packs()?;
+        let defaults = self.root.join("Resources/default scenery");
+        if let Ok(entries) = fs::read_dir(defaults) {
+            let mut paths = entries
+                .filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| p.is_dir())
+                .collect::<Vec<_>>();
+            paths.sort();
+            packs.extend(paths);
+        }
+        let mut index = std::collections::BTreeMap::new();
+        for pack in packs {
+            let Ok(text) = fs::read_to_string(pack.join("library.txt")) else {
+                continue;
+            };
+            for line in text.lines() {
+                let mut fields = line.split_whitespace();
+                let Some(command) = fields.next() else {
+                    continue;
+                };
+                if !["EXPORT", "EXPORT_EXCLUDE", "EXPORT_BACKUP", "EXPORT_EXTEND"]
+                    .contains(&command)
+                {
+                    continue;
+                }
+                let Some(virtual_path) = fields.next() else {
+                    continue;
+                };
+                let path = fields.collect::<Vec<_>>().join(" ");
+                if !path.is_empty() {
+                    let target = pack.join(path.replace('\\', "/"));
+                    if target.is_file() {
+                        index.entry(virtual_path.into()).or_insert(target);
+                    }
+                }
+            }
+        }
+        Ok(index)
+    }
+
     /// Available global base-mesh tiles, in deterministic package order.
     pub fn terrain_tile(&self, lat: f64, lon: f64) -> Option<PathBuf> {
         let lat = lat.floor() as i32;
@@ -211,6 +255,37 @@ mod tests {
 
     fn apt(id: &str, name: &str) -> String {
         format!("I\n1200 test\n\n1 0 0 0 {id} {name}\n99\n")
+    }
+
+    #[test]
+    fn preview_library_resolves_spaces_and_pack_priority() {
+        let root = temp_root();
+        write(
+            &root.join("Custom Scenery/scenery_packs.ini"),
+            "SCENERY_PACK Custom Scenery/Test/\n",
+        );
+        write(
+            &root.join("Custom Scenery/Test/library.txt"),
+            "A\n800\nLIBRARY\nEXPORT lib/test.obj objects/model with spaces.obj\n",
+        );
+        write(
+            &root.join("Custom Scenery/Test/objects/model with spaces.obj"),
+            "test",
+        );
+        write(
+            &root.join("Resources/default scenery/Test/library.txt"),
+            "EXPORT lib/test.obj fallback.obj\n",
+        );
+        write(
+            &root.join("Resources/default scenery/Test/fallback.obj"),
+            "test",
+        );
+        let index = Install::open(&root).unwrap().preview_library().unwrap();
+        assert_eq!(
+            index["lib/test.obj"],
+            root.join("Custom Scenery/Test/objects/model with spaces.obj")
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

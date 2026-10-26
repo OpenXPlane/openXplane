@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Installed airport objects
+
+- Airport scenes now instantiate nearby OBJ8 placements from the original
+  Global Airports DSF and resolve installed library resources. The KSEA preview
+  renders 2370 instances; AGP, facades, custom overlays, correct terrain placement
+  and complete materials remain unfinished. This is not verified visual parity
+  or complete mod compatibility. [Evidence and limits](research/DSF_OBJECTS.md).
+  ![KSEA DSF object preview](site/assets/ksea-dsf-objects-20261026.png)
+
 ### Main website and documentation
 
 - Added a separate presentation homepage with aircraft imagery, project overview,
