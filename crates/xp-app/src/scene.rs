@@ -9,8 +9,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub struct BorderMaterial {
+    pub texture: image::RgbaImage,
+    pub uv: Vec<[f32; 2]>,
+    pub repeat: bool,
+    pub composite: bool,
+    pub no_alpha: bool,
+}
+
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
+    pub border: Option<BorderMaterial>,
     pub texture: image::RgbaImage,
     /// World translation and Y-axis angle in radians; identity for baked geometry.
     pub instances: Vec<[f32; 4]>,
@@ -89,7 +98,19 @@ fn terrain_scene(
                 "TER {name}: projected={:?}, unsupported={:?}",
                 material.projected, material.unsupported
             );
-            Ok((material, texture))
+            let border = material
+                .border
+                .as_ref()
+                .and_then(|name| texture_path(resource, name))
+                .and_then(|path| image::open(path).ok())
+                .map(|image| image::imageops::flip_vertical(&image.to_rgba8()));
+            if material.border.is_some() && border.is_none() {
+                eprintln!(
+                    "TER border unavailable {name}: {:?}; preview retains unmasked base",
+                    material.border
+                );
+            }
+            Ok((material, texture, border))
         })();
         match parsed {
             Ok(m) => {
@@ -101,7 +122,9 @@ fn terrain_scene(
             }
         }
     }
-    let mut grouped = BTreeMap::<String, Vec<Vertex>>::new();
+    let mut grouped = BTreeMap::<(bool, String), Vec<Vertex>>::new();
+    let mut border_failures = std::collections::BTreeSet::new();
+    let mut border_uvs = BTreeMap::<(bool, String), Vec<[f32; 2]>>::new();
     let mut uv_failures = BTreeMap::<String, String>::new();
     let mut ground_triangles = Vec::new();
     let mut physical = 0;
@@ -139,16 +162,39 @@ fn terrain_scene(
                     p[4] as f32,
                 )
             };
+            let border_uv = materials
+                .get(&triangle.resource)
+                .and_then(Option::as_ref)
+                .and_then(|(m, _, _)| match m.border_uv(p) {
+                    Ok(uv) => Some(uv),
+                    Err(_) => {
+                        if triangle.flags & 2 != 0 && m.border.is_some() {
+                            border_failures.insert(triangle.resource.clone());
+                        }
+                        None
+                    }
+                })
+                .unwrap_or([1.0, 0.0]);
+            border_uvs
+                .entry((triangle.flags & 2 != 0, triangle.resource.clone()))
+                .or_default()
+                .push(border_uv);
             grouped
-                .entry(triangle.resource.clone())
+                .entry((triangle.flags & 2 != 0, triangle.resource.clone()))
                 .or_default()
                 .push(Vertex {
-                    position: position.to_array(),
+                    position: (position
+                        + if triangle.flags & 2 != 0 {
+                            Vec3::Y * 0.005
+                        } else {
+                            Vec3::ZERO
+                        })
+                    .to_array(),
                     normal: normal.to_array(),
                     uv: materials
                         .get(&triangle.resource)
                         .and_then(Option::as_ref)
-                        .and_then(|(m, _)| match m.uv([position.x, position.z], p) {
+                        .and_then(|(m, _, _)| match m.uv([position.x, position.z], p) {
                             Ok(uv) => Some(uv),
                             Err(e) => {
                                 uv_failures.insert(triangle.resource.clone(), e);
@@ -163,15 +209,33 @@ fn terrain_scene(
         "DSF source mesh {}: {} intersecting triangles, {physical} physical, {overlay} overlay, {} terrain definitions; source topology with elevation raster, base-material preview, all LODs, no collision integration",
         path.display(),
         features.terrain.len(),
-        grouped.len()
+        grouped
+            .keys()
+            .map(|(_, name)| name)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
     );
     let mut textured = 0;
+    let mut masked = 0;
     let meshes = grouped
         .into_iter()
-        .map(|(name, vertices)| {
+        .map(|((overlay, name), vertices)| {
+            let mut border = None;
+            let mut glass = false;
             let (texture, repeat_texture) =
-                if let Some(Some((material, mut texture))) = materials.remove(&name) {
-                    if material.no_alpha {
+                if let Some(Some((material, base, mask))) = materials.get(&name) {
+                    let mut texture = base.clone();
+                    if overlay && let Some(mask) = mask {
+                        masked += 1;
+                        border = Some(BorderMaterial {
+                            texture: mask.clone(),
+                            uv: border_uvs.remove(&(overlay, name.clone())).unwrap(),
+                            repeat: material.border_repeat,
+                            composite: material.composite_borders,
+                            no_alpha: material.no_alpha,
+                        });
+                        glass = !material.composite_borders;
+                    } else if material.no_alpha {
                         for pixel in texture.pixels_mut() {
                             pixel.0[3] = 255;
                         }
@@ -192,15 +256,16 @@ fn terrain_scene(
                 vertices,
                 texture,
                 repeat_texture,
-                glass: false,
+                glass,
                 center: Vec3::ZERO,
                 instances: vec![[0.0; 4]],
+                border,
                 animation: None,
             }
         })
         .collect();
     println!(
-        "TER base preview: {textured} textured resource batches; no border/composite/water shaders, explicit library season only, local projection phase, all LODs; unsupported UV cases use a constant sample: {uv_failures:?}"
+        "TER preview: {textured} textured batches, {masked} masked overlay batches; grayscale borders, original masks/coords with approximate depth ordering; missing border coordinates: {border_failures:?}; no composite color/normal/decal/water shaders; UV failures: {uv_failures:?}"
     );
     Ok((
         Scene {
@@ -265,6 +330,7 @@ pub fn facade_segment(
                 repeat_texture: false,
                 glass: false,
                 center: Vec3::ZERO,
+                border: None,
                 animation: None,
             });
         }
@@ -492,6 +558,7 @@ fn load_aircraft(aircraft_path: &Path, animate: bool) -> Result<Scene, Box<dyn s
             glass: object.glass || flags & 2 != 0,
             center: (mesh_low + mesh_high) * 0.5,
             instances: vec![[0.0; 4]],
+            border: None,
             animation: animate.then_some(AnimatedObject {
                 object,
                 rotation,
@@ -723,6 +790,7 @@ fn airport_objects(
                 glass: object.glass,
                 center: (low + high) * 0.5,
                 instances,
+                border: None,
                 animation: None,
             })
         })();
@@ -841,6 +909,7 @@ fn airport_polygons(
                 glass: !material.no_alpha,
                 repeat_texture: material.repeat,
                 center: Vec3::ZERO,
+                border: None,
                 animation: None,
             })
         })();
@@ -996,6 +1065,7 @@ fn airport_facades(
                 repeat_texture: false,
                 glass: false,
                 center: Vec3::ZERO,
+                border: None,
                 animation: None,
             };
             let mut batches = vec![walls];
@@ -1007,6 +1077,7 @@ fn airport_facades(
                     repeat_texture: true,
                     glass: false,
                     center: Vec3::ZERO,
+                    border: None,
                     animation: None,
                 });
             }
@@ -1080,6 +1151,7 @@ fn xp_scenery_raster(
         glass: false,
         center: Vec3::ZERO,
         instances: vec![[0.0; 4]],
+        border: None,
         animation: None,
     })
 }
@@ -1236,6 +1308,7 @@ pub fn airport_flight(
             glass: false,
             center: (low + high) * 0.5,
             instances: vec![[0.0; 4]],
+            border: None,
             animation: None,
         });
     }

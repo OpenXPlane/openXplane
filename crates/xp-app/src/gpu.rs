@@ -44,6 +44,8 @@ impl Camera {
 }
 
 struct GpuMesh {
+    border_uv: wgpu::Buffer,
+    border_group: wgpu::BindGroup,
     vertex: wgpu::Buffer,
     instances: wgpu::Buffer,
     instance_count: u32,
@@ -141,9 +143,44 @@ impl Renderer {
                 },
             ],
         });
+        let border_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("terrain border"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("scene"),
-            bind_group_layouts: &[Some(&camera_layout), Some(&texture_layout)],
+            bind_group_layouts: &[
+                Some(&camera_layout),
+                Some(&texture_layout),
+                Some(&border_layout),
+            ],
             immediate_size: 0,
         });
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -152,6 +189,7 @@ impl Renderer {
         });
         let attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2];
         let instance_attributes = wgpu::vertex_attr_array![3 => Float32x4];
+        let border_attributes = wgpu::vertex_attr_array![4=>Float32x2];
         let pipeline = |glass| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(if glass { "glass" } else { "opaque" }),
@@ -170,6 +208,11 @@ impl Renderer {
                             array_stride: 16,
                             step_mode: wgpu::VertexStepMode::Instance,
                             attributes: &instance_attributes,
+                        },
+                        wgpu::VertexBufferLayout {
+                            array_stride: 8,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &border_attributes,
                         },
                     ],
                 },
@@ -368,6 +411,88 @@ impl Renderer {
         });
         let mut generated_levels = 0;
         for mesh in &scene.meshes {
+            if mesh
+                .border
+                .as_ref()
+                .is_some_and(|b| b.uv.len() != mesh.vertices.len())
+            {
+                return Err("border UV/vertex count mismatch".into());
+            }
+            let default_uv = vec![[0.0f32; 2]; mesh.vertices.len()];
+            let border_uv = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("terrain border ST"),
+                contents: bytemuck::cast_slice(
+                    mesh.border
+                        .as_ref()
+                        .map_or(default_uv.as_slice(), |b| b.uv.as_slice()),
+                ),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+            let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
+            let border_image = mesh.border.as_ref().map_or(&white, |b| &b.texture);
+            let border_size = wgpu::Extent3d {
+                width: border_image.width(),
+                height: border_image.height(),
+                depth_or_array_layers: 1,
+            };
+            let border_texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("linear grayscale border mask"),
+                size: border_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &border_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                border_image.as_raw(),
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(border_size.width * 4),
+                    rows_per_image: Some(border_size.height),
+                },
+                border_size,
+            );
+            let border_view = border_texture.create_view(&Default::default());
+            let flags = mesh.border.as_ref().map_or([0u32; 4], |b| {
+                [if b.composite { 2 } else { 1 }, u32::from(b.no_alpha), 0, 0]
+            });
+            let flags_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("border mode"),
+                contents: bytemuck::cast_slice(&flags),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+            let border_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("terrain border"),
+                layout: &border_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&border_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(
+                            if mesh.border.as_ref().is_some_and(|b| b.repeat) {
+                                &repeating_sampler
+                            } else {
+                                &sampler
+                            },
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: flags_buffer.as_entire_binding(),
+                    },
+                ],
+            });
             let vertex_bytes = std::mem::size_of_val(mesh.vertices.as_slice()) as u64;
             let instance_bytes = std::mem::size_of_val(mesh.instances.as_slice()) as u64;
             if vertex_bytes > device.limits().max_buffer_size
@@ -488,6 +613,8 @@ impl Renderer {
                 ],
             });
             meshes.push(GpuMesh {
+                border_uv,
+                border_group,
                 vertex,
                 instances,
                 instance_count: mesh.instances.len().try_into()?,
@@ -644,8 +771,10 @@ impl Renderer {
                 &self.opaque
             });
             pass.set_bind_group(1, &mesh.material, &[]);
+            pass.set_bind_group(2, &mesh.border_group, &[]);
             pass.set_vertex_buffer(0, mesh.vertex.slice(..));
             pass.set_vertex_buffer(1, mesh.instances.slice(..));
+            pass.set_vertex_buffer(2, mesh.border_uv.slice(..));
             pass.draw(0..mesh.count, 0..mesh.instance_count);
         }
         if self.hud_count > 0 {

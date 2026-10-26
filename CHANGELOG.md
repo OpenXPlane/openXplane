@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Terrain border masks
+
+- Source terrain now applies grayscale BORDER_TEX masks using DSF border ST,
+  including COMPOSITE_BORDERS discard before NO_ALPHA. KSEA uses67 masked overlay
+  groups. Color compositing, original depth/material rules and paired visual
+  validation remain unfinished. [Evidence and limits](research/TERRAIN_BORDERS.md).
+  ![KSEA TER border masks](site/assets/ksea-ter-borders-20261026.jpg)
+
 ### Texture minification
 
 - Scene textures now receive GPU-generated mip chains and trilinear minification,

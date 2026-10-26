@@ -5,6 +5,9 @@ pub struct Material {
     pub base: String,
     pub repeat: bool,
     pub no_alpha: bool,
+    pub border: Option<String>,
+    pub border_repeat: bool,
+    pub composite_borders: bool,
     pub projected: Option<[f32; 2]>,
     pub offset: [f32; 2],
     pub angle: [f32; 4],
@@ -29,6 +32,9 @@ impl Material {
             base: String::new(),
             repeat: true,
             no_alpha: false,
+            border: None,
+            border_repeat: false,
+            composite_borders: false,
             projected: None,
             offset: [0.0; 2],
             angle: [0.0, 1.0, 0.0, 0.0],
@@ -55,6 +61,15 @@ impl Material {
                     out.repeat = command == "BASE_TEX";
                 }
                 "NO_ALPHA" => out.no_alpha = true,
+                "BORDER_TEX" | "BORDER_TEX_WRAP" => {
+                    let name = values.join(" ").replace(['\\', ':'], "/");
+                    if name.is_empty() {
+                        return Err("empty TER border path".into());
+                    }
+                    out.border = Some(name);
+                    out.border_repeat = command == "BORDER_TEX_WRAP";
+                }
+                "COMPOSITE_BORDERS" => out.composite_borders = true,
                 "PROJECTED" => {
                     let s = [number(0)?, number(1)?];
                     if s.iter().any(|v| *v <= 0.0) {
@@ -95,6 +110,16 @@ impl Material {
             Ok([s as f32, t as f32])
         }
     }
+
+    pub fn border_uv(&self, point: &[f64]) -> Result<[f32; 2], String> {
+        let index = if self.projected.is_some() { 5 } else { 7 };
+        let s = *point.get(index).ok_or("missing TER border S")? as f32;
+        let t = *point.get(index + 1).ok_or("missing TER border T")? as f32;
+        if !s.is_finite() || !t.is_finite() {
+            return Err("invalid TER border ST".into());
+        }
+        Ok([s, t])
+    }
 }
 
 #[cfg(test)]
@@ -106,7 +131,12 @@ mod tests {
         assert_eq!(m.base, "textures/base.png");
         assert!(!m.repeat);
         assert!(m.no_alpha);
-        assert!(m.unsupported.contains("BORDER_TEX"));
+        assert_eq!(m.border.as_deref(), Some("ignored.png"));
+        assert_eq!(
+            m.border_uv(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.2, 0.3, 0.4])
+                .unwrap(),
+            [0.3, 0.4]
+        );
         assert_eq!(
             m.uv([9.0, 9.0], &[0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.75])
                 .unwrap(),
@@ -115,6 +145,17 @@ mod tests {
         assert!(m.uv([0.0; 2], &[0.0; 5]).is_err());
         let text = "A\n800\nTERRAIN\nBASE_TEX base.png\nPROJECTED 100 200\nPROJECT_OFFSET 10 20\n";
         let m = Material::parse(text).unwrap();
+        assert_eq!(
+            m.border_uv(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.75]).unwrap(),
+            [0.25, 0.75]
+        );
+        assert!(m.border_uv(&[0.0; 5]).is_err());
+        let border =
+            Material::parse(&(text.to_owned() + "BORDER_TEX_WRAP border.png\nCOMPOSITE_BORDERS\n"))
+                .unwrap();
+        assert!(border.border_repeat && border.composite_borders);
+        assert_eq!(border.border.as_deref(), Some("border.png"));
+        assert!(Material::parse(&(text.to_owned() + "BORDER_TEX\n")).is_err());
         assert_eq!(m.uv([110.0, -220.0], &[]).unwrap(), [1.0, 1.0]);
         assert!(Material::parse(&text.replace("100 200", "0 200")).is_err());
         assert!(Material::parse(&text.replace("10 20", "NaN 20")).is_err());
