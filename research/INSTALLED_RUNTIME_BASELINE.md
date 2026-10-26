@@ -48,3 +48,7 @@ new original screenshot was obtained. Restoring window capture and obtaining
 matching original/port captures remain open work under [the goal](../docs/GOAL.md).
 Original content was read in place; no original source assets were copied into
 the repository. Logs and full installation inventories remain ignored/local.
+
+Follow-up: [the reference FPS investigation](REFERENCE_FPS_CAPTURE.md) now
+confirms actual reference execution and clean completion. Automatic image
+capture remains unresolved; no paired original frame has been obtained.

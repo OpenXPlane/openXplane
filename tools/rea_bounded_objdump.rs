@@ -14,8 +14,9 @@ fn main() -> ExitCode {
         "mode" => ("0x1414cedd0", "0x1414cef70"),
         "header" => ("0x1411222e0", "0x14112240c"),
         "singleton" => ("0x1414cc7f0", "0x1414cc814"),
+        "fps-pics" => ("0x140e6d3c1", "0x140e6d44b"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics");
             return ExitCode::from(2);
         }
     };
