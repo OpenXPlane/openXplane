@@ -50,6 +50,8 @@ weighted rubric, not a measurement of whole-game equivalence. See the
 
 ## Documentation
 
+[Project website](https://openxplane.github.io/openXplane/) · [Documentation site](https://openxplane.github.io/openXplane/docs/)
+
 - [User guide](docs/USER_GUIDE.md), [keyboard controls](docs/KEYBOARD.md) and [FAQ](docs/FAQ.md)
 - [Building](docs/BUILDING.md), [contributing](CONTRIBUTING.md) and [releasing](docs/RELEASING.md)
 - [Architecture](docs/ARCHITECTURE.md), [implementation plan](docs/PLAN.md) and [compatibility](docs/COMPATIBILITY.md)

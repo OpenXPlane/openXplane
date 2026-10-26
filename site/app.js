@@ -47,7 +47,7 @@ let compat = null;
 async function loadCompat() {
   if (compat) return compat;
   try {
-    const res = await fetch("docs/compat.json");
+    const res = await fetch("compat.json");
     if (!res.ok) throw new Error(res.status);
     compat = await res.json();
   } catch {
@@ -62,28 +62,28 @@ function totals(c) {
 
 const GALLERY = {
   anims: [
-    ["assets/anim/takeoff.gif", "Takeoff from Seattle-Tacoma", "The Cessna 172 accelerates down runway 16L and climbs out; chase camera, approximate flight model."],
-    ["assets/anim/orbit.gif", "Orbiting the Cessna 172 SP", "The OBJ8 exterior with textures, lighting and glass, drawn by wgpu."],
+    ["../assets/anim/takeoff.gif", "Takeoff from Seattle-Tacoma", "The Cessna 172 accelerates down runway 16L and climbs out; chase camera, approximate flight model."],
+    ["../assets/anim/orbit.gif", "Orbiting the Cessna 172 SP", "The OBJ8 exterior with textures, lighting and glass, drawn by wgpu."],
   ],
   airports: [
-    ["assets/gallery/airport-KSEA.jpg", "Seattle-Tacoma (KSEA)", "Runways, taxiways and aprons with holes, from apt.dat."],
-    ["assets/gallery/airport-KSFO.jpg", "San Francisco (KSFO)", "Four runways in apt.dat."],
-    ["assets/gallery/airport-KJFK.jpg", "New York JFK (KJFK)", "Runways with concrete surface codes."],
-    ["assets/gallery/airport-EGLL.jpg", "London Heathrow (EGLL)", "Two parallel runways."],
-    ["assets/gallery/airport-RJTT.jpg", "Tokyo Haneda (RJTT)", "Four runways, two of them crossing."],
-    ["assets/gallery/airport-LSZH.jpg", "Zurich (LSZH)", "Three runways in apt.dat."],
-    ["assets/gallery/airport-YSSY.jpg", "Sydney (YSSY)", "Three runways in apt.dat."],
+    ["../assets/gallery/airport-KSEA.jpg", "Seattle-Tacoma (KSEA)", "Runways, taxiways and aprons with holes, from apt.dat."],
+    ["../assets/gallery/airport-KSFO.jpg", "San Francisco (KSFO)", "Four runways in apt.dat."],
+    ["../assets/gallery/airport-KJFK.jpg", "New York JFK (KJFK)", "Runways with concrete surface codes."],
+    ["../assets/gallery/airport-EGLL.jpg", "London Heathrow (EGLL)", "Two parallel runways."],
+    ["../assets/gallery/airport-RJTT.jpg", "Tokyo Haneda (RJTT)", "Four runways, two of them crossing."],
+    ["../assets/gallery/airport-LSZH.jpg", "Zurich (LSZH)", "Three runways in apt.dat."],
+    ["../assets/gallery/airport-YSSY.jpg", "Sydney (YSSY)", "Three runways in apt.dat."],
   ],
   aircraft: [
-    ["assets/gallery/exterior-standard.jpg", "Cessna 172 SP", "The standard variant: fuselage, gear, propeller, wings, seats and glass."],
-    ["assets/gallery/exterior-seaplane.jpg", "Cessna 172 SP seaplane", "The floats variant loads and flies in the model as well."],
+    ["../assets/gallery/exterior-standard.jpg", "Cessna 172 SP", "The standard variant: fuselage, gear, propeller, wings, seats and glass."],
+    ["../assets/gallery/exterior-seaplane.jpg", "Cessna 172 SP seaplane", "The floats variant loads and flies in the model as well."],
   ],
   flight: [
-    ["assets/gallery/ui-frame-rate.jpg", "Data-output lines", "Lines 0, 3, 4, 17, 18 and 21 of the reference build's data-output table: labels from its code, layout, colour and the frame-rate sample values from a photograph, the rest from the approximate flight model."],
-    ["assets/gallery/flight-000.00s.jpg", "On the runway", "Standing on the gear at the start of runway 16L."],
-    ["assets/gallery/flight-017.00s.jpg", "Takeoff roll", "About 17 seconds in, the nose rotating."],
-    ["assets/gallery/flight-024.00s.jpg", "Liftoff", "The wheels leave the runway."],
-    ["assets/gallery/flight-040.00s.jpg", "Climb-out", "Climbing over the airport at about 90 knots."],
+    ["../assets/gallery/ui-frame-rate.jpg", "Data-output lines", "Lines 0, 3, 4, 17, 18 and 21 of the reference build's data-output table: labels from its code, layout, colour and the frame-rate sample values from a photograph, the rest from the approximate flight model."],
+    ["../assets/gallery/flight-000.00s.jpg", "On the runway", "Standing on the gear at the start of runway 16L."],
+    ["../assets/gallery/flight-017.00s.jpg", "Takeoff roll", "About 17 seconds in, the nose rotating."],
+    ["../assets/gallery/flight-024.00s.jpg", "Liftoff", "The wheels leave the runway."],
+    ["../assets/gallery/flight-040.00s.jpg", "Climb-out", "Climbing over the airport at about 90 knots."],
   ],
 };
 const lightboxItems = [];
@@ -189,7 +189,7 @@ async function renderDoc(name) {
   if (!known) return notFound();
   view.textContent = "Loading…";
   try {
-    const res = await fetch(`docs/${name}.md`);
+    const res = await fetch(`${name}.md`);
     if (!res.ok) throw new Error(res.status);
     const html = marked.parse(await res.text());
     const box = document.createElement("article");
@@ -203,7 +203,7 @@ async function renderDoc(name) {
     }
     // README images are repo-relative (site/assets/...); the site serves them from assets/
     for (const img of box.querySelectorAll("img[src]")) {
-      img.setAttribute("src", img.getAttribute("src").replace(/^(\.\/)?site\//, ""));
+      img.setAttribute("src", img.getAttribute("src").replace(/^(?:\.\/|\.\.\/)?site\/assets\//, "../assets/").replace(/^assets\//, "../assets/"));
     }
     view.replaceChildren(box);
   } catch {
