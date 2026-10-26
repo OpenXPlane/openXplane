@@ -7,6 +7,13 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Terrain shader research
+
+- Added a bounded SPIR-V archive inspector and recorded REA evidence for the
+  installed terrain shader archive. Candidate resource usage exposes unresolved
+  variant and border-channel handling; composite color blending is still not
+  implemented. [Findings and next probes](research/TERRAIN_SHADER_ARCHIVE.md).
+
 ### Terrain border masks
 
 - Source terrain now applies grayscale BORDER_TEX masks using DSF border ST,

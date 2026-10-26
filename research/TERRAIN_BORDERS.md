@@ -50,3 +50,8 @@ uses the shared live source-terrain builder; no original assets/code are copied.
 Other limitations in TERRAIN_MATERIALS.md and LIVE_TERRAIN.md remain applicable.
 Coverage estimates are reviewed and unchanged: masks alone do not establish
 original rendering or mod compatibility.
+
+The subsequent [shader archive investigation](TERRAIN_SHADER_ARCHIVE.md) finds
+an original variant using border alpha. The current grayscale-red rule is not
+native-verified: variant/resource swizzling must be resolved before claiming it
+matches the simulator. The preview remains explicitly approximate.
