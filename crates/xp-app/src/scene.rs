@@ -14,6 +14,13 @@ pub struct Mesh {
     pub texture: image::RgbaImage,
     pub glass: bool,
     pub center: Vec3,
+    animation: Option<AnimatedObject>,
+}
+
+struct AnimatedObject {
+    object: Object,
+    rotation: glam::Mat3,
+    translation: Vec3,
 }
 
 pub struct Scene {
@@ -103,6 +110,10 @@ pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
 }
 
 pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
+    load_aircraft(aircraft_path, false)
+}
+
+fn load_aircraft(aircraft_path: &Path, animate: bool) -> Result<Scene, Box<dyn std::error::Error>> {
     let acf = Aircraft::parse(&fs::read_to_string(aircraft_path)?)?;
     let dir = aircraft_path.parent().ok_or("ACF needs parent directory")?;
     // Static preview policy: the union of the normal surface/transparent passes,
@@ -176,7 +187,11 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
         ]);
         let path = dir.join("objects").join(name.replace('\\', "/"));
         let object = Object::parse(&fs::read_to_string(&path)?)?;
-        let mut vertices = object.baked_vertices();
+        let mut vertices = if animate {
+            object.animated_vertices(|_| None)?
+        } else {
+            object.baked_vertices()
+        };
         for vertex in &mut vertices {
             vertex.position = (rotation * Vec3::from_array(vertex.position)
                 + Vec3::from_array(attachment.position))
@@ -221,6 +236,11 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
             texture,
             glass: object.glass || flags & 2 != 0,
             center: (mesh_low + mesh_high) * 0.5,
+            animation: animate.then_some(AnimatedObject {
+                object,
+                rotation,
+                translation: Vec3::from_array(attachment.position),
+            }),
         });
     }
     let center = (low + high) * 0.5;
@@ -229,7 +249,7 @@ pub fn load(aircraft_path: &Path) -> Result<Scene, Box<dyn std::error::Error>> {
         return Err("Invalid scene bounds".into());
     }
     println!(
-        "Static ACF preview: preliminary object gate, mode4/pass0x19; all animation/kill datarefs = 0; final visibility and materials incomplete. Bounds: {low:?} .. {high:?}"
+        "ACF preview: preliminary object gate, mode4/pass0x19; initial animation/kill datarefs = 0; runtime animation cache={animate}; final visibility and materials incomplete. Bounds: {low:?} .. {high:?}"
     );
     Ok(Scene {
         meshes,
@@ -249,25 +269,47 @@ pub struct AircraftBody {
     pub first_mesh: usize,
     base: Vec<Vec<Vertex>>,
     base_center: Vec<Vec3>,
+    animations: Vec<Option<AnimatedObject>>,
 }
 
 impl AircraftBody {
     /// Poses the aircraft meshes of `scene` for the model's current state and centres the scene
     /// (and so the camera target) on the aircraft.
-    pub fn apply(&self, scene: &mut Scene, model: &openxplane::flight::FlightModel) {
+    pub fn apply(
+        &self,
+        scene: &mut Scene,
+        model: &openxplane::flight::FlightModel,
+        controls: &openxplane::flight::Controls,
+    ) -> Result<(), String> {
         let rot = glam::Mat3::from_quat(model.state.orientation);
-        for ((mesh, base), center) in scene.meshes[self.first_mesh..]
-            .iter_mut()
-            .zip(&self.base)
-            .zip(&self.base_center)
-        {
-            for (v, b) in mesh.vertices.iter_mut().zip(base) {
-                v.position = model.to_world(Vec3::from_array(b.position)).to_array();
-                v.normal = (rot * Vec3::from_array(b.normal)).to_array();
+        for (index, mesh) in scene.meshes[self.first_mesh..].iter_mut().enumerate() {
+            if let Some(source) = &self.animations[index] {
+                let vertices = source
+                    .object
+                    .animated_vertices(|name| model.animation_dataref(name, controls))?;
+                if vertices.len() != mesh.vertices.len() {
+                    return Err("animated vertex capacity changed".into());
+                }
+                let mut low = Vec3::splat(f32::INFINITY);
+                let mut high = Vec3::splat(f32::NEG_INFINITY);
+                for (v, b) in mesh.vertices.iter_mut().zip(vertices) {
+                    let point = source.rotation * Vec3::from_array(b.position) + source.translation;
+                    v.position = model.to_world(point).to_array();
+                    v.normal = (rot * source.rotation * Vec3::from_array(b.normal)).to_array();
+                    low = low.min(Vec3::from_array(v.position));
+                    high = high.max(Vec3::from_array(v.position));
+                }
+                mesh.center = (low + high) * 0.5;
+            } else {
+                for (v, b) in mesh.vertices.iter_mut().zip(&self.base[index]) {
+                    v.position = model.to_world(Vec3::from_array(b.position)).to_array();
+                    v.normal = (rot * Vec3::from_array(b.normal)).to_array();
+                }
+                mesh.center = model.to_world(self.base_center[index]);
             }
-            mesh.center = model.to_world(*center);
         }
         scene.center = model.state.position;
+        Ok(())
     }
 }
 
@@ -313,7 +355,7 @@ pub fn airport_flight(
         airport.pavements.len()
     );
 
-    let aircraft = load(aircraft_path)?;
+    let mut aircraft = load_aircraft(aircraft_path, true)?;
     let low_y = aircraft
         .meshes
         .iter()
@@ -349,11 +391,17 @@ pub fn airport_flight(
             texture: solid_texture(layer.color),
             glass: false,
             center: (low + high) * 0.5,
+            animation: None,
         });
     }
     let first_mesh = meshes.len();
     let base: Vec<Vec<Vertex>> = aircraft.meshes.iter().map(|m| m.vertices.clone()).collect();
     let base_center: Vec<Vec3> = aircraft.meshes.iter().map(|m| m.center).collect();
+    let animations = aircraft
+        .meshes
+        .iter_mut()
+        .map(|m| m.animation.take())
+        .collect();
     meshes.extend(aircraft.meshes);
     let mut session = FlightSession {
         scene: Scene {
@@ -366,10 +414,15 @@ pub fn airport_flight(
             first_mesh,
             base,
             base_center,
+            animations,
         },
         model,
     };
-    session.body.apply(&mut session.scene, &session.model);
+    session.body.apply(
+        &mut session.scene,
+        &session.model,
+        &openxplane::flight::Controls::default(),
+    )?;
     Ok(session)
 }
 

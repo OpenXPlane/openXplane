@@ -14,6 +14,16 @@ Every entry that changes what you can see carries a screenshot or an animation (
   and preserved earlier command examples and development notes in `docs/DEVELOPMENT_NOTES.md`.
   The compatibility generator now keeps the README summary compact.
 
+### Live aircraft animation
+
+- `fly` and `fly-render` now reevaluate cached OBJ8 animations from supported model
+  controls and gear state each frame. Geometry, normals and visibility update while
+  GPU vertex capacity stays fixed. Propeller/RPM, tire spin and plugin values remain
+  unresolved; this is not verified original animation parity.
+  `controls-render` exports four poses with the same model position and camera.
+  [Evidence, supported bindings and limits](research/LIVE_OBJ_ANIMATION.md).
+  ![Fixed-state control poses, encoded from actual port frames](site/assets/cessna-controls-20261026.gif)
+
 ### Attachment rotations
 
 - Aircraft previews now apply nonzero unattached object rotations to geometry and

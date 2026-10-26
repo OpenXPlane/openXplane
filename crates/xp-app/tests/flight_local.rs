@@ -17,7 +17,9 @@ fn reference_root() -> std::path::PathBuf {
 
 fn model() -> Option<FlightModel> {
     let root = reference_root();
-    let acf = root.join("Cessna 172 SP/Cessna_172SP.acf");
+    let acf = std::env::var_os("OPENXPLANE_REFERENCE_AIRCRAFT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("Cessna 172 SP/Cessna_172SP.acf"));
     if !acf.is_file() {
         eprintln!("skipped: {ACF} not found");
         return None;
@@ -259,4 +261,46 @@ fn swept_wings_run_through_delta_context_in_the_live_model() {
             "swept wing {wing} contributes no force"
         );
     }
+}
+
+#[test]
+fn animation_bindings_use_model_controls_and_original_gear_slots() {
+    let Some(mut m) = model() else { return };
+    let c = Controls {
+        aileron: 0.5,
+        elevator: 0.3,
+        flaps: 1.0,
+        elevator_trim: 0.2,
+        ..Controls::default()
+    };
+    let left = m
+        .animation_dataref("sim/flightmodel2/wing/aileron1_deg[2]", &c)
+        .unwrap();
+    let right = m
+        .animation_dataref("sim/flightmodel2/wing/aileron1_deg[3]", &c)
+        .unwrap();
+    assert!(left * right < 0.0, "left={left}, right={right}");
+    assert!(
+        m.animation_dataref("sim/flightmodel2/wing/flap1_deg[0]", &c)
+            .unwrap()
+            > 0.0
+    );
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/controls/elevator_trim", &c),
+        Some(0.2)
+    );
+    m.gears[0].index = 7;
+    m.gears[0].compression = 0.123;
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/gear/tire_vertical_deflection_mtr[7]", &c),
+        Some(0.123)
+    );
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/gear/tire_vertical_deflection_mtr[0]", &c),
+        None
+    );
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/engines/prop_rotation_angle_deg[0]", &c),
+        None
+    );
 }

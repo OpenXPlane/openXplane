@@ -30,10 +30,27 @@ openxplane fly <X-Plane> KSEA "<path to the .acf>"                              
 their original meaning back); `Delete` resets, `Esc` quits. The complete list is in the
 [keyboard reference](KEYBOARD.md).
 
+## Animated flight controls
+
+During `fly`, supported OBJ8 control-surface and wheel-compression animations now
+read the current approximate flight model. Flaps, ailerons, elevator/rudder, trim
+and steering use modeled values; propeller/RPM, wheel spin and plugin animation
+values remain unconnected. Unknown datarefs use zero. The aircraft remains subject
+to the [animation coverage limits](../research/LIVE_OBJ_ANIMATION.md).
+
+For reproducible fixed control poses at one model position and camera:
+
+```sh
+openxplane controls-render "<X-Plane>" KSEA "<path to the .acf>" "<output-prefix>"
+```
+
+This writes neutral, full-flap and opposing stick/pedal pose images without
+advancing physics time. It is a visual check, not a reference-game comparison.
+
 ## Aircraft preview coverage
 
 `view` and `render` enumerate the aircraft's ACF object records. The installed
-Cessna172 SP and Cirrus Vision SF50 have been rendered with this path. Preview
+Cessna172 SP and Cirrus Vision SF50 have been rendered with this path. Static aircraft-preview
 animation and kill datarefs are zero, and final visibility, cockpit textures,
 lighting and materials remain incomplete. Unattached object translations and rotations are
 supported; parent-part transforms currently report an error.

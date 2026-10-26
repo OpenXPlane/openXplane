@@ -1,4 +1,4 @@
-//! OBJ8 geometry and static animation evaluation. Not an X-Plane runtime.
+//! OBJ8 geometry and cached dataref-driven animation evaluation. Not an X-Plane runtime.
 use glam::{Mat4, Vec3};
 use std::{collections::BTreeMap, ops::Range};
 
@@ -16,6 +16,8 @@ pub struct Draw {
     pub transform: Mat4,
     pub visible: bool,
     pub cull: bool,
+    animation_ops: Vec<usize>,
+    enabled: bool,
 }
 
 #[derive(Debug, Default)]
@@ -28,17 +30,96 @@ pub struct Object {
     pub unsupported: BTreeMap<String, usize>,
     pub datarefs: BTreeMap<String, usize>,
     pub compatibility_notes: Vec<String>,
+    animations: Vec<Animation>,
 }
 
 #[derive(Clone)]
 struct Pose {
     matrix: Mat4,
     visible: bool,
+    operations: Vec<usize>,
 }
 
 enum Keys {
-    Rotate { axis: Vec3, keys: Vec<(f32, f32)> },
-    Translate { keys: Vec<(f32, Vec3)> },
+    Rotate {
+        axis: Vec3,
+        keys: Vec<(f32, f32)>,
+        dataref: String,
+    },
+    Translate {
+        keys: Vec<(f32, Vec3)>,
+        dataref: String,
+    },
+}
+
+#[derive(Debug)]
+enum Animation {
+    Rotate {
+        axis: Vec3,
+        keys: Vec<(f32, f32)>,
+        dataref: String,
+        linear: bool,
+    },
+    Translate {
+        keys: Vec<(f32, Vec3)>,
+        dataref: String,
+        linear: bool,
+    },
+    Visibility {
+        low: f32,
+        high: f32,
+        show: bool,
+        dataref: String,
+    },
+}
+
+impl Animation {
+    fn apply(&self, pose: &mut Pose, resolve: &impl Fn(&str) -> Option<f32>) -> Result<(), String> {
+        let read = |name: &str| resolve(name).filter(|v| v.is_finite()).unwrap_or(0.0);
+        match self {
+            Self::Rotate {
+                axis,
+                keys,
+                dataref,
+                linear,
+            } => {
+                let value = read(dataref);
+                let angle = if *linear {
+                    keys[0].1 + (keys[1].1 - keys[0].1) * fraction(value, keys[0].0, keys[1].0)
+                } else {
+                    interpolate(keys, value)?
+                };
+                pose.matrix *= rotation(*axis, angle)?;
+            }
+            Self::Translate {
+                keys,
+                dataref,
+                linear,
+            } => {
+                let value = read(dataref);
+                let offset = if *linear {
+                    keys[0]
+                        .1
+                        .lerp(keys[1].1, fraction(value, keys[0].0, keys[1].0))
+                } else {
+                    interpolate(keys, value)?
+                };
+                pose.matrix *= Mat4::from_translation(offset);
+            }
+            Self::Visibility {
+                low,
+                high,
+                show,
+                dataref,
+            } => {
+                let value = read(dataref);
+                if *low <= value && value <= *high {
+                    pose.visible = *show;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 fn numeric(tokens: &[&str], count: usize) -> Result<Vec<f32>, String> {
@@ -158,6 +239,7 @@ impl Object {
         let mut pose = Pose {
             matrix: Mat4::IDENTITY,
             visible: true,
+            operations: Vec::new(),
         };
         let mut stack = Vec::new();
         let mut keys: Option<Keys> = None;
@@ -230,8 +312,14 @@ impl Object {
                                 "line {line}: omitted translation calibration defaults to zero"
                             ));
                         }
-                        let t = fraction(0.0, v[6], v[7]);
-                        pose.matrix *= Mat4::from_translation(vec3(&v).lerp(vec3(&v[3..]), t));
+                        obj.animate(
+                            &mut pose,
+                            Animation::Translate {
+                                keys: vec![(v[6], vec3(&v)), (v[7], vec3(&v[3..]))],
+                                dataref: args.get(8).unwrap_or(&"none").to_string(),
+                                linear: true,
+                            },
+                        )?;
                     }
                     "ANIM_rotate" => {
                         let v = numeric_defaults(args, 5, 7)?;
@@ -240,8 +328,15 @@ impl Object {
                                 "line {line}: omitted rotation calibration defaults to zero"
                             ));
                         }
-                        let angle = v[3] + (v[4] - v[3]) * fraction(0.0, v[5], v[6]);
-                        pose.matrix *= rotation(vec3(&v), angle)?;
+                        obj.animate(
+                            &mut pose,
+                            Animation::Rotate {
+                                axis: vec3(&v),
+                                keys: vec![(v[5], v[3]), (v[6], v[4])],
+                                dataref: args.get(7).unwrap_or(&"none").to_string(),
+                                linear: true,
+                            },
+                        )?;
                     }
                     "ANIM_rotate_begin" => {
                         if keys.is_some() {
@@ -250,6 +345,7 @@ impl Object {
                         keys = Some(Keys::Rotate {
                             axis: vec3(&numeric(args, 3)?),
                             keys: vec![],
+                            dataref: args.get(3).unwrap_or(&"none").to_string(),
                         });
                     }
                     "ANIM_rotate_key" => {
@@ -261,8 +357,21 @@ impl Object {
                         }
                     }
                     "ANIM_rotate_end" => {
-                        if let Some(Keys::Rotate { axis, keys: values }) = keys.take() {
-                            pose.matrix *= rotation(axis, interpolate(&values, 0.0)?)?;
+                        if let Some(Keys::Rotate {
+                            axis,
+                            keys: values,
+                            dataref,
+                        }) = keys.take()
+                        {
+                            obj.animate(
+                                &mut pose,
+                                Animation::Rotate {
+                                    axis,
+                                    keys: values,
+                                    dataref,
+                                    linear: false,
+                                },
+                            )?;
                         } else {
                             return Err("rotate end outside block".into());
                         }
@@ -271,29 +380,48 @@ impl Object {
                         if keys.is_some() {
                             return Err("nested animation keys".into());
                         }
-                        keys = Some(Keys::Translate { keys: vec![] });
+                        keys = Some(Keys::Translate {
+                            keys: vec![],
+                            dataref: args.first().unwrap_or(&"none").to_string(),
+                        });
                     }
                     "ANIM_trans_key" => {
                         let v = numeric(args, 4)?;
-                        if let Some(Keys::Translate { keys }) = &mut keys {
+                        if let Some(Keys::Translate { keys, .. }) = &mut keys {
                             insert_key(keys, v[0], vec3(&v[1..]));
                         } else {
                             return Err("translation key outside block".into());
                         }
                     }
                     "ANIM_trans_end" => {
-                        if let Some(Keys::Translate { keys: values }) = keys.take() {
-                            pose.matrix *= Mat4::from_translation(interpolate(&values, 0.0)?);
+                        if let Some(Keys::Translate {
+                            keys: values,
+                            dataref,
+                        }) = keys.take()
+                        {
+                            obj.animate(
+                                &mut pose,
+                                Animation::Translate {
+                                    keys: values,
+                                    dataref,
+                                    linear: false,
+                                },
+                            )?;
                         } else {
                             return Err("translation end outside block".into());
                         }
                     }
                     "ANIM_hide" | "ANIM_show" => {
                         let v = numeric(args, 2)?;
-                        let in_range = v[0] <= 0.0 && 0.0 <= v[1];
-                        if in_range {
-                            pose.visible = command == "ANIM_show";
-                        }
+                        obj.animate(
+                            &mut pose,
+                            Animation::Visibility {
+                                low: v[0],
+                                high: v[1],
+                                show: command == "ANIM_show",
+                                dataref: args.get(2).unwrap_or(&"none").to_string(),
+                            },
+                        )?;
                     }
                     "ATTR_cull" => cull = true,
                     "ATTR_no_cull" => cull = false,
@@ -318,6 +446,8 @@ impl Object {
                             transform: pose.matrix,
                             visible: pose.visible && enabled && lod_count <= 1,
                             cull,
+                            animation_ops: pose.operations.clone(),
+                            enabled: enabled && lod_count <= 1,
                         });
                     }
                     _ => {
@@ -356,6 +486,52 @@ impl Object {
         Ok(obj)
     }
 
+    fn animate(&mut self, pose: &mut Pose, animation: Animation) -> Result<(), String> {
+        animation.apply(pose, &|_| None)?;
+        pose.operations.push(self.animations.len());
+        self.animations.push(animation);
+        Ok(())
+    }
+
+    /// Evaluate cached animation operations without reparsing the OBJ. Unknown or
+    /// non-finite datarefs use zero (viewer fallback, not original registry behavior).
+    /// Hidden triangles retain degenerate slots so GPU vertex counts stay constant.
+    pub fn animated_vertices(
+        &self,
+        resolve: impl Fn(&str) -> Option<f32>,
+    ) -> Result<Vec<Vertex>, String> {
+        let mut result = Vec::with_capacity(self.draws.iter().map(|d| d.indices.len()).sum());
+        for draw in &self.draws {
+            let mut pose = Pose {
+                matrix: Mat4::IDENTITY,
+                visible: true,
+                operations: Vec::new(),
+            };
+            for index in &draw.animation_ops {
+                self.animations[*index].apply(&mut pose, &resolve)?;
+            }
+            for index in &self.indices[draw.indices.clone()] {
+                let mut vertex = self.vertices[*index as usize];
+                if pose.visible && draw.enabled {
+                    vertex.position = pose
+                        .matrix
+                        .transform_point3(Vec3::from_array(vertex.position))
+                        .to_array();
+                    vertex.normal = pose
+                        .matrix
+                        .transform_vector3(Vec3::from_array(vertex.normal))
+                        .normalize_or_zero()
+                        .to_array();
+                } else {
+                    vertex.position = [0.0; 3];
+                    vertex.normal = [0.0; 3];
+                }
+                result.push(vertex);
+            }
+        }
+        Ok(result)
+    }
+
     pub fn baked_vertices(&self) -> Vec<Vertex> {
         let mut result = Vec::new();
         for draw in self.draws.iter().filter(|d| d.visible) {
@@ -391,6 +567,47 @@ mod tests {
         assert_eq!(v[0].position, [2.0, 0.0, 0.0]);
         assert_eq!(v[3].position, [0.0, 0.0, 0.0]);
     }
+    #[test]
+    fn reevaluates_nested_rotation_and_show_without_changing_vertex_capacity() {
+        let o = Object::parse(&format!("{TRI}ANIM_begin\nANIM_trans 2 0 0 2 0 0 0 0 none\nANIM_hide 0 1 sim/hide\nANIM_show 1 1 sim/show\nANIM_begin\nANIM_rotate_begin 0 0 1 sim/angle[3]\nANIM_rotate_key 1 90\nANIM_rotate_key 0 0\nANIM_rotate_end\nTRIS 0 3\nANIM_end\nANIM_end\nTRIS 0 3\n")).unwrap();
+        assert_eq!(o.baked_vertices().len(), 3);
+        let hidden = o.animated_vertices(|_| None).unwrap();
+        assert_eq!(hidden.len(), 6);
+        assert!(hidden[..3].iter().all(|v| v.position == [0.0; 3]));
+        for angle in [-1.0_f32, 0.0, 1.0, 2.0] {
+            let v = o
+                .animated_vertices(|name| match name {
+                    "sim/show" => Some(1.0),
+                    "sim/angle[3]" => Some(angle),
+                    _ => None,
+                })
+                .unwrap();
+            assert_eq!(v.len(), 6);
+            let radians = angle * std::f32::consts::FRAC_PI_2;
+            let expected = Vec3::new(2.0 + radians.cos(), radians.sin(), 0.0);
+            assert!((Vec3::from_array(v[1].position) - expected).length() < 1e-5);
+            assert_eq!(v[4].position, [1.0, 0.0, 0.0]);
+        }
+        let v = o
+            .animated_vertices(|name| match name {
+                "sim/show" | "sim/angle[3]" => Some(1.0),
+                _ => None,
+            })
+            .unwrap();
+        assert!((Vec3::from_array(v[1].normal) + Vec3::X).length() < 1e-5);
+    }
+
+    #[test]
+    fn evaluates_translation_keys_and_keeps_static_zero_result() {
+        let o = Object::parse(&format!("{TRI}ANIM_begin\nANIM_trans_begin sim/travel[1]\nANIM_trans_key 1 2 0 0\nANIM_trans_key -1 -2 0 0\nANIM_trans_key 1 3 0 0\nANIM_trans_end\nTRIS 0 3\nANIM_end\n")).unwrap();
+        let zero = o.animated_vertices(|_| None).unwrap();
+        assert_eq!(zero[0].position, o.baked_vertices()[0].position);
+        let v = o
+            .animated_vertices(|name| (name == "sim/travel[1]").then_some(2.0))
+            .unwrap();
+        assert_eq!(v[0].position, [5.5, 0.0, 0.0]);
+    }
+
     #[test]
     fn rejects_invalid_ranges_and_indices() {
         assert!(Object::parse(&format!("{TRI}TRIS 0 6")).is_err());

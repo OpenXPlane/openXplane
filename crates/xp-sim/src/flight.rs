@@ -71,6 +71,8 @@ pub struct Controls {
 
 #[derive(Clone, Debug)]
 pub struct Gear {
+    /// Original ACF slot; contact storage may omit inactive slots.
+    pub index: usize,
     /// Contact point with the strut fully extended, body frame.
     pub tip: Vec3,
     pub stiffness: f32,
@@ -457,6 +459,7 @@ impl FlightModel {
                 continue;
             }
             gears.push(Gear {
+                index: i,
                 tip: Vec3::new(x, y - leg * ACF_FT_TO_M, z),
                 stiffness: force / def,
                 damping: damp,
@@ -589,6 +592,49 @@ impl FlightModel {
     /// Gives the aircraft an airspeed along its nose (for starting in the air).
     pub fn set_airspeed(&mut self, speed: f32) {
         self.state.velocity = self.state.orientation * Vec3::NEG_Z * speed;
+    }
+
+    /// Visual adapter for this approximate model, not recovered original dataref
+    /// accessors. Unsupported names/indices remain unresolved rather than invented.
+    pub fn animation_dataref(&self, name: &str, c: &Controls) -> Option<f32> {
+        if name == "sim/flightmodel2/controls/elevator_trim" {
+            return Some(c.elevator_trim);
+        }
+        let (array, index) = name.strip_suffix(']')?.rsplit_once('[')?;
+        let index: usize = index.parse().ok()?;
+        match array {
+            "sim/cockpit2/engine/actuators/throttle_ratio" if index == 0 => Some(c.throttle),
+            "sim/flightmodel2/gear/tire_vertical_deflection_mtr" => self
+                .gears
+                .iter()
+                .find(|g| g.index == index)
+                .map(|g| g.compression),
+            "sim/flightmodel2/gear/tire_steer_actual_deg" => {
+                self.gears.iter().find(|g| g.index == index).map(|g| {
+                    -(c.rudder + c.rudder_trim).clamp(-1.0, 1.0) * g.steer_max_rad.to_degrees()
+                })
+            }
+            _ => {
+                let kind = match array {
+                    "sim/flightmodel2/wing/aileron1_deg" => 0,
+                    "sim/flightmodel2/wing/elevator1_deg" => 1,
+                    "sim/flightmodel2/wing/rudder1_deg" => 2,
+                    "sim/flightmodel2/wing/flap1_deg" => 3,
+                    _ => return None,
+                };
+                let wing = self.wings.iter().find(|w| w.index == index)?;
+                if !wing.controls.iter().any(|v| v[kind] > 0.0) {
+                    return Some(0.0);
+                }
+                Some(control_deflection(
+                    kind,
+                    wing.side,
+                    c,
+                    self.controls_range[kind],
+                    self.flap_degrees(c.flaps),
+                ))
+            }
+        }
     }
 
     fn flap_degrees(&self, handle: f32) -> f32 {
@@ -919,6 +965,7 @@ mod tests {
     #[test]
     fn three_strut_loads_balance_weight_and_moments() {
         let g = |x: f32, z: f32| Gear {
+            index: 0,
             tip: Vec3::new(x, -1.0, z),
             stiffness: 50_000.0,
             damping: 0.0,

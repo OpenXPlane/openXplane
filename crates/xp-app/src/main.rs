@@ -373,6 +373,50 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         }
         return Ok(true);
     }
+    if args.len() == 5 && args[0] == "controls-render" {
+        // Frozen-state control poses exercise the same animation path as live flight.
+        let mut session = scene::airport_flight(
+            Path::new(&args[1]),
+            &args[2].to_string_lossy(),
+            Path::new(&args[3]),
+        )?;
+        let prefix = args[4].to_string_lossy();
+        let (w, h) = frame_size();
+        let mut offscreen = pollster::block_on(gpu::Offscreen::new(&session.scene, w, h))?;
+        let mut camera = gpu::Camera::new(&session.scene);
+        let forward = session.model.state.orientation * glam::Vec3::NEG_Z;
+        camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
+        camera.pitch = 0.35;
+        camera.distance = 14.0;
+        for (name, elevator, aileron, rudder, flaps) in [
+            ("neutral", 0.0, 0.0, 0.0, 0.0),
+            ("flaps-down", 0.0, 0.0, 0.0, 1.0),
+            ("roll-left", 0.3, -0.8, -0.5, 0.0),
+            ("roll-right", -0.3, 0.8, 0.5, 0.0),
+        ] {
+            let controls = openxplane::flight::Controls {
+                elevator,
+                aileron,
+                rudder,
+                flaps,
+                ..Default::default()
+            };
+            session
+                .body
+                .apply(&mut session.scene, &session.model, &controls)?;
+            let output = format!("{prefix}-{name}.png");
+            offscreen.render(
+                &session.scene,
+                session.body.first_mesh,
+                &camera,
+                Path::new(&output),
+            )?;
+            println!(
+                "Frozen control pose {name}: elevator={elevator}, aileron={aileron}, rudder={rudder}, flaps={flaps} -> {output}"
+            );
+        }
+        return Ok(true);
+    }
     if args.len() >= 5 && args[0] == "fly-render" {
         // Renders chase-camera frames of the scripted takeoff at the given times (seconds). With
         // OPENXPLANE_FRAME_SIZE=WxH the frames are smaller (for animations).
@@ -398,7 +442,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 openxplane::flight::takeoff_pilot(&session.model, &mut c);
                 session.model.step(1.0 / 200.0, &c);
             }
-            session.body.apply(&mut session.scene, &session.model);
+            session.body.apply(&mut session.scene, &session.model, &c)?;
             let mut camera = gpu::Camera::new(&session.scene);
             let forward = session.model.state.orientation * glam::Vec3::NEG_Z;
             camera.yaw = std::f32::consts::PI - (-forward.x).atan2(-forward.z) + 0.55;
@@ -588,7 +632,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         return Ok(true);
     }
     if args.len() != 2 || args[0] != "inspect" {
-        return Err("Usage: openxplane ui-resources <content-root> | airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png>".into());
+        return Err("Usage: openxplane ui-resources <content-root> | airfoil-replay <airfoil.afl> <inputs.csv> <table.f32le|-> <initial-stall:0|1> | inspect <content-root> | aircraft-info <aircraft.acf> | airfoil-info <airfoil.afl> [alpha-degrees] | airfoil-eval <airfoil.afl> <induced-alpha> <multiplier> <divisor> | airfoil-mix <airfoil.afl> <induced-alpha> <multiplier> <divisor> <regime-parameter> | buffet-eval <table.f32le> <x> <y> <phase> <running-time-seconds> <cl> <cd> <cm> | mesh-info <aircraft.acf> | view <aircraft.acf> [--smoke] | render <aircraft.acf> <output.png> | controls-render <content-root> <icao> <aircraft.acf> <output-prefix>".into());
     }
     let root = fs::canonicalize(&args[1])?;
     let install = openxplane::install::Install::open(&root)?;

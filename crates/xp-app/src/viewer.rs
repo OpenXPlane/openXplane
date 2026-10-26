@@ -283,7 +283,7 @@ impl Flight {
     }
 
     /// Steps the simulation by real elapsed time (at most 0.1 s per frame) and poses the aircraft meshes.
-    fn advance(&mut self, scene: &mut Scene, camera: &mut Camera) {
+    fn advance(&mut self, scene: &mut Scene, camera: &mut Camera) -> Result<(), String> {
         let now = Instant::now();
         let real = (now - self.last).as_secs_f32();
         let dt = real.min(0.1);
@@ -304,7 +304,7 @@ impl Flight {
             r.sim_rate = Rate::blend(r.sim_rate, steps as f32 / real);
             r.ratio = Rate::blend(r.ratio, steps as f32 * STEP / real);
         }
-        self.body.apply(scene, &self.model);
+        self.body.apply(scene, &self.model, &self.controls)?;
         camera.target = self.model.state.position + self.view_offset;
         if !self.free_camera {
             // chase camera: behind the aircraft's heading, orbiting with the mouse
@@ -312,6 +312,7 @@ impl Flight {
             let heading = (-forward.x).atan2(-forward.z);
             camera.yaw = std::f32::consts::PI - heading + self.camera_yaw;
         }
+        Ok(())
     }
 
     fn title(&self) -> String {
@@ -424,7 +425,11 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 if let Some(flight) = &mut self.flight {
-                    flight.advance(&mut self.scene, &mut state.camera);
+                    if let Err(error) = flight.advance(&mut self.scene, &mut state.camera) {
+                        eprintln!("Aircraft animation failed: {error}");
+                        event_loop.exit();
+                        return;
+                    }
                     state
                         .renderer
                         .update_meshes(flight.body.first_mesh, &self.scene);
