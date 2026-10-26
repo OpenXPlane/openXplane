@@ -7,6 +7,13 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Documentation
+
+- Shortened the README to the project overview, download, quick start and documentation links.
+  Moved detailed compatibility tables and the generated roadmap to `docs/COMPATIBILITY.md`,
+  and preserved earlier command examples and development notes in `docs/DEVELOPMENT_NOTES.md`.
+  The compatibility generator now keeps the README summary compact.
+
 ### Installed scenery compatibility
 
 - Offscreen flight exports no longer display fixed frame-rate/CPU/GPU values

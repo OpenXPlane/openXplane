@@ -44,33 +44,17 @@ def table(data):
 
 def readme_block(data):
     impl, ver = totals(data)
-    road = '\n'.join(f"{i}. **{r['title']}** ({r['state']}): {r['detail']}" for i, r in enumerate(data['roadmap'], 1))
-    nxt = '\n'.join(f'- {n}' for n in data['next'])
     return f'''{START}
-## How close to the original is it?
+## Project status
 
-**About {impl:.0f}% implemented, about {ver:.0f}% verified identical to the original.** Early stage: it loads
-the original content, draws it, and flies an approximation; it does not yet behave like X-Plane.
+The goal is a complete game with 1:1 X-Plane 12 behaviour. The current engine loads original
+content, renders aircraft and airports, and flies an approximate flight model.
 
-- *Implemented* counts work that exists in any form, including approximations (the flight model is one).
-- *Verified identical* is an estimate of recovered behaviour supported by comparisons with the original code. Evidence distinguishes exact matches from controlled inputs and platform tolerances; it does not establish whole-game equivalence.
-
-This is a self-assessed, weighted rubric, not a measurement (method and per-subsystem numbers in
-[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md); data in [docs/compat.json](docs/compat.json), updated with
-`python3 tools/compat_score.py --write`).
-
-{table(data)}
-
-## Roadmap
-
-{road}
-
-Next up:
-
-{nxt}
-
-Details and the target crate layout: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**About {impl:.0f}% implemented and {ver:.0f}% verified identical**, according to a self-assessed
+weighted rubric, not a measurement of whole-game equivalence. See the
+[compatibility estimate and roadmap](docs/COMPATIBILITY.md) for evidence and limitations.
 {END}'''
+
 
 
 def main():
@@ -91,6 +75,8 @@ def main():
         assert marker in text, 'README has no "## Current state" heading to insert before'
         text = text.replace(marker, block + '\n\n' + marker, 1)
     readme.write_text(text)
+    road = '\n'.join(f"{i}. **{r['title']}** ({r['state']}): {r['detail']}" for i, r in enumerate(data['roadmap'], 1))
+    nxt = '\n'.join(f'- {n}' for n in data['next'])
     doc = f'''# Compatibility estimate
 
 Updated {data['updated']}. **About {impl:.0f}% implemented, about {ver:.0f}% verified identical to the original.**
@@ -98,6 +84,14 @@ Updated {data['updated']}. **About {impl:.0f}% implemented, about {ver:.0f}% ver
 {data['method']}
 
 {table(data)}
+
+## Roadmap
+
+{road}
+
+## Next steps
+
+{nxt}
 
 The generator is `tools/compat_score.py`; the data is `compat.json` in this folder.
 '''

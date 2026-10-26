@@ -5,7 +5,8 @@ const REPO = "https://github.com/OpenXPlane/openXplane";
 const DISCORD = "";
 
 const DOCS = [
-  ["README", "Overview and commands"],
+  ["README", "Project overview"],
+  ["DEVELOPMENT_NOTES", "Earlier development notes and commands"],
   ["CHANGELOG", "Changelog"],
   ["USER_GUIDE", "User guide"],
   ["BUILDING", "Building"],
