@@ -313,6 +313,61 @@ impl AircraftBody {
     }
 }
 
+/// A raster-based terrain preview. The original DSF triangle topology, terrain
+/// textures and physical ground are not substituted by this visual approximation.
+fn xp_scenery_raster(
+    path: &Path,
+    frame: &openxplane::world::Frame,
+    elevation: f32,
+) -> Result<Mesh, String> {
+    let raster = openxplane::dsf::HeightRaster::read(path)?;
+    let origin = frame.origin();
+    let step = 100.0_f64;
+    let half: i32 = 150;
+    let point = |x: i32, z: i32| {
+        let lat = origin[0] - (z as f64 * step / 6_371_000.0).to_degrees();
+        let lon = origin[1]
+            + (x as f64 * step / (6_371_000.0 * origin[0].to_radians().cos())).to_degrees();
+        Vec3::new(
+            (x as f64 * step) as f32,
+            raster.sample(lat, lon) - elevation - 0.3,
+            (z as f64 * step) as f32,
+        )
+    };
+    let mut vertices = Vec::new();
+    for z in -half..half {
+        for x in -half..half {
+            // Keep the existing flat airport slab until airport draping/collision is implemented.
+            if x.abs() < 80 && z.abs() < 80 {
+                continue;
+            }
+            let a = point(x, z);
+            let b = point(x + 1, z);
+            let c = point(x + 1, z + 1);
+            let d = point(x, z + 1);
+            for triangle in [[a, c, b], [a, d, c]] {
+                let normal = (triangle[1] - triangle[0])
+                    .cross(triangle[2] - triangle[0])
+                    .normalize_or_zero();
+                for p in triangle {
+                    vertices.push(Vertex {
+                        position: p.to_array(),
+                        normal: normal.to_array(),
+                        uv: [0.5, 0.5],
+                    });
+                }
+            }
+        }
+    }
+    Ok(Mesh {
+        vertices,
+        texture: solid_texture([85, 105, 65, 255]),
+        glass: false,
+        center: Vec3::ZERO,
+        animation: None,
+    })
+}
+
 /// An airport scene with the aircraft, its body vertices and a flight model resting on the first runway.
 pub struct FlightSession {
     pub scene: Scene,
@@ -367,6 +422,20 @@ pub fn airport_flight(
     model.rest_on_ground(low_y, [a[0] + ux * 150.0, a[1] + uz * 150.0], direction);
 
     let mut meshes = Vec::new();
+    let origin = frame.origin();
+    if let Some(path) = install.terrain_tile(origin[0], origin[1]) {
+        match xp_scenery_raster(&path, &frame, model.elevation_m) {
+            Ok(mesh) => {
+                println!(
+                    "Loaded DSF elevation terrain: {} ({} triangles; raster preview, no landclass textures)",
+                    path.display(),
+                    mesh.vertices.len() / 3
+                );
+                meshes.push(mesh);
+            }
+            Err(error) => eprintln!("DSF terrain unavailable: {}: {error}", path.display()),
+        }
+    }
     for layer in layers {
         let vertices = layer
             .triangles

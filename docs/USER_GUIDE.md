@@ -90,3 +90,11 @@ app only. Set `OPENXPLANE_DISCORD_APP_ID` to an empty value to turn it off ([det
 ## Check local original menu assets
 
 Run `cargo run --offline -p xp-app -- ui-resources /path/to/Xplane12` after copying the original `Resources/fonts` and `Resources/bitmaps/interface11` directories into that installation. This validates local loading of the menu texture catalog and font headers. It does not open the original menus or establish visual parity.
+
+## Installed terrain preview
+
+Airport scenes attempt to load the global DSF elevation tile containing the airport.
+Compressed DSF is decoded in memory. This adds surrounding heights, but the airport
+slab, collisions, solid terrain colors and missing buildings/roads remain incomplete.
+Use `terrain-render <X-Plane> KSEA <aircraft.acf> <output.png>` for a distant overview.
+See [DSF coverage](../research/DSF_TERRAIN.md); this is not full map compatibility.

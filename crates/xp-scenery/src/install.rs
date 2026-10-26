@@ -20,6 +20,27 @@ pub struct Install {
 }
 
 impl Install {
+    /// Available global base-mesh tiles, in deterministic package order.
+    pub fn terrain_tile(&self, lat: f64, lon: f64) -> Option<PathBuf> {
+        let lat = lat.floor() as i32;
+        let lon = lon.floor() as i32;
+        let group = format!(
+            "{:+03}{:+04}",
+            lat.div_euclid(10) * 10,
+            lon.div_euclid(10) * 10
+        );
+        let tile = format!("{lat:+03}{lon:+04}.dsf");
+        let root = self.root.join("Global Scenery");
+        ["X-Plane 12 Global Scenery", "X-Plane 12 Demo Areas"]
+            .into_iter()
+            .map(|name| {
+                root.join(name)
+                    .join("Earth nav data")
+                    .join(&group)
+                    .join(&tile)
+            })
+            .find(|p| p.is_file())
+    }
     pub fn open(root: &Path) -> Result<Self, String> {
         if !root.is_dir() {
             return Err(format!("not a directory: {}", root.display()));

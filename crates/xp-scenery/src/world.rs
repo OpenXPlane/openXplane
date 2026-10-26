@@ -19,6 +19,9 @@ pub struct Frame {
 }
 
 impl Frame {
+    pub fn origin(&self) -> [f64; 2] {
+        [self.lat0, self.lon0]
+    }
     pub fn new(lat0: f64, lon0: f64) -> Self {
         Self { lat0, lon0 }
     }

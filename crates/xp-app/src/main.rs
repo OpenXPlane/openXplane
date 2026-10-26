@@ -617,6 +617,22 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         viewer::run(scene, args.len() == 5)?;
         return Ok(true);
     }
+    if args.len() == 5 && args[0] == "terrain-render" {
+        let scene = scene::airport(
+            Path::new(&args[1]),
+            &args[2].to_string_lossy(),
+            Path::new(&args[3]),
+        )?;
+        let (w, h) = frame_size();
+        let mut offscreen = pollster::block_on(gpu::Offscreen::new(&scene, w, h))?;
+        let mut camera = gpu::Camera::new(&scene);
+        camera.distance = 16000.0;
+        camera.pitch = 0.65;
+        camera.yaw = 0.6;
+        camera.radius = 30000.0;
+        offscreen.render(&scene, 0, &camera, Path::new(&args[4]))?;
+        return Ok(true);
+    }
     if args.len() == 5 && args[0] == "airport-render" {
         let scene = scene::airport(
             Path::new(&args[1]),

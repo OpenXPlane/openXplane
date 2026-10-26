@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Installed DSF terrain
+
+- Airport scenes now read available compressed global DSF elevation rasters in
+  place and render peripheral terrain. This remains a coarse solid-color preview:
+  the central flat airport slab, missing objects/materials and flat collisions
+  are unresolved. `terrain-render` exports an overview for inspection.
+  [Coverage and next work](research/DSF_TERRAIN.md).
+  ![First DSF elevation preview with unresolved airport slab](site/assets/ksea-dsf-raster-20261026.png)
+
 ### Documentation
 
 - Shortened the README to the project overview, download, quick start and documentation links.
