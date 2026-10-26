@@ -407,8 +407,8 @@ fn airport_objects(
     if !path.is_file() {
         return Ok(Vec::new());
     }
-    let placements =
-        openxplane::dsf::object_placements(&fs::read(&path).map_err(|e| e.to_string())?)?;
+    let features = openxplane::dsf::features(&fs::read(&path).map_err(|e| e.to_string())?)?;
+    let placements = features.objects;
     let library = install.preview_library_at(Some(origin))?;
     let mut grouped = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
     let mut unresolved = 0;
@@ -432,7 +432,8 @@ fn airport_objects(
             unresolved += 1;
         }
     }
-    let mut meshes = Vec::new();
+    let mut meshes = airport_facades(&features.polygons, &pack, &library, frame);
+    let facade_batches = meshes.len();
     let mut instances = 0;
     let mut failed = 0;
     let mut expanded = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
@@ -545,11 +546,115 @@ fn airport_objects(
         }
     }
     println!(
-        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {unresolved} unresolved placements; {failed} failed resources. Preview libraries/flat placement; no facade/network support.",
+        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {unresolved} unresolved placements; {failed} failed resources. Preview libraries/flat placement; partial straight FAC walls, no networks.",
         placements.len(),
-        meshes.len()
+        meshes.len() - facade_batches
     );
     Ok(meshes)
+}
+
+fn airport_facades(
+    polygons: &[openxplane::dsf::PolygonPlacement],
+    pack: &Path,
+    library: &BTreeMap<String, PathBuf>,
+    frame: &openxplane::world::Frame,
+) -> Vec<Mesh> {
+    let mut grouped = BTreeMap::<PathBuf, Vec<&openxplane::dsf::PolygonPlacement>>::new();
+    let mut skipped = 0;
+    for polygon in polygons {
+        if !polygon.resource.ends_with(".fac") {
+            continue;
+        }
+        let Some(first) = polygon.windings.first().and_then(|w| w.first()) else {
+            continue;
+        };
+        let [x, z] = frame.to_local(first[1], first[0]);
+        if x.abs() > 6000.0 || z.abs() > 6000.0 {
+            continue;
+        }
+        let direct = pack.join(&polygon.resource);
+        if direct.is_file() {
+            grouped.entry(direct).or_default().push(polygon);
+        } else if let Some(path) = library.get(&polygon.resource) {
+            grouped.entry(path.clone()).or_default().push(polygon);
+        } else {
+            skipped += 1;
+        }
+    }
+    let mut meshes = Vec::new();
+    let mut placed = 0;
+    for (path, polygons) in grouped {
+        let result = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
+            let facade = openxplane::facade::parse(&fs::read_to_string(&path)?)?;
+            let texture = if let Some(name) = &facade.wall_texture {
+                image::imageops::flip_vertical(
+                    &image::open(texture_path(&path, name).ok_or("missing facade wall texture")?)?
+                        .to_rgba8(),
+                )
+            } else {
+                solid_texture([180, 180, 180, 255])
+            };
+            let mut vertices = Vec::new();
+            for polygon in polygons {
+                if polygon.windings.len() != 1
+                    || polygon.windings[0]
+                        .iter()
+                        .any(|p| ![2, 3].contains(&p.len()))
+                {
+                    skipped += 1;
+                    continue;
+                }
+                let winding = &polygon.windings[0];
+                let mut points = winding
+                    .iter()
+                    .map(|p| frame.to_local(p[1], p[0]))
+                    .collect::<Vec<_>>();
+                let mut choices = winding
+                    .iter()
+                    .map(|p| p.get(2).copied().unwrap_or(0.0) as usize)
+                    .collect::<Vec<_>>();
+                if points.len() > 2 && points.first() == points.last() {
+                    points.pop();
+                    choices.pop();
+                }
+                match facade.straight_walls(&points, &choices, polygon.parameter as f32) {
+                    Ok(wall) => {
+                        placed += 1;
+                        vertices.extend(wall.into_iter().map(|v| Vertex {
+                            position: [v[0], v[1], v[2]],
+                            normal: [v[3], v[4], v[5]],
+                            uv: [v[6], v[7]],
+                        }));
+                    }
+                    Err(e) => {
+                        skipped += 1;
+                        eprintln!("Facade footprint skipped {}: {e}", path.display());
+                    }
+                }
+            }
+            Ok(Mesh {
+                vertices,
+                texture,
+                instances: vec![[0.0; 4]],
+                glass: false,
+                center: Vec3::ZERO,
+                animation: None,
+            })
+        })();
+        match result {
+            Ok(mesh) if !mesh.vertices.is_empty() => meshes.push(mesh),
+            Ok(_) => {}
+            Err(e) => {
+                skipped += 1;
+                eprintln!("Facade resource skipped {}: {e}", path.display());
+            }
+        }
+    }
+    println!(
+        "FAC straight-wall preview: {placed} footprints, {} batches, {skipped} skipped footprints/resources; deterministic fits, flat ground, no curved walls/miters/roofs/attachments.",
+        meshes.len()
+    );
+    meshes
 }
 
 /// A raster-based terrain preview. The original DSF triangle topology, terrain

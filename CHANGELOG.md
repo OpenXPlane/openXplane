@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Installed facade walls
+
+- Airport scenes now place straight type-2 FAC wall meshes along supported DSF
+  contours, using installed textures and explicit wall choices. KSEA builds
+  88 footprints in 22 batches. Roofs, curved walls, corner miters and attached
+  objects remain missing; deterministic fits and flat ground are approximations.
+  [Evidence and native investigation](research/FACADE_WALLS.md).
+  ![KSEA straight FAC wall preview](site/assets/ksea-fac-walls-20261026.png)
+
 ### Type-2 facade mesh inspection
 
 - Added typed FAC floor/segment/mesh/wall/spelling loading and `fac-render` to
