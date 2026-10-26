@@ -44,6 +44,32 @@ payload boundaries, every truncation of a complete prefix, bad signatures and
 unsupported display encoding. This is inspection tooling, not a runtime loader
 or an emulation comparison. Original mappings and REA listings stay local.
 
+### Serialized resource layouts
+
+The full reader's PE unwind range is0x14105e350..0x14105f675. A further REA
+observation covers that range and the record helper0x14105dec0..0x14105e32e
+(stopping before its jump-table data). Following the entry string, the reader
+consumes a byte count limited to four groups. Each group has a kind byte, field
+count byte and two bytes per field. It then reads a little-endian 32-bit layout
+count. Each layout has a byte resource count and nine bytes per resource: four
+raw fields, a little-endian 16-bit name index and three trailing fields.
+The native helper checks the name index against the name table.
+
+`--layouts` enables inspection through this boundary. The terrain mapping has
+three groups and one layout with45 resource records, ending at offset1324.
+The serialized resource names include base, composite, border and material
+inputs. Field meanings are deliberately left numeric: the native helper also
+changes some resource classes according to backend state and computes offsets;
+the inspector does not reproduce those operations. Layouts are not a list of
+active resources for a particular draw. No live variant or original-equivalent
+material arithmetic has been established.
+
+Synthetic layout tests cover field preservation, name resolution, every
+truncation, out-of-range name indices, excessive group counts and impossible
+layout counts. Real font, SSR-mesh and terrain layouts were read locally.
+Rust workspace formatting, clippy and tests remain required; inspection results
+do not justify increasing implemented or verified renderer percentages.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

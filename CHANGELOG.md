@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Extended XSV inspection through serialized resource layouts using original
+  reader evidence. Added bounds and name-reference tests; active variant and
+  backend-dependent resource remapping remain unresolved.
 - Recovered the XSV6 mapping prefix through REA and added a bounded inspector
   with malformed-input tests. Corrected the signature description; runtime
   variant selection remains unresolved.

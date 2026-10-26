@@ -22,10 +22,11 @@ fn main() -> ExitCode {
         "obj-key-insert" => ("0x1408751b0", "0x1408752b0"),
         "facade-segment-loader" => ("0x141981450", "0x141981650"),
         "shader-mapping-header" => ("0x14103fafa", "0x14103fb2b"),
-        "shader-mapping-reader" => ("0x14105e350", "0x14105e650"),
+        "shader-mapping-reader" => ("0x14105e350", "0x14105f675"),
         "shader-mapping-names" => ("0x141060320", "0x1410604b5"),
+        "shader-mapping-record" => ("0x14105dec0", "0x14105e32e"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record");
             return ExitCode::from(2);
         }
     };
