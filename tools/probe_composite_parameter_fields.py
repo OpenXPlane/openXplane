@@ -23,6 +23,12 @@ def probe(path):
     expected_reset = [struct.unpack('<f', struct.pack('<f', v))[0] for v in expected_reset]
     if reset != expected_reset:
         raise ValueError(f'COMPOSITE_TEX reset mismatch: {reset}')
+    e.write(frame + 0xe8, b'\xff' * 0x3c)
+    e.uc.reg_write(UC_X86_REG_RBP, frame)
+    e.call(0x1419a78f7, until=0x1419a7932, max_instructions=30)
+    nowrap_reset = [e.read_f32(frame + 0xe8 + 4 * i) for i in range(12)]
+    if nowrap_reset != expected_reset[:12] or e.read(frame + 0x118, 12) != b'\xff' * 12:
+        raise ValueError(f'COMPOSITE_TEX_NOWRAP reset mismatch: {nowrap_reset}')
     observations = []
     for optional in (False, True):
         supplied = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0] + ([16.0] if optional else [])
@@ -90,7 +96,8 @@ def probe(path):
         if actual != expected:
             raise ValueError('TER composite projection mismatch')
         projections.append({'input': scale32, 'reciprocals': actual})
-    return {'reference_sha256': REFERENCE_SHA256, 'texture_reset': {'range': ['0x1419a7616', '0x1419a765a'], 'fields': reset}, 'begin_va': '0x140c2e780',
+    return {'reference_sha256': REFERENCE_SHA256, 'texture_reset': {'range': ['0x1419a7616', '0x1419a765a'], 'fields': reset},
+            'nowrap_reset': {'range': ['0x1419a78f7', '0x1419a7932'], 'fields': nowrap_reset, 'trailing_bytes_unchanged': 12}, 'begin_va': '0x140c2e780',
             'exclusive_stop_va': '0x140c2f1c0', 'observations': observations,
             'ter_block': {'begin_va': '0x1419a9f82', 'exclusive_stop_va': '0x1419ab53b',
                           'observations': ter_observations},

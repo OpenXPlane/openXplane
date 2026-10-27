@@ -145,7 +145,10 @@ impl Material {
                 }
                 "PROJECT_OFFSET" => out.offset = [number(0)?, number(1)?],
                 "PROJECT_ANGLE" => out.angle = [number(0)?, number(1)?, number(2)?, number(3)?],
-                "COMPOSITE_TEX" | "COMPOSITE_TEX_NOWRAP" | "COMPOSITE_NOISE" => {
+                "COMPOSITE_TEX"
+                | "COMPOSITE_TEX_NOWRAP"
+                | "COMPOSITE_NOWRAP"
+                | "COMPOSITE_NOISE" => {
                     let path = values.join(" ").replace(['\\', ':'], "/");
                     if path.is_empty() {
                         return Err("empty TER composite path".into());
@@ -154,8 +157,8 @@ impl Material {
                         out.composite.noise = Some(path);
                     } else {
                         out.composite.texture = Some(path);
-                        out.composite.nowrap = command == "COMPOSITE_TEX_NOWRAP";
-                        out.composite.mode5_fields = if command == "COMPOSITE_TEX" {
+                        out.composite.nowrap = command != "COMPOSITE_TEX";
+                        out.composite.mode5_fields = if command != "COMPOSITE_NOWRAP" {
                             Some(([1.0, 1.0], [0.1, 0.1, 0.0625, 8.0, 0.5, 0.5, 0.0]))
                         } else {
                             None
@@ -372,6 +375,15 @@ mod tests {
         );
         assert!(!m.composite.nowrap);
         assert_eq!(m.composite.texture.as_deref(), Some("last.png"));
+        let legacy =
+            Material::parse(&(header.to_owned() + "COMPOSITE_NOWRAP textures:legacy.png\n"))
+                .unwrap();
+        assert_eq!(
+            legacy.composite.texture.as_deref(),
+            Some("textures/legacy.png")
+        );
+        assert!(legacy.composite.nowrap);
+        assert!(legacy.unsupported.contains("COMPOSITE_NOWRAP"));
         for directive in [
             "COMPOSITE_PARAMS 1 2 3 4 5",
             "COMPOSITE_PARAMS 1 2 3 4 5 NaN",
@@ -432,6 +444,12 @@ mod tests {
                 [3.0, -4.0, 5.0, 6.0],
                 [7.0, 8.0, 9.0, 10.0]
             ])
+        );
+        let nowrap =
+            Material::parse(&(header.to_owned() + "COMPOSITE_TEX_NOWRAP c.png\n")).unwrap();
+        assert_eq!(
+            nowrap.composite.loaded_mode5_uniform_prefix([0.0; 3]),
+            reset.composite.loaded_mode5_uniform_prefix([0.0; 3])
         );
     }
     #[test]

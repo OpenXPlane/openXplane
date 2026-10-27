@@ -529,8 +529,18 @@ FAR fields become zero. `loaded_mode5_uniform_prefix` models those defaults and
 later recognized projection/parameter directives, including repeated texture
 resets, while retaining raw directives separately. Its FAR fields are still
 explicit caller inputs. It assumes no intervening directive changes texture mode;
-other modes, NOWRAP and texture-binding behavior remain unverified. It is not yet
+other modes and texture-binding behavior remain unverified. It is not yet
 used by the renderer, so this is not a rendered-pixel comparison.
+
+The installed binary also recognizes `COMPOSITE_TEX_NOWRAP`: its branch sets
+mode 5 and resets the same projection, parameter and three FAR fields at
+`0x1419a78f7..0x1419a7932`. An isolated emulator check verifies these fields and
+the unchanged following 12 bytes; unlike `COMPOSITE_TEX`, this reset does not
+write those trailing bytes. The mode-5 prefix helper now models this branch as
+well. Separately, the parser retains the older `COMPOSITE_NOWRAP` spelling from
+the [published TER specification](https://developer.x-plane.com/article/terrain-type-ter-file-format-specification/).
+This spelling was not found in the inspected executable, so its mode-5 defaults
+remain unresolved. Both forms still report that rendering is unsupported.
 
 REA identifies the same runtime global in a registration routine at
 `0x1405b0240`: its name is `terrain/composite_far_dist_bias`, and constructor
