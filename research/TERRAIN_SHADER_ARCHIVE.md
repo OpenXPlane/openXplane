@@ -284,6 +284,43 @@ Next identify the final mode after actual COMPOSITE_TEX/PROJECTED combinations,
 then choose matching modules using the recovered index. Renderer percentages and
 original-mod verification remain unchanged.
 
+#### Projection, borders and validation narrow the candidates
+
+REA confirms the accepted PROJECTED block at0x1419a7e23..0x1419a7e59 reads
+two integers, converts them to floats at frame+0x290/+0x294 and sets
+frame+0x2b0 to1. It does not overwrite the texture mode at frame+0xd4.
+The extended detail probe checks two positive scale pairs and preserves a
+supplied mode5 through this block. This is still an isolated block observation,
+not a complete directive-order or finalization comparison. It also exposes an
+unresolved loader difference: our PROJECTED parser currently accepts floats.
+
+The COMPOSITE_BORDERS check at0x1419a8370 targets0x14279f260; its accepted
+branch at0x1419a8380 stores2 into frame+0x2b4, corresponding to material+0x224.
+Thus the previously chosen border digit1 is not the composite-border case.
+
+REA also identifies the native validator0x14176eb70..0x14176ec94. The material
+probe now invokes it separately on the180 prepared states, without stubs in the
+validator. It accepts26 and rejects154. The older preparation-only checks were
+never evidence that all180 combinations could draw. In particular geometry
+digit1 does not accept composite texture modes5/6 under these conditions.
+
+With an explicitly hypothetical mode0-prefix[1,0], GEOM_MODE0, BORDER_MODE2,
+TEX_MODE5, PROJ_BASE1 and other feature digits zero, the XSV lookup gives:
+
+| RENDERING_MODE | Slot | Fragment primary ID | Named texture observations |
+| ---: | ---: | ---: | --- |
+| 0 | 34081 | 1202 | base, composite, border, material and noise among others |
+| 1 | 34085 | 225 | border only |
+| 2 | 34089 | 1203 | base, composite, border, material, BRDF and probes among others |
+| 3 | 34093 | 1204 | base, composite, border, material, BRDF and probes among others |
+
+These are reproducible lookups using the recovered index and mapping inspector,
+not observed KSEA selections. Rendering mode1's program225 does not even name
+base/composite textures; mode names alone do not identify a color pass. The new
+candidates1202/1203/1204 are better-scoped leads for composite color analysis
+than the small DETAIL candidate493. Live geometry/rendering modes, prefix state,
+uniform values, full TER finalization and resource upload remain unresolved.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

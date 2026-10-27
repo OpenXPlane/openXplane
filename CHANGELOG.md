@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Checked original projection-field updates and native variant validation.
+  Composite borders use digit2; rejected combinations and archive lookups narrow
+  composite-color candidates to the relevant declared modes. Live selection and
+  renderer integration remain unfinished.
 - Identified DETAIL as texture mode9 and corrected the interpretation of shader
   candidate493. Checked original reciprocal-scale arithmetic; COMPOSITE_TEX has
   a separate loader branch and still needs final-mode tracing.

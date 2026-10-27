@@ -6,7 +6,7 @@ import json
 import struct
 from pathlib import Path
 
-from emulate_xp import Emulator, UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX
+from emulate_xp import Emulator, RET_ADDR, UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX
 from probe_terrain_shader_registration import REFERENCE_SHA256
 from unicorn import UC_HOOK_CODE
 
@@ -33,7 +33,10 @@ def probe(path):
                     0x14093ccc0: resize, 0x141991300: zero})
 
     def guard(uc, address, size, user):
-        if address not in e.stubs and not 0x14176b3f0 <= address <= 0x14176b757:
+        if address not in e.stubs and not (
+                0x14176b3f0 <= address <= 0x14176b757
+                or 0x14176eb70 <= address < 0x14176ec94
+                or address == RET_ADDR):
             raise ValueError(f"unexpected native callee {address:#x}")
 
     e.uc.hook_add(UC_HOOK_CODE, guard)
@@ -52,13 +55,17 @@ def probe(path):
             expected = [rendering_mode, 1, 0, 0, 1, texture_mode, int(projected), 0, 0, 0, 0]
             if digits != expected:
                 raise ValueError(f"unexpected material digits {digits} != {expected}")
+            accepted = bool(e.call(0x14176eb70, ints=[output], max_instructions=200) & 0xff)
             observations.append({"rendering_mode": rendering_mode, "texture_mode": texture_mode,
-                                 "projected": projected, "digits": digits})
+                                 "projected": projected, "digits": digits,
+                                 "native_validation": accepted})
     return {"reference_sha256": REFERENCE_SHA256,
             "entry_va": "0x14176b3f0", "exclusive_stop_va": "0x14176b757",
             "observations": observations,
+            "validation_va": "0x14176eb70",
+            "accepted_count": sum(o["native_validation"] for o in observations),
             "stub_addresses": [hex(a) for a in e.stubs],
-            "limitations": "Synthetic material fields; texture queries return absent, vector resize is substituted and feature query returns false. Stops before native validation. No TER loading, live state or complete material equivalence is verified."}
+            "limitations": "Synthetic material fields; texture queries return absent, vector resize is substituted and feature query returns false. Preparation stops before validation, which is then executed separately without stubs. No TER loading, live state or complete material equivalence is verified."}
 
 
 if __name__ == "__main__":
