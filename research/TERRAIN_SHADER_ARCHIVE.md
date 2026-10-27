@@ -513,13 +513,24 @@ The direct TER `FAR` branch reads three floats and a texture path. For mode 5 it
 multiplies the first two floats by a runtime global at `0x14611d060`, then stores
 `1 / (end - start)`, `0 - (1 / (end - start)) * start`, and the third float in
 material offsets `0x7c`, `0x80`, and `0x84`. The material constructor initializes
-these three fields to zero, but later overrides and the runtime global's origin
-remain to be traced. `tools/probe_terrain_far.py` compares 257 finite synthetic
-cases bit-for-bit against the original block, with the numeric reader, global,
-and zero register supplied by the harness. The parser retains FAR values and the
+these three fields to zero, but later overrides remain to be traced.
+`tools/probe_terrain_far.py` compares 257 finite synthetic
+cases per branch bit-for-bit against the original blocks, with the numeric reader,
+global and constant registers supplied by the harness. The parser retains FAR values and the
 path, and exposes the arithmetic with an explicit caller-supplied scale. It does
 not yet reproduce directive-order effects, bind the texture or render the result;
 the unsupported warning remains. This does not establish full mod compatibility.
+
+REA identifies the same runtime global in a registration routine at
+`0x1405b0240`: its name is `terrain/composite_far_dist_bias`, and constructor
+`0x140d758c0` stores the supplied initial value of 1.0 in the global. This does
+not prove the value remains 1.0 during a flight or that it cannot be configured.
+The TER `NEAR` branch at `0x1419aaa33..0x1419aaa9f` uses the same input shape
+and shared fields, but stores `-1 / (end - start)` and
+`1 - (-1 / (end - start)) * start`. Both directives are now retained in source
+order, with the last one represented in the metadata and its warning preserved.
+Native execution applies these branches only when the current texture mode is 5;
+the port does not yet model that directive-order condition or texture binding.
 
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.

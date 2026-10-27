@@ -27,13 +27,15 @@ pub struct Composite {
     pub far: Option<CompositeFar>,
 }
 
-/// Raw FAR values and the associated distant texture path.
+/// Raw FAR or NEAR values and the associated texture path.
 #[derive(Debug)]
 pub struct CompositeFar {
     pub start: f32,
     pub end: f32,
     pub texture_scale: f32,
     pub texture: String,
+    /// NEAR reverses the distance transition relative to FAR.
+    pub near: bool,
 }
 
 impl CompositeFar {
@@ -41,8 +43,9 @@ impl CompositeFar {
     pub fn material_fields(&self, distance_scale: f32) -> [f32; 3] {
         let start = self.start * distance_scale;
         let end = self.end * distance_scale;
-        let slope = 1.0 / (end - start);
-        [slope, 0.0 - slope * start, self.texture_scale]
+        let (slope, initial) = if self.near { (-1.0, 1.0) } else { (1.0, 0.0) };
+        let slope = slope / (end - start);
+        [slope, initial - slope * start, self.texture_scale]
     }
 }
 
@@ -160,15 +163,16 @@ impl Material {
                     out.composite.params = Some(params);
                     out.unsupported.insert(command.into());
                 }
-                "FAR" => {
+                "FAR" | "NEAR" => {
                     if values.len() < 4 {
-                        return Err("TER FAR requires three values and a texture path".into());
+                        return Err("TER FAR/NEAR requires three values and a texture path".into());
                     }
                     out.composite.far = Some(CompositeFar {
                         start: number(0)?,
                         end: number(1)?,
                         texture_scale: number(2)?,
                         texture: values[3..].join(" ").replace(['\\', ':'], "/"),
+                        near: command == "NEAR",
                     });
                     out.unsupported.insert(command.into());
                 }
@@ -232,6 +236,15 @@ mod tests {
         );
         assert!(material.unsupported.contains("FAR"));
         assert!(Material::parse("A\n800\nTERRAIN\nBASE_TEX base.png\nFAR 1 2 3\n").is_err());
+        let near = Material::parse(
+            "A\n800\nTERRAIN\nBASE_TEX b.png\nFAR 1 2 3 far.png\nNEAR 10 30 0.5 near.png\n",
+        )
+        .unwrap();
+        let transition = near.composite.far.unwrap();
+        assert!(transition.near);
+        assert_eq!(transition.texture, "near.png");
+        assert_eq!(transition.material_fields(1.0), [-0.05, 1.5, 0.5]);
+        assert!(near.unsupported.contains("NEAR"));
     }
     #[test]
     #[ignore = "requires a read-only installed reference via OPENXPLANE_REFERENCE_ROOT"]
