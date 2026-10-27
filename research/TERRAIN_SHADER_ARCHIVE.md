@@ -321,6 +321,48 @@ candidates1202/1203/1204 are better-scoped leads for composite color analysis
 than the small DETAIL candidate493. Live geometry/rendering modes, prefix state,
 uniform values, full TER finalization and resource upload remain unresolved.
 
+#### Composite candidate1202 sample provenance
+
+The archive inspector now reports implicit/explicit LOD image-sample offsets,
+result and coordinate IDs, and named handle roots through Load, CopyObject and
+SampledImage. Unknown handle operations remain unresolved; cycles/depth are
+bounded. This is structural provenance, not an evaluator, control-flow reachability
+analysis or confirmation that a named texture is bound at runtime. `--member`
+selects an exact archive member while preserving whole-archive inventory.
+
+Candidate terrain_1202.spv is33316 bytes, SHA256
+`6c1161db1f9fd629d481b3e282c8535dc090d48e86371cb141d6edf69b6bd95b`.
+It has18 sample instructions,13 implicit and5 explicit LOD. Every image handle
+in this module resolves through the supported chain operations. Relevant samples:
+
+| Byte offset | Named roots | Coordinate ID | LOD |
+| --- | --- | ---: | --- |
+| 0x297c | tex_base_texture + tex_base_sampler | 11951 | implicit |
+| 0x2a10 | tex_comp | 16121 | implicit |
+| 0x2a88 | tex_comp2 | 16122 | implicit |
+| 0x2ae8 | tex_noise | 8935 | implicit |
+| 0x2b9c | tex_noise | 8936 | implicit |
+| 0x2c50 | tex_noise | 23247 | implicit |
+| 0x2cf0 | tex_noise | 23248 | implicit |
+| 0x69e8 | tex_bord | 14006 | implicit |
+
+Local instruction inspection of0x2afc..0x30f8 shows arithmetic combining four
+noise samples, an alpha extraction from the first composite sample, a smoothstep
+weight and subsequent color mixing. Another weight uses material fields and an
+eye-position input. This is a lead for an isolated arithmetic comparison, not a
+recovered final-color claim: actual uniforms, texture channel interpretation,
+sampling, specialization and downstream material/lighting remain unverified.
+The earlier DETAIL493 arithmetic must not be substituted for this sequence.
+
+```sh
+python tools/inspect_spirv_archive.py "<X-Plane>/Resources/shaders/bin/spv/terrain.xsa" --member terrain_1202.spv --limit 1
+```
+
+Synthetic tests cover combined image/sampler roots, copy/load chains, descriptor
+decorations, unresolved and cyclic handles, truncated samples and exact member
+selection. They verify the inspector only. No original shader bytes or translated
+source enter the repository; original-derived listings remain ignored locally.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

@@ -29,6 +29,27 @@ class ShaderInspectionTests(unittest.TestCase):
             self.assertEqual(report["candidate_count"], 1)
             self.assertEqual(report["candidates"][0]["member"], "test.spv")
             self.assertEqual(inspect_archive(path, "missing", 1)["candidate_count"], 0)
+            self.assertEqual(inspect_archive(path, "missing", 1, "test.spv")["candidate_count"], 1)
+            self.assertEqual(inspect_archive(path, "tex_comp", 1, "absent.spv")["candidate_count"], 0)
+
+    def test_sampled_image_handle_chain_and_unresolved(self):
+        raw = fixture()
+        words = []
+        for opcode, args in [(61, [1, 4, 2]), (83, [1, 5, 4]),
+                             (86, [1, 6, 5, 9]), (87, [1, 7, 6, 8])]:
+            words += [((len(args) + 1) << 16) | opcode, *args]
+        report = inspect_module(raw + struct.pack('<' + 'I' * len(words), *words))
+        sample = report["image_samples"][0]
+        self.assertEqual(sample["result_id"], 7)
+        self.assertEqual(sample["coordinate_id"], 8)
+        self.assertEqual(sample["named_handle_roots"], report["named_ids"])
+        self.assertEqual(sample["unresolved_handle_ids"], [9])
+        # A malformed cyclic handle graph must terminate and stay unresolved.
+        cycle = struct.pack('<4I', (4 << 16) | 83, 1, 4, 4)
+        sample = inspect_module(raw + struct.pack('<' + 'I' * len(words), *words) + cycle)["image_samples"][0]
+        self.assertEqual(sample["unresolved_handle_ids"], [4, 9])
+        with self.assertRaises(ValueError):
+            inspect_module(raw + struct.pack('<3I', (3 << 16) | 87, 1, 2))
 
     def test_truncated_and_zero_size_instructions(self):
         with self.assertRaises(ValueError):

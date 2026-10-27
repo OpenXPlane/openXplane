@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Added image-sample provenance and exact-member selection to the SPIR-V
+  inspector. Candidate1202 exposes four noise samples and distinct composite
+  coordinates; arithmetic execution and live color parity remain unverified.
 - Checked original projection-field updates and native variant validation.
   Composite borders use digit2; rejected combinations and archive lookups narrow
   composite-color candidates to the relevant declared modes. Live selection and
