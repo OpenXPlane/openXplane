@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Located material-to-variant preparation and checked180 controlled states
+  against original instructions. Texture, border and projection digits now have
+  recorded input offsets; original TER loading and live draw selection remain
+  unresolved.
 - Recovered variant slot arithmetic and matched1128 controlled states against
   the original machine code. The extra factor of four is explained; candidate493
   now maps to explicit terrain parameter digits. Live material selection remains

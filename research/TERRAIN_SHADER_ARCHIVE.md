@@ -216,6 +216,39 @@ python tools/probe_shader_variant_index.py "<X-Plane>/X-Plane.exe"
 python -m unittest discover -s tools -p test_shader_variant_index.py
 ```
 
+#### Material-to-digit preparation
+
+A reference to the terrain shader object at0x14176ae5b leads to the material
+preparation call0x14176ac83. REA confirms its callee
+0x14176b3f0..0x14176b795. The new optional emulation probe executes that callee
+through the exclusive boundary0x14176b757, immediately before validation. It
+substitutes texture-presence queries, vector resize and one feature query,
+guards native execution to the observed range and checks the resulting11 digits.
+It does not claim complete material preparation or successful variant selection.
+
+The180 checked synthetic cases span rendering digits0..4, texture digits0..17
+and both projection states. Geometry digit1 and border digit1 are supplied;
+other feature state is absent. The observed mapping includes material+0x44 to
+TEX_MODE, material+0x224 to BORDER_MODE, material+0x1b4 to GEOM_MODE and
+material+0x220 != -1 to PROJ_BASE. Rendering mode is supplied by R9. Caller stack
+arguments supply USE_SHAD, TONE_MODE and shadow state. Material+0x198 is set to1
+in these cases: when it is zero, rendering mode1 substitutes TEX_MODE14 and
+clears the border digit. The actual meaning of this field and how original TER
+loading fills these offsets remain unresolved.
+
+The probe uses zero-initialized scratch material state and absent texture-query
+results, so it does not cover texture-format-dependent alpha, decals, normal
+decals, seasons, weather or the validation stage. The observed integer offsets
+are reference-build-specific, not a public mod ABI or a port runtime layout.
+
+```sh
+python tools/probe_terrain_material_digits.py "<X-Plane>/X-Plane.exe"
+```
+
+Next trace the original TER loader's assignments to these fields, including
+COMPOSITE_TEX and COMPOSITE_BORDERS, then verify with loaded material state.
+Current COMPOSITE_TEX rendering remains unimplemented and estimates unchanged.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

@@ -32,8 +32,9 @@ fn main() -> ExitCode {
         "shader-registration-empty" => ("0x14103cdb0", "0x14103cdc8"),
         "terrain-shader-factory" => ("0x14176cb30", "0x14176ce76"),
         "shader-variant-index" => ("0x14104f0a0", "0x14104f16a"),
+        "terrain-material-digits" => ("0x14176b3f0", "0x14176b795"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record/shader-registration-base/shader-registration-empty/terrain-shader-factory/shader-variant-index");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record/shader-registration-base/shader-registration-empty/terrain-shader-factory/shader-variant-index/terrain-material-digits");
             return ExitCode::from(2);
         }
     };
