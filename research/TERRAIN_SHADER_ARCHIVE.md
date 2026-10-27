@@ -182,6 +182,40 @@ the registration result in RDX to an indirect manager call at0x14176ccf7 and
 stores its result at0x1460ac238. The indirect target and its runtime state still
 need tracing. No original disassembly or resource data is distributed.
 
+#### Recovered slot arithmetic
+
+REA confirms0x14104f0a0..0x14104f16a computes a mixed-radix slot. Its RCX
+shader object supplies range records at0xf88..0xf90, each40 bytes with the radix
+at+32. RDX supplies parameter digits through its first pointer. When the shader's
+32-bit field0x112c is zero, the function first includes R8's low byte with radix2
+and the state byte at RDX+0x80 with radix2. With a nonzero field, it skips both.
+Their live meanings are still unknown. It then accumulates each parameter digit
+times the running product of preceding radices, using32-bit wrapping arithmetic.
+This explains the previously unresolved factor of four: mode0 has capacity
+4*207360=829440. It does not establish the caller's actual parameter values.
+
+`tools/shader_variant_index.py` implements the recovered arithmetic for analysis
+and decodes slots under an explicit prefix assumption. Its encoder validates
+valid digit ranges; the native arithmetic itself does not perform those checks.
+`tools/probe_shader_variant_index.py` compares it with the original function on
+1128 controlled inputs: zero, maximum, each maximum digit in isolation and128
+seeded random states, for both field modes and all four binary prefix pairs.
+No calls or stubs occur inside the index function. Declaration recovery still
+uses the substitutions disclosed by the registration probe. Synthetic tests
+exercise exhaustive small-radix round trips, invalid inputs and32-bit wrapping.
+
+Under mode0 and the observed terrain declaration order, slots13465 and39385
+both decode to prefix[1,0], RENDERING_MODE1, GEOM_MODE1, BORDER_MODE1 and
+TEX_MODE9. All other digits are zero except PROJ_BASE, which is0 and1
+respectively. This ties candidate493 to a precise combination of declarations;
+the meanings of TEX_MODE9 and BORDER_MODE1, live selection, uniform values and
+resource upload remain to be recovered before renderer integration.
+
+```sh
+python tools/probe_shader_variant_index.py "<X-Plane>/X-Plane.exe"
+python -m unittest discover -s tools -p test_shader_variant_index.py
+```
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

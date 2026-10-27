@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Recovered variant slot arithmetic and matched1128 controlled states against
+  the original machine code. The extra factor of four is explained; candidate493
+  now maps to explicit terrain parameter digits. Live material selection remains
+  unverified and the renderer is unchanged.
 - Removed the base-constructor stub from terrain registration research and
   checked its original inline stage vector. Located the manager call; variant
   index encoding and rendered output remain unchanged.
