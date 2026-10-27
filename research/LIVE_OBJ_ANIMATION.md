@@ -1,5 +1,17 @@
 # Live OBJ animation in the flight scene
 
+`ANIM_keyframe_loop` following a completed translation or rotation now wraps
+the resolved finite dataref value by its positive period before interpolation.
+This follows the published OBJ8 remainder description; negative values, invalid
+periods and native runtime evaluation have not been compared against the original.
+REA identified a loader branch at `0x1408784b6..0x1408784d8` that converts the
+read double to float and stores it at the current animation record's `+0x14`.
+`tools/probe_obj_animation_loop.py` checks five supplied numbers through this
+block with the numeric reader substituted. This tests storage, not evaluation.
+Some installed UHWW OBJ files omit required key-table end commands and put the
+loop command inside the unfinished block. Those files still fail parsing; no
+implicit-end behavior is asserted without a native comparison.
+
 ## Behavior and evidence boundaries
 
 OBJ parsing previously consumed animation commands at dataref value zero and kept

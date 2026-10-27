@@ -59,11 +59,13 @@ enum Animation {
         keys: Vec<(f32, f32)>,
         dataref: String,
         linear: bool,
+        looping: Option<f32>,
     },
     Translate {
         keys: Vec<(f32, Vec3)>,
         dataref: String,
         linear: bool,
+        looping: Option<f32>,
     },
     Visibility {
         low: f32,
@@ -82,8 +84,9 @@ impl Animation {
                 keys,
                 dataref,
                 linear,
+                looping,
             } => {
-                let value = read(dataref);
+                let value = looping.map_or_else(|| read(dataref), |period| read(dataref) % period);
                 let angle = if *linear {
                     keys[0].1 + (keys[1].1 - keys[0].1) * fraction(value, keys[0].0, keys[1].0)
                 } else {
@@ -95,8 +98,9 @@ impl Animation {
                 keys,
                 dataref,
                 linear,
+                looping,
             } => {
-                let value = read(dataref);
+                let value = looping.map_or_else(|| read(dataref), |period| read(dataref) % period);
                 let offset = if *linear {
                     keys[0]
                         .1
@@ -318,6 +322,7 @@ impl Object {
                                 keys: vec![(v[6], vec3(&v)), (v[7], vec3(&v[3..]))],
                                 dataref: args.get(8).unwrap_or(&"none").to_string(),
                                 linear: true,
+                                looping: None,
                             },
                         )?;
                     }
@@ -335,6 +340,7 @@ impl Object {
                                 keys: vec![(v[5], v[3]), (v[6], v[4])],
                                 dataref: args.get(7).unwrap_or(&"none").to_string(),
                                 linear: true,
+                                looping: None,
                             },
                         )?;
                     }
@@ -370,6 +376,7 @@ impl Object {
                                     keys: values,
                                     dataref,
                                     linear: false,
+                                    looping: None,
                                 },
                             )?;
                         } else {
@@ -405,6 +412,7 @@ impl Object {
                                     keys: values,
                                     dataref,
                                     linear: false,
+                                    looping: None,
                                 },
                             )?;
                         } else {
@@ -422,6 +430,26 @@ impl Object {
                                 dataref: args.get(2).unwrap_or(&"none").to_string(),
                             },
                         )?;
+                    }
+                    "ANIM_keyframe_loop" => {
+                        if keys.is_some() {
+                            return Err("animation loop before key block end is unsupported".into());
+                        }
+                        let period = numeric(args, 1)?[0];
+                        if period <= 0.0 {
+                            return Err("invalid animation loop period".into());
+                        }
+                        let index = *pose
+                            .operations
+                            .last()
+                            .ok_or("animation loop has no preceding animation")?;
+                        match &mut obj.animations[index] {
+                            Animation::Rotate { looping, .. }
+                            | Animation::Translate { looping, .. } => *looping = Some(period),
+                            Animation::Visibility { .. } => {
+                                return Err("animation loop follows visibility".into());
+                            }
+                        }
                     }
                     "ATTR_cull" => cull = true,
                     "ATTR_no_cull" => cull = false,
@@ -606,6 +634,14 @@ mod tests {
             .animated_vertices(|name| (name == "sim/travel[1]").then_some(2.0))
             .unwrap();
         assert_eq!(v[0].position, [5.5, 0.0, 0.0]);
+    }
+    #[test]
+    fn keyframe_loop_wraps_dataref_before_interpolation() {
+        let o = Object::parse(&format!("{TRI}ANIM_begin\nANIM_trans_begin sim/time\nANIM_trans_key 0 0 0 0\nANIM_trans_key 8 8 0 0\nANIM_trans_end\nANIM_keyframe_loop 8\nTRIS 0 3\nANIM_end\n")).unwrap();
+        let at_two = o.animated_vertices(|_| Some(2.0)).unwrap();
+        let at_ten = o.animated_vertices(|_| Some(10.0)).unwrap();
+        assert_eq!(at_two[0].position, at_ten[0].position);
+        assert!(!o.unsupported.contains_key("ANIM_keyframe_loop"));
     }
 
     #[test]

@@ -20,6 +20,7 @@ fn main() -> ExitCode {
         "attachment-view" => ("0x1407b4780", "0x1407b47f7"),
         "attachment-matrix" => ("0x141775d10", "0x141775ece"),
         "obj-key-insert" => ("0x1408751b0", "0x1408752b0"),
+        "obj-animation-loop" => ("0x14087849e", "0x1408784dd"),
         "facade-segment-loader" => ("0x141981450", "0x141981650"),
         "shader-mapping-header" => ("0x14103fafa", "0x14103fb2b"),
         "shader-mapping-reader" => ("0x14105e350", "0x14105f675"),
