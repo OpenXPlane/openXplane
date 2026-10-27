@@ -11,7 +11,10 @@ Synthetic tests cover ordering, disabled packs, overlay and global fallback.
 The installed `2_UHWW_Ortho` tile is an overlay, not a base mesh. Overlay DSFs
 above the selected base are now read in pack order, with their object, facade and
 draped polygon placements passed through the existing preview renderers. DSF
-exclusion zones and airport ownership filters are not implemented; layer order,
+object exclusion zones are applied to point placements from lower-priority
+overlays. Repeated `sim/exclude_obj` properties, rectangular bounds and concave
+polygon boundaries are retained. Other exclusion types and airport ownership
+filters remain unimplemented; layer order,
 height and resource interpretation remain approximations. No 1:1 parity is claimed.
 An offscreen UHWW run selected the global `+43+132` base and rendered 16885
 source triangles, with 1198 nearby object instances. The resulting
@@ -23,6 +26,10 @@ With overlay loading enabled, an installed UHWW run reads both `1_UHWW` and
 preview, while `1_UHWW` reports 652 unresolved object placements and three
 failed resources, including nested animation keys and non-UTF-8 text. These
 observations are local to this installation and do not establish mod parity.
+An additional UHWW run applied object zones from higher-priority overlays and
+reported 430 Global Airports and 350 AEP placements excluded. Its
+[screenshot](../site/assets/uhww-object-exclusions.jpg) is a port-only preview;
+there is no matched original screenshot or native exclusion-loader replay yet.
 The first full overlay preview exhausted GPU memory on an RTX 2080. The preview
 now resizes uploaded color textures to a maximum dimension of 1024 pixels by
 default (`OPENXPLANE_TEXTURE_MAX_SIZE` overrides it). This is a visual-quality

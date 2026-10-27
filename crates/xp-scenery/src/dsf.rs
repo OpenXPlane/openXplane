@@ -115,6 +115,110 @@ pub fn is_overlay(data: &[u8]) -> Result<bool, String> {
     Ok(false)
 }
 
+/// Object exclusion region in geographic longitude/latitude coordinates.
+#[derive(Debug)]
+pub struct ObjectExclusion {
+    bounds: [f64; 4],
+    polygon: Vec<[f64; 2]>,
+}
+
+impl ObjectExclusion {
+    pub fn contains(&self, lon: f64, lat: f64) -> bool {
+        let [west, south, east, north] = self.bounds;
+        if lon < west || lon > east || lat < south || lat > north {
+            return false;
+        }
+        if self.polygon.is_empty() {
+            return true;
+        }
+        let mut inside = false;
+        for i in 0..self.polygon.len() {
+            let [x1, y1] = self.polygon[i];
+            let [x2, y2] = self.polygon[(i + 1) % self.polygon.len()];
+            let cross = (lon - x1) * (y2 - y1) - (lat - y1) * (x2 - x1);
+            if cross.abs() < 1e-12
+                && lon >= x1.min(x2)
+                && lon <= x1.max(x2)
+                && lat >= y1.min(y2)
+                && lat <= y1.max(y2)
+            {
+                return true;
+            }
+            if (y1 > lat) != (y2 > lat) && lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1 {
+                inside = !inside;
+            }
+        }
+        inside
+    }
+}
+
+/// Retain every object exclusion property, including repeated keys.
+pub fn object_exclusions(data: &[u8]) -> Result<Vec<ObjectExclusion>, String> {
+    if data.len() < 28
+        || data.len() > LIMIT
+        || &data[..8] != b"XPLNEDSF"
+        || data[8..12] != 1u32.to_le_bytes()
+    {
+        return Err("unsupported DSF header or size".into());
+    }
+    let mut result = Vec::new();
+    for (tag, body) in atoms(&data[12..data.len() - 16])? {
+        if tag != *b"DAEH" {
+            continue;
+        }
+        for (tag, body) in atoms(body)? {
+            if tag != *b"PORP" {
+                continue;
+            }
+            let values = strings(body)?;
+            if values.len() % 2 != 0 {
+                return Err("odd DSF properties".into());
+            }
+            for pair in values.as_chunks::<2>().0 {
+                if pair[0] != "sim/exclude_obj" {
+                    continue;
+                }
+                let (rectangle, polygon) = pair[1].split_once(';').unwrap_or((&pair[1], ""));
+                let parse = |s: &str| {
+                    s.parse::<f64>()
+                        .map_err(|_| "invalid exclusion coordinate".to_string())
+                        .and_then(|v| {
+                            if v.is_finite() {
+                                Ok(v)
+                            } else {
+                                Err("nonfinite exclusion coordinate".into())
+                            }
+                        })
+                };
+                let b = rectangle
+                    .split('/')
+                    .map(parse)
+                    .collect::<Result<Vec<_>, _>>()?;
+                let bounds: [f64; 4] = b.try_into().map_err(|_| "invalid exclusion bounds")?;
+                if bounds[0] > bounds[2] || bounds[1] > bounds[3] {
+                    return Err("reversed exclusion bounds".into());
+                }
+                let coords = if polygon.is_empty() {
+                    Vec::new()
+                } else {
+                    polygon
+                        .split(',')
+                        .map(parse)
+                        .collect::<Result<Vec<_>, _>>()?
+                };
+                if !coords.is_empty() && (coords.len() < 6 || coords.len() % 2 != 0) {
+                    return Err("invalid exclusion polygon".into());
+                }
+                result.push(ObjectExclusion {
+                    bounds,
+                    polygon: coords.as_chunks::<2>().0.to_vec(),
+                });
+            }
+        }
+    }
+    Ok(result)
+}
+
 impl HeightRaster {
     pub fn read(path: &Path) -> Result<Self, String> {
         Self::parse(&read_bytes(path)?)
@@ -262,6 +366,20 @@ use std::io::Read;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn object_exclusions_preserve_repeated_rectangles_and_concave_polygons() {
+        let mut data = b"XPLNEDSF\x01\0\0\0".to_vec();
+        let props = b"sim/exclude_obj\0-2/-1/2/1\0sim/exclude_obj\x0010/10/14/14;10,10,14,10,14,11,11,11,11,14,10,14\0";
+        data.extend(atom(b"DAEH", &atom(b"PORP", props)));
+        data.extend([0; 16]);
+        let zones = object_exclusions(&data).unwrap();
+        assert_eq!(zones.len(), 2);
+        assert!(zones[0].contains(0.0, 0.0));
+        assert!(!zones[0].contains(3.0, 0.0));
+        assert!(zones[1].contains(10.5, 13.0));
+        assert!(!zones[1].contains(13.0, 13.0));
+        assert!(zones[1].contains(11.0, 12.0));
+    }
     fn atom(tag: &[u8; 4], body: &[u8]) -> Vec<u8> {
         [
             tag.as_slice(),

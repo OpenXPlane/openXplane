@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Overlay object exclusions
+
+- Apply repeated rectangular and polygonal `sim/exclude_obj` zones to object
+  placements in lower-priority scenery overlays. In the installed UHWW scene,
+  430 Global Airports and 350 AEP placements were excluded. The [preview](site/assets/uhww-object-exclusions.jpg)
+  still uses approximate scenery rendering; other exclusion types and airport
+  ownership filters remain unsupported.
+
 ### Scenery overlay preview
 
 - Load enabled overlay DSFs above the base mesh, including package-local objects,

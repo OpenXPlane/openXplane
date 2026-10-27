@@ -653,16 +653,22 @@ impl AircraftBody {
 
 fn airport_objects(
     pack: &Path,
-    path: &Path,
+    bytes: &[u8],
     library: &BTreeMap<String, PathBuf>,
     frame: &openxplane::world::Frame,
     ground: Option<&openxplane::ground::Ground>,
+    exclusions: &[openxplane::dsf::ObjectExclusion],
 ) -> Result<Vec<Mesh>, String> {
-    let features = openxplane::dsf::features(&openxplane::dsf::read_bytes(path)?)?;
+    let features = openxplane::dsf::features(bytes)?;
     let placements = features.objects;
     let mut grouped = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
     let mut unresolved = 0;
+    let mut excluded = 0;
     for p in &placements {
+        if exclusions.iter().any(|zone| zone.contains(p.lon, p.lat)) {
+            excluded += 1;
+            continue;
+        }
         let [x, z] = frame.to_local(p.lat, p.lon);
         if x.abs() > 6000.0 || z.abs() > 6000.0 {
             continue;
@@ -810,7 +816,7 @@ fn airport_objects(
         }
     }
     println!(
-        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {unresolved} unresolved placements; {failed} failed resources. Preview libraries/terrain height with flat fallback; partial straight FAC walls, no networks.",
+        "DSF objects: {} tile placements; {instances} nearby instances, {} resource batches; {excluded} excluded, {unresolved} unresolved placements; {failed} failed resources. Preview libraries/terrain height with flat fallback; partial straight FAC walls, no networks.",
         placements.len(),
         meshes.len() - facade_batches
     );
@@ -1324,11 +1330,30 @@ pub fn airport_flight(
         model.set_ground(ground.clone());
     }
     let overlay_library = install.preview_library_at(Some(frame.origin()))?;
+    let mut exclusions = Vec::new();
     for (pack, path) in install.overlay_tiles(frame.origin()[0], frame.origin()[1])? {
         println!("Scenery overlay: {}", path.display());
-        match airport_objects(&pack, &path, &overlay_library, &frame, ground.as_deref()) {
+        let bytes = match openxplane::dsf::read_bytes(&path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                eprintln!("DSF overlay unavailable {}: {e}", path.display());
+                continue;
+            }
+        };
+        match airport_objects(
+            &pack,
+            &bytes,
+            &overlay_library,
+            &frame,
+            ground.as_deref(),
+            &exclusions,
+        ) {
             Ok(objects) => meshes.extend(objects),
             Err(e) => eprintln!("DSF overlay unavailable {}: {e}", path.display()),
+        }
+        match openxplane::dsf::object_exclusions(&bytes) {
+            Ok(zones) => exclusions.extend(zones),
+            Err(e) => eprintln!("DSF object exclusions unavailable {}: {e}", path.display()),
         }
     }
     let first_mesh = meshes.len();
