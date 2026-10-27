@@ -25,6 +25,9 @@ pub struct Composite {
     /// Six required values and the optional seventh (zero when absent).
     pub params: Option<[f32; 7]>,
     pub far: Option<CompositeFar>,
+    // State for the observed mode-5 directive sequence. Other texture modes
+    // and their interactions have not yet been reconstructed.
+    mode5_fields: Option<([f32; 2], [f32; 7])>,
 }
 
 /// Raw FAR or NEAR values and the associated texture path.
@@ -50,6 +53,17 @@ impl CompositeFar {
 }
 
 impl Composite {
+    /// Mode-5 fields after the recognized texture, projection and parameter
+    /// directives, assuming no intervening directive changes texture mode.
+    pub fn loaded_mode5_uniform_prefix(&self, far: [f32; 3]) -> Option<[[f32; 4]; 3]> {
+        let (projection, params) = self.mode5_fields?;
+        let [a, b, c, d, e, f, g] = params;
+        Some([
+            [projection[0], -projection[1], a, b],
+            [c, -d, e, f],
+            [g, far[0], far[1], far[2]],
+        ])
+    }
     /// Build the first three material vectors for native texture mode 5.
     /// `far` contains already-prepared original material values, not raw FAR
     /// directive arguments. Missing projection or parameters stay unresolved.
@@ -141,6 +155,11 @@ impl Material {
                     } else {
                         out.composite.texture = Some(path);
                         out.composite.nowrap = command == "COMPOSITE_TEX_NOWRAP";
+                        out.composite.mode5_fields = if command == "COMPOSITE_TEX" {
+                            Some(([1.0, 1.0], [0.1, 0.1, 0.0625, 8.0, 0.5, 0.5, 0.0]))
+                        } else {
+                            None
+                        };
                     }
                     // Preserve the runtime warning until these inputs reach the shader.
                     out.unsupported.insert(command.into());
@@ -150,6 +169,10 @@ impl Material {
                         return Err("TER composite projection requires two values".into());
                     }
                     out.composite.projected = Some([number(0)?, number(1)?]);
+                    if let Some((projection, _)) = &mut out.composite.mode5_fields {
+                        *projection =
+                            [number(0)?, number(1)?].map(|v| (1.0_f64 / f64::from(v)) as f32);
+                    }
                     out.unsupported.insert(command.into());
                 }
                 "COMPOSITE_PARAMS" => {
@@ -161,6 +184,9 @@ impl Material {
                         *value = number(i)?;
                     }
                     out.composite.params = Some(params);
+                    if let Some((_, current)) = &mut out.composite.mode5_fields {
+                        *current = params;
+                    }
                     out.unsupported.insert(command.into());
                 }
                 "FAR" | "NEAR" => {
@@ -378,6 +404,34 @@ mod tests {
             Composite::default()
                 .mode5_uniform_prefix([0.0; 3])
                 .is_none()
+        );
+    }
+    #[test]
+    fn mode5_texture_resets_prior_fields_and_later_directives_override_them() {
+        let header = "A\n800\nTERRAIN\nBASE_TEX base.png\n";
+        let reset = Material::parse(
+            &(header.to_owned()
+                + "COMPOSITE_PROJECTED 8 4\nCOMPOSITE_PARAMS 1 2 3 4 5 6 7\nCOMPOSITE_TEX c.png\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            reset.composite.loaded_mode5_uniform_prefix([0.0; 3]),
+            Some([[1.0, -1.0, 0.1, 0.1], [0.0625, -8.0, 0.5, 0.5], [0.0; 4]])
+        );
+        let changed = Material::parse(
+            &(header.to_owned()
+                + "COMPOSITE_TEX c.png\nCOMPOSITE_PROJECTED 2 4\nCOMPOSITE_PARAMS 1 2 3 4 5 6 7\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            changed
+                .composite
+                .loaded_mode5_uniform_prefix([8.0, 9.0, 10.0]),
+            Some([
+                [0.5, -0.25, 1.0, 2.0],
+                [3.0, -4.0, 5.0, 6.0],
+                [7.0, 8.0, 9.0, 10.0]
+            ])
         );
     }
     #[test]

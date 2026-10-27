@@ -496,8 +496,8 @@ against that block, substituting numeric input and supplying XMM10=double1.
 COMPOSITE_PARAMS populates material+0x60..0x78 as documented above. Therefore the
 port's `Composite::mode5_uniform_prefix` prepares the first three vectors when
 both directives are present, taking the last three prepared material fields as
-explicit caller inputs. These are not raw FAR directive arguments. Absent fields
-remain unresolved rather than receiving invented defaults.
+explicit caller inputs. These are not raw FAR directive arguments. This raw-input
+helper leaves absent fields unresolved.
 
 ```sh
 python tools/probe_terrain_uniform_prefix.py "<X-Plane>/X-Plane.exe"
@@ -520,6 +520,17 @@ global and constant registers supplied by the harness. The parser retains FAR va
 path, and exposes the arithmetic with an explicit caller-supplied scale. It does
 not yet reproduce directive-order effects, bind the texture or render the result;
 the unsupported warning remains. This does not establish full mod compatibility.
+
+The `COMPOSITE_TEX` accepted branch resets the numeric material fields at
+`0x1419a7616..0x1419a765a`. An isolated emulator run verifies the reset values
+independently of the number-reading probes: projection reciprocals become 1,1;
+the seven parameter fields become 0.1,0.1,0.0625,8,0.5,0.5,0; and the three
+FAR fields become zero. `loaded_mode5_uniform_prefix` models those defaults and
+later recognized projection/parameter directives, including repeated texture
+resets, while retaining raw directives separately. Its FAR fields are still
+explicit caller inputs. It assumes no intervening directive changes texture mode;
+other modes, NOWRAP and texture-binding behavior remain unverified. It is not yet
+used by the renderer, so this is not a rendered-pixel comparison.
 
 REA identifies the same runtime global in a registration routine at
 `0x1405b0240`: its name is `terrain/composite_far_dist_bias`, and constructor
