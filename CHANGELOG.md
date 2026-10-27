@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Identified DETAIL as texture mode9 and corrected the interpretation of shader
+  candidate493. Checked original reciprocal-scale arithmetic; COMPOSITE_TEX has
+  a separate loader branch and still needs final-mode tracing.
 - Located material-to-variant preparation and checked180 controlled states
   against original instructions. Texture, border and projection digits now have
   recorded input offsets; original TER loading and live draw selection remain

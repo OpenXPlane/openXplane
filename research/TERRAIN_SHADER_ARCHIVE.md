@@ -249,6 +249,41 @@ Next trace the original TER loader's assignments to these fields, including
 COMPOSITE_TEX and COMPOSITE_BORDERS, then verify with loaded material state.
 Current COMPOSITE_TEX rendering remains unimplemented and estimates unchanged.
 
+#### DETAIL corrects the candidate interpretation
+
+REA bounded observations in the TER loader identify the directive check at
+0x1419a84b9 targeting0x14279f2a0 (`DETAIL`). Its accepted branch at0x1419a84d1
+reads one float, computes its reciprocal through double precision and stores the
+rounded float twice, followed by two float1 values. At0x1419a8514 it stores
+texture mode9 into the local material at frame+0xd4. This is material+0x44
+relative to the material beginning at frame+0x90. The loader's creation calls at
+0x1419abb6f and0x1419abc14 pass that material block onward.
+
+Consequently candidate493, selected earlier because it names tex_comp resources,
+is linked to DETAIL mode9, not established as the program for COMPOSITE_TEX.
+Resource names alone were insufficient. The earlier analysis candidate remains
+useful for DETAIL investigation but must not drive generic COMPOSITE_TEX
+implementation. No such integration has been made.
+
+The separate COMPOSITE_TEX check at0x1419a7380 targets0x142585910. Its texture
+load branch stores mode5 at0x1419a75cd. This is an intermediate assignment:
+later directives and finalization can change the mode, so mode5 alone does not
+establish the final composite material's active shader.
+
+`tools/probe_terrain_detail_mode.py` checks six positive scales in the original
+arithmetic block through an exact exclusive stop. It substitutes only the float
+read, supplies a synthetic frame and XMM10=double1, and confirms the reciprocal
+fields and mode9 assignment. Token recognition, full loading and draw state are
+outside this probe. Original bytes and listings remain local.
+
+```sh
+python tools/probe_terrain_detail_mode.py "<X-Plane>/X-Plane.exe"
+```
+
+Next identify the final mode after actual COMPOSITE_TEX/PROJECTED combinations,
+then choose matching modules using the recovered index. Renderer percentages and
+original-mod verification remain unchanged.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

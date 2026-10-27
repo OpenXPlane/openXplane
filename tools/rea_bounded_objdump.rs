@@ -33,8 +33,10 @@ fn main() -> ExitCode {
         "terrain-shader-factory" => ("0x14176cb30", "0x14176ce76"),
         "shader-variant-index" => ("0x14104f0a0", "0x14104f16a"),
         "terrain-material-digits" => ("0x14176b3f0", "0x14176b795"),
+        "terrain-detail-mode" => ("0x1419a84b3", "0x1419a851e"),
+        "terrain-composite-texture" => ("0x1419a7376", "0x1419a765f"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record/shader-registration-base/shader-registration-empty/terrain-shader-factory/shader-variant-index/terrain-material-digits");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record/shader-registration-base/shader-registration-empty/terrain-shader-factory/shader-variant-index/terrain-material-digits/terrain-detail-mode/terrain-composite-texture");
             return ExitCode::from(2);
         }
     };
