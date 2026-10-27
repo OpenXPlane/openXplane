@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Recovered and tested original mode5 composite uniform-prefix packing, including
+  reciprocal projection and sign changes. Added a port helper for explicit inputs;
+  renderer integration and live GPU comparison remain unfinished.
 - Confirmed composite parameter order in the direct TER-loader branch as well
   as the common reader; added explicit seventh-value regression coverage.
   GPU uniform upload remains unverified.

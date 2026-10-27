@@ -461,6 +461,54 @@ This establishes material field storage only. Uniform upload, default values
 when the whole directive is absent, sampler behavior and complete live materials
 remain unverified. Do not infer GPU uniform equivalence from adjacent fields.
 
+#### Material uniform prefix
+
+The material constant creation routine0x1417702b0 zeroes a0x1c0-byte buffer,
+calls0x1417705c0 to fill it, creates a matching-sized graphics resource on a
+cache miss and copies the filled bytes into it. Its helper at0x14176f680 also
+caches the0x1c0-byte value. In terrain_1202.spv, the `u_material_data` member
+offsets span0x000 through0x1b0, consistent with a0x1c0-byte block. The direct
+original packing range0x1417705c0..0x1417709b2 is retained through REA; the
+function's split PE unwind records do not cover the whole range as one entry.
+
+The mode jump table selects0x14177090c for texture mode5. With a zeroed output,
+its first three vectors are material fields:
+
+| Uniform vector | Source material offsets |
+| --- | --- |
+| tex_params | +0x58, negated +0x5c, +0x60, +0x64 |
+| tex_params2 | +0x68, negated +0x6c, +0x70, +0x74 |
+| tex_params3 | +0x78, +0x7c, +0x80, +0x84 |
+
+The mode5 branch also copies material+0x88..0x94 to tex_params4. Mode6 uses
+different packing and leaves the third/fourth vectors untouched in this region.
+`tools/probe_terrain_uniform_prefix.py` compares the first64 bytes against
+original instructions on512 controlled raw-bit cases for both modes, including
+signed zero, infinities and NaN bit patterns. It zeroes the destination as the
+native caller does and substitutes a texture-presence query; it stops before
+remaining fields and upload. These tests check copying and sign-bit operations,
+not float shader results or the full constant buffer.
+
+The direct COMPOSITE_PROJECTED branch0x1419a8316..0x1419a8360 reads two floats,
+uses double-precision reciprocals rounded to float and stores them at material
+offsets0x58/+0x5c. The extended parameter probe checks three positive scale pairs
+against that block, substituting numeric input and supplying XMM10=double1.
+COMPOSITE_PARAMS populates material+0x60..0x78 as documented above. Therefore the
+port's `Composite::mode5_uniform_prefix` prepares the first three vectors when
+both directives are present, taking the last three prepared material fields as
+explicit caller inputs. These are not raw FAR directive arguments. Absent fields
+remain unresolved rather than receiving invented defaults.
+
+```sh
+python tools/probe_terrain_uniform_prefix.py "<X-Plane>/X-Plane.exe"
+python tools/probe_composite_parameter_fields.py "<X-Plane>/X-Plane.exe"
+```
+
+The helper is not connected to the renderer. Texture coordinates, remaining
+uniforms, FAR conversion, shader selection and actual resource/color-space upload
+still need recovery and live comparison. Composite rendering remains unsupported
+and compatibility percentages remain unchanged.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

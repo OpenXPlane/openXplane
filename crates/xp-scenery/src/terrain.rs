@@ -26,6 +26,22 @@ pub struct Composite {
     pub params: Option<[f32; 7]>,
 }
 
+impl Composite {
+    /// Build the first three material vectors for native texture mode 5.
+    /// `far` contains already-prepared original material values, not raw FAR
+    /// directive arguments. Missing projection or parameters stay unresolved.
+    pub fn mode5_uniform_prefix(&self, far: [f32; 3]) -> Option<[[f32; 4]; 3]> {
+        let [s, t] = self.projected?;
+        let [a, b, c, d, e, f, g] = self.params?;
+        let reciprocal = |v: f32| (1.0_f64 / f64::from(v)) as f32;
+        Some([
+            [reciprocal(s), -reciprocal(t), a, b],
+            [c, -d, e, f],
+            [g, far[0], far[1], far[2]],
+        ])
+    }
+}
+
 impl Material {
     pub fn parse(text: &str) -> Result<Self, String> {
         let lines = text
@@ -252,6 +268,25 @@ mod tests {
                 "{directive}"
             );
         }
+    }
+
+    #[test]
+    fn mode5_uniform_prefix_uses_original_field_order_and_sign() {
+        let text = "A\n800\nTERRAIN\nBASE_TEX base.png\nCOMPOSITE_PROJECTED 2 4\nCOMPOSITE_PARAMS 1 2 3 4 5 6 7\n";
+        let material = Material::parse(text).unwrap();
+        assert_eq!(
+            material.composite.mode5_uniform_prefix([8.0, 9.0, 10.0]),
+            Some([
+                [0.5, -0.25, 1.0, 2.0],
+                [3.0, -4.0, 5.0, 6.0],
+                [7.0, 8.0, 9.0, 10.0]
+            ])
+        );
+        assert!(
+            Composite::default()
+                .mode5_uniform_prefix([0.0; 3])
+                .is_none()
+        );
     }
     #[test]
     fn base_mapping_preserves_explicit_st_and_projected_scale() {

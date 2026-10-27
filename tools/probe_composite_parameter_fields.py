@@ -2,10 +2,11 @@
 import argparse
 import hashlib
 import json
+import struct
 from pathlib import Path
 from emulate_xp import Emulator, UC_X86_REG_RAX
 from probe_terrain_shader_registration import REFERENCE_SHA256
-from unicorn.x86_const import UC_X86_REG_RBP, UC_X86_REG_RSI
+from unicorn.x86_const import UC_X86_REG_RBP, UC_X86_REG_RSI, UC_X86_REG_XMM10
 
 
 def probe(path):
@@ -63,12 +64,31 @@ def probe(path):
         if actual != supplied + ([] if optional else [0.0]) or reads != supplied:
             raise ValueError('TER composite field mismatch')
         ter_observations.append({'optional_seventh': optional, 'stored_fields': actual})
+    projections = []
+    for scales in ([2.0, 4.0], [0.1, 123.0], [0.25, 4096.0]):
+        scale32 = [struct.unpack('<f', struct.pack('<f', v))[0] for v in scales]
+        pending = iter(scale32)
+
+        def read_scale(emu):
+            emu.set_xmm_f32(0, next(pending))
+
+        e.stubs[0x1406ca600] = read_scale
+        e.uc.reg_write(UC_X86_REG_RBP, frame)
+        e.uc.reg_write(UC_X86_REG_XMM10, struct.unpack('<Q', struct.pack('<d', 1.0))[0])
+        e.call(0x1419a8316, until=0x1419a8360, max_instructions=100)
+        actual = [e.read_f32(frame + 0xe8), e.read_f32(frame + 0xec)]
+        expected = [struct.unpack('<f', struct.pack('<f', 1.0 / v))[0] for v in scale32]
+        if actual != expected:
+            raise ValueError('TER composite projection mismatch')
+        projections.append({'input': scale32, 'reciprocals': actual})
     return {'reference_sha256': REFERENCE_SHA256, 'begin_va': '0x140c2e780',
             'exclusive_stop_va': '0x140c2f1c0', 'observations': observations,
             'ter_block': {'begin_va': '0x1419a9f82', 'exclusive_stop_va': '0x1419ab53b',
                           'observations': ter_observations},
+            'ter_projection': {'begin_va': '0x1419a8316', 'exclusive_stop_va': '0x1419a8360',
+                               'observations': projections},
             'stub_addresses': ['0x1406ca600', '0x14061d8d0', '0x14072f8c0'],
-            'limitations': 'Starts after token recognition; number/whitespace/optional-token queries substituted and cursor synthetic. Verifies field order and absent optional value in common and TER blocks only; not complete TER parsing or GPU uniform mapping.'}
+            'limitations': 'Starts after token recognition; number/whitespace/optional-token queries substituted, cursor and XMM10 synthetic. Verifies storage order and reciprocal arithmetic only; not complete TER parsing or GPU execution.'}
 
 
 if __name__ == '__main__':

@@ -40,8 +40,11 @@ fn main() -> ExitCode {
         "terrain-composite-border-field" => ("0x1419a8365", "0x1419a838f"),
         "composite-parameter-fields" => ("0x140c2e780", "0x140c2e850"),
         "ter-composite-parameter-fields" => ("0x1419a9f64", "0x1419aa016"),
+        "terrain-uniform-packing" => ("0x1417705c0", "0x1417709b2"),
+        "terrain-uniform-cache" => ("0x1417702b0", "0x1417705b8"),
+        "ter-composite-projection" => ("0x1419a82fc", "0x1419a8365"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record/shader-registration-base/shader-registration-empty/terrain-shader-factory/shader-variant-index/terrain-material-digits/terrain-detail-mode/terrain-composite-texture/terrain-variant-validation/terrain-projected-fields/terrain-composite-border-field/composite-parameter-fields/ter-composite-parameter-fields");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record/shader-registration-base/shader-registration-empty/terrain-shader-factory/shader-variant-index/terrain-material-digits/terrain-detail-mode/terrain-composite-texture/terrain-variant-validation/terrain-projected-fields/terrain-composite-border-field/composite-parameter-fields/ter-composite-parameter-fields/terrain-uniform-packing/terrain-uniform-cache/ter-composite-projection");
             return ExitCode::from(2);
         }
     };
