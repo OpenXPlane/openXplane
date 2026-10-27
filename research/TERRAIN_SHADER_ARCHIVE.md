@@ -115,6 +115,55 @@ compute stage records, auxiliary extra-byte lengths, sample filtering and limits
 unknown stage rejection and every truncation of a complete variant fixture.
 Rendering estimates remain unchanged pending runtime integration and comparison.
 
+### Terrain registration observation
+
+REA confirms the constructor0x14176e120..0x14176eb6d registers the seven-byte
+name `terrain` from0x1425052b8. The adjacent0x14176db40 constructor registers
+`fake_terrain`; a separate BLEND_MODE reference at0x14086bd2d belongs to particle
+configuration. Neither is evidence for the real terrain variant selection.
+
+`tools/probe_terrain_shader_registration.py` runs the original terrain constructor
+and record helpers0x1409168d0 and0x1417697a0 in Unicorn. It checks the executable
+SHA256 before execution and guards native execution to these three unwind ranges.
+The base constructor, string copy/assignment, vector assignment, destruction and
+free are substituted. The synthetic base provides capacity for two stage bytes;
+the three vector assignments are intercepted to inspect their temporary records.
+The probe checks the returned object, registered name and all three captures.
+This is a bounded synthetic observation, not a live GPU or complete constructor
+equivalence test. Original instructions and resources are not emitted.
+
+The ordered range records captured at object offset0x58 are:
+
+| Parameter | Recorded range |
+| --- | ---: |
+| RENDERING_MODE | 5 |
+| GEOM_MODE | 6 |
+| USE_SHAD | 2 |
+| TONE_MODE | 2 |
+| BORDER_MODE | 3 |
+| TEX_MODE | 18 |
+| PROJ_BASE | 2 |
+| SEASONAL | 2 |
+| WANT_CSM | 2 |
+| WANT_SOFT_SHADOWS | 2 |
+| ALPHA_TO_COVERAGE | 2 |
+
+Their product is207360, whereas the XSV has829440 slots. The factor of four
+is unresolved; these ranges alone do not establish index encoding. A second
+capture at0x1b0 contains ALPHA_MODE, HAS_DECS, HAS_NORM_DECS, NITE_MODE and
+BLEND_MODE, each with a zero flag byte. The native helper stores a byte here,
+unlike the 32-bit range in the first record helper. The third capture at0x308
+names six attributes: a_instance_tint, a_lod_fade, a_night_level, a_color,
+a_texcoord2 and a_season. These are declarations, not observed draw inputs.
+
+```sh
+python tools/probe_terrain_shader_registration.py "<X-Plane>/X-Plane.exe"
+```
+
+Next trace the caller's range expansion/index arithmetic and reconcile the
+factor of four before assigning parameter values to slots13465 and39385.
+No renderer behaviour or compatibility estimate changes from this observation.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

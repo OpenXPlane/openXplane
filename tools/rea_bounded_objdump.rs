@@ -25,8 +25,11 @@ fn main() -> ExitCode {
         "shader-mapping-reader" => ("0x14105e350", "0x14105f675"),
         "shader-mapping-names" => ("0x141060320", "0x1410604b5"),
         "shader-mapping-record" => ("0x14105dec0", "0x14105e32e"),
+        "terrain-shader-registration" => ("0x14176e120", "0x14176eb6d"),
+        "shader-range-record" => ("0x1409168d0", "0x140916957"),
+        "shader-value-record" => ("0x1417697a0", "0x141769828"),
         _ => {
-            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record");
+            eprintln!("select OPENXPLANE_REA_RANGE mode/header/singleton/fps-pics/attachment/attachment-gate/attachment-view/attachment-matrix/obj-key-insert/facade-segment-loader/shader-mapping-header/shader-mapping-reader/shader-mapping-names/shader-mapping-record/terrain-shader-registration/shader-range-record/shader-value-record");
             return ExitCode::from(2);
         }
     };

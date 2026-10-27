@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Added a build-checked emulation probe for original terrain registration,
+  recording parameter ranges and disclosed stubs. Slot encoding remains
+  unresolved; this research does not change the rendered image.
 - Traversed complete serialized XSV variants and linked candidate493 to two
   mapping slots. All95 installed mapping files were structurally consumed;
   this does not establish active scene selection or shader equivalence.
