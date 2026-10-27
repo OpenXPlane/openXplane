@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Confirmed composite parameter order in the direct TER-loader branch as well
+  as the common reader; added explicit seventh-value regression coverage.
+  GPU uniform upload remains unverified.
 - TER loading now retains composite texture/noise paths, projection and numeric
   parameters. Read3597 installed terrain definitions, including1213 composite
   declarations, and checked resource paths. Rendering still reports compositing

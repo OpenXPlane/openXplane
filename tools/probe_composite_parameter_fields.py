@@ -41,10 +41,34 @@ def probe(path):
         if actual != expected or reads != supplied:
             raise ValueError('composite field mismatch')
         observations.append({'optional_seventh': optional, 'stored_fields': actual})
+    ter_observations = []
+    for optional in (False, True):
+        supplied = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0] + ([16.0] if optional else [])
+        pending = iter(supplied)
+        reads = []
+
+        def ter_number(emu):
+            value = next(pending)
+            reads.append(value)
+            emu.set_xmm_f32(0, value)
+
+        def has_optional(emu):
+            emu.uc.reg_write(UC_X86_REG_RAX, int(optional))
+
+        e.stubs.update({0x1406ca600: ter_number, 0x14072f8c0: has_optional})
+        e.uc.reg_write(UC_X86_REG_RBP, frame)
+        e.write(frame + 0xf0, b'\xff' * 28)
+        e.call(0x1419a9f82, until=0x1419ab53b, max_instructions=100)
+        actual = [e.read_f32(frame + 0xf0 + 4 * i) for i in range(7)]
+        if actual != supplied + ([] if optional else [0.0]) or reads != supplied:
+            raise ValueError('TER composite field mismatch')
+        ter_observations.append({'optional_seventh': optional, 'stored_fields': actual})
     return {'reference_sha256': REFERENCE_SHA256, 'begin_va': '0x140c2e780',
             'exclusive_stop_va': '0x140c2f1c0', 'observations': observations,
-            'stub_addresses': ['0x1406ca600', '0x14061d8d0'],
-            'limitations': 'Starts after token recognition; number/whitespace queries substituted and cursor synthetic. Verifies field order and absent optional value only; not complete TER parsing or shader uniform mapping.'}
+            'ter_block': {'begin_va': '0x1419a9f82', 'exclusive_stop_va': '0x1419ab53b',
+                          'observations': ter_observations},
+            'stub_addresses': ['0x1406ca600', '0x14061d8d0', '0x14072f8c0'],
+            'limitations': 'Starts after token recognition; number/whitespace/optional-token queries substituted and cursor synthetic. Verifies field order and absent optional value in common and TER blocks only; not complete TER parsing or GPU uniform mapping.'}
 
 
 if __name__ == '__main__':

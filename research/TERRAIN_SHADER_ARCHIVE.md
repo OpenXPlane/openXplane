@@ -443,6 +443,24 @@ Next connect these inputs to the recovered original uniform packing and sampler
 rules, then integrate and capture the running scene. Scenery/rendering estimates
 remain unchanged: ingestion alone does not establish original mod compatibility.
 
+#### Direct TER field-order confirmation
+
+The earlier numeric probe covered a common composite reader whose observed
+callers are0x140c32190 and0x140c322e0. That was not a complete TER-loader replay.
+A direct check in the TER loader at0x1419a9f6a targets COMPOSITE_PARAMS.
+REA now covers0x1419a9f64..0x1419aa016, and the extended probe executes its
+accepted branch0x1419a9f82 through0x1419ab53b. It substitutes the numeric reader
+and optional-token query. Six- and seven-number cases reproduce the common
+reader's ordering and zero default, independently of the common-reader path.
+
+In the TER local frame, the first six values land at0xf0,0xf4,0xf8,0xfc,0x100
+and0x104; the seventh lands at0x108. The material begins at frame+0x90, so these
+are material offsets0x60..0x78. The port retains these serialized inputs; an
+additional regression assertion explicitly checks a supplied seventh value.
+This establishes material field storage only. Uniform upload, default values
+when the whole directive is absent, sampler behavior and complete live materials
+remain unverified. Do not infer GPU uniform equivalence from adjacent fields.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.
