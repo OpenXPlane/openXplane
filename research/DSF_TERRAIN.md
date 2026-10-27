@@ -8,12 +8,28 @@ Terrain definitions are also resolved relative to the selected package before
 the preview library. A custom mesh without an elevation raster uses the global
 raster as a preview fallback, which is not proof of correct native elevations.
 Synthetic tests cover ordering, disabled packs, overlay and global fallback.
-The installed `2_UHWW_Ortho` tile is an overlay, not a base mesh; overlay DSF
-composition and exclusions remain unimplemented. No 1:1 parity is claimed.
+The installed `2_UHWW_Ortho` tile is an overlay, not a base mesh. Overlay DSFs
+above the selected base are now read in pack order, with their object, facade and
+draped polygon placements passed through the existing preview renderers. DSF
+exclusion zones and airport ownership filters are not implemented; layer order,
+height and resource interpretation remain approximations. No 1:1 parity is claimed.
 An offscreen UHWW run selected the global `+43+132` base and rendered 16885
 source triangles, with 1198 nearby object instances. The resulting
 [preview](../site/assets/uhww-base-selection.jpg) is not paired with an original
 capture and does not demonstrate custom base-mesh rendering.
+
+With overlay loading enabled, an installed UHWW run reads both `1_UHWW` and
+`2_UHWW_Ortho`. The latter supplies 12 draped polygons, all resolved by the
+preview, while `1_UHWW` reports 652 unresolved object placements and three
+failed resources, including nested animation keys and non-UTF-8 text. These
+observations are local to this installation and do not establish mod parity.
+The first full overlay preview exhausted GPU memory on an RTX 2080. The preview
+now resizes uploaded color textures to a maximum dimension of 1024 pixels by
+default (`OPENXPLANE_TEXTURE_MAX_SIZE` overrides it). This is a visual-quality
+compromise, not the simulator's texture streaming or filtering behavior.
+The subsequent run completed on that GPU, resizing 181 textures. Its
+[UHWW screenshot](../site/assets/uhww-overlay-preview.jpg) shows the photo layer
+and visible remaining seams; no corresponding original screenshot was captured.
 
 The user's request is to load the actual game maps instead of a runway on a flat
 plane. This first integration reads the installed global scenery DSF elevation

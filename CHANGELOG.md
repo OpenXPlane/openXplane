@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Scenery overlay preview
+
+- Load enabled overlay DSFs above the base mesh, including package-local objects,
+  facades and draped polygons. [UHWW preview](site/assets/uhww-overlay-preview.jpg)
+  shows the installed aerial-photo overlay. Exclusions, ownership filters and
+  complete layering are still missing. To fit large scenes in GPU memory, color
+  textures are resized to at most 1024 pixels by default; set
+  `OPENXPLANE_TEXTURE_MAX_SIZE` to change this preview limit.
+
 ### Custom base-mesh selection
 
 - Enabled custom scenery base meshes now take priority over global tiles; DSF

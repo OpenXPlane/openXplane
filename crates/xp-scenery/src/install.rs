@@ -97,6 +97,40 @@ impl Install {
             })
             .find(|p| p.is_file())
     }
+
+    /// Overlay files above the selected base mesh, in scenery-pack order.
+    /// Exclusions and airport ownership filters are not applied here.
+    pub fn overlay_tiles(&self, lat: f64, lon: f64) -> Result<Vec<(PathBuf, PathBuf)>, String> {
+        let (group, tile) = tile_names(lat, lon).ok_or("invalid tile coordinates")?;
+        let mut packs = self.scenery_packs()?;
+        let marker = self.root.join("*GLOBAL_AIRPORTS*");
+        let mut global_seen = false;
+        for pack in &mut packs {
+            if *pack == marker {
+                *pack = self.global_airports_dir();
+                global_seen = true;
+            }
+        }
+        if !global_seen {
+            packs.push(self.global_airports_dir());
+        }
+        let mut overlays = Vec::new();
+        for pack in packs {
+            let path = pack.join("Earth nav data").join(&group).join(&tile);
+            if !path.is_file() {
+                continue;
+            }
+            match crate::dsf::read_bytes(&path).and_then(|bytes| crate::dsf::is_overlay(&bytes)) {
+                Ok(true) => overlays.push((pack, path)),
+                Ok(false) => break,
+                Err(error) => eprintln!(
+                    "Skipping unreadable scenery tile {}: {error}",
+                    path.display()
+                ),
+            }
+        }
+        Ok(overlays)
+    }
     pub fn open(root: &Path) -> Result<Self, String> {
         if !root.is_dir() {
             return Err(format!("not a directory: {}", root.display()));
@@ -449,6 +483,13 @@ mod tests {
         fs::create_dir_all(global.parent().unwrap()).unwrap();
         fs::write(&global, dsf(false)).unwrap();
         let install = Install::open(&root).unwrap();
+        assert_eq!(
+            install.overlay_tiles(47.4, -122.4).unwrap(),
+            vec![(
+                root.join("Custom Scenery/Overlay"),
+                root.join("Custom Scenery/Overlay").join(relative)
+            )]
+        );
         assert_eq!(
             install.terrain_tile(47.4, -122.4),
             Some(root.join("Custom Scenery/Mesh").join(relative))

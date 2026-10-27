@@ -406,6 +406,14 @@ impl Renderer {
         });
         let mut meshes = Vec::new();
         let mipmaps = std::env::var("OPENXPLANE_MIPMAPS").as_deref() != Ok("0");
+        // Preview budget until the renderer can stream compressed source mipmaps.
+        let texture_limit = std::env::var("OPENXPLANE_TEXTURE_MAX_SIZE")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|v| *v > 0)
+            .unwrap_or(1024)
+            .min(device.limits().max_texture_dimension_2d);
+        let mut resized_textures = 0;
         let mut mip_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("scene mipmap generation"),
         });
@@ -510,9 +518,23 @@ impl Renderer {
                 contents: bytemuck::cast_slice(&mesh.instances),
                 usage: wgpu::BufferUsages::VERTEX,
             });
+            let resized = if mesh.texture.width().max(mesh.texture.height()) > texture_limit {
+                resized_textures += 1;
+                let scale =
+                    texture_limit as f64 / mesh.texture.width().max(mesh.texture.height()) as f64;
+                Some(image::imageops::resize(
+                    &mesh.texture,
+                    ((mesh.texture.width() as f64 * scale).round() as u32).max(1),
+                    ((mesh.texture.height() as f64 * scale).round() as u32).max(1),
+                    image::imageops::FilterType::Triangle,
+                ))
+            } else {
+                None
+            };
+            let source_texture = resized.as_ref().unwrap_or(&mesh.texture);
             let size = wgpu::Extent3d {
-                width: mesh.texture.width(),
-                height: mesh.texture.height(),
+                width: source_texture.width(),
+                height: source_texture.height(),
                 depth_or_array_layers: 1,
             };
             let levels = if mipmaps {
@@ -539,7 +561,7 @@ impl Renderer {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                mesh.texture.as_raw(),
+                source_texture.as_raw(),
                 wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(size.width * 4),
@@ -626,7 +648,7 @@ impl Renderer {
         }
         queue.submit([mip_encoder.finish()]);
         println!(
-            "Texture filtering: mipmaps={mipmaps}, {generated_levels} generated levels; trilinear minification, no original filtering parity claimed"
+            "Texture filtering: mipmaps={mipmaps}, {generated_levels} generated levels; preview max dimension {texture_limit}, {resized_textures} textures resized; no original filtering parity claimed"
         );
         Ok(Self {
             device,

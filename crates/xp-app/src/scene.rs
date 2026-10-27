@@ -652,26 +652,14 @@ impl AircraftBody {
 }
 
 fn airport_objects(
-    install: &openxplane::install::Install,
+    pack: &Path,
+    path: &Path,
+    library: &BTreeMap<String, PathBuf>,
     frame: &openxplane::world::Frame,
     ground: Option<&openxplane::ground::Ground>,
 ) -> Result<Vec<Mesh>, String> {
-    let origin = frame.origin();
-    let lat = origin[0].floor() as i32;
-    let lon = origin[1].floor() as i32;
-    let relative = format!(
-        "Earth nav data/{:+03}{:+04}/{lat:+03}{lon:+04}.dsf",
-        lat.div_euclid(10) * 10,
-        lon.div_euclid(10) * 10
-    );
-    let pack = install.global_airports_dir();
-    let path = pack.join(relative);
-    if !path.is_file() {
-        return Ok(Vec::new());
-    }
-    let features = openxplane::dsf::features(&fs::read(&path).map_err(|e| e.to_string())?)?;
+    let features = openxplane::dsf::features(&openxplane::dsf::read_bytes(path)?)?;
     let placements = features.objects;
-    let library = install.preview_library_at(Some(origin))?;
     let mut grouped = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
     let mut unresolved = 0;
     for p in &placements {
@@ -694,11 +682,11 @@ fn airport_objects(
             unresolved += 1;
         }
     }
-    let mut meshes = airport_facades(&features.polygons, &pack, &library, frame, ground);
+    let mut meshes = airport_facades(&features.polygons, pack, library, frame, ground);
     meshes.extend(airport_polygons(
         &features.polygons,
-        &pack,
-        &library,
+        pack,
+        library,
         frame,
         ground,
     ));
@@ -1335,9 +1323,13 @@ pub fn airport_flight(
     if let Some(ground) = &ground {
         model.set_ground(ground.clone());
     }
-    match airport_objects(&install, &frame, ground.as_deref()) {
-        Ok(objects) => meshes.extend(objects),
-        Err(e) => eprintln!("DSF objects unavailable: {e}"),
+    let overlay_library = install.preview_library_at(Some(frame.origin()))?;
+    for (pack, path) in install.overlay_tiles(frame.origin()[0], frame.origin()[1])? {
+        println!("Scenery overlay: {}", path.display());
+        match airport_objects(&pack, &path, &overlay_library, &frame, ground.as_deref()) {
+            Ok(objects) => meshes.extend(objects),
+            Err(e) => eprintln!("DSF overlay unavailable {}: {e}", path.display()),
+        }
     }
     let first_mesh = meshes.len();
     let base: Vec<Vec<Vertex>> = aircraft.meshes.iter().map(|m| m.vertices.clone()).collect();
