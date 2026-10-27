@@ -363,6 +363,52 @@ decorations, unresolved and cyclic handles, truncated samples and exact member
 selection. They verify the inspector only. No original shader bytes or translated
 source enter the repository; original-derived listings remain ignored locally.
 
+#### Isolated composite arithmetic comparison
+
+`tools/spirv_arithmetic.py` interprets only a caller-selected straight-line region
+using CPU float32 arithmetic. It supports the needed constant, memory-access,
+vector and GLSL.std.450 operations, rejecting unsupported executed instructions,
+branches and unaligned range boundaries. It does not implement specialization,
+derivatives, GPU filtering, complete SPIR-V semantics or validation. Memory and
+sample callbacks are supplied inputs; this is not execution on the original GPU.
+
+The build-identified1202 probe covers byte offsets0x2a9c..0x3100:78 instructions
+and four substituted noise samples. For256 seeded synthetic cases it checks
+geometric progression of noise coordinates, interprets the instruction stream,
+and compares resulting RGBA and two mixing weights with an independently written
+float64 formula. Maximum absolute error was1.5248492502006883e-7 with a declared
+3e-6 tolerance. This establishes consistency of the CPU interpretation and the
+formula under those inputs, not original sampler or rendered-pixel equivalence.
+
+In the local material structure, let T0/T1/T2 denote tex_params/tex_params2/
+tex_params3 and N_i the four supplied noise samples. The observed intermediate
+calculation is:
+
+- Coordinates start at baseUV*T1.x and multiply by T1.y for each later octave.
+- Noise is the sum of (2*N_i.z-1)*T1.z*T1.w^i for i=0..3.
+- Weight b is smoothstep(T2.x-T0.z, T2.x+T0.z,
+  noise-2*T0.w*(firstCompositeAlpha-0.5)).
+- The first RGB mixes firstCompositeRGB toward baseRGB by b, preserving the
+  first composite's alpha.
+- Weight d is clamp(T2.y*(-eyePosition.z)+T2.z,0,1). The intermediate RGBA then
+  mixes that first result toward the second composite sample by d.
+- Two later-use weights are b*(1-d) and (1-b)*(1-d).
+
+Positive smoothstep widths were supplied. Zero/reversed edges, real uniform
+population, actual texture formats/color spaces, specializations, downstream
+material/lighting and live KSEA state remain outside the comparison. These are
+intermediate values; they must not be presented as a recovered final pixel.
+
+```sh
+python -m unittest discover -s tools -p test_spirv_arithmetic.py
+python tools/probe_terrain_composite_arithmetic.py "<X-Plane>/Resources/shaders/bin/spv/terrain.xsa"
+```
+
+Synthetic interpreter tests cover memory/sample substitution, shuffle and mix,
+smoothstep clamping, and rejection of unsupported control flow/bad boundaries.
+No translated original shader is distributed. Next recover uniform population
+and sampling inputs before integrating this arithmetic into the port renderer.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

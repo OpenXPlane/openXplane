@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Compared an isolated78-instruction composite arithmetic region with a separate
+  formula on256 synthetic cases. Added a limited CPU probe with explicit sample
+  substitutions; GPU output and live material values remain unverified.
 - Added image-sample provenance and exact-member selection to the SPIR-V
   inspector. Candidate1202 exposes four noise samples and distinct composite
   coordinates; arithmetic execution and live color parity remain unverified.
