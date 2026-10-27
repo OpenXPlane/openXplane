@@ -164,6 +164,24 @@ Next trace the caller's range expansion/index arithmetic and reconcile the
 factor of four before assigning parameter values to slots13465 and39385.
 No renderer behaviour or compatibility estimate changes from this observation.
 
+#### Native base initialization follow-up
+
+The probe now executes the base constructor0x14068e2c0..0x14068e38f and its
+leaf helper0x14103cdb0..0x14103cdc8 instead of substituting base initialization.
+REA bounded listings confirm the base initializes inline vectors and the leaf
+clears an empty record. The scratch object remains zero-initialized before the
+original code runs; container assignment and CRT substitutions listed above
+remain. The probe checks the stage vector points at object+0x48 and contains
+exactly two bytes,1 and2. The three captured declaration lists and207360 range
+product remain unchanged. This removes one synthetic assumption but does not
+resolve the factor of four or prove live draw behaviour.
+
+The sole confirmed call reference to the terrain registration constructor is
+at0x14176cce5, within0x14176cb30..0x14176ce76. REA confirms the caller passes
+the registration result in RDX to an indirect manager call at0x14176ccf7 and
+stores its result at0x1460ac238. The indirect target and its runtime state still
+need tracing. No original disassembly or resource data is distributed.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

@@ -9,6 +9,9 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- Removed the base-constructor stub from terrain registration research and
+  checked its original inline stage vector. Located the manager call; variant
+  index encoding and rendered output remain unchanged.
 - Added a build-checked emulation probe for original terrain registration,
   recording parameter ranges and disclosed stubs. Slot encoding remains
   unresolved; this research does not change the rendered image.

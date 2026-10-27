@@ -11,7 +11,8 @@ from unicorn import UC_HOOK_CODE
 
 REFERENCE_SHA256 = "2ca099b7c6b218e78d02bdbe298be2aebf670b67c5adff827449b065e1107936"
 FUNCTIONS = [(0x14176e120, 0x14176eb6d),
-             (0x1409168d0, 0x140916957), (0x1417697a0, 0x141769828)]
+             (0x1409168d0, 0x140916957), (0x1417697a0, 0x141769828),
+             (0x14068e2c0, 0x14068e38f), (0x14103cdb0, 0x14103cdc8)]
 
 
 def probe(path):
@@ -40,12 +41,6 @@ def probe(path):
         emu.write_u64(address + 24, max(15, len(data)))
         emu.uc.reg_write(UC_X86_REG_RAX, address)
 
-    def base(e):
-        # Synthetic base state avoids capacity growth for the two stage bytes.
-        buffer = e.alloc(8)
-        for offset, value in [(0x30, buffer), (0x38, buffer), (0x40, buffer + 8)]:
-            e.write_u64(obj + offset, value)
-
     def assign(e):
         put(e.reg(UC_X86_REG_RCX), e.read(e.reg(UC_X86_REG_RDX), e.reg(UC_X86_REG_R8)))
 
@@ -72,7 +67,7 @@ def probe(path):
         captures.append({"offset": hex(offset), "entries": entries})
 
     emu.stubs.update({
-        0x14068e2c0: base, 0x1405df240: assign, 0x1405dcad0: assign,
+        0x1405df240: assign, 0x1405dcad0: assign,
         0x1405dd5c0: copy, 0x140917b20: capture, 0x141769b40: capture,
         0x140917c10: capture, 0x1422e8078: lambda e: None,
         0x1422e7c2c: lambda e: None,
@@ -90,14 +85,19 @@ def probe(path):
         raise ValueError("registration did not return the expected terrain object")
     if [c["offset"] for c in captures] != ["0x58", "0x1b0", "0x308"]:
         raise ValueError("registration capture incomplete")
+    stage_start = emu.read_u64(obj + 0x30)
+    stage_end = emu.read_u64(obj + 0x38)
+    if stage_start != obj + 0x48 or stage_end - stage_start != 2:
+        raise ValueError("unexpected inline stage vector")
     return {
         "reference_sha256": digest,
         "entry_va": hex(FUNCTIONS[0][0]),
-        "native_record_helpers": [hex(a) for a, _ in FUNCTIONS[1:]],
+        "native_helpers": [hex(a) for a, _ in FUNCTIONS[1:]],
+        "stage_bytes": list(emu.read(stage_start, 2)),
         "stub_addresses": [hex(a) for a in emu.stubs],
         "captures": captures,
         "range_product": math.prod(r["range"] for r in captures[0]["entries"]),
-        "limitations": "Synthetic base object; string operations, vector assignment, destruction and free are stubbed. No live draw state, index encoding or shader execution is verified.",
+        "limitations": "Zero-initialized scratch object with native base initialization; string operations, vector assignment, destruction and free are stubbed. No live draw state, index encoding or shader execution is verified.",
     }
 
 
