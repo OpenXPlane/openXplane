@@ -505,9 +505,21 @@ python tools/probe_composite_parameter_fields.py "<X-Plane>/X-Plane.exe"
 ```
 
 The helper is not connected to the renderer. Texture coordinates, remaining
-uniforms, FAR conversion, shader selection and actual resource/color-space upload
+uniforms, shader selection and actual resource/color-space upload
 still need recovery and live comparison. Composite rendering remains unsupported
 and compatibility percentages remain unchanged.
+
+The direct TER `FAR` branch reads three floats and a texture path. For mode 5 it
+multiplies the first two floats by a runtime global at `0x14611d060`, then stores
+`1 / (end - start)`, `0 - (1 / (end - start)) * start`, and the third float in
+material offsets `0x7c`, `0x80`, and `0x84`. The material constructor initializes
+these three fields to zero, but later overrides and the runtime global's origin
+remain to be traced. `tools/probe_terrain_far.py` compares 257 finite synthetic
+cases bit-for-bit against the original block, with the numeric reader, global,
+and zero register supplied by the harness. The parser retains FAR values and the
+path, and exposes the arithmetic with an explicit caller-supplied scale. It does
+not yet reproduce directive-order effects, bind the texture or render the result;
+the unsupported warning remains. This does not establish full mod compatibility.
 
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.

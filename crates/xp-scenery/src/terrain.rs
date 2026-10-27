@@ -24,6 +24,26 @@ pub struct Composite {
     pub projected: Option<[f32; 2]>,
     /// Six required values and the optional seventh (zero when absent).
     pub params: Option<[f32; 7]>,
+    pub far: Option<CompositeFar>,
+}
+
+/// Raw FAR values and the associated distant texture path.
+#[derive(Debug)]
+pub struct CompositeFar {
+    pub start: f32,
+    pub end: f32,
+    pub texture_scale: f32,
+    pub texture: String,
+}
+
+impl CompositeFar {
+    /// Original mode-5 material fields; `distance_scale` is engine state.
+    pub fn material_fields(&self, distance_scale: f32) -> [f32; 3] {
+        let start = self.start * distance_scale;
+        let end = self.end * distance_scale;
+        let slope = 1.0 / (end - start);
+        [slope, 0.0 - slope * start, self.texture_scale]
+    }
 }
 
 impl Composite {
@@ -140,6 +160,18 @@ impl Material {
                     out.composite.params = Some(params);
                     out.unsupported.insert(command.into());
                 }
+                "FAR" => {
+                    if values.len() < 4 {
+                        return Err("TER FAR requires three values and a texture path".into());
+                    }
+                    out.composite.far = Some(CompositeFar {
+                        start: number(0)?,
+                        end: number(1)?,
+                        texture_scale: number(2)?,
+                        texture: values[3..].join(" ").replace(['\\', ':'], "/"),
+                    });
+                    out.unsupported.insert(command.into());
+                }
                 _ => {
                     out.unsupported.insert(command.into());
                 }
@@ -186,6 +218,53 @@ impl Material {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn far_retains_texture_and_prepares_mode5_fields() {
+        let material = Material::parse(
+            "A\n800\nTERRAIN\nBASE_TEX base.png\nFAR 5000 20000 0.03125 ../textures/far.dds\n",
+        )
+        .unwrap();
+        let far = material.composite.far.unwrap();
+        assert_eq!(far.texture, "../textures/far.dds");
+        assert_eq!(
+            far.material_fields(1.0),
+            [1.0 / 15000.0, -(1.0 / 15000.0) * 5000.0, 0.03125]
+        );
+        assert!(material.unsupported.contains("FAR"));
+        assert!(Material::parse("A\n800\nTERRAIN\nBASE_TEX base.png\nFAR 1 2 3\n").is_err());
+    }
+    #[test]
+    #[ignore = "requires a read-only installed reference via OPENXPLANE_REFERENCE_ROOT"]
+    fn installed_far_directives() {
+        let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT").expect("reference root required");
+        let directory = std::path::Path::new(&root)
+            .join("Resources/default scenery/1000 world terrain/terrain12");
+        let mut count = 0;
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|s| s.to_str()) != Some("ter") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            if !text
+                .lines()
+                .any(|line| line.trim_start().starts_with("FAR "))
+            {
+                continue;
+            }
+            let material =
+                Material::parse(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let far = material.composite.far.unwrap();
+            assert!(
+                path.parent().unwrap().join(&far.texture).is_file(),
+                "{}",
+                path.display()
+            );
+            count += 1;
+        }
+        assert!(count > 0);
+        eprintln!("Read {count} installed terrain12 TER files with FAR textures");
+    }
     #[test]
     #[ignore = "requires a read-only installed reference via OPENXPLANE_REFERENCE_ROOT"]
     fn installed_composite_metadata_and_resources() {
