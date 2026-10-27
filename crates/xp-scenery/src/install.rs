@@ -63,16 +63,29 @@ impl Install {
         Ok(index.first_choices())
     }
 
-    /// Available global base-mesh tiles, in deterministic package order.
+    /// First usable base mesh in enabled custom-pack order, then global scenery.
     pub fn terrain_tile(&self, lat: f64, lon: f64) -> Option<PathBuf> {
-        let lat = lat.floor() as i32;
-        let lon = lon.floor() as i32;
-        let group = format!(
-            "{:+03}{:+04}",
-            lat.div_euclid(10) * 10,
-            lon.div_euclid(10) * 10
-        );
-        let tile = format!("{lat:+03}{lon:+04}.dsf");
+        let (group, tile) = tile_names(lat, lon)?;
+        for pack in self.scenery_packs().ok()? {
+            let path = pack.join("Earth nav data").join(&group).join(&tile);
+            if !path.is_file() {
+                continue;
+            }
+            match crate::dsf::read_bytes(&path).and_then(|bytes| crate::dsf::is_overlay(&bytes)) {
+                Ok(false) => return Some(path),
+                Ok(true) => continue,
+                Err(error) => eprintln!(
+                    "Skipping unreadable scenery tile {}: {error}",
+                    path.display()
+                ),
+            }
+        }
+        self.global_terrain_tile(lat, lon)
+    }
+
+    /// Global fallback, also used for elevation when a custom mesh has no raster.
+    pub fn global_terrain_tile(&self, lat: f64, lon: f64) -> Option<PathBuf> {
+        let (group, tile) = tile_names(lat, lon)?;
         let root = self.root.join("Global Scenery");
         ["X-Plane 12 Global Scenery", "X-Plane 12 Demo Areas"]
             .into_iter()
@@ -201,6 +214,22 @@ impl Install {
         }
         Ok(None)
     }
+}
+
+fn tile_names(lat: f64, lon: f64) -> Option<(String, String)> {
+    if !(-90.0..90.0).contains(&lat) || !(-180.0..180.0).contains(&lon) {
+        return None;
+    }
+    let lat = lat.floor() as i32;
+    let lon = lon.floor() as i32;
+    Some((
+        format!(
+            "{:+03}{:+04}",
+            lat.div_euclid(10) * 10,
+            lon.div_euclid(10) * 10
+        ),
+        format!("{lat:+03}{lon:+04}.dsf"),
+    ))
 }
 
 fn collect_acf(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
@@ -385,6 +414,48 @@ mod tests {
             parse_scenery_packs(ini),
             ["Custom Scenery/B/", "Custom Scenery/A/"]
         );
+    }
+
+    #[test]
+    fn custom_base_mesh_precedes_global_but_overlays_and_disabled_packs_do_not() {
+        fn dsf(overlay: bool) -> Vec<u8> {
+            fn atom(tag: &[u8; 4], body: &[u8]) -> Vec<u8> {
+                let mut result = tag.to_vec();
+                result.extend(((body.len() + 8) as u32).to_le_bytes());
+                result.extend(body);
+                result
+            }
+            let mut prop = b"sim/overlay\0".to_vec();
+            prop.extend(if overlay { &b"1\0"[..] } else { &b"0\0"[..] });
+            let mut result = b"XPLNEDSF\x01\0\0\0".to_vec();
+            result.extend(atom(b"DAEH", &atom(b"PORP", &prop)));
+            result.extend([0; 16]);
+            result
+        }
+        let root = temp_root();
+        write(
+            &root.join("Custom Scenery/scenery_packs.ini"),
+            "SCENERY_PACK_DISABLED Custom Scenery/Off/\nSCENERY_PACK Custom Scenery/Overlay/\nSCENERY_PACK Custom Scenery/Mesh/\n",
+        );
+        let relative = "Earth nav data/+40-130/+47-123.dsf";
+        for (name, overlay) in [("Off", false), ("Overlay", true), ("Mesh", false)] {
+            let path = root.join("Custom Scenery").join(name).join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, dsf(overlay)).unwrap();
+        }
+        let global = root
+            .join("Global Scenery/X-Plane 12 Global Scenery")
+            .join(relative);
+        fs::create_dir_all(global.parent().unwrap()).unwrap();
+        fs::write(&global, dsf(false)).unwrap();
+        let install = Install::open(&root).unwrap();
+        assert_eq!(
+            install.terrain_tile(47.4, -122.4),
+            Some(root.join("Custom Scenery/Mesh").join(relative))
+        );
+        fs::remove_file(root.join("Custom Scenery/Mesh").join(relative)).unwrap();
+        assert_eq!(install.terrain_tile(47.4, -122.4), Some(global));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

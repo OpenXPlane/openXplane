@@ -63,7 +63,16 @@ fn terrain_scene(
         .terrain_tile(origin[0], origin[1])
         .ok_or("base DSF tile not found")?;
     let bytes = openxplane::dsf::read_bytes(&path)?;
-    let raster = openxplane::dsf::HeightRaster::parse(&bytes)?;
+    let raster = match openxplane::dsf::HeightRaster::parse(&bytes) {
+        Ok(raster) => raster,
+        Err(error) => {
+            let global = install
+                .global_terrain_tile(origin[0], origin[1])
+                .ok_or(error)?;
+            eprintln!("Using global elevation raster for {}", path.display());
+            openxplane::dsf::HeightRaster::read(&global)?
+        }
+    };
     let features = openxplane::dsf::features_with_terrain(
         &bytes,
         Some([
@@ -85,7 +94,13 @@ fn terrain_scene(
             continue;
         }
         let parsed = (|| -> Result<_, Box<dyn std::error::Error>> {
-            let resource = library.get(name).ok_or("terrain library path unresolved")?;
+            let package = path.ancestors().nth(3).ok_or("DSF package path missing")?;
+            let local = package.join(name.replace('\\', "/"));
+            let resource = if local.is_file() {
+                &local
+            } else {
+                library.get(name).ok_or("terrain library path unresolved")?
+            };
             let material =
                 openxplane::scenery_terrain::Material::parse(&fs::read_to_string(resource)?)?;
             let texture = image::imageops::flip_vertical(

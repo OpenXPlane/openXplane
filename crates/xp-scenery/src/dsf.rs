@@ -86,6 +86,35 @@ pub fn read_bytes(path: &Path) -> Result<Vec<u8>, String> {
     Ok(data)
 }
 
+/// Read the DSF overlay flag without requiring a raster or decoding geometry.
+pub fn is_overlay(data: &[u8]) -> Result<bool, String> {
+    if data.len() < 28
+        || data.len() > LIMIT
+        || &data[..8] != b"XPLNEDSF"
+        || data[8..12] != 1u32.to_le_bytes()
+    {
+        return Err("unsupported DSF header or size".into());
+    }
+    for (tag, body) in atoms(&data[12..data.len() - 16])? {
+        if tag == *b"DAEH" {
+            for (tag, body) in atoms(body)? {
+                if tag == *b"PORP" {
+                    let values = strings(body)?;
+                    if values.len() % 2 != 0 {
+                        return Err("odd DSF properties".into());
+                    }
+                    for pair in values.as_chunks::<2>().0 {
+                        if pair[0] == "sim/overlay" {
+                            return Ok(pair[1] == "1");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
 impl HeightRaster {
     pub fn read(path: &Path) -> Result<Self, String> {
         Self::parse(&read_bytes(path)?)

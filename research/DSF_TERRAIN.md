@@ -1,5 +1,20 @@
 # Installed DSF elevation preview
 
+Enabled custom scenery packages are now searched in `scenery_packs.ini` order
+for a base DSF before global scenery. The documented `sim/overlay=1` property
+excludes overlays from that choice; unreadable candidates are reported and
+skipped. See [DSF usage](https://developer.x-plane.com/article/dsf-usage-in-x-plane/).
+Terrain definitions are also resolved relative to the selected package before
+the preview library. A custom mesh without an elevation raster uses the global
+raster as a preview fallback, which is not proof of correct native elevations.
+Synthetic tests cover ordering, disabled packs, overlay and global fallback.
+The installed `2_UHWW_Ortho` tile is an overlay, not a base mesh; overlay DSF
+composition and exclusions remain unimplemented. No 1:1 parity is claimed.
+An offscreen UHWW run selected the global `+43+132` base and rendered 16885
+source triangles, with 1198 nearby object instances. The resulting
+[preview](../site/assets/uhww-base-selection.jpg) is not paired with an original
+capture and does not demonstrate custom base-mesh rendering.
+
 The user's request is to load the actual game maps instead of a runway on a flat
 plane. This first integration reads the installed global scenery DSF elevation
 raster in memory, including 7z-compressed DSF. It does not yet load a complete map.

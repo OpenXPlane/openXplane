@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Custom base-mesh selection
+
+- Enabled custom scenery base meshes now take priority over global tiles; DSF
+  overlays and disabled packs are excluded from the base-mesh choice. Package-local
+  terrain definitions resolve before library exports. Overlay composition remains
+  unimplemented. The [UHWW preview](site/assets/uhww-base-selection.jpg) shows the
+  installed global base because the installed UHWW Ortho tile is an overlay.
+
 ### Terrain shader research
 
 - Recovered and tested original mode5 composite uniform-prefix packing, including
