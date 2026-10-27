@@ -409,6 +409,40 @@ smoothstep clamping, and rejection of unsupported control flow/bad boundaries.
 No translated original shader is distributed. Next recover uniform population
 and sampling inputs before integrating this arithmetic into the port renderer.
 
+#### Composite metadata reaches the TER loader
+
+The port TER parser now retains COMPOSITE_TEX/NOWRAP, COMPOSITE_NOISE,
+COMPOSITE_PROJECTED and COMPOSITE_PARAMS in a typed metadata record. Paths use
+the existing TER separator normalization. Parameter arrays retain six mandatory
+values and an optional seventh, which is zero when omitted. No missing-directive
+defaults or GPU uniform mapping are inferred. Finite numeric inputs and field
+counts are validated; warnings still identify all these directives as unsupported
+by the renderer. This changes content ingestion, not the rendered material.
+
+REA confirms the common parameter block0x140c2e780..0x140c2e850 reads six
+floats into offsets0x20..0x34 of its output record and writes the optional float
+at0x38, or zero when absent. The optional emulation probe starts after directive
+recognition and substitutes numeric/whitespace queries with a synthetic cursor.
+Both six- and seven-value cases preserve the recorded field order. This does not
+prove full tokenizer or shader-uniform equivalence.
+
+The installed-content test explicitly run with OPENXPLANE_REFERENCE_ROOT read
+3597 TER files in the top-level terrain10 directory,1213 declaring composite
+textures. All parsed and their declared composite/noise files existed locally.
+It does not cover every scenery pack or shader behaviour and is ignored in
+ordinary CI without the supplied installation. Synthetic tests cover optional
+values, last-directive precedence, nowrap, paths and malformed/nonfinite values.
+
+```sh
+python tools/probe_composite_parameter_fields.py "<X-Plane>/X-Plane.exe"
+# Set OPENXPLANE_REFERENCE_ROOT to the read-only installation before this test:
+cargo test -p xp-scenery terrain::tests::installed_composite_metadata_and_resources --lib -- --ignored --nocapture
+```
+
+Next connect these inputs to the recovered original uniform packing and sampler
+rules, then integrate and capture the running scene. Scenery/rendering estimates
+remain unchanged: ingestion alone does not establish original mod compatibility.
+
 The new standard-library-only inspector reproduces archive digests, member
 digests, entry execution models, debug resource IDs and descriptor decorations.
 It checks ZIP CRCs and instruction framing, with bounded archive/member sizes.

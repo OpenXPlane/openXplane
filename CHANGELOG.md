@@ -9,6 +9,10 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ### Terrain shader research
 
+- TER loading now retains composite texture/noise paths, projection and numeric
+  parameters. Read3597 installed terrain definitions, including1213 composite
+  declarations, and checked resource paths. Rendering still reports compositing
+  as unsupported; no visual change is claimed.
 - Compared an isolated78-instruction composite arithmetic region with a separate
   formula on256 synthetic cases. Added a limited CPU probe with explicit sample
   substitutions; GPU output and live material values remain unverified.
