@@ -26,7 +26,8 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             .ok_or("airport not found")?;
         let (frame, _) = openxplane::world::airport_layers(&airport, 8000.0)?;
         let origin = frame.origin();
-        let library = install.preview_library_at(Some(origin))?;
+        let season = env::var("OPENXPLANE_SCENERY_SEASON").unwrap_or_else(|_| "sum".into());
+        let library = install.preview_library_for(Some(origin), Some(&season))?;
         for (pack, path) in install.overlay_tiles(origin[0], origin[1])? {
             let features = openxplane::dsf::features(&openxplane::dsf::read_bytes(&path)?)?;
             let mut missing = std::collections::BTreeMap::<String, usize>::new();

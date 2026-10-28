@@ -1329,7 +1329,8 @@ pub fn airport_flight(
     if let Some(ground) = &ground {
         model.set_ground(ground.clone());
     }
-    let overlay_library = install.preview_library_at(Some(frame.origin()))?;
+    let season = std::env::var("OPENXPLANE_SCENERY_SEASON").unwrap_or_else(|_| "sum".into());
+    let overlay_library = install.preview_library_for(Some(frame.origin()), Some(&season))?;
     let mut exclusions = Vec::new();
     for (pack, path) in install.overlay_tiles(frame.origin()[0], frame.origin()[1])? {
         println!("Scenery overlay: {}", path.display());

@@ -1,5 +1,15 @@
 # Installed airport DSF object preview
 
+The overlay renderer and resource audit now use the same explicit preview season
+as terrain (`OPENXPLANE_SCENERY_SEASON`, default `sum`). Previously they omitted
+seasonal exports. Repeating the installed UHWW audit resolves all 70 formerly
+missing AEP leaf placements before exclusions. The main custom overlay still
+has 652 unresolved placements: 115 under 3D_people_library, 330 MisterX_Library,
+2 RE_Library, 138 handyobjects, 54 opensceneryx and 13 package-relative objects.
+The named library folders are absent from the inspected Custom Scenery directory;
+this does not prove identical original search behavior. No new rendered frame
+or native seasonal-selection comparison was made for this correction.
+
 `scenery-object-audit <installation> <ICAO>` lists unresolved object resources
 within the same 6 km preview bounds, grouped by name and overlay package. Counts
 are before exclusions and AGP expansion; no geometry or GPU textures are loaded.
