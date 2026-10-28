@@ -32,6 +32,13 @@ a sorted string range via `0x140cec650`, compares string length, then compares
 bytes via `0x1423c0180`; it returns a boolean and optionally a record index.
 Thus the observed boolean is name membership, not an established disk-open
 result. Trace the collection's population and subsequent file loading next.
+The later original loop at `0x1419ec550..0x1419ec583` visits the constructed
+string vector in order, calls `0x141620280`, then `0x1415404e0`, stopping at
+`0x1419ec795` on its first nonzero result. The latter converts the path and
+queries metadata, rejecting a directory mode bit. The new
+`probe_texture_candidate_loop.py` checks all-miss and first/middle/last-hit
+paths with normalization and metadata answers substituted. Extension order and
+actual file opening are still outside this controlled comparison.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
