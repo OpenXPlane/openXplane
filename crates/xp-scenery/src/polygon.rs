@@ -315,7 +315,9 @@ fn earcut_group(points: &[[f32; 2]], group: &[Vec<usize>]) -> Result<Vec<[usize;
         return Err(format!("POL triangulation area mismatch: {deviation}"));
     }
     Ok(indices
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .map(|t| [order[t[0]], order[t[1]], order[t[2]]])
         .collect())
 }
