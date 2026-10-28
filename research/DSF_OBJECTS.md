@@ -39,6 +39,13 @@ queries metadata, rejecting a directory mode bit. The new
 `probe_texture_candidate_loop.py` checks all-miss and first/middle/last-hit
 paths with normalization and metadata answers substituted. Extension order and
 actual file opening are still outside this controlled comparison.
+`probe_texture_extensions.py` executes the three inline-string replacement
+blocks directly: DDS `0x1419eb98c..0x1419eba1f`, BMP
+`0x1419eba42..0x1419ebad0` and PNG `0x1419ebaf3..0x1419ebb81`.
+Twelve cases confirm replacement of the last four bytes, including a DDS input
+producing a PNG candidate. The original blocks execute without stubs. Long-name
+allocation, normalization and the caller's mode-dependent ordering are untested;
+this evidence alone does not establish the active POL fallback policy.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
