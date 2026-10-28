@@ -32,6 +32,11 @@ a sorted string range via `0x140cec650`, compares string length, then compares
 bytes via `0x1423c0180`; it returns a boolean and optionally a record index.
 Thus the observed boolean is name membership, not an established disk-open
 result. Trace the collection's population and subsequent file loading next.
+`tools/probe_texture_name_membership.py` executes the original comparison with
+a controlled search-result pointer. Four inline ASCII cases confirm an exact
+match succeeds with index zero, while changed extension, case and length fail.
+The original byte comparison runs without substitution; the lower-bound search
+result is supplied. This is not a filesystem, full search or fallback test.
 
 Further inspection of the remaining 13 package-relative UHWW placements found
 five missing filenames: three industrial resources and two fuel-tank resources.
