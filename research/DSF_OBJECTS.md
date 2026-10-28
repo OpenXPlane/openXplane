@@ -97,6 +97,9 @@ a different loader that is not yet identified. The `0x1419ecad0` wrapper (string
 is called by the DSF/library parser at `0x140726430` with mode 6, and
 modes 3..7 take the non-texture branch at `0x1419ec270`; they appear to resolve
 scenery resource files, not image candidates.
+The FAC parser starts near `0x1419802e0` (strings `WALL_RULE`, `SHADER_WALL`, `HARD_WALL`,
+`FACADE_SCRAPER`, `TEX_SIZE`). Its texture-loading callee is the next lead; candidates are
+`0x141975500`, `0x1419851e0` and `0x141975ac0`, each called four times there.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
