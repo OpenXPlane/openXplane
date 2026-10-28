@@ -208,19 +208,8 @@ impl Material {
             }
             first = end;
         }
-        let coordinates = points
-            .iter()
-            .flat_map(|p| p.map(f64::from))
-            .collect::<Vec<_>>();
-        let indices = earcutr::earcut(&coordinates, holes, 2)
-            .map_err(|e| format!("POL triangulation: {e}"))?;
-        let deviation = earcutr::deviation(&coordinates, holes, 2, &indices);
-        if indices.is_empty() || !deviation.is_finite() || deviation > 1e-5 {
-            return Err(format!("POL triangulation area mismatch: {deviation}"));
-        }
+        let indices = triangulate(points, holes)?;
         let triangles = indices
-            .as_chunks::<3>()
-            .0
             .iter()
             .map(|t| {
                 let mut t = *t;
@@ -273,6 +262,111 @@ impl Material {
         }
         Ok(out)
     }
+}
+
+fn inside_ring(point: [f32; 2], ring: &[[f32; 2]]) -> bool {
+    let mut inside = false;
+    let mut j = ring.len() - 1;
+    for i in 0..ring.len() {
+        let (a, b) = (ring[i], ring[j]);
+        if (a[1] > point[1]) != (b[1] > point[1])
+            && point[0] < (b[0] - a[0]) * (point[1] - a[1]) / (b[1] - a[1]) + a[0]
+        {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
+/// Splits a ring at repeated vertices (pinched outlines) into simple rings.
+fn split_pinched(points: &[[f32; 2]], ring: Vec<usize>, out: &mut Vec<Vec<usize>>) {
+    for i in 0..ring.len() {
+        for j in i + 1..ring.len() {
+            if points[ring[i]] == points[ring[j]] && j - i >= 3 && ring.len() - (j - i) >= 3 {
+                let inner = ring[i..j].to_vec();
+                let mut rest = ring[..i].to_vec();
+                rest.extend_from_slice(&ring[j..]);
+                split_pinched(points, inner, out);
+                split_pinched(points, rest, out);
+                return;
+            }
+        }
+    }
+    out.push(ring);
+}
+
+fn earcut_group(points: &[[f32; 2]], group: &[Vec<usize>]) -> Result<Vec<[usize; 3]>, String> {
+    let order = group.iter().flatten().copied().collect::<Vec<_>>();
+    let coordinates = order
+        .iter()
+        .flat_map(|&i| points[i].map(f64::from))
+        .collect::<Vec<_>>();
+    let mut holes = Vec::new();
+    let mut offset = 0;
+    for ring in &group[..group.len() - 1] {
+        offset += ring.len();
+        holes.push(offset);
+    }
+    let indices =
+        earcutr::earcut(&coordinates, &holes, 2).map_err(|e| format!("POL triangulation: {e}"))?;
+    let deviation = earcutr::deviation(&coordinates, &holes, 2, &indices);
+    if indices.is_empty() || !deviation.is_finite() || deviation > 1e-5 {
+        return Err(format!("POL triangulation area mismatch: {deviation}"));
+    }
+    Ok(indices
+        .chunks_exact(3)
+        .map(|t| [order[t[0]], order[t[1]], order[t[2]]])
+        .collect())
+}
+
+/// Triangulates the rings of one POL footprint. Rings listed as holes that lie
+/// outside the first ring are triangulated as separate outlines, and pinched
+/// outlines are split, so every group handed to earcut is a simple polygon.
+fn triangulate(points: &[[f32; 2]], holes: &[usize]) -> Result<Vec<[usize; 3]>, String> {
+    let mut bounds = vec![0];
+    bounds.extend_from_slice(holes);
+    bounds.push(points.len());
+    let rings = bounds
+        .windows(2)
+        .map(|w| (w[0]..w[1]).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let outer_points = rings[0].iter().map(|&i| points[i]).collect::<Vec<_>>();
+    let mut groups: Vec<Vec<Vec<usize>>> = vec![vec![rings[0].clone()]];
+    for ring in &rings[1..] {
+        if inside_ring(points[ring[0]], &outer_points) {
+            groups[0].push(ring.clone());
+        } else {
+            groups.push(vec![ring.clone()]);
+        }
+    }
+    let mut triangles = Vec::new();
+    for group in groups {
+        match earcut_group(points, &group) {
+            Ok(t) => triangles.extend(t),
+            Err(e) if group.len() == 1 => {
+                let mut parts = Vec::new();
+                split_pinched(points, group[0].clone(), &mut parts);
+                if parts.len() == 1 {
+                    return Err(e);
+                }
+                for part in parts {
+                    let area = part
+                        .iter()
+                        .zip(part.iter().cycle().skip(1))
+                        .map(|(&i, &j)| points[i][0] * points[j][1] - points[j][0] * points[i][1])
+                        .sum::<f32>()
+                        .abs()
+                        * 0.5;
+                    if area >= 0.01 {
+                        triangles.extend(earcut_group(points, &[part])?);
+                    }
+                }
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(triangles)
 }
 
 #[cfg(test)]

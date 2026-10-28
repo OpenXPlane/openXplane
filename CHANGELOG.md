@@ -7,6 +7,15 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### POL footprints with detached or pinched rings
+
+- Triangulate POL footprints whose "hole" ring lies outside the outline as separate
+  polygons, and split pinched outlines, instead of skipping them. The UHWW preview
+  now skips no POL footprint (previously 8). The [port capture](site/assets/uhww-port-20261029.jpg)
+  is a port-only preview; the [reference capture](site/assets/uhww-reference-20261029.jpg)
+  is the original X-Plane at the same airport, from a different camera, and does not
+  claim visual parity.
+
 ### Legacy OBJ comments
 
 - Read OBJ files whose comments use legacy encodings while requiring valid UTF-8

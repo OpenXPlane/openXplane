@@ -105,7 +105,8 @@ fn terrain_scene(
                 openxplane::scenery_terrain::Material::parse(&fs::read_to_string(resource)?)?;
             let texture = image::imageops::flip_vertical(
                 &open_texture(
-                    terrain_texture_path(resource, &material.base).ok_or("terrain base texture missing")?,
+                    terrain_texture_path(resource, &material.base)
+                        .ok_or("terrain base texture missing")?,
                 )?
                 .to_rgba8(),
             );
@@ -371,13 +372,17 @@ pub fn facade_segment(
 
 /// Decodes a texture file chosen by `texture_path`; KTX2 is handled here because
 /// the `image` crate does not read it.
-pub fn open_texture(path: impl AsRef<Path>) -> Result<image::DynamicImage, Box<dyn std::error::Error>> {
+pub fn open_texture(
+    path: impl AsRef<Path>,
+) -> Result<image::DynamicImage, Box<dyn std::error::Error>> {
     let path = path.as_ref();
     if path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("ktx2"))
     {
-        return Ok(image::DynamicImage::ImageRgba8(decode_ktx2(&fs::read(path)?)?));
+        return Ok(image::DynamicImage::ImageRgba8(decode_ktx2(&fs::read(
+            path,
+        )?)?));
     }
     Ok(image::open(path)?)
 }
@@ -386,7 +391,9 @@ pub fn open_texture(path: impl AsRef<Path>) -> Result<image::DynamicImage, Box<d
 fn decode_ktx2(data: &[u8]) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
     const MAGIC: &[u8; 12] = b"\xabKTX 20\xbb\r\n\x1a\n";
     let u32_at = |o: usize| -> Result<u32, Box<dyn std::error::Error>> {
-        Ok(u32::from_le_bytes(data.get(o..o + 4).ok_or("truncated KTX2")?.try_into()?))
+        Ok(u32::from_le_bytes(
+            data.get(o..o + 4).ok_or("truncated KTX2")?.try_into()?,
+        ))
     };
     if data.get(..12) != Some(MAGIC) {
         return Err("not a KTX2 file".into());
@@ -400,7 +407,9 @@ fn decode_ktx2(data: &[u8]) -> Result<image::RgbaImage, Box<dyn std::error::Erro
     }
     let offset = u64::from_le_bytes(data.get(80..88).ok_or("truncated KTX2")?.try_into()?) as usize;
     let length = u64::from_le_bytes(data.get(88..96).ok_or("truncated KTX2")?.try_into()?) as usize;
-    let level = data.get(offset..offset.checked_add(length).ok_or("bad KTX2 level")?).ok_or("truncated KTX2 level")?;
+    let level = data
+        .get(offset..offset.checked_add(length).ok_or("bad KTX2 level")?)
+        .ok_or("truncated KTX2 level")?;
     let mut out = image::RgbaImage::new(width, height);
     let rgb565 = |v: u16| {
         let (r, g, b) = ((v >> 11) & 31, (v >> 5) & 63, v & 31);
@@ -417,7 +426,12 @@ fn decode_ktx2(data: &[u8]) -> Result<image::RgbaImage, Box<dyn std::error::Erro
         );
         let (a, b) = (rgb565(c0), rgb565(c1));
         let mix = |x: u16, y: u16, i: usize| ((x * (3 - i as u16) + y * i as u16) / 3) as u8;
-        let mut table = [[a[0], a[1], a[2], 255], [b[0], b[1], b[2], 255], [0; 4], [0; 4]];
+        let mut table = [
+            [a[0], a[1], a[2], 255],
+            [b[0], b[1], b[2], 255],
+            [0; 4],
+            [0; 4],
+        ];
         if c0 > c1 || opaque_only {
             for i in 0..3 {
                 table[2][i] = mix(a[i] as u16, b[i] as u16, 1);
@@ -447,7 +461,11 @@ fn decode_ktx2(data: &[u8]) -> Result<image::RgbaImage, Box<dyn std::error::Erro
                 for bx in 0..blocks_x {
                     let at = (by * blocks_x + bx) * size;
                     let block = level.get(at..at + size).ok_or("truncated KTX2 level")?;
-                    let (alpha, color) = if bc3 { (Some(&block[..8]), &block[8..]) } else { (None, block) };
+                    let (alpha, color) = if bc3 {
+                        (Some(&block[..8]), &block[8..])
+                    } else {
+                        (None, block)
+                    };
                     let table = bc1_colors(color, bc3);
                     let bits = u32::from_le_bytes([color[4], color[5], color[6], color[7]]);
                     let alpha_values = alpha.map(|a| {
@@ -527,7 +545,11 @@ fn resolve_texture(resource: &Path, name: &str, kind: TextureKind) -> Option<Pat
         .rsplit_once('.')
         .map_or(name.as_str(), |(stem, _)| stem);
     let parent = resource.parent()?;
-    let [dds, png, bmp] = [replacement(".dds")?, replacement(".png")?, replacement(".bmp")?];
+    let [dds, png, bmp] = [
+        replacement(".dds")?,
+        replacement(".png")?,
+        replacement(".bmp")?,
+    ];
     let mut candidates = vec![
         parent.join(&dds),
         parent.join(&png),
@@ -1660,14 +1682,20 @@ mod tests {
         fs::create_dir_all(pack.join("custom terrain textures")).unwrap();
         fs::write(pack.join("custom object textures/t.png"), b"").unwrap();
         fs::write(pack.join("custom terrain textures/t.bmp"), b"").unwrap();
-        assert_eq!(texture_path(&obj, "t.dds"), Some(pack.join("custom object textures/t.png")));
+        assert_eq!(
+            texture_path(&obj, "t.dds"),
+            Some(pack.join("custom object textures/t.png"))
+        );
         assert_eq!(
             terrain_texture_path(&obj, "t.dds"),
             Some(pack.join("custom terrain textures/t.bmp"))
         );
         // A package-relative file wins over the custom folder, KTX2 is never tried there.
         fs::write(pack.join("objects/t.ktx2"), b"").unwrap();
-        assert_eq!(texture_path(&obj, "t.dds"), Some(pack.join("objects/t.ktx2")));
+        assert_eq!(
+            texture_path(&obj, "t.dds"),
+            Some(pack.join("objects/t.ktx2"))
+        );
         let _ = fs::remove_dir_all(&base);
     }
 
@@ -1683,7 +1711,10 @@ mod tests {
         // Undotted names get ".ktx2" appended; backslashes are separators.
         fs::create_dir_all(dir.join("sub")).unwrap();
         fs::write(dir.join("sub").join("noext.ktx2"), b"").unwrap();
-        assert_eq!(texture_path(&pol, r"sub\noext"), Some(dir.join("sub/noext.ktx2")));
+        assert_eq!(
+            texture_path(&pol, r"sub\noext"),
+            Some(dir.join("sub/noext.ktx2"))
+        );
         // The original extension is replaced, not preserved, so a PNG declaration finds DDS.
         fs::write(dir.join("sub").join("x.dds"), b"").unwrap();
         assert_eq!(texture_path(&pol, "sub/x.png"), Some(dir.join("sub/x.dds")));
