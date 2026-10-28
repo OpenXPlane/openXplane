@@ -77,6 +77,14 @@ therefore uses one mode-1 resolver for OBJ, TER and POL. Other modes (3, 15, the
 road and COMPOSITE_TEX callers) and FAC wall textures are not traced. The installed
 game ships one KTX2 file (`moon_NML.ktx2`), unused by scenery, so KTX2 decoding stays
 an explicit error. The UHWW render is byte-identical before and after this change.
+The resolver compares ECX only against 1 (`0x1419ebcfb`, prefixed four-candidate
+assembly) and dispatches `ECX-1` (0..6) through a jump table at `0x1419ec804`: mode 1
+at `0x1419ec051`, mode 2 at `0x1419ec20b`, modes 3..7 at `0x1419ec270`; larger values
+skip it. Those branches append further candidates under `custom terrain textures/`
+or `custom object textures/` (selected by EDX == 2) after the package-relative ones.
+The installed game has neither folder and the root they are resolved against is not
+traced, so the port does not implement this fallback. Callers with EDX other than
+the OBJ/TER/POL values, and the final existence search, are likewise untraced.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
