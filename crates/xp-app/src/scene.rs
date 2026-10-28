@@ -1438,6 +1438,25 @@ mod tests {
     }
 
     #[test]
+    fn texture_path_edge_names_follow_native_replacement() {
+        let dir = std::env::temp_dir().join(format!("xp_tex_edge_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let pol = dir.join("a.pol");
+        // Names of four bytes or fewer are not rewritten by the DDS/PNG/BMP blocks.
+        fs::write(dir.join("abcd"), b"").unwrap();
+        assert_eq!(texture_path(&pol, "abcd"), Some(dir.join("abcd")));
+        // Undotted names get ".ktx2" appended; backslashes are separators.
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::write(dir.join("sub").join("noext.ktx2"), b"").unwrap();
+        assert_eq!(texture_path(&pol, r"sub\noext"), Some(dir.join("sub/noext.ktx2")));
+        // The original extension is replaced, not preserved, so a PNG declaration finds DDS.
+        fs::write(dir.join("sub").join("x.dds"), b"").unwrap();
+        assert_eq!(texture_path(&pol, "sub/x.png"), Some(dir.join("sub/x.dds")));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn draped_airport_triangles_follow_physical_plane_without_changing_area() {
         let ground = openxplane::ground::Ground::new(vec![[
             [0.0, 10.0, 0.0],
