@@ -259,3 +259,12 @@ is still unobserved. Likely causes are opens through a relative
 `RootDirectory` handle (the hook reads only the name) or another API. The
 mode-1 candidate order is therefore supported by the decompiled resolver only,
 not by a runtime capture for this pack.
+
+### Candidate ambiguity in `1_UHWW`
+
+A static scan of every TEXTURE/BASE_TEX line in the pack's OBJ/FAC/POL files
+(503 references) shows only 8 where more than one native candidate exists on
+disk (all DDS+PNG pairs: ASIG, Vestidos_varios, Cobus_2700 x4,
+AsphaltDamaged0001_2_S). The remaining references have a single candidate or
+none, so the order matters for 8 references, where the port picks DDS first as
+the decompiled resolver and the 2_UHWW_Ortho runtime capture indicate.
