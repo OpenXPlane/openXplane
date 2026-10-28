@@ -44,6 +44,18 @@ remains incomplete while required mod behaviour is missing or unverified; do not
 increase verified percentages merely for adding this requirement. Read installed
 add-ons locally and respect their licences; do not redistribute their contents.
 
+Track each tested package with its identity/version, required libraries or script
+runtime, host OS/ABI, reference build, reproduction command and observed result
+in both engines. Include missing dependencies and loading errors, not just
+successful screenshots. Keep package discovery, parsing, rendering and full
+runtime compatibility as separate results. Do not substitute converted packages
+or stock aircraft for third-party end-to-end acceptance.
+
+The installed UHWW scenery is an active compatibility case: package ordering,
+object exclusions, legacy OBJ comments and animation parsing have partial
+coverage. Missing external libraries, texture selection and complete rendering
+remain unresolved; these checks do not establish full scenery mod support.
+
 ## Required Git delivery
 
 For every completed coherent change:

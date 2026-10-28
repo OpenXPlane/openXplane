@@ -43,6 +43,10 @@ See the [user guide](docs/USER_GUIDE.md) for aircraft viewing, airport scenes an
 The goal is a complete game with 1:1 X-Plane 12 behaviour. The current engine loads original
 content, renders aircraft and airports, and flies an approximate flight model.
 
+Compatibility with unmodified original mods is mandatory: aircraft, liveries,
+scenery, libraries, scripts and native plugins. Full mod support is not yet
+implemented or verified. See the [mod acceptance requirements](docs/GOAL.md#original-mod-compatibility-is-mandatory).
+
 **About 43.8% implemented and 28.3% verified identical**, according to a self-assessed
 weighted rubric, not a measurement of whole-game equivalence. See the
 [compatibility estimate and roadmap](docs/COMPATIBILITY.md) for evidence and limitations.
