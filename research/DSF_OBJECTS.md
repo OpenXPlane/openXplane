@@ -1,5 +1,11 @@
 # Installed airport DSF object preview
 
+Further inspection of the remaining 13 package-relative UHWW placements found
+five missing filenames: three industrial resources and two fuel-tank resources.
+None of those files exists under `1_UHWW`, and no matching export was found in
+installed `library.txt` files. This supports an incomplete installed dependency
+set for these references; it does not establish native fallback/search parity.
+
 The overlay renderer and resource audit now use the same explicit preview season
 as terrain (`OPENXPLANE_SCENERY_SEASON`, default `sum`). Previously they omitted
 seasonal exports. Repeating the installed UHWW audit resolves all 70 formerly
