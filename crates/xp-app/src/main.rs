@@ -19,6 +19,38 @@ fn frame_size() -> (u32, u32) {
 
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 3 && args[0] == "scenery-object-audit" {
+        let install = openxplane::install::Install::open(Path::new(&args[1]))?;
+        let (airport, _) = install
+            .find_airport(args[2].to_str().ok_or("invalid airport")?)?
+            .ok_or("airport not found")?;
+        let (frame, _) = openxplane::world::airport_layers(&airport, 8000.0)?;
+        let origin = frame.origin();
+        let library = install.preview_library_at(Some(origin))?;
+        for (pack, path) in install.overlay_tiles(origin[0], origin[1])? {
+            let features = openxplane::dsf::features(&openxplane::dsf::read_bytes(&path)?)?;
+            let mut missing = std::collections::BTreeMap::<String, usize>::new();
+            for object in features.objects {
+                let [x, z] = frame.to_local(object.lat, object.lon);
+                if x.abs() > 6000.0 || z.abs() > 6000.0 {
+                    continue;
+                }
+                if !pack.join(&object.resource).is_file() && !library.contains_key(&object.resource)
+                {
+                    *missing.entry(object.resource).or_default() += 1;
+                }
+            }
+            println!(
+                "{}: {} unresolved placements before exclusions",
+                path.display(),
+                missing.values().sum::<usize>()
+            );
+            for (name, count) in missing {
+                println!("{count}\t{name}");
+            }
+        }
+        return Ok(true);
+    }
     if args.len() == 4 && args[0] == "mesh-render" {
         let scene = scene::terrain_mesh(
             Path::new(&args[1]),

@@ -1,5 +1,13 @@
 # Installed airport DSF object preview
 
+`scenery-object-audit <installation> <ICAO>` lists unresolved object resources
+within the same 6 km preview bounds, grouped by name and overlay package. Counts
+are before exclusions and AGP expansion; no geometry or GPU textures are loaded.
+The installed UHWW audit finds references under handyobjects and opensceneryx,
+plus 70 AEP leaf placements. This identifies unresolved references only, not
+whether a library is missing, disabled or interpreted incorrectly. Full native
+library-resolution comparison remains outstanding.
+
 On 2026-10-26 the KSEA scene loaded object placements from the installed
 Global Airports tile `+47-123.dsf`, reading original files in place. This is
 public-format-based integration, not a recovered native loader or proof of
