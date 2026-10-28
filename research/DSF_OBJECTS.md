@@ -1,5 +1,13 @@
 # Installed airport DSF object preview
 
+The post-season-fix UHWW offscreen run completed on RTX 2080. AEP reports
+350 excluded object placements, zero unresolved and zero failed resources.
+Comparing the RGBA capture with the preceding legacy-comment run found zero
+changed pixels (maximum channel difference zero). Resolving the seasonal names
+therefore did not change this fixed view; it must not be presented as a visual
+improvement or as proof of seasonal runtime parity. The existing
+[capture](../site/assets/uhww-legacy-comments.jpg) represents the same pixels.
+
 Texture-resolution follow-up: UHWW's `plita_PAG_14`, `_seam` and `_shadow`
 POL resources declare DDS names but the package contains matching PNG files
 instead. The preview currently fails those materials. Reverse DDS-to-PNG
