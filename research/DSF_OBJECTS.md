@@ -118,6 +118,14 @@ objects, all contained in the reference set; the remaining five (harbor cranes a
 The port reports no missing textures, matching the reference. This is a resolution-set
 comparison, not a byte-level comparison of rendered output.
 
+A second runtime pass (reference started from the main menu, flight at UHWW 07L in daylight,
+`CreateFileW` hook, then `NtCreateFile` hook plus a scenery reload) captured the 24
+`2_UHWW_Ortho/images/vladivostok_NxM.pol` resources. Each POL declares `TEXTURE_NOWRAP
+vladivostok_NxM.png`; the game attempted `.dds`, then `.png` (the only file present), and a
+later `.ktx2` probe without a `.bmp` attempt. The port resolves the same files (`.dds` missing,
+`.png` exists). Textures of `1_UHWW` objects were not observed through either hook even after
+the reload, so their per-file selection remains unverified at runtime.
+
 FAC wall textures use the same material parser as POL. The FAC parser `0x14197f440` (entry
 seen at `0x1419802e0`) calls `0x140c32190` with kind 5 at `0x14197f736` and `0x141980f7e`;
 that parser reaches `0x140c32d60`, whose TEXTURE branch calls `0x1419eb8c0` with mode 1
