@@ -92,7 +92,11 @@ Callers with other modes are the road loader (`0x140977fa0`, derived from a loop
 counter), the `effects`/`blank.png` helper at `0x140f63110` (modes 3 and 15) and
 `0x1408a3914` (15). The preview renders no road networks, so no rendered path uses
 them. The sorted-name search and first-hit iteration were verified separately.
-FAC wall texture callers are not yet identified.
+No direct caller of `0x1419eb8c0` references facade strings, so FAC wall textures reach
+a different loader that is not yet identified. The `0x1419ecad0` wrapper (strings `SCN`)
+is called by the DSF/library parser at `0x140726430` with mode 6, and
+modes 3..7 take the non-texture branch at `0x1419ec270`; they appear to resolve
+scenery resource files, not image candidates.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
