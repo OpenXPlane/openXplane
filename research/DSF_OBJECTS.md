@@ -84,8 +84,14 @@ assembly) and dispatches `ECX-1` (0..6) through a jump table at `0x1419ec804`: m
 at `0x1419ec051`, mode 2 at `0x1419ec20b`, modes 3..7 at `0x1419ec270`; larger values
 skip it. Those branches append further candidates under `custom terrain textures/`
 or `custom object textures/` (selected by EDX == 2) after the package-relative ones.
-The installed game has neither folder and the root they are resolved against is not
-traced, so the port does not implement this fallback. Callers with EDX other than
+Decompilation of `0x1419eb8c0` (Ghidra 12.1.4 headless, full analysis) shows that, in mode 1,
+after the four package-relative candidates it appends `<pack root>/custom object textures/`
+(or `custom terrain textures/` when EDX == 2) plus the DDS, PNG and BMP names, never KTX2.
+The pack root comes from `0x1419f5950`, which locates `Custom Scenery/<pack>/` or
+`Global Scenery/<pack>/` in the resource path. EDX is 3 for the OBJ loader (call
+`0x14089c30a`), 2 for `TERRAIN` BASE_TEX/TEXTURE and `COMPOSITE_TEX`, and a variable for POL.
+The port implements this (terrain kind for TER, object kind elsewhere). The installed game
+has no such folders, so rendering is unchanged. Callers with EDX other than
 the OBJ/TER/POL values are likewise untraced. By call-site scan, `COMPOSITE_TEX`,
 `RUNWAY_TILE` and the other `0x140c2e..0x140c35` material callers also use mode 1.
 Callers with other modes are the road loader (`0x140977fa0`, derived from a loop

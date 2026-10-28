@@ -105,7 +105,7 @@ fn terrain_scene(
                 openxplane::scenery_terrain::Material::parse(&fs::read_to_string(resource)?)?;
             let texture = image::imageops::flip_vertical(
                 &open_texture(
-                    texture_path(resource, &material.base).ok_or("terrain base texture missing")?,
+                    terrain_texture_path(resource, &material.base).ok_or("terrain base texture missing")?,
                 )?
                 .to_rgba8(),
             );
@@ -116,7 +116,7 @@ fn terrain_scene(
             let border = material
                 .border
                 .as_ref()
-                .and_then(|name| texture_path(resource, name))
+                .and_then(|name| terrain_texture_path(resource, name))
                 .and_then(|path| open_texture(path).ok())
                 .map(|image| image::imageops::flip_vertical(&image.to_rgba8()));
             if material.border.is_some() && border.is_none() {
@@ -494,7 +494,23 @@ fn decode_ktx2(data: &[u8]) -> Result<image::RgbaImage, Box<dyn std::error::Erro
     Ok(out)
 }
 
+/// Reference resolver arguments (`FUN_1419eb8c0`): mode 1 with EDX == 2 is a
+/// terrain texture, any other EDX an object texture.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TextureKind {
+    Object,
+    Terrain,
+}
+
 pub fn texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
+    resolve_texture(resource, name, TextureKind::Object)
+}
+
+pub fn terrain_texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
+    resolve_texture(resource, name, TextureKind::Terrain)
+}
+
+fn resolve_texture(resource: &Path, name: &str, kind: TextureKind) -> Option<PathBuf> {
     let name = name.replace('\\', "/");
     // OBJ, TER BASE_TEX/TEXTURE and POL all call the reference resolver with
     // mode 1, which replaces the last four bytes for DDS/PNG/BMP, but
@@ -511,15 +527,34 @@ pub fn texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
         .rsplit_once('.')
         .map_or(name.as_str(), |(stem, _)| stem);
     let parent = resource.parent()?;
-    [
-        replacement(".dds")?,
-        replacement(".png")?,
-        replacement(".bmp")?,
-        format!("{ktx_stem}.ktx2"),
-    ]
-    .into_iter()
-    .map(|candidate| parent.join(candidate))
-    .find(|candidate| candidate.is_file())
+    let [dds, png, bmp] = [replacement(".dds")?, replacement(".png")?, replacement(".bmp")?];
+    let mut candidates = vec![
+        parent.join(&dds),
+        parent.join(&png),
+        parent.join(&bmp),
+        parent.join(format!("{ktx_stem}.ktx2")),
+    ];
+    // After the package-relative candidates the resolver tries the package
+    // root's `custom object textures/` (or `custom terrain textures/`) folder
+    // with the DDS, PNG and BMP names only.
+    if let Some(root) = scenery_pack_root(resource) {
+        let folder = match kind {
+            TextureKind::Object => "custom object textures",
+            TextureKind::Terrain => "custom terrain textures",
+        };
+        candidates.extend([dds, png, bmp].map(|n| root.join(folder).join(n)));
+    }
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
+/// `<...>/Custom Scenery/<pack>` or `<...>/Global Scenery/<pack>` for a path inside it.
+fn scenery_pack_root(path: &Path) -> Option<PathBuf> {
+    let parts: Vec<_> = path.components().collect();
+    let at = parts.iter().position(|c| {
+        let c = c.as_os_str().to_string_lossy();
+        c.eq_ignore_ascii_case("Custom Scenery") || c.eq_ignore_ascii_case("Global Scenery")
+    })?;
+    (parts.len() > at + 2).then(|| parts[..=at + 1].iter().collect())
 }
 
 pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
@@ -1605,6 +1640,28 @@ mod tests {
         if let Ok(out) = std::env::var("OPENXPLANE_KTX2_OUT") {
             img.save(out).unwrap();
         }
+    }
+
+    #[test]
+    fn custom_texture_folders_follow_package_relative_candidates() {
+        let base = std::env::temp_dir().join(format!("xp_custom_tex_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let pack = base.join("Custom Scenery").join("Pack");
+        let obj = pack.join("objects").join("a.obj");
+        fs::create_dir_all(obj.parent().unwrap()).unwrap();
+        fs::create_dir_all(pack.join("custom object textures")).unwrap();
+        fs::create_dir_all(pack.join("custom terrain textures")).unwrap();
+        fs::write(pack.join("custom object textures/t.png"), b"").unwrap();
+        fs::write(pack.join("custom terrain textures/t.bmp"), b"").unwrap();
+        assert_eq!(texture_path(&obj, "t.dds"), Some(pack.join("custom object textures/t.png")));
+        assert_eq!(
+            terrain_texture_path(&obj, "t.dds"),
+            Some(pack.join("custom terrain textures/t.bmp"))
+        );
+        // A package-relative file wins over the custom folder, KTX2 is never tried there.
+        fs::write(pack.join("objects/t.ktx2"), b"").unwrap();
+        assert_eq!(texture_path(&obj, "t.dds"), Some(pack.join("objects/t.ktx2")));
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]
