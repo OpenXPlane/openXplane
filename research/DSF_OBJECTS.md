@@ -75,8 +75,10 @@ to mode 1, including the OBJ loader at `0x14089c220` (call `0x14089c30a`), the
 TERRAIN `BASE_TEX`/`TEXTURE` loader at `0x1419a6400` and the POL branch. The preview
 therefore uses one mode-1 resolver for OBJ, TER and POL. Other modes (3, 15, the
 road and COMPOSITE_TEX callers) and FAC wall textures are not traced. The installed
-game ships one KTX2 file (`moon_NML.ktx2`), unused by scenery, so KTX2 decoding stays
-an explicit error. The UHWW render is byte-identical before and after this change.
+game ships one KTX2 file (`moon_NML.ktx2`, BC1, 1024x1024, no supercompression),
+unused by scenery. The port decodes level 0 of uncompressed-container 2D KTX2 files in
+BC1, BC3 and RGBA8; other formats and supercompressed files return an explicit error.
+The sample decodes to the expected lunar normal map. The UHWW render is byte-identical before and after this change.
 The resolver compares ECX only against 1 (`0x1419ebcfb`, prefixed four-candidate
 assembly) and dispatches `ECX-1` (0..6) through a jump table at `0x1419ec804`: mode 1
 at `0x1419ec051`, mode 2 at `0x1419ec20b`, modes 3..7 at `0x1419ec270`; larger values

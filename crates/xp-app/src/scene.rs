@@ -104,7 +104,7 @@ fn terrain_scene(
             let material =
                 openxplane::scenery_terrain::Material::parse(&fs::read_to_string(resource)?)?;
             let texture = image::imageops::flip_vertical(
-                &image::open(
+                &open_texture(
                     texture_path(resource, &material.base).ok_or("terrain base texture missing")?,
                 )?
                 .to_rgba8(),
@@ -117,7 +117,7 @@ fn terrain_scene(
                 .border
                 .as_ref()
                 .and_then(|name| texture_path(resource, name))
-                .and_then(|path| image::open(path).ok())
+                .and_then(|path| open_texture(path).ok())
                 .map(|image| image::imageops::flip_vertical(&image.to_rgba8()));
             if material.border.is_some() && border.is_none() {
                 eprintln!(
@@ -312,7 +312,7 @@ pub fn facade_segment(
         .ok_or("FAC segment index out of range")?;
     let texture = if let Some(name) = &facade.wall_texture {
         let texture = texture_path(path, name).ok_or("missing FAC wall texture")?;
-        image::imageops::flip_vertical(&image::open(texture)?.to_rgba8())
+        image::imageops::flip_vertical(&open_texture(texture)?.to_rgba8())
     } else {
         solid_texture([180, 180, 180, 255])
     };
@@ -367,6 +367,131 @@ pub fn facade_segment(
         radius,
         background: PREVIEW_BACKGROUND,
     })
+}
+
+/// Decodes a texture file chosen by `texture_path`; KTX2 is handled here because
+/// the `image` crate does not read it.
+pub fn open_texture(path: impl AsRef<Path>) -> Result<image::DynamicImage, Box<dyn std::error::Error>> {
+    let path = path.as_ref();
+    if path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("ktx2"))
+    {
+        return Ok(image::DynamicImage::ImageRgba8(decode_ktx2(&fs::read(path)?)?));
+    }
+    Ok(image::open(path)?)
+}
+
+/// Reads level 0 of a 2D KTX2 file without supercompression: BC1, BC3 or RGBA8.
+fn decode_ktx2(data: &[u8]) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
+    const MAGIC: &[u8; 12] = b"\xabKTX 20\xbb\r\n\x1a\n";
+    let u32_at = |o: usize| -> Result<u32, Box<dyn std::error::Error>> {
+        Ok(u32::from_le_bytes(data.get(o..o + 4).ok_or("truncated KTX2")?.try_into()?))
+    };
+    if data.get(..12) != Some(MAGIC) {
+        return Err("not a KTX2 file".into());
+    }
+    let (format, width, height) = (u32_at(12)?, u32_at(20)?, u32_at(24)?);
+    if u32_at(44)? != 0 {
+        return Err("KTX2 supercompression is unsupported".into());
+    }
+    if u32_at(32)? > 1 || u32_at(36)? > 1 || u32_at(40)? == 0 {
+        return Err("only 2D single-layer KTX2 textures are supported".into());
+    }
+    let offset = u64::from_le_bytes(data.get(80..88).ok_or("truncated KTX2")?.try_into()?) as usize;
+    let length = u64::from_le_bytes(data.get(88..96).ok_or("truncated KTX2")?.try_into()?) as usize;
+    let level = data.get(offset..offset.checked_add(length).ok_or("bad KTX2 level")?).ok_or("truncated KTX2 level")?;
+    let mut out = image::RgbaImage::new(width, height);
+    let rgb565 = |v: u16| {
+        let (r, g, b) = ((v >> 11) & 31, (v >> 5) & 63, v & 31);
+        [
+            ((r * 255 + 15) / 31) as u8,
+            ((g * 255 + 31) / 63) as u8,
+            ((b * 255 + 15) / 31) as u8,
+        ]
+    };
+    let bc1_colors = |block: &[u8], opaque_only: bool| -> [[u8; 4]; 4] {
+        let (c0, c1) = (
+            u16::from_le_bytes([block[0], block[1]]),
+            u16::from_le_bytes([block[2], block[3]]),
+        );
+        let (a, b) = (rgb565(c0), rgb565(c1));
+        let mix = |x: u16, y: u16, i: usize| ((x * (3 - i as u16) + y * i as u16) / 3) as u8;
+        let mut table = [[a[0], a[1], a[2], 255], [b[0], b[1], b[2], 255], [0; 4], [0; 4]];
+        if c0 > c1 || opaque_only {
+            for i in 0..3 {
+                table[2][i] = mix(a[i] as u16, b[i] as u16, 1);
+                table[3][i] = mix(a[i] as u16, b[i] as u16, 2);
+            }
+            table[2][3] = 255;
+            table[3][3] = 255;
+        } else {
+            for i in 0..3 {
+                table[2][i] = ((a[i] as u16 + b[i] as u16) / 2) as u8;
+            }
+            table[2][3] = 255;
+        }
+        table
+    };
+    match format {
+        37 | 43 => {
+            let need = width as usize * height as usize * 4;
+            let src = level.get(..need).ok_or("truncated KTX2 level")?;
+            out.copy_from_slice(src);
+        }
+        131 | 132 | 137 | 138 => {
+            let bc3 = format >= 137;
+            let size = if bc3 { 16 } else { 8 };
+            let blocks_x = width.div_ceil(4) as usize;
+            for by in 0..height.div_ceil(4) as usize {
+                for bx in 0..blocks_x {
+                    let at = (by * blocks_x + bx) * size;
+                    let block = level.get(at..at + size).ok_or("truncated KTX2 level")?;
+                    let (alpha, color) = if bc3 { (Some(&block[..8]), &block[8..]) } else { (None, block) };
+                    let table = bc1_colors(color, bc3);
+                    let bits = u32::from_le_bytes([color[4], color[5], color[6], color[7]]);
+                    let alpha_values = alpha.map(|a| {
+                        let (a0, a1) = (a[0] as u16, a[1] as u16);
+                        let mut v = [0u8; 8];
+                        v[0] = a0 as u8;
+                        v[1] = a1 as u8;
+                        for i in 2..8u16 {
+                            v[i as usize] = if a0 > a1 {
+                                (((8 - i) * a0 + (i - 1) * a1) / 7) as u8
+                            } else if i < 6 {
+                                (((6 - i) * a0 + (i - 1) * a1) / 5) as u8
+                            } else if i == 6 {
+                                0
+                            } else {
+                                255
+                            };
+                        }
+                        let mut idx = 0u64;
+                        for (i, b) in a[2..8].iter().enumerate() {
+                            idx |= (*b as u64) << (8 * i);
+                        }
+                        (v, idx)
+                    });
+                    for py in 0..4usize {
+                        for px in 0..4usize {
+                            let (x, y) = ((bx * 4 + px) as u32, (by * 4 + py) as u32);
+                            if x >= width || y >= height {
+                                continue;
+                            }
+                            let n = py * 4 + px;
+                            let mut c = table[((bits >> (2 * n)) & 3) as usize];
+                            if let Some((v, idx)) = &alpha_values {
+                                c[3] = v[((idx >> (3 * n)) & 7) as usize];
+                            }
+                            out.put_pixel(x, y, image::Rgba(c));
+                        }
+                    }
+                }
+            }
+        }
+        _ => return Err(format!("unsupported KTX2 vkFormat {format}").into()),
+    }
+    Ok(out)
 }
 
 pub fn texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
@@ -558,7 +683,7 @@ fn load_aircraft(aircraft_path: &Path, animate: bool) -> Result<Scene, Box<dyn s
             Some(texture_name) => {
                 let texture_path = texture_path(&path, texture_name)
                     .ok_or_else(|| format!("Missing texture for {name}: {texture_name}"))?;
-                image::imageops::flip_vertical(&image::open(&texture_path)?.to_rgba8())
+                image::imageops::flip_vertical(&open_texture(&texture_path)?.to_rgba8())
             }
             None => {
                 println!("ACF object {name}: no declared base texture; preview uses white");
@@ -775,7 +900,7 @@ fn airport_objects(
             let base = object.baked_vertices();
             let texture = if let Some(name) = &object.texture {
                 let texture = texture_path(&path, name).ok_or("missing scenery texture")?;
-                image::imageops::flip_vertical(&image::open(texture)?.to_rgba8())
+                image::imageops::flip_vertical(&open_texture(texture)?.to_rgba8())
             } else {
                 solid_texture([255; 4])
             };
@@ -876,7 +1001,7 @@ fn airport_polygons(
         let loaded = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
             let material = openxplane::polygon::Material::parse(&fs::read_to_string(&path)?)?;
             let mut texture = image::imageops::flip_vertical(
-                &image::open(
+                &open_texture(
                     texture_path(&path, &material.texture).ok_or("POL texture missing")?,
                 )?
                 .to_rgba8(),
@@ -993,7 +1118,7 @@ fn airport_facades(
             let facade = openxplane::facade::parse(&fs::read_to_string(&path)?)?;
             let texture = if let Some(name) = &facade.wall_texture {
                 image::imageops::flip_vertical(
-                    &image::open(texture_path(&path, name).ok_or("missing facade wall texture")?)?
+                    &open_texture(texture_path(&path, name).ok_or("missing facade wall texture")?)?
                         .to_rgba8(),
                 )
             } else {
@@ -1005,7 +1130,7 @@ fn airport_facades(
                 .or(facade.wall_texture.as_ref())
             {
                 texture_path(&path, name)
-                    .and_then(|p| image::open(p).ok())
+                    .and_then(|p| open_texture(p).ok())
                     .map(|im| image::imageops::flip_vertical(&im.to_rgba8()))
             } else {
                 Some(solid_texture([180, 180, 180, 255]))
@@ -1435,6 +1560,51 @@ mod tests {
         fs::write(dir.join("tile.dds"), b"").unwrap();
         assert_eq!(texture_path(&pol, "tile.dds"), Some(dir.join("tile.dds")));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    fn ktx2(format: u32, w: u32, h: u32, payload: &[u8]) -> Vec<u8> {
+        let mut d = b"\xabKTX 20\xbb\r\n\x1a\n".to_vec();
+        for v in [format, 1, w, h, 0, 0, 1, 1, 0] {
+            d.extend(v.to_le_bytes());
+        }
+        d.extend([0u8; 16]); // dfd and kvd ranges
+        d.extend([0u8; 16]); // sgd range
+        d.extend(104u64.to_le_bytes());
+        d.extend((payload.len() as u64).to_le_bytes());
+        d.extend((payload.len() as u64).to_le_bytes());
+        d.extend(payload);
+        d
+    }
+
+    #[test]
+    fn ktx2_decodes_bc1_bc3_and_rgba8() {
+        // BC1: red (0xf800) and blue (0x001f), every texel index 0 -> red.
+        let bc1 = [0x00, 0xf8, 0x1f, 0x00, 0, 0, 0, 0];
+        let img = decode_ktx2(&ktx2(131, 4, 4, &bc1)).unwrap();
+        assert!(img.pixels().all(|p| p.0 == [255, 0, 0, 255]));
+        // Index 1 selects the second colour.
+        let bc1 = [0x00, 0xf8, 0x1f, 0x00, 0x55, 0x55, 0x55, 0x55];
+        let img = decode_ktx2(&ktx2(131, 4, 4, &bc1)).unwrap();
+        assert!(img.pixels().all(|p| p.0 == [0, 0, 255, 255]));
+        // BC3: alpha endpoints 255/0, all alpha indices 1 -> alpha 0.
+        let mut bc3 = vec![255, 0, 0x49, 0x92, 0x24, 0x49, 0x92, 0x24];
+        bc3.extend([0x00, 0xf8, 0x1f, 0x00, 0, 0, 0, 0]);
+        let img = decode_ktx2(&ktx2(137, 4, 4, &bc3)).unwrap();
+        assert!(img.pixels().all(|p| p.0 == [255, 0, 0, 0]));
+        let img = decode_ktx2(&ktx2(37, 1, 1, &[1, 2, 3, 4])).unwrap();
+        assert_eq!(img.get_pixel(0, 0).0, [1, 2, 3, 4]);
+        assert!(decode_ktx2(&ktx2(999, 1, 1, &[0; 4])).is_err());
+    }
+
+    #[test]
+    #[ignore = "needs the installed X-Plane; set OPENXPLANE_KTX2_SAMPLE and optionally OPENXPLANE_KTX2_OUT"]
+    fn ktx2_decodes_installed_sample() {
+        let path = std::env::var("OPENXPLANE_KTX2_SAMPLE").unwrap();
+        let img = open_texture(&path).unwrap().to_rgba8();
+        assert!(img.width() > 0 && img.height() > 0);
+        if let Ok(out) = std::env::var("OPENXPLANE_KTX2_OUT") {
+            img.save(out).unwrap();
+        }
     }
 
     #[test]
