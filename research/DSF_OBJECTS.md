@@ -69,8 +69,14 @@ is still outside this comparison. POL resolution stops at the first existing
 file even if decoding fails.
 The port enables BMP decoding; it reports an error for a selected KTX2. No claim
 is made about other texture modes, optional prefix replacements, filesystem case
-semantics, native GPU decoding or complete material/visual parity. OBJ/FAC/TER
-resolution retains its previous preview policy pending their caller traces.
+semantics, native GPU decoding or complete material/visual parity.
+A static scan of direct `call` sites finds 83 callers of `0x1419eb8c0`; 55 resolve
+to mode 1, including the OBJ loader at `0x14089c220` (call `0x14089c30a`), the
+TERRAIN `BASE_TEX`/`TEXTURE` loader at `0x1419a6400` and the POL branch. The preview
+therefore uses one mode-1 resolver for OBJ, TER and POL. Other modes (3, 15, the
+road and COMPOSITE_TEX callers) and FAC wall textures are not traced. The installed
+game ships one KTX2 file (`moon_NML.ktx2`), unused by scenery, so KTX2 decoding stays
+an explicit error. The UHWW render is byte-identical before and after this change.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.

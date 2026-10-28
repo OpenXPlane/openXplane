@@ -369,22 +369,10 @@ pub fn facade_segment(
     })
 }
 
-pub fn texture_path(object: &Path, name: &str) -> Option<PathBuf> {
-    let path = object.parent()?.join(name.replace('\\', "/"));
-    // X-Plane assets commonly declare PNG while shipping a DDS with the same stem.
-    let dds = path.with_extension("dds");
-    if dds.is_file() {
-        Some(dds)
-    } else if path.is_file() {
-        Some(path)
-    } else {
-        None
-    }
-}
-
-fn polygon_texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
+pub fn texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
     let name = name.replace('\\', "/");
-    // Native mode 1 replaces the last four bytes for DDS/PNG/BMP, but
+    // OBJ, TER BASE_TEX/TEXTURE and POL all call the reference resolver with
+    // mode 1, which replaces the last four bytes for DDS/PNG/BMP, but
     // removes the last dotted suffix for KTX2. Stop on the first file even
     // if its decoder subsequently fails; a decode error is not a search miss.
     let replacement = |extension| {
@@ -889,7 +877,7 @@ fn airport_polygons(
             let material = openxplane::polygon::Material::parse(&fs::read_to_string(&path)?)?;
             let mut texture = image::imageops::flip_vertical(
                 &image::open(
-                    polygon_texture_path(&path, &material.texture).ok_or("POL texture missing")?,
+                    texture_path(&path, &material.texture).ok_or("POL texture missing")?,
                 )?
                 .to_rgba8(),
             );
@@ -1437,15 +1425,15 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let pol = dir.join("a.pol");
-        assert_eq!(polygon_texture_path(&pol, "tile.dds"), None);
+        assert_eq!(texture_path(&pol, "tile.dds"), None);
         fs::write(dir.join("tile.ktx2"), b"").unwrap();
-        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.ktx2")));
+        assert_eq!(texture_path(&pol, "tile.dds"), Some(dir.join("tile.ktx2")));
         fs::write(dir.join("tile.bmp"), b"").unwrap();
-        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.bmp")));
+        assert_eq!(texture_path(&pol, "tile.dds"), Some(dir.join("tile.bmp")));
         fs::write(dir.join("tile.png"), b"").unwrap();
-        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.png")));
+        assert_eq!(texture_path(&pol, "tile.dds"), Some(dir.join("tile.png")));
         fs::write(dir.join("tile.dds"), b"").unwrap();
-        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.dds")));
+        assert_eq!(texture_path(&pol, "tile.dds"), Some(dir.join("tile.dds")));
         let _ = fs::remove_dir_all(&dir);
     }
 
