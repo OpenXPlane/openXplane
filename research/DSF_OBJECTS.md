@@ -86,7 +86,13 @@ skip it. Those branches append further candidates under `custom terrain textures
 or `custom object textures/` (selected by EDX == 2) after the package-relative ones.
 The installed game has neither folder and the root they are resolved against is not
 traced, so the port does not implement this fallback. Callers with EDX other than
-the OBJ/TER/POL values, and the final existence search, are likewise untraced.
+the OBJ/TER/POL values are likewise untraced. By call-site scan, `COMPOSITE_TEX`,
+`RUNWAY_TILE` and the other `0x140c2e..0x140c35` material callers also use mode 1.
+Callers with other modes are the road loader (`0x140977fa0`, derived from a loop
+counter), the `effects`/`blank.png` helper at `0x140f63110` (modes 3 and 15) and
+`0x1408a3914` (15). The preview renders no road networks, so no rendered path uses
+them. The sorted-name search and first-hit iteration were verified separately.
+FAC wall texture callers are not yet identified.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
