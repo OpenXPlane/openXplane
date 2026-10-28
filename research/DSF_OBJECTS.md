@@ -1,5 +1,11 @@
 # Installed airport DSF object preview
 
+Texture-resolution follow-up: UHWW's `plita_PAG_14`, `_seam` and `_shadow`
+POL resources declare DDS names but the package contains matching PNG files
+instead. The preview currently fails those materials. Reverse DDS-to-PNG
+substitution has not been confirmed in the reference loader, so this observation
+is a next investigation target rather than a claim that those files are absent.
+
 Further inspection of the remaining 13 package-relative UHWW placements found
 five missing filenames: three industrial resources and two fuel-tank resources.
 None of those files exists under `1_UHWW`, and no matching export was found in
