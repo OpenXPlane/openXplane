@@ -839,6 +839,7 @@ fn airport_objects(
     let mut grouped = BTreeMap::<PathBuf, Vec<(Vec3, f32)>>::new();
     let mut unresolved = 0;
     let mut excluded = 0;
+    let mut unresolved_names = std::collections::BTreeSet::new();
     for p in &placements {
         if exclusions.iter().any(|zone| zone.contains(p.lon, p.lat)) {
             excluded += 1;
@@ -861,6 +862,12 @@ fn airport_objects(
                 .push((Vec3::new(x, 0.0, z), p.heading));
         } else {
             unresolved += 1;
+            unresolved_names.insert(p.resource.clone());
+        }
+    }
+    if std::env::var_os("OPENXPLANE_LOG_UNRESOLVED").is_some() {
+        for name in &unresolved_names {
+            eprintln!("unresolved object: {name}");
         }
     }
     let mut meshes = airport_facades(&features.polygons, pack, library, frame, ground);

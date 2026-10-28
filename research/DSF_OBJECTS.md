@@ -109,6 +109,15 @@ port. The UHWW package's own textures were not opened in the observed window
 comparison exists. Library OBJ lookups also try `<package>/custom objects/<path>` after
 `<package>/<path>`; this is a resource, not texture, resolver and is not ported.
 
+UHWW file-level comparison against the reference `Log.txt` of the observed session (flight at UHWW
+07L): the reference reports 150 distinct `Unable to locate object` resources for `1_UHWW`, one missing
+POL (`MisterX_Library/Ground_Textures/Asphalt2_light.pol`) and no `Unable to locate
+albedo/image` texture error. The port, with `OPENXPLANE_LOG_UNRESOLVED=1`, reports 145 distinct unresolved
+objects, all contained in the reference set; the remaining five (harbor cranes and ships under
+`MisterX_Library`, absent from the install) lie outside the port's 6000 m placement radius.
+The port reports no missing textures, matching the reference. This is a resolution-set
+comparison, not a byte-level comparison of rendered output.
+
 FAC wall textures use the same material parser as POL. The FAC parser `0x14197f440` (entry
 seen at `0x1419802e0`) calls `0x140c32190` with kind 5 at `0x14197f736` and `0x141980f7e`;
 that parser reaches `0x140c32d60`, whose TEXTURE branch calls `0x1419eb8c0` with mode 1
