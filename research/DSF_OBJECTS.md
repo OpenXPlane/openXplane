@@ -12,6 +12,12 @@ from the identified reference build. It references `.dds` at `0x1419eba01` and
 This establishes separate filename candidates, not successful fallback or their
 selection order. Trace subsequent existence checks and loader flags before
 changing runtime resource resolution. Original listings remain local and ignored.
+Following the original routine through `0x1419ec4df` shows vector construction
+of string candidates, mode-dependent branches and optional prefix replacement.
+The call at `0x1419ec3a9` compares a prefix, rather than proving filesystem
+existence. No candidate-open attempt has been established in this range.
+The next step is to trace consumers of the produced vector before assigning
+native DDS/PNG fallback semantics.
 
 Further inspection of the remaining 13 package-relative UHWW placements found
 five missing filenames: three industrial resources and two fuel-tank resources.
