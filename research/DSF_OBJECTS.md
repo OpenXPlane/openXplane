@@ -37,6 +37,12 @@ a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
 The original byte comparison runs without substitution; the lower-bound search
 result is supplied. This is not a filesystem, full search or fallback test.
+The extended probe removes that substitution and executes the original search
+as well. It checks the four comparisons above and 27 requests across empty,
+single-record and five-record sorted collections, including first/last hits,
+missing prefixes and names beyond either endpoint. Hit indices match synthetic
+record positions. This supersedes the supplied-search-result limitation for
+these inline-ASCII cases, but still exercises no filesystem or fallback policy.
 
 Further inspection of the remaining 13 package-relative UHWW placements found
 five missing filenames: three industrial resources and two fuel-tank resources.
