@@ -109,14 +109,14 @@ port. The UHWW package's own textures were not opened in the observed window
 comparison exists. Library OBJ lookups also try `<package>/custom objects/<path>` after
 `<package>/<path>`; this is a resource, not texture, resolver and is not ported.
 
-No direct caller of `0x1419eb8c0` references facade strings, so FAC wall textures reach
-a different loader that is not yet identified. The `0x1419ecad0` wrapper (strings `SCN`)
-is called by the DSF/library parser at `0x140726430` with mode 6, and
-modes 3..7 take the non-texture branch at `0x1419ec270`; they appear to resolve
-scenery resource files, not image candidates.
-The FAC parser starts near `0x1419802e0` (strings `WALL_RULE`, `SHADER_WALL`, `HARD_WALL`,
-`FACADE_SCRAPER`, `TEX_SIZE`). Its texture-loading callee is the next lead; candidates are
-`0x141975500`, `0x1419851e0` and `0x141975ac0`, each called four times there.
+FAC wall textures use the same material parser as POL. The FAC parser `0x14197f440` (entry
+seen at `0x1419802e0`) calls `0x140c32190` with kind 5 at `0x14197f736` and `0x141980f7e`;
+that parser reaches `0x140c32d60`, whose TEXTURE branch calls `0x1419eb8c0` with mode 1
+(Ghidra call at `0x140c33097`) and the kind as EDX, i.e. the object-texture folder.
+The port therefore resolves FAC walls with the same mode-1 order. In the resolver, mode 2
+adds one `custom terrain textures/` candidate and modes 3..7 build `custom objects/`
+resource-file candidates (decompiled `0x1419eb8c0`); they are not texture lookups used by
+the rendered preview.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
