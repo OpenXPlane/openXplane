@@ -396,8 +396,8 @@ pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
         .filter(|p| p.key.ends_with("/_v10_att_file_stl") && !p.value.is_empty())
     {
         let path = dir.join("objects").join(p.value.replace('\\', "/"));
-        let object = match fs::read_to_string(&path) {
-            Ok(text) => match Object::parse(&text) {
+        let object = match fs::read(&path) {
+            Ok(bytes) => match Object::parse_bytes(&bytes) {
                 Ok(object) => object,
                 Err(e) => {
                     errors.push(format!("{}: {e}", path.display()));
@@ -521,7 +521,7 @@ fn load_aircraft(aircraft_path: &Path, animate: bool) -> Result<Scene, Box<dyn s
             m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2],
         ]);
         let path = dir.join("objects").join(name.replace('\\', "/"));
-        let object = Object::parse(&fs::read_to_string(&path)?)?;
+        let object = Object::parse_bytes(&fs::read(&path)?)?;
         let mut vertices = if animate {
             object.animated_vertices(|_| None)?
         } else {
@@ -756,7 +756,7 @@ fn airport_objects(
     );
     for (path, poses) in expanded {
         let loaded = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
-            let object = Object::parse(&fs::read_to_string(&path)?)?;
+            let object = Object::parse_bytes(&fs::read(&path)?)?;
             let base = object.baked_vertices();
             let texture = if let Some(name) = &object.texture {
                 let texture = texture_path(&path, name).ok_or("missing scenery texture")?;

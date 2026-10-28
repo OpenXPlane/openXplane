@@ -1,5 +1,14 @@
 # Live OBJ animation in the flight scene
 
+OBJ byte loading now strips comment bytes before UTF-8 decoding. This preserves
+valid resource names and rejects invalid bytes outside comments. The installed
+ruscenery `fuel-tank3.obj` contains non-UTF-8 bytes only in two comments; its
+geometry and declared texture now load. The subsequent UHWW preview reports
+1193 nearby instances, zero failed resources and 652 unresolved placements in
+the main custom overlay. This is a content-loading observation, not original
+encoding or rendering parity. The [capture](../site/assets/uhww-legacy-comments.jpg)
+has no matched original frame.
+
 `ANIM_keyframe_loop` wraps the resolved finite dataref value by its nonzero period
 before interpolation; zero disables wrapping in the preview. This follows the
 published OBJ8 remainder description; negative values, zero-period behavior and

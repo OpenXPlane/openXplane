@@ -225,6 +225,20 @@ fn interpolate<
 }
 
 impl Object {
+    /// Decode meaningful OBJ records as UTF-8 after dropping byte-level comments.
+    /// This permits legacy comment encodings without altering paths or datarefs.
+    pub fn parse_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let mut text = String::new();
+        for (line, bytes) in bytes.split(|b| *b == b'\n').enumerate() {
+            let end = bytes.iter().position(|b| *b == b'#').unwrap_or(bytes.len());
+            let record = std::str::from_utf8(&bytes[..end])
+                .map_err(|_| format!("OBJ8 line {}: non-UTF-8 data", line + 1))?;
+            text.push_str(record);
+            text.push('\n');
+        }
+        Self::parse(&text)
+    }
+
     pub fn parse(text: &str) -> Result<Self, String> {
         let mut records = text.lines().enumerate().filter_map(|(n, l)| {
             let l = l.split('#').next().unwrap().trim();
@@ -619,6 +633,29 @@ impl Object {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn non_utf8_comments_do_not_hide_invalid_resource_names() {
+        let mut bytes = TRI.as_bytes().to_vec();
+        bytes.extend(b"# legacy \xa9 comment\nTRIS 0 3\n");
+        assert!(Object::parse_bytes(&bytes).is_ok());
+        bytes.extend(b"TEXTURE bad\xff.png\n");
+        assert!(
+            Object::parse_bytes(&bytes)
+                .unwrap_err()
+                .contains("non-UTF-8 data")
+        );
+    }
+
+    #[test]
+    #[ignore = "requires read-only installed ruscenery via OPENXPLANE_REFERENCE_ROOT"]
+    fn installed_legacy_comment_object_loads() {
+        let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT").expect("reference root required");
+        let path =
+            std::path::Path::new(&root).join("Custom Scenery/ruscenery/buildings/fuel-tank3.obj");
+        let object = Object::parse_bytes(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(object.texture.as_deref(), Some("fuel-tank.png"));
+        assert!(!object.baked_vertices().is_empty());
+    }
     const TRI: &str = "A\n800\nOBJ\nPOINT_COUNTS 3 0 0 3\nVT 0 0 0 0 1 0 0 0\nVT 1 0 0 0 1 0 1 0\nVT 0 0 1 0 1 0 0 1\nIDX 0\nIDX 1\nIDX 2\n";
     #[test]
     fn applies_nested_transforms_and_restores_parent() {

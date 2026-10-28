@@ -7,6 +7,13 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Legacy OBJ comments
+
+- Read OBJ files whose comments use legacy encodings while requiring valid UTF-8
+  in commands and resource paths. The installed ruscenery fuel tank now loads;
+  the [UHWW preview](site/assets/uhww-legacy-comments.jpg) completes with no failed
+  object resources in its main custom overlay. Unresolved placements remain.
+
 ### OBJ animation compatibility
 
 - Load keyframe loops inside animation tables, including files with or without
