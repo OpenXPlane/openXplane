@@ -382,6 +382,33 @@ pub fn texture_path(object: &Path, name: &str) -> Option<PathBuf> {
     }
 }
 
+fn polygon_texture_path(resource: &Path, name: &str) -> Option<PathBuf> {
+    let name = name.replace('\\', "/");
+    // Native mode 1 replaces the last four bytes for DDS/PNG/BMP, but
+    // removes the last dotted suffix for KTX2. Stop on the first file even
+    // if its decoder subsequently fails; a decode error is not a search miss.
+    let replacement = |extension| {
+        if name.len() > 4 {
+            Some(format!("{}{extension}", name.get(..name.len() - 4)?))
+        } else {
+            Some(name.clone())
+        }
+    };
+    let ktx_stem = name
+        .rsplit_once('.')
+        .map_or(name.as_str(), |(stem, _)| stem);
+    let parent = resource.parent()?;
+    [
+        replacement(".dds")?,
+        replacement(".png")?,
+        replacement(".bmp")?,
+        format!("{ktx_stem}.ktx2"),
+    ]
+    .into_iter()
+    .map(|candidate| parent.join(candidate))
+    .find(|candidate| candidate.is_file())
+}
+
 pub fn audit(aircraft_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
     let acf = Aircraft::parse(&fs::read_to_string(aircraft_path)?)?;
     let dir = aircraft_path.parent().ok_or("ACF needs parent directory")?;
@@ -861,8 +888,10 @@ fn airport_polygons(
         let loaded = (|| -> Result<Mesh, Box<dyn std::error::Error>> {
             let material = openxplane::polygon::Material::parse(&fs::read_to_string(&path)?)?;
             let mut texture = image::imageops::flip_vertical(
-                &image::open(texture_path(&path, &material.texture).ok_or("POL texture missing")?)?
-                    .to_rgba8(),
+                &image::open(
+                    polygon_texture_path(&path, &material.texture).ok_or("POL texture missing")?,
+                )?
+                .to_rgba8(),
             );
             if material.no_alpha {
                 for p in texture.pixels_mut() {
@@ -1401,6 +1430,24 @@ pub fn airport(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn polygon_texture_follows_native_candidate_order() {
+        let dir = std::env::temp_dir().join(format!("xp_pol_tex_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let pol = dir.join("a.pol");
+        assert_eq!(polygon_texture_path(&pol, "tile.dds"), None);
+        fs::write(dir.join("tile.ktx2"), b"").unwrap();
+        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.ktx2")));
+        fs::write(dir.join("tile.bmp"), b"").unwrap();
+        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.bmp")));
+        fs::write(dir.join("tile.png"), b"").unwrap();
+        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.png")));
+        fs::write(dir.join("tile.dds"), b"").unwrap();
+        assert_eq!(polygon_texture_path(&pol, "tile.dds"), Some(dir.join("tile.dds")));
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn draped_airport_triangles_follow_physical_plane_without_changing_area() {

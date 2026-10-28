@@ -12,7 +12,7 @@ repository = "https://github.com/OpenXPlane/openXplane"
 [workspace.dependencies]
 bytemuck = { version = "1.25.2", features = ["derive"] }
 glam = "0.30.10"
-image = { version = "0.25.10", default-features = false, features = ["png", "dds"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "dds", "bmp"] }
 pollster = "0.4.0"
 wgpu = "29.0.4"
 winit = "0.30.13"

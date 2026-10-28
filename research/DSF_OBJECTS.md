@@ -10,9 +10,9 @@ improvement or as proof of seasonal runtime parity. The existing
 
 Texture-resolution follow-up: UHWW's `plita_PAG_14`, `_seam` and `_shadow`
 POL resources declare DDS names but the package contains matching PNG files
-instead. The preview currently fails those materials. Reverse DDS-to-PNG
-substitution has not been confirmed in the reference loader, so this observation
-is a next investigation target rather than a claim that those files are absent.
+instead. The subsequent POL-only resolver now searches DDS, PNG, BMP, then KTX2
+instead of treating the missing declared DDS as a missing material. See the
+native mode and ordering evidence below. KTX2 decoding remains unsupported.
 
 REA now captures the bounded texture-loader range `0x1419eb8c0..0x1419ebba0`
 from the identified reference build. It references `.dds` at `0x1419eba01` and
@@ -42,10 +42,35 @@ actual file opening are still outside this controlled comparison.
 `probe_texture_extensions.py` executes the three inline-string replacement
 blocks directly: DDS `0x1419eb98c..0x1419eba1f`, BMP
 `0x1419eba42..0x1419ebad0` and PNG `0x1419ebaf3..0x1419ebb81`.
-Twelve cases confirm replacement of the last four bytes, including a DDS input
-producing a PNG candidate. The original blocks execute without stubs. Long-name
+Twenty-one cases confirm replacement of the last four bytes, including a DDS
+input producing a PNG candidate; names of zero, one or four bytes stay unchanged.
+The original blocks execute without stubs. Long-name
 allocation, normalization and the caller's mode-dependent ordering are untested;
 this evidence alone does not establish the active POL fallback policy.
+
+The subsequent static trace identifies the `DRAPED_POLYGON` loader at
+`0x1406ba930..0x1406bb875`. It dispatches material parsing through
+`0x140c32190` at `0x1406bb15f`, then `0x140c32d60`. The base `TEXTURE` branch
+calls `0x1419eb8c0` at `0x140c33097` with ECX=1. Bounded REA captures cover
+`0x1406bb120..0x1406bb164` and `0x140c33020..0x140c3309c`; listings remain local.
+`probe_texture_candidate_order.py` executes the native call-argument setup and
+the mode-1 candidate assembly at `0x1419ebce3..0x1419ec014`. Two synthetic
+nonempty-prefix cases observe DDS, PNG, BMP, KTX2 in that order. Concatenation
+is substituted with an empty inline result; native vector moves and cleanup run
+with preallocated capacity. Candidate contents are supplied, not derived by this
+probe. Earlier extension and first-hit probes cover separate stages.
+
+The fourth candidate removes the last dotted suffix and appends `.ktx2`, unlike
+the first three four-byte replacements. Its string constant is at `0x1425e126c`.
+Five additional cases execute `0x1419ebb94..0x1419ebce3`, including the original
+copy routine without stubs, on a prepared inline string. Dotted, undotted and
+empty names match; this gives 26 extension cases total. Long-name allocation
+is still outside this comparison. POL resolution stops at the first existing
+file even if decoding fails.
+The port enables BMP decoding; it reports an error for a selected KTX2. No claim
+is made about other texture modes, optional prefix replacements, filesystem case
+semantics, native GPU decoding or complete material/visual parity. OBJ/FAC/TER
+resolution retains its previous preview policy pending their caller traces.
 `tools/probe_texture_name_membership.py` executes the original comparison with
 a controlled search-result pointer. Four inline ASCII cases confirm an exact
 match succeeds with index zero, while changed extension, case and length fail.
