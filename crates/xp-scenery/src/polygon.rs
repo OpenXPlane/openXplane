@@ -375,6 +375,47 @@ fn triangulate(points: &[[f32; 2]], holes: &[usize]) -> Result<Vec<[usize; 3]>, 
 mod tests {
     use super::*;
 
+    fn area(points: &[[f32; 2]], tris: &[[usize; 3]]) -> f32 {
+        tris.iter()
+            .map(|t| {
+                let [a, b, c] = t.map(|i| points[i]);
+                ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])).abs() * 0.5
+            })
+            .sum()
+    }
+
+    #[test]
+    fn detached_hole_ring_becomes_a_separate_polygon() {
+        let points = [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 10.0],
+            [0.0, 10.0],
+            [50.0, 0.0],
+            [60.0, 0.0],
+            [60.0, 10.0],
+            [50.0, 10.0],
+        ];
+        let tris = triangulate(&points, &[4]).unwrap();
+        assert!((area(&points, &tris) - 200.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn pinched_outline_is_split_at_the_repeated_vertex() {
+        let points = [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 10.0],
+            [0.0, 10.0],
+            [0.0, 0.0],
+            [-10.0, 0.0],
+            [-10.0, -10.0],
+            [0.0, -10.0],
+        ];
+        let tris = triangulate(&points, &[]).unwrap();
+        assert!((area(&points, &tris) - 200.0).abs() < 1e-3);
+    }
+
     #[test]
     fn holes_keep_area_and_empty_centers_with_explicit_st() {
         let m = Material::parse("A\n850\nDRAPED_POLYGON\nTEXTURE ground.png\nSCALE 1 1\n").unwrap();
