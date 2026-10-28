@@ -6,6 +6,13 @@ instead. The preview currently fails those materials. Reverse DDS-to-PNG
 substitution has not been confirmed in the reference loader, so this observation
 is a next investigation target rather than a claim that those files are absent.
 
+REA now captures the bounded texture-loader range `0x1419eb8c0..0x1419ebba0`
+from the identified reference build. It references `.dds` at `0x1419eba01` and
+`.png` at `0x1419ebb64`, with string-building calls to `0x1405eca90`.
+This establishes separate filename candidates, not successful fallback or their
+selection order. Trace subsequent existence checks and loader flags before
+changing runtime resource resolution. Original listings remain local and ignored.
+
 Further inspection of the remaining 13 package-relative UHWW placements found
 five missing filenames: three industrial resources and two fuel-tank resources.
 None of those files exists under `1_UHWW`, and no matching export was found in

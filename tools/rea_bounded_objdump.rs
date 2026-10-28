@@ -21,6 +21,7 @@ fn main() -> ExitCode {
         "attachment-matrix" => ("0x141775d10", "0x141775ece"),
         "obj-key-insert" => ("0x1408751b0", "0x1408752b0"),
         "obj-animation-loop" => ("0x14087849e", "0x1408784dd"),
+        "texture-name-candidates" => ("0x1419eb8c0", "0x1419ebba0"),
         "obj-animation-key-blocks" => ("0x1408781d3", "0x1408784dd"),
         "facade-segment-loader" => ("0x141981450", "0x141981650"),
         "shader-mapping-header" => ("0x14103fafa", "0x14103fb2b"),
