@@ -248,3 +248,14 @@ original-equivalent placement or rendering. Workspace fmt, Clippy and tests
 cover this implementation; the native/original visual comparisons remain absent.
 
 ![KSEA with AGP object annotations](../site/assets/ksea-agp-20261026.png)
+
+## Third UHWW runtime pass (1_UHWW object textures)
+
+Frida hooks (CreateFileW/NtCreateFile/NtOpenFile, filtered to `1_UHWW` and
+texture extensions) were attached before the flight started and the flight
+loaded fully (Cirrus SR-22 at UHWW). The session recorded no matching opens at
+all, so the reference's choice among DDS/PNG/BMP/KTX2 for `1_UHWW` OBJ textures
+is still unobserved. Likely causes are opens through a relative
+`RootDirectory` handle (the hook reads only the name) or another API. The
+mode-1 candidate order is therefore supported by the decompiled resolver only,
+not by a runtime capture for this pack.
