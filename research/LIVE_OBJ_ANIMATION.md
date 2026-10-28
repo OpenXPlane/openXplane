@@ -21,6 +21,9 @@ The installed UHWW preview subsequently loaded the previously rejected models;
 its first overlay reported one failed resource rather than four. A zero loop
 period disables wrapping in the preview, while the original runtime's handling
 of that value remains unverified.
+The [UHWW capture](../site/assets/uhww-animation-compat.jpg) is an initial-state
+preview; scenery object animation is baked there, and no matched reference capture
+or motion comparison is available.
 
 ## Behavior and evidence boundaries
 

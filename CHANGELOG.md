@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### OBJ animation compatibility
+
+- Load keyframe loops inside animation tables, including files with or without
+  explicit end commands, and support looped visibility. Four previously skipped
+  installed OBJ files now parse; [UHWW preview](site/assets/uhww-animation-compat.jpg)
+  shows the scene at its initial animation state. Animated scenery is still baked
+  in this preview and has not been compared against the original runtime.
+
 ### Overlay object exclusions
 
 - Apply repeated rectangular and polygonal `sim/exclude_obj` zones to object
