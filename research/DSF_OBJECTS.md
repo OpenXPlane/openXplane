@@ -18,6 +18,12 @@ The call at `0x1419ec3a9` compares a prefix, rather than proving filesystem
 existence. No candidate-open attempt has been established in this range.
 The next step is to trace consumers of the produced vector before assigning
 native DDS/PNG fallback semantics.
+The caller `0x1419ec820..0x1419ecac9` tests supplied records through
+`0x140d062c0`, which adds `0x60` and enters `0x140d062d0`. That routine queries
+a sorted string range via `0x140cec650`, compares string length, then compares
+bytes via `0x1423c0180`; it returns a boolean and optionally a record index.
+Thus the observed boolean is name membership, not an established disk-open
+result. Trace the collection's population and subsequent file loading next.
 
 Further inspection of the remaining 13 package-relative UHWW placements found
 five missing filenames: three industrial resources and two fuel-tank resources.

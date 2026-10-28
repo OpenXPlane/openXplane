@@ -23,6 +23,8 @@ fn main() -> ExitCode {
         "obj-animation-loop" => ("0x14087849e", "0x1408784dd"),
         "texture-name-candidates" => ("0x1419eb8c0", "0x1419ebba0"),
         "texture-path-candidates" => ("0x1419ebce3", "0x1419ec4df"),
+        "texture-name-membership" => ("0x140d062c0", "0x140d06394"),
+        "texture-candidate-wrapper" => ("0x1419ec820", "0x1419ecac9"),
         "obj-animation-key-blocks" => ("0x1408781d3", "0x1408784dd"),
         "facade-segment-loader" => ("0x141981450", "0x141981650"),
         "shader-mapping-header" => ("0x14103fafa", "0x14103fb2b"),
