@@ -268,3 +268,12 @@ disk (all DDS+PNG pairs: ASIG, Vestidos_varios, Cobus_2700 x4,
 AsphaltDamaged0001_2_S). The remaining references have a single candidate or
 none, so the order matters for 8 references, where the port picks DDS first as
 the decompiled resolver and the 2_UHWW_Ortho runtime capture indicate.
+
+### Missing texture references in `1_UHWW`
+
+8 texture references have no file on disk (`SBP02_01_LIT.dds`,
+`Cobus_2700_LIT.png`, `Golf_Silver.png`, `Girl/Texture/gate-6.png`,
+`LSG_LIT.png`). Their OBJ files are referenced only from `GroundTraffic.txt`
+(traffic vehicles), not from DSF/apt.dat placements, and the reference
+`Log.txt` has no entry for any of them. The static preview never loads them, so
+they do not cause silent skips of placed scenery.
