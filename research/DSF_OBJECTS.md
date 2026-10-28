@@ -277,3 +277,14 @@ the decompiled resolver and the 2_UHWW_Ortho runtime capture indicate.
 (traffic vehicles), not from DSF/apt.dat placements, and the reference
 `Log.txt` has no entry for any of them. The static preview never loads them, so
 they do not cause silent skips of placed scenery.
+
+### DSF object totals per scenery tile (UHWW preview, 2026-10-29)
+
+The "0 nearby instances" lines in the preview log are tiles/packs with no
+placements inside the 6000 m radius (or all excluded), not a loader failure.
+Tiles with content: 1109 placements -> 1193 nearby instances in 98 batches with
+652 unresolved placements (145 distinct names, the set already shown to be
+contained in the reference `Log.txt` "Unable to locate object" entries);
+576 placements -> 159 instances in 11 batches (430 excluded); 405 placements,
+all excluded or out of range. No failed resources. This agrees in kind with the
+reference log; per-instance placement parity is still unmeasured.
