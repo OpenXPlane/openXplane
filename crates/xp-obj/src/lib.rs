@@ -72,6 +72,7 @@ enum Animation {
         high: f32,
         show: bool,
         dataref: String,
+        looping: Option<f32>,
     },
 }
 
@@ -115,8 +116,9 @@ impl Animation {
                 high,
                 show,
                 dataref,
+                looping,
             } => {
-                let value = read(dataref);
+                let value = looping.map_or_else(|| read(dataref), |period| read(dataref) % period);
                 if *low <= value && value <= *high {
                     pose.visible = *show;
                 }
@@ -247,6 +249,7 @@ impl Object {
         };
         let mut stack = Vec::new();
         let mut keys: Option<Keys> = None;
+        let mut loop_closed_key_block: Option<bool> = None;
         let mut cull = true;
         let mut enabled = true;
         let mut counts = None;
@@ -254,6 +257,9 @@ impl Object {
         for (line, record) in records {
             let tokens: Vec<_> = record.split_whitespace().collect();
             let command = tokens[0];
+            if command != "ANIM_trans_end" && command != "ANIM_rotate_end" {
+                loop_closed_key_block = None;
+            }
             let args = &tokens[1..];
             for arg in args {
                 if arg.starts_with(|c: char| c.is_ascii_digit() || c == '-' || c == '+')
@@ -363,6 +369,9 @@ impl Object {
                         }
                     }
                     "ANIM_rotate_end" => {
+                        if keys.is_none() && loop_closed_key_block.take() == Some(true) {
+                            return Ok(());
+                        }
                         if let Some(Keys::Rotate {
                             axis,
                             keys: values,
@@ -401,6 +410,9 @@ impl Object {
                         }
                     }
                     "ANIM_trans_end" => {
+                        if keys.is_none() && loop_closed_key_block.take() == Some(false) {
+                            return Ok(());
+                        }
                         if let Some(Keys::Translate {
                             keys: values,
                             dataref,
@@ -428,16 +440,37 @@ impl Object {
                                 high: v[1],
                                 show: command == "ANIM_show",
                                 dataref: args.get(2).unwrap_or(&"none").to_string(),
+                                looping: None,
                             },
                         )?;
                     }
                     "ANIM_keyframe_loop" => {
-                        if keys.is_some() {
-                            return Err("animation loop before key block end is unsupported".into());
-                        }
                         let period = numeric(args, 1)?[0];
-                        if period <= 0.0 {
-                            return Err("invalid animation loop period".into());
+                        if let Some(pending) = keys.take() {
+                            loop_closed_key_block = Some(matches!(&pending, Keys::Rotate { .. }));
+                            let animation = match pending {
+                                Keys::Rotate {
+                                    axis,
+                                    keys,
+                                    dataref,
+                                } => Animation::Rotate {
+                                    axis,
+                                    keys,
+                                    dataref,
+                                    linear: false,
+                                    looping: None,
+                                },
+                                Keys::Translate { keys, dataref } => Animation::Translate {
+                                    keys,
+                                    dataref,
+                                    linear: false,
+                                    looping: None,
+                                },
+                            };
+                            obj.animate(&mut pose, animation)?;
+                            obj.compatibility_notes.push(format!(
+                                "line {line}: loop closes pending animation keys in preview"
+                            ));
                         }
                         let index = *pose
                             .operations
@@ -445,9 +478,11 @@ impl Object {
                             .ok_or("animation loop has no preceding animation")?;
                         match &mut obj.animations[index] {
                             Animation::Rotate { looping, .. }
-                            | Animation::Translate { looping, .. } => *looping = Some(period),
-                            Animation::Visibility { .. } => {
-                                return Err("animation loop follows visibility".into());
+                            | Animation::Translate { looping, .. } => {
+                                *looping = (period != 0.0).then_some(period)
+                            }
+                            Animation::Visibility { looping, .. } => {
+                                *looping = (period != 0.0).then_some(period)
                             }
                         }
                     }
@@ -642,6 +677,64 @@ mod tests {
         let at_ten = o.animated_vertices(|_| Some(10.0)).unwrap();
         assert_eq!(at_two[0].position, at_ten[0].position);
         assert!(!o.unsupported.contains_key("ANIM_keyframe_loop"));
+    }
+    #[test]
+    fn loop_inside_unclosed_key_table_allows_nested_animation() {
+        let o = Object::parse(&format!("{TRI}ANIM_begin\nANIM_trans_begin sim/time\nANIM_trans_key 0 0 0 0\nANIM_trans_key 8 8 0 0\nANIM_keyframe_loop 8\nANIM_begin\nANIM_rotate_begin 0 1 0 sim/time\nANIM_rotate_key 0 0\nANIM_rotate_key 8 90\nANIM_keyframe_loop 8\nTRIS 0 3\nANIM_end\nANIM_end\n")).unwrap();
+        assert_eq!(
+            o.animated_vertices(|_| Some(2.0)).unwrap()[0].position,
+            o.animated_vertices(|_| Some(10.0)).unwrap()[0].position
+        );
+        assert_eq!(o.compatibility_notes.len(), 2);
+    }
+    #[test]
+    fn visibility_loop_wraps_before_hide_check() {
+        let o = Object::parse(&format!(
+            "{TRI}ANIM_begin\nANIM_hide 1 3 sim/time\nANIM_keyframe_loop 8\nTRIS 0 3\nANIM_end\n"
+        ))
+        .unwrap();
+        assert_eq!(
+            o.animated_vertices(|_| Some(2.0)).unwrap()[0].position,
+            o.animated_vertices(|_| Some(10.0)).unwrap()[0].position
+        );
+        assert_ne!(
+            o.animated_vertices(|_| Some(2.0)).unwrap()[1].position,
+            o.animated_vertices(|_| Some(4.0)).unwrap()[1].position
+        );
+    }
+    #[test]
+    fn zero_loop_period_keeps_unwrapped_preview() {
+        let o = Object::parse(&format!("{TRI}ANIM_begin\nANIM_trans 0 0 0 8 0 0 0 8 sim/time\nANIM_keyframe_loop 0\nTRIS 0 3\nANIM_end\n")).unwrap();
+        assert_eq!(
+            o.animated_vertices(|_| Some(10.0)).unwrap()[0].position,
+            [10.0, 0.0, 0.0]
+        );
+    }
+    #[test]
+    fn keyframe_loop_before_explicit_end_is_accepted() {
+        let o = Object::parse(&format!("{TRI}ANIM_begin\nANIM_rotate_begin 0 1 0 sim/time\nANIM_rotate_key 0 0\nANIM_rotate_key 5 90\nANIM_keyframe_loop 5\nANIM_rotate_end\nTRIS 0 3\nANIM_end\n")).unwrap();
+        assert_eq!(
+            o.animated_vertices(|_| Some(2.0)).unwrap()[1].position,
+            o.animated_vertices(|_| Some(7.0)).unwrap()[1].position
+        );
+    }
+
+    #[test]
+    #[ignore = "requires read-only installed UHWW scenery via OPENXPLANE_REFERENCE_ROOT"]
+    fn installed_uhww_animated_object_loads() {
+        let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT").expect("reference root required");
+        for name in [
+            "Custom Scenery/1_UHWW/objects/animated/Rigolan_CargaCinta_Animated.obj",
+            "Custom Scenery/1_UHWW/objects/SecurityCameras.obj",
+            "Custom Scenery/1_UHWW/objects/Vehicles/Catering_Trucks/Medium/LSG_737_animated.obj",
+            "Resources/default scenery/airport scenery/Modern_Airports/Control_Towers/radar_4m_1.obj",
+        ] {
+            let path = std::path::Path::new(&root).join(name);
+            let object = Object::parse(&std::fs::read_to_string(&path).unwrap())
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            assert!(!object.draws.is_empty());
+            assert!(!object.animated_vertices(|_| Some(1.0)).unwrap().is_empty());
+        }
     }
 
     #[test]

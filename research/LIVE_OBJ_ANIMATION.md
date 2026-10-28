@@ -1,16 +1,26 @@
 # Live OBJ animation in the flight scene
 
-`ANIM_keyframe_loop` following a completed translation or rotation now wraps
-the resolved finite dataref value by its positive period before interpolation.
-This follows the published OBJ8 remainder description; negative values, invalid
-periods and native runtime evaluation have not been compared against the original.
+`ANIM_keyframe_loop` wraps the resolved finite dataref value by its nonzero period
+before interpolation; zero disables wrapping in the preview. This follows the
+published OBJ8 remainder description; negative values, zero-period behavior and
+native runtime evaluation have not been compared against the original.
 REA identified a loader branch at `0x1408784b6..0x1408784d8` that converts the
 read double to float and stores it at the current animation record's `+0x14`.
 `tools/probe_obj_animation_loop.py` checks five supplied numbers through this
 block with the numeric reader substituted. This tests storage, not evaluation.
-Some installed UHWW OBJ files omit required key-table end commands and put the
-loop command inside the unfinished block. Those files still fail parsing; no
-implicit-end behavior is asserted without a native comparison.
+Some installed UHWW OBJ files omit key-table end commands and put the loop
+command inside the unfinished block. Original code at `0x140878267..0x14087827c`
+creates the translation record at the begin directive; the loop branch updates
+the most recent animation record without checking whether the key-table end was
+seen. The preview accepts a loop after a nonempty key table by committing that
+table, and supports looping visibility. This is a bounded compatibility policy:
+late key directives and full original parser/evaluator behavior are unverified.
+The installed `Rigolan_CargaCinta_Animated.obj` now parses and evaluates, but
+its animated visual appearance has not been matched against the simulator.
+The installed UHWW preview subsequently loaded the previously rejected models;
+its first overlay reported one failed resource rather than four. A zero loop
+period disables wrapping in the preview, while the original runtime's handling
+of that value remains unverified.
 
 ## Behavior and evidence boundaries
 
