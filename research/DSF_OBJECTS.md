@@ -92,6 +92,17 @@ Callers with other modes are the road loader (`0x140977fa0`, derived from a loop
 counter), the `effects`/`blank.png` helper at `0x140f63110` (modes 3 and 15) and
 `0x1408a3914` (15). The preview renders no road networks, so no rendered path uses
 them. The sorted-name search and first-hit iteration were verified separately.
+Runtime observation (reference X-Plane 12.4.3 started under Frida, hooking `CreateFileW` and
+`NtCreateFile`, new flight at UHWW, scenery reload): first-attempt order of texture file
+opens per base name is DDS, PNG, BMP, KTX2, with candidates absent from the directory
+apparently skipped. Custom Scenery bases show (dds,png,ktx2) 122 times and (dds,ktx2) 111
+times; default scenery shows (dds,png,bmp,ktx2) twice. No base shows PNG before DDS except
+UI bitmap callers with other modes. This agrees with the mode-1 order implemented in the
+port. The UHWW package's own textures were not opened in the observed window
+(only its OBJ/POL files and `2_UHWW_Ortho` DDS/PNG candidates), so no UHWW-specific file
+comparison exists. Library OBJ lookups also try `<package>/custom objects/<path>` after
+`<package>/<path>`; this is a resource, not texture, resolver and is not ported.
+
 No direct caller of `0x1419eb8c0` references facade strings, so FAC wall textures reach
 a different loader that is not yet identified. The `0x1419ecad0` wrapper (strings `SCN`)
 is called by the DSF/library parser at `0x140726430` with mode 6, and
