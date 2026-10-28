@@ -288,3 +288,19 @@ contained in the reference `Log.txt` "Unable to locate object" entries);
 576 placements -> 159 instances in 11 batches (430 excluded); 405 placements,
 all excluded or out of range. No failed resources. This agrees in kind with the
 reference log; per-instance placement parity is still unmeasured.
+
+### Fourth UHWW runtime pass: hooks verified, no `1_UHWW` texture opens
+
+Fresh X-Plane process (PID 10840), Frida attached at the main menu before
+"Resume last flight" (UHWW, Cirrus SR-22). The hook counted calls to
+CreateFileW/NtCreateFile/NtOpenFile (about 99,000 CreateFileW and 99,000
+NtCreateFile by the end of loading, so the hook was firing) and logged every
+texture-extension open whose path contains `UHWW`. 144 distinct paths were
+logged, **all inside `2_UHWW_Ortho/images/`** (`vladivostok_<x>x<y>`):
+`.dds` first, then `.png` for each tile, followed by a `.ktx2` attempt for
+every tile. **No `1_UHWW` path was opened at all.** The earlier "no events"
+result was therefore not a hook bug: in this session the reference does not
+read any texture file from the `1_UHWW` pack (its objects either are not
+instantiated near the start position or resolve elsewhere), so the DDS/PNG
+choice for those objects cannot be observed in this scene. The ordering for
+the ortho POL textures (dds, png, then ktx2) matches the earlier pass.
