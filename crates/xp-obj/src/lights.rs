@@ -163,6 +163,13 @@ impl LightTable {
     }
 }
 
+impl LightTable {
+    /// Billboard and spill definitions of a named light (a name may have both).
+    pub fn named(&self, name: &str) -> (Option<&LightSpec>, Option<&LightSpec>) {
+        (self.get(name, false), self.get(name, true))
+    }
+}
+
 fn is_spill(overload: Overload) -> bool {
     !matches!(overload, Overload::BillboardHw | Overload::BillboardSw)
 }
@@ -204,5 +211,56 @@ SPILL_HW_DIR\tarea_lt_param_sp\t0.85 0.75 1.0 1.0 SIZE DX DY DZ 0.3\n";
         println!("{} specs, {} irregular", t.specs.len(), t.irregular.len());
         assert!(t.specs.len() > 800);
         assert!(t.get("taillight", false).is_some());
+    }
+
+    #[test]
+    #[ignore = "requires read-only installed UHWW scenery via OPENXPLANE_REFERENCE_ROOT"]
+    fn installed_uhww_named_lights_resolve_in_the_table() {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path
+                    .extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("obj"))
+                {
+                    out.push(path);
+                }
+            }
+        }
+        let root = std::path::PathBuf::from(
+            std::env::var_os("OPENXPLANE_REFERENCE_ROOT").expect("reference root required"),
+        );
+        let table = LightTable::parse(
+            &std::fs::read_to_string(root.join("Resources/bitmaps/world/lites/lights.txt"))
+                .unwrap(),
+        )
+        .unwrap();
+        let mut files = Vec::new();
+        walk(&root.join("Custom Scenery/1_UHWW"), &mut files);
+        let (mut named, mut missing) = (0, std::collections::BTreeSet::new());
+        for path in files {
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(object) = crate::Object::parse_bytes(&bytes) else {
+                continue;
+            };
+            for light in &object.lights {
+                if matches!(
+                    light.kind,
+                    crate::LightKind::Named | crate::LightKind::Param
+                ) {
+                    named += 1;
+                    let name = light.name.as_deref().unwrap();
+                    if matches!(table.named(name), (None, None)) {
+                        missing.insert(name.to_string());
+                    }
+                }
+            }
+        }
+        println!("{named} named lights, unresolved names: {missing:?}");
+        assert!(named > 0);
     }
 }
