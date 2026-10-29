@@ -42,3 +42,13 @@ Consequence: a native port needs `update_engine_kind12` (1004 instructions in th
 table. Naming the offsets that this path reads is the next step; the kind 12 notes in `research/FLIGHT_STEP.md`
 already describe its outputs (`M+0xcc` power, manifold terms `M+0x240/0x244/0x248`, speeds `M+0x90/0x98`).
 A trajectory recording from the original (Phase 1 exit) is needed to check any result.
+
+## Naming the offsets: first attempt
+The offsets read by the kind 1/2 path (`update_engine_piston` and `update_engine_kind12`) are `M+` 0x40, 0x48,
+0x64, 0x68, 0x6c, 0x74, 0x78, 0x84, 0x90, 0x98, 0xa0, 0xb8, 0xcc, 0x20c, 0x210, 0x214, 0x22c, 0x240..0x258, 0x25c,
+0x268, 0x2bc; `B+` 0x938..0x93c, 0x9e0..0x9f4, 0xab0, 0xb00..0xb18, 0xb6c, 0x1a64; `E+` 0xc, 0x14, 0x18, 0x64,
+0x1e4; `F+` 0x28, 0x68b0, 0x6880. Looking them up as `B` offsets in `crates/xp-acf/data/object_schema.tsv`
+gives unrelated names (for example 0xb6c matches `acf/_jato_dur`, 0xb18 `acf/_brake_to_steer_power`), so the
+schema's `B` column is not the same object as the `B` of these routines, or only part of it. Names therefore
+cannot be taken from that file; they have to come from the callers (what the engine setup stores at each
+offset), so no field is named yet. Result recorded to avoid repeating the lookup.
