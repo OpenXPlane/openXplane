@@ -109,6 +109,44 @@ pub struct ApproachLight {
     pub line: usize,
 }
 
+/// Rows 50-56 (1050-1056 in newer files): an airport radio frequency.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frequency {
+    /// Row code as written (50 recorded, 51 ATIS, 52 unicom, 53 clearance, 54 tower, 55 approach, 56 departure
+    /// in the documented numbering; kept as the file's code).
+    pub code: u32,
+    /// Frequency in units of 10 kHz as in the file (`12780` = 127.80 MHz).
+    pub value: u32,
+    pub name: String,
+    pub line: usize,
+}
+
+/// One node of a linear feature with its trailing attribute fields (line type, light type) verbatim.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinearNode {
+    pub node: Node,
+    pub attributes: Vec<String>,
+}
+
+/// Row 120: a linear feature (painted line or lights) and its node rows. The feature ends at the
+/// first end node (115/116) or closing node (113/114).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinearFeature {
+    pub name: String,
+    pub nodes: Vec<LinearNode>,
+    pub closed: bool,
+    pub line: usize,
+}
+
+/// Row 1204: a taxi-network active zone (runway hold / ILS critical area) and the runway ends it covers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActiveZone {
+    /// `arrival`, `departure` or `ils` (kept verbatim).
+    pub kind: String,
+    pub runways: Vec<String>,
+    pub line: usize,
+}
+
 /// Row 19: a windsock.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Windsock {
@@ -141,6 +179,9 @@ pub struct Airport {
     pub pavements: Vec<Pavement>,
     pub start_locations: Vec<StartLocation>,
     pub windsocks: Vec<Windsock>,
+    pub active_zones: Vec<ActiveZone>,
+    pub frequencies: Vec<Frequency>,
+    pub linear_features: Vec<LinearFeature>,
     pub signs: Vec<Sign>,
     pub approach_lights: Vec<ApproachLight>,
     pub taxi_nodes: Vec<TaxiNode>,
@@ -181,6 +222,9 @@ fn parse_header(code: u32, fields: &[&str], line: usize) -> Result<Airport, Stri
         pavements: Vec::new(),
         start_locations: Vec::new(),
         windsocks: Vec::new(),
+        active_zones: Vec::new(),
+        frequencies: Vec::new(),
+        linear_features: Vec::new(),
         signs: Vec::new(),
         approach_lights: Vec::new(),
         taxi_nodes: Vec::new(),
@@ -253,6 +297,7 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
     // Node rows are interpreted only directly after a 110 pavement header (they also occur in
     // linear features 120 and boundaries 130, which are not interpreted).
     let mut in_pavement = false;
+    let mut in_linear = false;
     let mut open_loop: Vec<Node> = Vec::new();
     loop {
         buf.clear();
@@ -293,6 +338,24 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
         let Some(airport) = current.as_mut() else {
             continue;
         };
+        if matches!(code, 111..=116) && in_linear {
+            let node = parse_node(code, &fields, line_no)?;
+            let used = if matches!(code, 112 | 114 | 116) {
+                5
+            } else {
+                3
+            };
+            let feature = airport.linear_features.last_mut().unwrap();
+            feature.nodes.push(LinearNode {
+                node,
+                attributes: fields[used..].iter().map(|f| f.to_string()).collect(),
+            });
+            if matches!(code, 113..=116) {
+                feature.closed = matches!(code, 113 | 114);
+                in_linear = false;
+            }
+            continue;
+        }
         if matches!(code, 111..=116) && in_pavement {
             let node = parse_node(code, &fields, line_no)?;
             open_loop.push(node);
@@ -303,7 +366,25 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
             continue;
         }
         in_pavement = code == 110;
+        in_linear = code == 120;
         match code {
+            1204 if fields.len() >= 3 => airport.active_zones.push(ActiveZone {
+                kind: fields[1].to_string(),
+                runways: fields[2].split(',').map(str::to_string).collect(),
+                line: line_no,
+            }),
+            120 => airport.linear_features.push(LinearFeature {
+                name: fields[1..].join(" "),
+                nodes: Vec::new(),
+                closed: false,
+                line: line_no,
+            }),
+            50..=56 | 1050..=1056 if fields.len() >= 2 => airport.frequencies.push(Frequency {
+                code,
+                value: num(fields[1], "frequency", line_no)?,
+                name: fields[2..].join(" "),
+                line: line_no,
+            }),
             110 => {
                 if fields.len() < 2 {
                     return Err(format!("short pavement row at line {line_no}"));
@@ -394,6 +475,57 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn active_zones_list_runway_ends() {
+        let text = "A
+1200 t
+
+1 0 0 0 TEST Test Field
+1204 departure 07L,07R,25L,25R
+1204 ils 25R
+99
+";
+        let a = find_airport(text.as_bytes(), "TEST").unwrap().unwrap();
+        assert_eq!(a.active_zones.len(), 2);
+        assert_eq!(a.active_zones[0].kind, "departure");
+        assert_eq!(a.active_zones[0].runways, ["07L", "07R", "25L", "25R"]);
+        assert_eq!(a.active_zones[1].runways, ["25R"]);
+    }
+
+    #[test]
+    fn frequencies_and_linear_features_are_typed() {
+        let text = "A
+1200 t
+
+1 0 0 0 TEST Test Field
+54 11950 TWR
+50 12780 TEST ATIS
+120 Default hold RWY 07L (near)
+111 47.0 -122.0 1 100
+112 47.1 -122.1 47.05 -122.05 1 100
+115 47.2 -122.2 1
+120 Loop
+111 47.0 -122.0
+113 47.1 -122.1 3
+99
+";
+        let a = find_airport(text.as_bytes(), "TEST").unwrap().unwrap();
+        assert_eq!(a.frequencies.len(), 2);
+        assert!(a.active_zones.is_empty());
+        assert_eq!((a.frequencies[0].code, a.frequencies[0].value), (54, 11950));
+        assert_eq!(a.frequencies[1].name, "TEST ATIS");
+        assert_eq!(a.linear_features.len(), 2);
+        let hold = &a.linear_features[0];
+        assert_eq!(hold.name, "Default hold RWY 07L (near)");
+        assert_eq!(hold.nodes.len(), 3);
+        assert_eq!(hold.nodes[0].attributes, ["1", "100"]);
+        assert_eq!(hold.nodes[1].node.ctrl, Some((47.05, -122.05)));
+        assert_eq!(hold.nodes[1].attributes, ["1", "100"]);
+        assert_eq!(hold.nodes[2].attributes, ["1"]);
+        assert!(!hold.closed && a.linear_features[1].closed);
+        assert!(a.other_rows.is_empty(), "{:?}", a.other_rows);
+    }
 
     #[test]
     fn signs_and_approach_lights_are_typed() {
@@ -526,8 +658,10 @@ mod tests {
         assert_eq!(p.loops[0][1].ctrl, Some((10.0, 20.15)));
         assert_eq!(p.loops[1].len(), 3);
         assert_eq!(a.pavements[1].loops[0][2].ctrl, Some((11.15, 21.1)));
-        // nodes of the 120 linear feature are not interpreted
-        assert_eq!(a.other_rows.get(&111), Some(&1));
+        // nodes of the 120 linear feature belong to that feature, not to pavements
+        assert_eq!(a.other_rows.get(&111), None);
+        assert_eq!(a.linear_features.len(), 1);
+        assert_eq!(a.linear_features[0].nodes.len(), 1);
     }
 
     #[test]
@@ -576,6 +710,14 @@ mod installed {
         assert_eq!(a.windsocks.len(), 1);
         assert_eq!((a.taxi_nodes.len(), a.taxi_edges.len()), (26, 28));
         assert_eq!((a.signs.len(), a.approach_lights.len()), (14, 2));
+        assert_eq!((a.frequencies.len(), a.linear_features.len()), (4, 11));
+        assert_eq!(a.active_zones.len(), 60);
+        assert!(
+            a.other_rows.keys().all(|c| *c == 1200),
+            "{:?}",
+            a.other_rows
+        );
+        println!("remaining other rows: {:?}", a.other_rows);
         assert!(
             a.taxi_edges
                 .iter()
