@@ -102,3 +102,23 @@ re-derived. Offsets not listed are not documented anywhere in the notes.
 | `M+0x2bc` | lubrication blend |
 
 Undocumented but read: `M+0x64`, `0x68`, `0x6c`, `0x70`, `0x74`, `0x84`. They need the setup code that writes them.
+
+### Roles read from `update_engine_kind12` and `piston_levers`
+Read from the code of the existing port (`piston.rs` lines 250-251, 855-890, 1065-1070); roles are inferred from
+how each field is used, not from names in the original.
+
+- `M+0x74`: running flag (integer); a non-running engine skips `kind12_running` and the table power is
+  multiplied by it.
+- `M+0x70`: engine-enabled flag; zero forces the lever level `M+0x22c` to 0 for kinds 3 and 4.
+- `M+0x6c`: gate of the lean/rich response: only when nonzero are `M+0x210` and `M+0x214` updated (rate
+  `M+0x20c * 0.3 * M+0x40 * (0.8 * lever + 0.2)` and a decay with time constant `2/ca`, `ca` being the speed over
+  the idle speed `B+0x9f4`, clamped to `0.001..1000`).
+- `M+0x64` and `M+0x68`: current and previous value of one quantity. Each frame `M+0x68` is set to `M+0x64`,
+  and before that, for kind 1 only, a drop (`M+0x68 > M+0x64`) adds `(M+0x68 - M+0x64) * 0.3` to the lean
+  state `M+0x214`, limited to `0..10`. This is a throttle-closing transient, not a steady term.
+- `M+0x84`: a phase angle in the ignition pulsation: `sin(M+0x84 * 0.0174.. * cylinders)` times a ramp of
+  `1 / cylinders` that rises with `|M+0x78|` up to half the idle speed `B+0x9f4`. It matters at low speed
+  only; with 4 cylinders and idle 500 rpm it vanishes above 250 rpm.
+
+Not yet known: what the setup code writes to `M+0x64` (the quantity whose drop is detected), and the units of
+`M+0x84` (the factor `0x3c8efa36` is `pi/180`, so degrees).
