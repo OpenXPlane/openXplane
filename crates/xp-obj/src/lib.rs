@@ -899,6 +899,63 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires read-only installed UHWW scenery via OPENXPLANE_REFERENCE_ROOT"]
+    fn installed_uhww_lights_parse_without_new_failures() {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path
+                    .extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("obj"))
+                {
+                    out.push(path);
+                }
+            }
+        }
+        let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT").expect("reference root required");
+        let mut files = Vec::new();
+        walk(
+            &std::path::Path::new(&root).join("Custom Scenery/1_UHWW"),
+            &mut files,
+        );
+        let (mut parsed, mut lights, mut light_errors) = (0, 0, Vec::new());
+        for path in files {
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            match Object::parse_bytes(&bytes) {
+                Ok(object) => {
+                    parsed += 1;
+                    lights += object.lights.len();
+                    for key in [
+                        "LIGHT_NAMED",
+                        "LIGHT_PARAM",
+                        "LIGHT_CUSTOM",
+                        "LIGHT_SPILL_CUSTOM",
+                        "VLIGHT",
+                        "LIGHTS",
+                    ] {
+                        assert!(
+                            !object.unsupported.contains_key(key),
+                            "{}: {key}",
+                            path.display()
+                        );
+                    }
+                }
+                Err(e) if e.contains("LIGHT") => {
+                    light_errors.push(format!("{}: {e}", path.display()))
+                }
+                Err(_) => {}
+            }
+        }
+        println!("{parsed} objects parsed, {lights} lights");
+        assert!(light_errors.is_empty(), "{light_errors:#?}");
+        assert!(lights > 0);
+    }
+
+    #[test]
     fn rejects_invalid_ranges_and_indices() {
         assert!(Object::parse(&format!("{TRI}TRIS 0 6")).is_err());
         assert!(Object::parse(&format!("{}TRIS 0 3", TRI.replace("IDX 2", "IDX 9"))).is_err());
