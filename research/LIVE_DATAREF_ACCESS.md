@@ -32,3 +32,20 @@ line alone does not prove the Frida call was the trigger; the two attach attempt
 - Write a small plugin loaded from `Resources/plugins` that reads datarefs and logs them. That is the
   supported XPLM route; it has to be built for the installed plugin ABI and installed into the reference tree,
   which modifies the reference installation and was not done.
+
+## Lead for the Data Output route (found, not exercised)
+
+`Output/preferences/X-Plane.prf` has 173 keys `_Bdisk0` .. `_Bdisk172` (value 0 in the reference tree), one per
+data-output line, in the same index order as `crates/xp-app/assets/dout/lines.tsv` (`dout_lines.cpp` builds
+indices `0..0xac`, which is 173 lines). The name and the count match the "write to disk" column of the
+Data Output screen; that the key actually switches the disk file on, and that the file is `Data.txt` in the
+simulator root, are expected from X-Plane's behaviour and were not tested here. Lines useful for a trajectory
+comparison by index: 1 (times), 3 (airspeeds), 4 (Mach, VVI, g-loads), 8 (stick), 13 (trim, flaps, speedbrakes),
+16 (P, Q, R), 17 (pitch, roll, headings), 18 (alpha, beta, flight path), 20 (latitude, longitude, altitudes),
+21 (position and velocity in metres), 25 (throttle handle).
+
+A run would need: the keys above set to 1 while the game is closed (back up and restore the prefs file, since it
+sits in the reference tree), a started flight of the stock Cessna 172 SP at a known airport with a scripted
+control sequence, and the resulting `Data.txt` paired with the port's `FlightModel` driven by the same inputs
+and time step. None of this was done; the Phase 1 exit check (recorded Cessna trajectories matching within a
+stated tolerance) remains unmet.
