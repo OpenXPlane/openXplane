@@ -736,7 +736,35 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             &args[2].to_string_lossy(),
             Path::new(&args[3]),
         )?;
-        pollster::block_on(gpu::render_png(&scene, Path::new(&args[4])))?;
+        // OPENXPLANE_CAMERA="x,y,z,heading_deg,pitch_deg" places a first-person camera at the
+        // scene-space eye position, looking along heading (0 = -Z, 90 = +X) and pitch (up positive).
+        let camera = match std::env::var("OPENXPLANE_CAMERA") {
+            Ok(spec) => {
+                let v = spec
+                    .split(',')
+                    .map(|s| s.trim().parse::<f32>())
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| format!("invalid OPENXPLANE_CAMERA: {e}"))?;
+                if v.len() != 5 {
+                    return Err("OPENXPLANE_CAMERA needs x,y,z,heading,pitch".into());
+                }
+                let (heading, pitch) = (v[3].to_radians(), v[4].to_radians());
+                let forward = glam::Vec3::new(
+                    heading.sin() * pitch.cos(),
+                    pitch.sin(),
+                    -heading.cos() * pitch.cos(),
+                );
+                let mut camera = gpu::Camera::new(&scene);
+                camera.target = glam::Vec3::new(v[0], v[1], v[2]) + forward;
+                camera.yaw = heading + std::f32::consts::PI;
+                camera.pitch = -pitch;
+                camera.distance = 1.0;
+                camera.radius = 200.0;
+                camera
+            }
+            Err(_) => gpu::Camera::new(&scene),
+        };
+        pollster::block_on(gpu::render_png_camera(&scene, &camera, Path::new(&args[4])))?;
         return Ok(true);
     }
     if args.len() == 3 && args[0] == "render" {

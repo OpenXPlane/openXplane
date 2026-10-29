@@ -214,6 +214,9 @@ its own code. The research tools do not modify the original files.
 ```sh
 cargo run --offline -- airport-render Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf" ksea.png
 cargo run --offline -- airport-view Xplane12 KSEA "Xplane12/Cessna 172 SP/Cessna_172SP.acf"
+# First-person camera for frame comparison (scene-space eye x,y,z metres; heading 0 = -Z,
+# 90 = +X; pitch up positive):
+OPENXPLANE_CAMERA="0,2,0,70,0" cargo run --offline -- airport-render Xplane12 UHWW "Xplane12/Cessna 172 SP/Cessna_172SP.acf" uhww.png
 ```
 
 Draws an airport from `apt.dat` (runways with markings, taxiway and apron pavements with holes) and puts the
