@@ -170,6 +170,33 @@ impl LightTable {
     }
 }
 
+/// Flash brightness in 0..=1 at `time` seconds, following the rules documented in the header of the
+/// installed `lights.txt` (triangle wave; amplitude > 1 subtracts `amp - 1` for a strobe; amplitude < 1
+/// lifts the dark level to `amp`; amplitude > 1000 is a square wave with pulse width `(amp - 1000) / 1000`).
+/// These are the documented semantics, not yet compared with the original code.
+pub fn flash_level(freq: f32, phase: f32, amp: f32, time: f32) -> f32 {
+    if freq <= 0.0 {
+        return 1.0;
+    }
+    let cycle = ((time - phase) * freq).rem_euclid(1.0);
+    if amp > 1000.0 {
+        return if cycle < (amp - 1000.0) / 1000.0 {
+            1.0
+        } else {
+            0.0
+        };
+    }
+    let triangle = 1.0 - (2.0 * cycle - 1.0).abs();
+    let level = if amp > 1.0 {
+        triangle * amp - (amp - 1.0)
+    } else if amp < 1.0 {
+        amp + triangle * (1.0 - amp)
+    } else {
+        triangle
+    };
+    level.clamp(0.0, 1.0)
+}
+
 fn is_spill(overload: Overload) -> bool {
     !matches!(overload, Overload::BillboardHw | Overload::BillboardSw)
 }
@@ -177,6 +204,24 @@ fn is_spill(overload: Overload) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flash_levels_follow_documented_amplitude_rules() {
+        // Pulsing triangle: dark at the cycle start, full at the middle.
+        assert_eq!(flash_level(1.0, 0.0, 1.0, 0.0), 0.0);
+        assert!((flash_level(1.0, 0.0, 1.0, 0.5) - 1.0).abs() < 1e-6);
+        // Strobe: amplitude 10 is lit only near the peak.
+        assert_eq!(flash_level(1.0, 0.0, 10.0, 0.25), 0.0);
+        assert!(flash_level(1.0, 0.0, 10.0, 0.5) > 0.99);
+        // Amplitude 0.5 never drops below 50 %.
+        assert!((flash_level(1.0, 0.0, 0.5, 0.0) - 0.5).abs() < 1e-6);
+        // Square wave, 50 % width, and phase shift.
+        assert_eq!(flash_level(1.0, 0.0, 1500.0, 0.25), 1.0);
+        assert_eq!(flash_level(1.0, 0.0, 1500.0, 0.75), 0.0);
+        assert_eq!(flash_level(1.0, 0.5, 1500.0, 0.75), 1.0);
+        // No frequency means steady.
+        assert_eq!(flash_level(0.0, 0.0, 1.0, 3.0), 1.0);
+    }
 
     const SAMPLE: &str = "A\n850\nLIGHT_SPECS\nTEXTURE lights.dds\nX_DIVISIONS 16\nY_DIVISIONS 8\n\
 BILLBOARD_HW\ttaillight\t1.0\t0.05\t0.00\t1.0\t100cd\t1 6 6\t0 0 0.99 -0.4 0 0 0 0\n\
