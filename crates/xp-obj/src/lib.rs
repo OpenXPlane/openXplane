@@ -55,6 +55,18 @@ pub struct Object {
     pub indices: Vec<u32>,
     pub draws: Vec<Draw>,
     pub texture: Option<String>,
+    /// `TEXTURE_LIT` night texture path. Parsed only; not rendered.
+    pub texture_lit: Option<String>,
+    /// `TEXTURE_NORMAL [scale] path` normal-map path. Parsed only; not rendered.
+    pub texture_normal: Option<String>,
+    /// `NORMAL_METALNESS`: the normal map's alpha channel carries metalness.
+    pub normal_metalness: bool,
+    /// `GLOBAL_specular ratio`. Parsed only.
+    pub specular: Option<f32>,
+    /// `GLOBAL_no_blend [cutoff]` or `GLOBAL_luminance [nits]` and `GLOBAL_no_shadow` flags.
+    pub global_no_blend: Option<f32>,
+    pub global_luminance: Option<f32>,
+    pub global_no_shadow: bool,
     pub glass: bool,
     pub unsupported: BTreeMap<String, usize>,
     pub datarefs: BTreeMap<String, usize>,
@@ -349,6 +361,32 @@ impl Object {
                             obj.texture = Some(path.into());
                         }
                     }
+                    "TEXTURE_LIT" | "TEXTURE_NORMAL" => {
+                        // TEXTURE_NORMAL may carry a leading numeric scale before the path.
+                        let rest = record.strip_prefix(command).unwrap().trim();
+                        let path = match rest.split_once(char::is_whitespace) {
+                            Some((first, tail)) if first.parse::<f32>().is_ok() => tail.trim(),
+                            _ => rest,
+                        };
+                        if !path.is_empty() {
+                            if command == "TEXTURE_LIT" {
+                                obj.texture_lit = Some(path.into());
+                            } else {
+                                obj.texture_normal = Some(path.into());
+                            }
+                        }
+                    }
+                    "NORMAL_METALNESS" => obj.normal_metalness = true,
+                    "GLOBAL_specular" => obj.specular = Some(numeric(args, 1)?[0]),
+                    "GLOBAL_no_blend" => {
+                        obj.global_no_blend =
+                            Some(args.first().map_or(Ok(0.5), |a| obj_decimal(a))?)
+                    }
+                    "GLOBAL_luminance" => {
+                        obj.global_luminance =
+                            Some(args.first().map_or(Ok(1000.0), |a| obj_decimal(a))?)
+                    }
+                    "GLOBAL_no_shadow" => obj.global_no_shadow = true,
                     "BLEND_GLASS" => {
                         obj.glass = true;
                     }
@@ -733,6 +771,28 @@ impl Object {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn material_commands_are_parsed_not_dropped() {
+        let o = Object::parse(&format!(
+            "{TRI}TEXTURE_LIT a_LIT.png
+TEXTURE_NORMAL 0.5 a_NML.png
+NORMAL_METALNESS
+GLOBAL_specular 0.7
+GLOBAL_no_blend
+GLOBAL_luminance 500
+GLOBAL_no_shadow
+"
+        ))
+        .unwrap();
+        assert_eq!(o.texture_lit.as_deref(), Some("a_LIT.png"));
+        assert_eq!(o.texture_normal.as_deref(), Some("a_NML.png"));
+        assert!(o.normal_metalness && o.global_no_shadow);
+        assert_eq!(o.specular, Some(0.7));
+        assert_eq!(o.global_no_blend, Some(0.5));
+        assert_eq!(o.global_luminance, Some(500.0));
+        assert!(o.unsupported.is_empty(), "{:?}", o.unsupported);
+    }
 
     #[test]
     fn light_commands_are_parsed_not_dropped() {
