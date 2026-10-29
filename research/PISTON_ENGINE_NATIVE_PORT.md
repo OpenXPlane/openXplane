@@ -179,3 +179,5 @@ environment is the engine lever, the thrust term and the frame time. The recorde
 workspace is green; I did not run the one-constant mutation check on this stage, so its pinning is unmeasured.
 With it the whole kind 1/2 handler (head, running part, end) is native; the dispatch, `power_from_tables` and
 the kinds 0, 3 and 4 handlers are still on the emulator, and the flight loop does not call any of this yet.
+
+Mutation check of the end stage (one constant changed at a time, 10 changes): the vectors caught 8. Not caught: the `0.6` factor of a negative `x6f` and the `29.92` inHg divisor of the manifold limit (the branch `B+0x938 < 1` is rarely reached by the random vectors). Note that the stock C172 has `crit_alt_mtr = 0`, so that branch is the one it takes: add vectors for it before relying on this stage.
