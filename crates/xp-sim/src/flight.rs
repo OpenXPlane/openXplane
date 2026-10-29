@@ -624,6 +624,14 @@ impl FlightModel {
         let index: usize = index.parse().ok()?;
         match array {
             "sim/cockpit2/engine/actuators/throttle_ratio" if index == 0 => Some(c.throttle),
+            // Gear retraction is not simulated yet: every modelled gear is reported fully deployed.
+            "sim/flightmodel2/gear/deploy_ratio" => {
+                self.gears.iter().any(|g| g.index == index).then_some(1.0)
+            }
+            // No mixture control exists yet; the documented start state is full rich.
+            "sim/cockpit2/engine/actuators/mixture_ratio" if index == 0 => Some(1.0),
+            // Doors are never opened by the simulation: closed.
+            "sim/flightmodel2/misc/door_open_ratio" => Some(0.0),
             "sim/flightmodel2/gear/tire_vertical_deflection_mtr" => self
                 .gears
                 .iter()

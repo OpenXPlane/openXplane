@@ -331,3 +331,26 @@ fn animation_bindings_use_model_controls_and_original_gear_slots() {
         None
     );
 }
+
+#[test]
+fn default_state_animation_datarefs_are_deployed_rich_and_closed() {
+    let Some(m) = model() else { return };
+    let c = Controls::default();
+    // The Cessna's gear is fixed: every modelled gear reads fully deployed, unknown slots read nothing.
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/gear/deploy_ratio[0]", &c),
+        Some(1.0)
+    );
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/gear/deploy_ratio[999]", &c),
+        None
+    );
+    assert_eq!(
+        m.animation_dataref("sim/cockpit2/engine/actuators/mixture_ratio[0]", &c),
+        Some(1.0)
+    );
+    assert_eq!(
+        m.animation_dataref("sim/flightmodel2/misc/door_open_ratio[3]", &c),
+        Some(0.0)
+    );
+}
