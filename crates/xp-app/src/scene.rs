@@ -1468,6 +1468,9 @@ pub fn airport_flight(
         .fold(f32::INFINITY, f32::min);
     let mut model = openxplane::flight::FlightModel::load(aircraft_path, &install, 80.0, 90.0)?;
     model.elevation_m = airport.elevation_ft * 0.3048;
+    // Local clock time follows the airport longitude; the scenario date/time itself is still the
+    // SimClock placeholder.
+    model.clock.longitude_deg = frame.origin()[1];
     let mut direction = Vec3::new(ux, 0.0, uz);
     let mut position = [a[0] + ux * 150.0, a[1] + uz * 150.0];
     // OPENXPLANE_START=ramp starts on the first apt.dat start location (row 1300) that allows
