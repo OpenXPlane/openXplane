@@ -26,8 +26,19 @@ and the noise source (`0x140984e50`). A native model needs those objects as type
 4. `power_from_tables` (kinds 3 and 4): power from the altitude and temperature tables `B+0xb1c..0xb34`
    and the engine speed `M+0x90`, written to `M+0xcc`; the result is `M+0xcc / M+0x25c`.
 
-## What the C172 SP needs
-The stock Cessna's engine kind and its table values live in the `.acf`; which of the kinds above it uses is
-not yet read from the file. Naming the offsets used by the kind it uses (and the propeller routine
-`prop::prop_force`) is the prerequisite for replacing the assumed thrust law. A trajectory recording from the
-original (Phase 1 exit) is needed to check the result.
+## What the C172 SP needs (read from the installed `.acf`)
+
+- `_engn/0/_type RCP_INJ`: kind 2 in the original's table (`ELE` 0, `RCP_CRB` 1, `RCP_INJ` 2, `TRB_FRE` 3, `TRB_FIX` 4;
+  `research/FLIGHT_STEP.md`). So the path is stage 2 and 3 with `update_engine_kind12`; `power_from_tables`
+  (kinds 3 and 4 only) and the kind 3/4 limits are not used.
+- `_engn/0/_RSC_max_pwr_ENGN 2500`, `_RSC_redline_ENGN 2700` (rpm), `_power_max_limit 178`, `_thrust_max_limit 0`,
+  engine health 1.0, no clutch, no freewheel.
+- `_prop/0/_prop_type 0`, `_des_rpm_prp 2700`: a fixed-pitch propeller, no governor.
+- Fixed units are not stated in the file; `178` is read as horsepower (the 172 SP is rated 180 hp) and the
+  speeds as rpm, both unverified.
+
+Consequence: a native port needs `update_engine_kind12` (1004 instructions in the original, ported at
+`engine_*.rs`) plus the `piston_power`/`piston_levers` stages above and `prop::prop_force`, not the whole engine
+table. Naming the offsets that this path reads is the next step; the kind 12 notes in `research/FLIGHT_STEP.md`
+already describe its outputs (`M+0xcc` power, manifold terms `M+0x240/0x244/0x248`, speeds `M+0x90/0x98`).
+A trajectory recording from the original (Phase 1 exit) is needed to check any result.
