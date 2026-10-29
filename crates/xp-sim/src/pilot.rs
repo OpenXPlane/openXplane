@@ -53,6 +53,11 @@ pub fn apply_command(c: &mut Controls, command: &str, phase: Phase) -> Effect {
         "sim/engines/mixture_down" if acts => bump(&mut c.mixture, -MIXTURE_STEP, 0.0, 1.0),
         "sim/engines/mixture_max" if phase == Phase::Begin => c.mixture = 1.0,
         "sim/engines/mixture_min" if phase == Phase::Begin => c.mixture = 0.0,
+        "sim/engines/carb_heat_on" if phase == Phase::Begin => c.carb_heat = 1.0,
+        "sim/engines/carb_heat_off" if phase == Phase::Begin => c.carb_heat = 0.0,
+        "sim/engines/carb_heat_toggle" if phase == Phase::Begin => {
+            c.carb_heat = if c.carb_heat > 0.0 { 0.0 } else { 1.0 }
+        }
         "sim/flight_controls/flaps_up" if phase == Phase::Begin => {
             bump(&mut c.flaps, -1.0 / 3.0, 0.0, 1.0)
         }
@@ -147,6 +152,9 @@ fn is_stateless_noop(command: &str, phase: Phase) -> bool {
                 | "sim/engines/mixture_down"
                 | "sim/engines/mixture_max"
                 | "sim/engines/mixture_min"
+                | "sim/engines/carb_heat_on"
+                | "sim/engines/carb_heat_off"
+                | "sim/engines/carb_heat_toggle"
                 | "sim/flight_controls/flaps_up"
                 | "sim/flight_controls/flaps_down"
                 | "sim/flight_controls/brakes_toggle_max"
@@ -276,6 +284,20 @@ mod tests {
         assert_eq!(c.mixture, 0.0);
         run(&mut c, "sim/engines/mixture_max", Phase::Begin);
         assert_eq!(c.mixture, 1.0);
+    }
+
+    #[test]
+    fn carb_heat_commands_set_and_toggle() {
+        let mut c = Controls::default();
+        assert_eq!(c.carb_heat, 0.0);
+        run(&mut c, "sim/engines/carb_heat_toggle", Phase::Begin);
+        assert_eq!(c.carb_heat, 1.0);
+        run(&mut c, "sim/engines/carb_heat_toggle", Phase::Begin);
+        assert_eq!(c.carb_heat, 0.0);
+        run(&mut c, "sim/engines/carb_heat_on", Phase::Begin);
+        assert_eq!(c.carb_heat, 1.0);
+        run(&mut c, "sim/engines/carb_heat_off", Phase::Begin);
+        assert_eq!(c.carb_heat, 0.0);
     }
 
     #[test]

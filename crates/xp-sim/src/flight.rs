@@ -69,6 +69,8 @@ pub struct Controls {
     pub rudder_trim: f32,
     /// Mixture lever 0..1 (1 = full rich, the documented start state).
     pub mixture: f32,
+    /// Carburettor heat 0..1 (0 = off).
+    pub carb_heat: f32,
 }
 
 impl Default for Controls {
@@ -84,6 +86,7 @@ impl Default for Controls {
             aileron_trim: 0.0,
             rudder_trim: 0.0,
             mixture: 1.0,
+            carb_heat: 0.0,
         }
     }
 }
@@ -714,6 +717,7 @@ impl FlightModel {
             }
             // The lever state only; the engine model does not use the mixture yet.
             "sim/cockpit2/engine/actuators/mixture_ratio" if index == 0 => Some(c.mixture),
+            "sim/cockpit2/engine/actuators/carb_heat_ratio" if index == 0 => Some(c.carb_heat),
             // Doors are never opened by the simulation: closed.
             "sim/flightmodel2/misc/door_open_ratio" => Some(0.0),
             "sim/flightmodel2/gear/tire_vertical_deflection_mtr" => self
