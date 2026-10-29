@@ -43,12 +43,33 @@ table. Naming the offsets that this path reads is the next step; the kind 12 not
 already describe its outputs (`M+0xcc` power, manifold terms `M+0x240/0x244/0x248`, speeds `M+0x90/0x98`).
 A trajectory recording from the original (Phase 1 exit) is needed to check any result.
 
-## Naming the offsets: first attempt
-The offsets read by the kind 1/2 path (`update_engine_piston` and `update_engine_kind12`) are `M+` 0x40, 0x48,
-0x64, 0x68, 0x6c, 0x74, 0x78, 0x84, 0x90, 0x98, 0xa0, 0xb8, 0xcc, 0x20c, 0x210, 0x214, 0x22c, 0x240..0x258, 0x25c,
-0x268, 0x2bc; `B+` 0x938..0x93c, 0x9e0..0x9f4, 0xab0, 0xb00..0xb18, 0xb6c, 0x1a64; `E+` 0xc, 0x14, 0x18, 0x64,
-0x1e4; `F+` 0x28, 0x68b0, 0x6880. Looking them up as `B` offsets in `crates/xp-acf/data/object_schema.tsv`
-gives unrelated names (for example 0xb6c matches `acf/_jato_dur`, 0xb18 `acf/_brake_to_steer_power`), so the
-schema's `B` column is not the same object as the `B` of these routines, or only part of it. Names therefore
-cannot be taken from that file; they have to come from the callers (what the engine setup stores at each
-offset), so no field is named yet. Result recorded to avoid repeating the lookup.
+## Naming the offsets
+The offset column of `crates/xp-acf/data/object_schema.tsv` is **hexadecimal** (an earlier attempt read it as
+decimal and got unrelated names; that was a parsing mistake, not a schema problem). With the right reading the
+`B` offsets of the kind 1/2 path resolve to ACF properties, and the engine record `E` (record `R5ff8`, stride
+0x68) resolves too: `E+4 _power_max_limit`, `E+0x14 _RSC_max_pwr_ENGN`, `E+0x18 _RSC_redline_ENGN`,
+`E+0x64 _engn_health_var` (so `E+0xc` and `E+0x1e4` are not engine-record ACF fields).
+
+| Offset | ACF property (`acf/_...`) | Stock C172 SP value |
+|---|---|---:|
+| `B+0x934` | `prop_inlet_recovery_v12` | 0 |
+| `B+0x938` | `crit_alt_mtr` | 0 |
+| `B+0x93c` | `engine_pwr_rat_from_crit_alt` | 0 |
+| `B+0x958` | `num_cylinders` | 4 |
+| `B+0x9e0` | `throt_max_fwd_nrm` | 1 |
+| `B+0x9f0` | `engine_friction_ratio` | 1 |
+| `B+0x9f4` | `RSC_idlespeed_ENGN` | 500 |
+| `B+0xab0` | `fadec_EQ_mixture` | 0 |
+| `B+0xb00` / `0xb04` | `SFC_alt_hi_PRP` / `SFC_alt_lo_PRP` | 12000 / 2000 |
+| `B+0xb08` / `0xb0c` | `SFC_full_hi_PRP` / `SFC_full_lo_PRP` | 0.425 / 0.445 |
+| `B+0xb10` / `0xb14` | `SFC_half_hi_PRP` / `SFC_half_lo_PRP` | 0.36 / 0.38 |
+| `B+0xb18` | `ff_rat_idle_PRP` | 0.15 |
+| `B+0xb6c` | `SFC_recip_rich_ratio` | 1.1 |
+| `B+0xa18` | `fuel_intro_time_prop` | 15 |
+| `B+0x1a64` | `max_MP_limit` | 29.9 |
+
+Not resolved by the schema: `B+0x920` (bound-element count), `B+0x9dc`, `B+0xa9c` (engine mode), and the `M`
+(engine state) and `F` (flight) offsets, which are runtime state rather than ACF fields. The values are read
+from the installed file; the interpretation of each term is the existing port's, not re-derived here.
+Note that `B+0x938` and `B+0x93c` are 0 in the stock aircraft, so `piston_levers`' `x11 = (B+0x93c - 1)/1.7 + 1`
+is 0.412 for it.
