@@ -387,3 +387,18 @@ fn flight_datarefs_follow_state_signs_and_units() {
     m.state.orientation = glam::Quat::from_rotation_x(10.0_f32.to_radians()) * m.state.orientation;
     assert!(get(&m, "sim/flightmodel/position/theta") > 5.0);
 }
+
+#[test]
+fn clock_datarefs_advance_with_simulation_time() {
+    let Some(mut m) = model() else { return };
+    let c = Controls::default();
+    m.clock.zulu_start_sec = 3599.0;
+    let seconds =
+        |m: &FlightModel| m.animation_dataref("sim/cockpit2/clock_timer/zulu_time_seconds", &c);
+    let hours =
+        |m: &FlightModel| m.animation_dataref("sim/cockpit2/clock_timer/zulu_time_hours", &c);
+    assert_eq!(hours(&m), Some(0.0));
+    run(&mut m, &c, 2.1);
+    assert_eq!(hours(&m), Some(1.0));
+    assert_eq!(seconds(&m), Some(1.0));
+}

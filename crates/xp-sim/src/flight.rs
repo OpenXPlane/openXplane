@@ -165,6 +165,8 @@ pub struct FlightModel {
     reference_area: f32,
     reference_chord: f32,
     rest: Option<(State, Vec<Gear>)>,
+    /// Scenario clock behind the time datarefs; the default is a placeholder, not a scenario time.
+    pub clock: crate::clock::SimClock,
 }
 
 /// A simple scripted pilot for tests and demonstrations: full power after two seconds, rotation at 55
@@ -535,6 +537,7 @@ impl FlightModel {
             reference_area: ref_area,
             reference_chord: ref_chord,
             rest: None,
+            clock: crate::clock::SimClock::default(),
         })
     }
 
@@ -649,6 +652,9 @@ impl FlightModel {
 
     pub fn animation_dataref(&self, name: &str, c: &Controls) -> Option<f32> {
         if let Some(value) = self.flight_dataref(name, c) {
+            return Some(value);
+        }
+        if let Some(value) = self.clock.dataref(name, self.state.time) {
             return Some(value);
         }
         if name == "sim/flightmodel2/controls/elevator_trim" {
