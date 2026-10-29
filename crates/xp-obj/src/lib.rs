@@ -1,4 +1,5 @@
 //! OBJ8 geometry and cached dataref-driven animation evaluation. Not an X-Plane runtime.
+pub mod lights;
 use glam::{Mat4, Vec3};
 use std::{collections::BTreeMap, ops::Range};
 
