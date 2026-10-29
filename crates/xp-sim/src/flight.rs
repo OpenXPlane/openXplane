@@ -699,6 +699,26 @@ impl FlightModel {
             return Some(value);
         }
         match name {
+            // Cold-and-dark defaults the simulation never changes: autopilot and annunciator tests off,
+            // landing light off, yoke visible, internal view, hobbs not running. None is compared with the original.
+            "sim/cockpit/warnings/autopilot_test_ap_lit"
+            | "sim/cockpit/warnings/annunciator_test_pressed"
+            | "sim/cockpit2/autopilot/autopilot_on"
+            | "sim/cockpit2/autopilot/heading_status"
+            | "sim/cockpit2/autopilot/nav_status"
+            | "sim/cockpit2/autopilot/altitude_hold_status"
+            | "sim/cockpit2/autopilot/vvi_status"
+            | "sim/cockpit2/autopilot/gpss_status"
+            | "sim/cockpit2/autopilot/rate_status"
+            | "sim/cockpit2/autopilot/glideslope_status"
+            | "sim/cockpit2/autopilot/approach_status"
+            | "sim/cockpit2/autopilot/backcourse_status"
+            | "sim/cockpit2/switches/landing_lights_on"
+            | "sim/graphics/view/hide_yoke"
+            | "sim/graphics/view/view_is_external"
+            | "sim/cockpit2/clock_timer/hobbs_time_hours"
+            | "sim/cockpit2/clock_timer/hobbs_time_minutes"
+            | "sim/time/hobbs_time" => return Some(0.0),
             "laminar/c172/flap_side_shift" => return Some(c172_flap_side_shift(c.flaps)),
             // The OAT/volts button of the clock starts on volts.
             "laminar/c172/knob_OAT" => return Some(2.0),

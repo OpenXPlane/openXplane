@@ -402,3 +402,17 @@ fn clock_datarefs_advance_with_simulation_time() {
     assert_eq!(hours(&m), Some(1.0));
     assert_eq!(seconds(&m), Some(1.0));
 }
+
+#[test]
+fn cold_and_dark_defaults_are_answered() {
+    let Some(m) = model() else { return };
+    let c = Controls::default();
+    for name in [
+        "sim/cockpit2/autopilot/autopilot_on",
+        "sim/graphics/view/hide_yoke",
+        "sim/time/hobbs_time",
+        "sim/cockpit2/switches/landing_lights_on",
+    ] {
+        assert_eq!(m.animation_dataref(name, &c), Some(0.0), "{name}");
+    }
+}

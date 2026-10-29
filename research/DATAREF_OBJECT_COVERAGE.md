@@ -34,3 +34,13 @@ attitude, body-rate, speed, altitude and vertical-speed datarefs of the preview 
 default-state or preview-model values; none is compared with the original. Largest remaining groups:
 `cockpit2/clock_timer/*`, `cockpit2/electrical/*` (bus volts, battery, generator), `cockpit2/switches/*`,
 `gear/tire_rotation_angle_deg`, `cockpit2/autopilot/*`, `time/zulu_time_sec`.
+
+## Cold-and-dark defaults and system state (later pass)
+
+Re-measured with the same tool: 126 of the 144 table names are now named by the port (22 not), up from 92
+(52 not). The additions are the clock, electrical switches, fuel selector, ignition key, carburettor heat,
+mixture lever and the flap side shift, plus fixed zero defaults for autopilot status, annunciator and
+autopilot tests, landing light, `hide_yoke`, `view_is_external` and hobbs time. All are default-state values
+or values from the stock xlua scripts (`research/C172_XLUA_SYSTEMS.md`); none is compared with the
+original, and "named" is still a text match. Largest groups still open: `timer_mode`, `bus_volts`,
+`custom_slider_*`, `tire_rotation_angle_deg`, `HSI_source_select_pilot`, `fuel_quantity`, engine indicators.
