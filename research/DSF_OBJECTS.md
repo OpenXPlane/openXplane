@@ -346,3 +346,13 @@ argues against a static-aircraft setting as the cause. The most likely
 explanation is a hook blind spot for those library opens (a different API or
 an earlier/cached read), not an object the reference omits. Placement parity for
 these 38 resources is therefore unknown, not disproved.
+
+### OBJ reader function identity (decompiled)
+
+The two callers of the texture opener `FUN_14089c220` (0x14087ca10, 0x14087caed)
+sit in `FUN_1408763a0`, a ~3960-line function whose error strings cite
+`engine/OBJ/OBJ_read.cpp` (for example the rain-system wiper and thermal
+texture messages at lines 0xb42/0xb4e). It is the per-file OBJ reader, not the
+DSF placement/instancing path, so it does not expose per-instance positions.
+Decompiling it needs a 20 min decompiler timeout in the headless script. Finding
+the instancing step that consumes DSF object placements is still open.
