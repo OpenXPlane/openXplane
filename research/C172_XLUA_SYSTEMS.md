@@ -39,5 +39,6 @@ from the native electrical model and the start mode, so they still need a refere
 - `c172_sound` needs no port: it only copies ten `audio_volume_*` radio datarefs (nav1-4, adf1-2, dme, dme1-2,
   marker) into `laminar/C172/sound/radio_volume_pilot[0..9]` every frame, in that order. It matters once the
   radios and sound exist (Phase 5 item 3, Phase 6).
-- Not ported: the ADF frequency clamps (200..1799 for the active and standby frequency) and
-  `knob_TAS`/`knob_EGT` of `c172_custom_datarefs`; they need radio and gauge state that does not exist yet.
+- `xp_sim::flight::c172_clamp_adf_hz`: the 200..1799 ADF clamp as a function (no radio state exists to apply it to).
+- Not ported:
+  `knob_TAS`/`knob_EGT` of `c172_custom_datarefs`, which need gauge state that does not exist yet.

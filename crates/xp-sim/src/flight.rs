@@ -1140,6 +1140,12 @@ pub fn c172_flap_side_shift(handle: f32) -> f32 {
     }
 }
 
+/// ADF frequency limits the stock Cessna 172 SP applies every frame (`c172_custom_datarefs`): both the active and
+/// the standby frequency are held to 200..1799 (the datarefs are integers in kHz).
+pub fn c172_clamp_adf_hz(hz: f32) -> f32 {
+    hz.clamp(200.0, 1799.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1199,5 +1205,12 @@ mod tests {
         assert_eq!(c172_flap_side_shift(1.0 / 3.0), 0.0);
         assert_eq!(c172_flap_side_shift(2.0 / 3.0), 0.5);
         assert_eq!(c172_flap_side_shift(1.0), 1.0);
+    }
+
+    #[test]
+    fn c172_adf_frequency_is_held_to_the_band() {
+        assert_eq!(c172_clamp_adf_hz(100.0), 200.0);
+        assert_eq!(c172_clamp_adf_hz(1000.0), 1000.0);
+        assert_eq!(c172_clamp_adf_hz(2000.0), 1799.0);
     }
 }
