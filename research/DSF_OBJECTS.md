@@ -304,3 +304,30 @@ read any texture file from the `1_UHWW` pack (its objects either are not
 instantiated near the start position or resolve elsewhere), so the DDS/PNG
 choice for those objects cannot be observed in this scene. The ordering for
 the ortho POL textures (dds, png, then ktx2) matches the earlier pass.
+
+### Resource-set comparison: port vs reference file opens (UHWW)
+
+Reference: fresh X-Plane process, Frida `CreateFileW` hook attached at the main
+menu, last flight resumed at UHWW, all opens of OBJ/FAC/POL/AGP/TER/texture
+files under Custom/Global Scenery and `Resources/default scenery` logged
+(5257 distinct paths, 2963 OBJ). Port: `OPENXPLANE_LOG_UNRESOLVED=1` now also
+prints `resolved object: <path> nearest=<m>` for every DSF placement resolved
+within the 6000 m radius (103 resources, 100 OBJ + 3 AGP).
+
+- 65 of the 103 port resources were also opened by the reference
+  (all `1_UHWW` placements that the reference loads, nearest <= 1984 m).
+- 38 port resources were **not opened by the reference** although the nearest
+  instance is as close as 237 m, so draw distance alone does not explain them.
+  Groups: `ruscenery/aircrafts/*` (static aircraft), `ruscenery/tech/*` and
+  `ruscenery/buildings/*` (vehicles/fuel tanks), `md80_dal_static.obj`,
+  several `Resources/default scenery` fuel tanks/lights/AGP, and
+  `AEP/effects/*`. Static aircraft and ground vehicles being skipped by the
+  reference (a rendering/density setting or an exclusion rule not yet
+  modelled) is a hypothesis; it has not been tested.
+- The reference also opens 425 OBJ files inside `1_UHWW`/`2_UHWW_Ortho`, only
+  61 of which the port resolves from DSF placements (library preloads and
+  apt.dat/traffic objects account for the rest; not yet attributed).
+
+This is the first measured placement-level difference: the port instantiates
+objects the reference does not load. Per-instance positions are still
+uncompared.

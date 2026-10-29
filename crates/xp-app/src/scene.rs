@@ -891,6 +891,16 @@ fn airport_objects(
         for name in &unresolved_names {
             eprintln!("unresolved object: {name}");
         }
+        for (resource, instances) in &grouped {
+            let nearest = instances
+                .iter()
+                .map(|(at, _)| at.x.hypot(at.z))
+                .fold(f32::INFINITY, f32::min);
+            eprintln!(
+                "resolved object: {} nearest={nearest:.0}",
+                resource.display()
+            );
+        }
     }
     let mut meshes = airport_facades(&features.polygons, pack, library, frame, ground);
     meshes.extend(airport_polygons(
