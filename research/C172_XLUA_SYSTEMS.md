@@ -34,5 +34,6 @@ from the native electrical model and the start mode, so they still need a refere
 - `xp_sim::fuel`: tank selector steps (left, all, right), cutoff and the handle datarefs of
   `c172_fuel_selector`. Start position "all" is assumed; the commands are not bound to keys and fuel
   flow is not modelled.
+- `xp_sim::flight::c172_flap_side_shift` and `laminar/c172/knob_OAT` (starts on volts, value 2).
 - Not ported: `c172_starter` (ignition key and starter command wiring), `c172_sound`,
-  `c172_custom_datarefs` (flap side shift, OAT knob, ADF clamps).
+  the ADF frequency clamps (200..1799) and `knob_TAS`/`knob_EGT` of `c172_custom_datarefs`.

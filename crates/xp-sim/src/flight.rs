@@ -690,6 +690,12 @@ impl FlightModel {
         if let Some(value) = self.fuel.dataref(name) {
             return Some(value);
         }
+        match name {
+            "laminar/c172/flap_side_shift" => return Some(c172_flap_side_shift(c.flaps)),
+            // The OAT/volts button of the clock starts on volts.
+            "laminar/c172/knob_OAT" => return Some(2.0),
+            _ => {}
+        }
         if name == "sim/flightmodel2/controls/elevator_trim" {
             return Some(c.elevator_trim);
         }
@@ -1068,6 +1074,19 @@ pub fn c172_pilot_ias(cas_kt: f32) -> f32 {
     }
 }
 
+/// Side shift of the flap handle gate in the stock Cessna 172 SP (`c172_custom_datarefs`): the script sets it
+/// to 0 at the first detent, 0.5 at the second and 1 at full flaps, and leaves it alone between detents.
+/// Without that memory this reads 0 below the second detent, which matches a handle moved up from the first.
+pub fn c172_flap_side_shift(handle: f32) -> f32 {
+    if handle >= 0.9995 {
+        1.0
+    } else if handle > 0.665 {
+        0.5
+    } else {
+        0.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1117,5 +1136,13 @@ mod tests {
         assert!((c172_pilot_ias(42.5) - 35.0).abs() < 1e-4);
         assert!((c172_pilot_ias(69.99) - 70.0).abs() < 0.02);
         assert_eq!(c172_pilot_ias(90.0), 90.0);
+    }
+
+    #[test]
+    fn c172_flap_side_shift_follows_the_detents() {
+        assert_eq!(c172_flap_side_shift(0.0), 0.0);
+        assert_eq!(c172_flap_side_shift(1.0 / 3.0), 0.0);
+        assert_eq!(c172_flap_side_shift(2.0 / 3.0), 0.5);
+        assert_eq!(c172_flap_side_shift(1.0), 1.0);
     }
 }
