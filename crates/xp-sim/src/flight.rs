@@ -186,6 +186,8 @@ pub struct FlightModel {
     rest: Option<(State, Vec<Gear>)>,
     /// Scenario clock behind the time datarefs; the default is a placeholder, not a scenario time.
     pub clock: crate::clock::SimClock,
+    /// Switch state behind the electrical datarefs (cold and dark, analog Cessna).
+    pub electrical: crate::electrical::Electrical,
 }
 
 /// A simple scripted pilot for tests and demonstrations: full power after two seconds, rotation at 55
@@ -557,6 +559,10 @@ impl FlightModel {
             reference_chord: ref_chord,
             rest: None,
             clock: crate::clock::SimClock::default(),
+            electrical: crate::electrical::Electrical::at_start(
+                crate::electrical::Start::ColdAndDark,
+                1,
+            ),
         })
     }
 
@@ -674,6 +680,9 @@ impl FlightModel {
             return Some(value);
         }
         if let Some(value) = self.clock.dataref(name, self.state.time) {
+            return Some(value);
+        }
+        if let Some(value) = self.electrical.dataref(name) {
             return Some(value);
         }
         if name == "sim/flightmodel2/controls/elevator_trim" {
