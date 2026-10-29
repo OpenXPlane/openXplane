@@ -664,8 +664,8 @@ impl FlightModel {
             "sim/flightmodel/position/P" => (-rate.z).to_degrees(),
             "sim/flightmodel/position/R" => (-rate.y).to_degrees(),
             "sim/flightmodel/position/true_airspeed" => true_airspeed,
-            "sim/flightmodel/position/indicated_airspeed"
-            | "sim/cockpit2/gauges/indicators/airspeed_kts_pilot" => t.airspeed_kt,
+            "sim/flightmodel/position/indicated_airspeed" => t.airspeed_kt,
+            "sim/cockpit2/gauges/indicators/airspeed_kts_pilot" => c172_pilot_ias(t.airspeed_kt),
             "sim/cockpit2/gauges/indicators/altitude_ft_pilot" => t.altitude_ft,
             "sim/flightmodel/position/vh_ind_fpm"
             | "sim/cockpit2/gauges/indicators/vvi_fpm_pilot" => t.vertical_speed_fpm,
@@ -1050,6 +1050,19 @@ pub fn static_loads(gears: &[Gear], cg: Vec3, weight: f32) -> Vec<f32> {
         .collect()
 }
 
+/// Airspeed the stock Cessna 172 SP shows to the pilot: its `c172_IAS` script overrides the indicator with
+/// zero below 15 kt of calibrated airspeed, a stretched ramp up to 70 kt, and the calibrated value above.
+/// The calibrated airspeed is taken to be the model's indicated airspeed.
+pub fn c172_pilot_ias(cas_kt: f32) -> f32 {
+    if cas_kt < 15.0 {
+        0.0
+    } else if cas_kt < 70.0 {
+        (cas_kt - 15.0) * (70.0 / 55.0)
+    } else {
+        cas_kt
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1090,5 +1103,14 @@ mod tests {
             "the nose carries less than a main: {f:?}"
         );
         assert_eq!(f[1], f[2]);
+    }
+
+    #[test]
+    fn c172_pilot_ias_follows_the_stock_script_ramp() {
+        assert_eq!(c172_pilot_ias(10.0), 0.0);
+        assert_eq!(c172_pilot_ias(15.0), 0.0);
+        assert!((c172_pilot_ias(42.5) - 35.0).abs() < 1e-4);
+        assert!((c172_pilot_ias(69.99) - 70.0).abs() < 0.02);
+        assert_eq!(c172_pilot_ias(90.0), 90.0);
     }
 }
