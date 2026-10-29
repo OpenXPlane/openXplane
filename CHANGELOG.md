@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### apt.dat ramp start and airport data
+
+- Type every row of the UHWW `apt.dat` block (start locations, taxi network, signs, approach
+  lights, frequencies, linear features, active zones). `OPENXPLANE_START=ramp` starts the
+  aircraft on the first `props` start location (gate 13, heading 148.5) instead of the runway;
+  the [capture](site/assets/uhww-ramp-start-20261029.jpg) is port-only. The default start rule
+  of the original game was not compared, so the default stays the runway start.
+
 ### POL footprints with detached or pinched rings
 
 - Triangulate POL footprints whose "hole" ring lies outside the outline as separate

@@ -193,6 +193,21 @@ pub struct Airport {
 }
 
 impl Airport {
+    /// First start location (file order) usable by the aircraft class (`heavy`, `jets`, `turboprops`,
+    /// `props`, `helos`), optionally restricted to a location type such as `gate` or `tie-down`.
+    /// The original game's own default-start rule has not been compared; this is a deterministic
+    /// file-order selection for callers that ask for a ramp start.
+    pub fn start_for_class(
+        &self,
+        class: &str,
+        location_type: Option<&str>,
+    ) -> Option<&StartLocation> {
+        self.start_locations.iter().find(|s| {
+            s.aircraft_classes.iter().any(|c| c == class)
+                && location_type.is_none_or(|t| s.location_type == t)
+        })
+    }
+
     pub fn metadata_value(&self, key: &str) -> Option<&str> {
         self.metadata
             .iter()
@@ -477,6 +492,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn start_selection_follows_file_order_and_class() {
+        let text = "A
+1200 t
+
+1 0 0 0 TEST Test Field
+1300 47.0 -122.0 10 gate heavy|jets A
+1300 47.1 -122.1 20 tie-down props|helos B
+1300 47.2 -122.2 30 gate props C
+99
+";
+        let a = find_airport(text.as_bytes(), "TEST").unwrap().unwrap();
+        assert_eq!(a.start_for_class("jets", None).unwrap().name, "A");
+        assert_eq!(a.start_for_class("props", None).unwrap().name, "B");
+        assert_eq!(a.start_for_class("props", Some("gate")).unwrap().name, "C");
+        assert!(a.start_for_class("turboprops", None).is_none());
+    }
+
+    #[test]
     fn active_zones_list_runway_ends() {
         let text = "A
 1200 t
@@ -712,6 +745,13 @@ mod installed {
         assert_eq!((a.signs.len(), a.approach_lights.len()), (14, 2));
         assert_eq!((a.frequencies.len(), a.linear_features.len()), (4, 11));
         assert_eq!(a.active_zones.len(), 60);
+        let ramp = a
+            .start_for_class("props", None)
+            .expect("a props start location");
+        println!(
+            "first props start: {} {} {}",
+            ramp.location_type, ramp.name, ramp.heading_deg
+        );
         assert!(
             a.other_rows.keys().all(|c| *c == 1200),
             "{:?}",

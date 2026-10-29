@@ -1468,8 +1468,25 @@ pub fn airport_flight(
         .fold(f32::INFINITY, f32::min);
     let mut model = openxplane::flight::FlightModel::load(aircraft_path, &install, 80.0, 90.0)?;
     model.elevation_m = airport.elevation_ft * 0.3048;
-    let direction = Vec3::new(ux, 0.0, uz);
-    model.rest_on_ground(low_y, [a[0] + ux * 150.0, a[1] + uz * 150.0], direction);
+    let mut direction = Vec3::new(ux, 0.0, uz);
+    let mut position = [a[0] + ux * 150.0, a[1] + uz * 150.0];
+    // OPENXPLANE_START=ramp starts on the first apt.dat start location (row 1300) that allows
+    // `props` aircraft; the default stays the runway start. Heading 0 = north = -Z.
+    if std::env::var("OPENXPLANE_START").as_deref() == Ok("ramp") {
+        match airport.start_for_class("props", None) {
+            Some(start) => {
+                position = frame.to_local(start.lat, start.lon);
+                let heading = start.heading_deg.to_radians();
+                direction = Vec3::new(heading.sin(), 0.0, -heading.cos());
+                println!(
+                    "Ramp start {} {} heading {:.1}",
+                    start.location_type, start.name, start.heading_deg
+                );
+            }
+            None => println!("No props start location; using the runway start"),
+        }
+    }
+    model.rest_on_ground(low_y, position, direction);
 
     let mut meshes = Vec::new();
     let mut ground = match terrain_scene(root, icao) {
