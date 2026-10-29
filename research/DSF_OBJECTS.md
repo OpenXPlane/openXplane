@@ -331,3 +331,18 @@ within the 6000 m radius (103 resources, 100 OBJ + 3 AGP).
 This is the first measured placement-level difference: the port instantiates
 objects the reference does not load. Per-instance positions are still
 uncompared.
+
+#### Correction to the comparison above
+
+The "skipped by the reference" reading is too strong. For 20 of the 38 port
+resources the reference does probe the pack-relative candidates
+(`1_UHWW/ruscenery/aircrafts/tu-154-0.obj`, then
+`1_UHWW/custom objects/ruscenery/...`), so those placements are processed. The
+final library file open (`Custom Scenery/ruscenery/aircrafts/...`) is never seen
+by the `CreateFileW` hook: it recorded 0 opens from `Custom Scenery/ruscenery/`
+although 2269 default-scenery and 199 AEP OBJ opens appear. The reference also
+has `renopt_static_acf 1` (static aircraft enabled) in its preferences, which
+argues against a static-aircraft setting as the cause. The most likely
+explanation is a hook blind spot for those library opens (a different API or
+an earlier/cached read), not an object the reference omits. Placement parity for
+these 38 resources is therefore unknown, not disproved.
