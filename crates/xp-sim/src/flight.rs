@@ -105,6 +105,9 @@ pub struct Gear {
     pub steer_max_rad: f32,
     pub compression: f32,
     pub on_ground: bool,
+    /// Tyre radius in metres (the ACF stores feet) and the accumulated roll angle in degrees, 0..360.
+    pub tire_radius: f32,
+    pub rotation_deg: f32,
 }
 
 /// Boundary points and per-element flags of one wing in the layout the wing element function reads.
@@ -501,6 +504,8 @@ impl FlightModel {
                     * if x.abs() < 0.01 { 1.0 } else { 0.0 },
                 compression: 0.0,
                 on_ground: false,
+                tire_radius: acf.float_property(&key("_tire_radius")).unwrap_or(0.0) * ACF_FT_TO_M,
+                rotation_deg: 0.0,
             });
         }
         if gears.is_empty() {
@@ -744,6 +749,11 @@ impl FlightModel {
             | "sim/cockpit2/switches/custom_slider_on" => Some(0.0),
             // Doors are never opened by the simulation: closed.
             "sim/flightmodel2/misc/door_open_ratio" => Some(0.0),
+            "sim/flightmodel2/gear/tire_rotation_angle_deg" => self
+                .gears
+                .iter()
+                .find(|g| g.index == index)
+                .map(|g| g.rotation_deg),
             "sim/flightmodel2/gear/tire_vertical_deflection_mtr" => self
                 .gears
                 .iter()
@@ -1048,6 +1058,16 @@ impl FlightModel {
         st.position += st.velocity * dt;
         st.orientation = (st.orientation * Quat::from_scaled_axis(st.omega * dt)).normalize();
         st.time += f64::from(dt);
+        // Tyres in contact roll with the forward ground speed (no wheel lock or slip).
+        let forward_speed = (st.orientation * Vec3::NEG_Z).dot(st.velocity);
+        for g in self
+            .gears
+            .iter_mut()
+            .filter(|g| g.on_ground && g.tire_radius > 0.0)
+        {
+            let step = (forward_speed / g.tire_radius * dt).to_degrees();
+            g.rotation_deg = (g.rotation_deg + step).rem_euclid(360.0);
+        }
     }
 
     pub fn telemetry(&self, controls: &Controls) -> Telemetry {
@@ -1146,6 +1166,8 @@ mod tests {
             steer_max_rad: 0.0,
             compression: 0.0,
             on_ground: false,
+            tire_radius: 0.2,
+            rotation_deg: 0.0,
         };
         let gears = [g(0.0, -0.6), g(-1.2, 1.4), g(1.2, 1.4)];
         let cg = Vec3::new(0.0, 0.0, 0.9);

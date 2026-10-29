@@ -419,3 +419,29 @@ fn cold_and_dark_defaults_are_answered() {
         assert_eq!(m.animation_dataref(name, &c), Some(0.0), "{name}");
     }
 }
+
+#[test]
+fn tires_roll_with_ground_speed_and_stay_still_at_rest() {
+    let Some(mut m) = model() else { return };
+    let name = "sim/flightmodel2/gear/tire_rotation_angle_deg[1]";
+    let rest = Controls::default();
+    run(&mut m, &rest, 1.0);
+    let at_rest = m.animation_dataref(name, &rest).unwrap();
+    assert!(at_rest < 5.0 || at_rest > 355.0, "at rest {at_rest}");
+    let roll = Controls {
+        throttle: 1.0,
+        ..Default::default()
+    };
+    run(&mut m, &roll, 8.0);
+    let angle = m.animation_dataref(name, &roll).unwrap();
+    assert!(
+        (0.0..360.0).contains(&angle) && (angle - at_rest).abs() > 1.0,
+        "rolled {angle}"
+    );
+    assert!(
+        m.telemetry(&roll).airspeed_kt > 10.0,
+        "the take-off roll built up speed"
+    );
+    let radius = m.gears.iter().find(|g| g.index == 1).unwrap().tire_radius;
+    assert!(radius > 0.1 && radius < 0.5, "radius {radius} m");
+}

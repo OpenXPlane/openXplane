@@ -329,3 +329,6 @@ compatibility yet.
 
 Results of the first investigation: [research/BASELINE.md](../research/BASELINE.md).
 
+
+Note on `crates/xp-app/tests/flight_local.rs`: it skips silently unless `OPENXPLANE_REFERENCE_ROOT` and
+`OPENXPLANE_REFERENCE_AIRCRAFT` (path of `Cessna_172SP.acf`) are both set. Setting only the root runs nothing.
