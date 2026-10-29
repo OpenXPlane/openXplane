@@ -27,3 +27,12 @@ start state, so it replaces guessing for Phase 5 item 2.
 `battery_on[0]` and `generator_on[0]` at start, and the bus voltage and amps values themselves, come
 from the native electrical model and the start mode, so they still need a reference recording (see
 `research/LIVE_DATAREF_ACCESS.md`). The scripts only fix the interlock, cross-tie and the values above.
+
+## Ported so far
+- `xp_sim::electrical`: start switches, interlock, brightness defaults (no bus volts/amps).
+- `xp_sim::flight::c172_pilot_ias`: the `c172_IAS` ramp (0 below 15 kt, `(CAS-15)*70/55` to 70 kt).
+- `xp_sim::fuel`: tank selector steps (left, all, right), cutoff and the handle datarefs of
+  `c172_fuel_selector`. Start position "all" is assumed; the commands are not bound to keys and fuel
+  flow is not modelled.
+- Not ported: `c172_starter` (ignition key and starter command wiring), `c172_sound`,
+  `c172_custom_datarefs` (flap side shift, OAT knob, ADF clamps).

@@ -2,4 +2,5 @@
 pub mod clock;
 pub mod electrical;
 pub mod flight;
+pub mod fuel;
 pub mod pilot;

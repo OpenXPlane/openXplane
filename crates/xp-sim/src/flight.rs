@@ -188,6 +188,7 @@ pub struct FlightModel {
     pub clock: crate::clock::SimClock,
     /// Switch state behind the electrical datarefs (cold and dark, analog Cessna).
     pub electrical: crate::electrical::Electrical,
+    pub fuel: crate::fuel::FuelSelector,
 }
 
 /// A simple scripted pilot for tests and demonstrations: full power after two seconds, rotation at 55
@@ -559,6 +560,7 @@ impl FlightModel {
             reference_chord: ref_chord,
             rest: None,
             clock: crate::clock::SimClock::default(),
+            fuel: crate::fuel::FuelSelector::default(),
             electrical: crate::electrical::Electrical::at_start(
                 crate::electrical::Start::ColdAndDark,
                 1,
@@ -683,6 +685,9 @@ impl FlightModel {
             return Some(value);
         }
         if let Some(value) = self.electrical.dataref(name) {
+            return Some(value);
+        }
+        if let Some(value) = self.fuel.dataref(name) {
             return Some(value);
         }
         if name == "sim/flightmodel2/controls/elevator_trim" {
