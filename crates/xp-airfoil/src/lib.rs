@@ -28,6 +28,7 @@ pub mod limits;
 pub mod mass;
 pub mod matrix;
 pub mod piston;
+pub mod piston_native;
 pub mod profile;
 pub mod prop;
 pub mod regimes;

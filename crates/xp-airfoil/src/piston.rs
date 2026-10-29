@@ -122,92 +122,82 @@ pub fn update_engine_piston(
 }
 
 /// The first part of the update, for engines of a kind other than 0: the lag towards the commanded values
-/// `M+0x58/0x60` and the power, density and manifold terms `M+0x24c/0x254/0x258`.
+/// `M+0x58/0x60` and the power, density and manifold terms `M+0x24c/0x254/0x258`. The arithmetic is
+/// [`crate::piston_native::power_terms`]; this adapter reads the fields from the emulated objects, forwards the
+/// environment calls in the original's order and writes the results back.
 fn piston_power(vm: &mut Vm, env: &mut dyn Callees, m: u64, f: u64, b: u64, n: i32) {
-    let step_toward = |vm: &mut Vm, env: &mut dyn Callees, target: u64, current: u64| {
-        let current_value = vm.f32(current);
-        let room = vm.f32(target) - current_value;
-        let step = (frame_time(env) * 0.2) as f32;
-        let t = if neg(step) > room {
-            neg(step)
-        } else {
-            sse_min(step, room)
-        };
-        vm.set_f32(current, t + current_value);
-    };
-    step_toward(vm, env, m + 0x54, m + 0x58);
-    step_toward(vm, env, m + 0x5c, m + 0x60);
-    let index = n.clamp(0, 1);
-    let mut x6 = 0.0f32;
-    if !bind(env, f, 0xa8, index) {
-        x6 = sse_max(vm.f32(m + 0x58), 0.0);
+    use crate::piston_native::{PowerEnv, PowerInput, power_terms};
+    struct Adapter<'a> {
+        vm: &'a mut Vm,
+        env: &'a mut dyn Callees,
+        f: u64,
+        m: u64,
+        seed: Option<f32>,
     }
-    let held = sse_max(vm.f32(m + 0x60), x6);
-    let d2 = f64::from(vm.f32(f + 0xb7a8 + 4 * n as i64 as u64));
-    let d3 = f64::from(held);
-    let x0 = vm.f32(b + 0x934) * vm.f32(f + 0x424);
-    let divisor = sse_max(vm.f32(f + 0x68), 0.01);
-    let power = (d2 * (1.0 - d3)) as f32;
-    let ratio = ((f64::from(x0) + f64::from(x0)) / f64::from(divisor) + 1.0) as f32;
-    let x0b = vm.f32(m + 0x90) - 0.0;
-    let mut x4 = sse_min(1.0, ratio);
-    let bound = (ratio - 1.0) / 100.0 * x0b + 1.0;
-    if x4 <= bound || x4.is_nan() || bound.is_nan() {
-        x4 = sse_min(sse_max(1.0, ratio), bound);
-    }
-    let mut x3 = ((1.0 - d3 * 0.15) * f64::from(ratio)) as f32;
-    vm.set_f32(m + 0x24c, x3);
-    let is_kind1 = |vm: &Vm| vm.i32(vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64) == 1;
-    if is_kind1(vm) {
-        x3 = ((1.0 - f64::from(vm.f32(m + 0x50)) * 0.1) * f64::from(x3)) as f32;
-        vm.set_f32(m + 0x24c, x3);
-    }
-    if is_kind1(vm) {
-        let lean = (1.0 - f64::from(x4 * vm.f32(m + 0x2b4))) as f32;
-        x3 *= clamp(lean, 0.0, 1.0);
-    }
-    let half = (f64::from(power) * 0.5) as f32;
-    let squared = half * half * x4;
-    let x3 = x3 * clamp((1.0 - f64::from(squared)) as f32, 0.0, 1.0);
-    vm.set_f32(m + 0x24c, x3);
-    let x254 = x3 * vm.f32(f + 0x68) / 101325.0;
-    vm.set_f32(m + 0x254, x254);
-    let fold = |vm: &Vm, offsets: [u64; 4]| {
-        let a = sse_max(vm.f32(b + offsets[0]), vm.f32(b + offsets[1]));
-        let c = sse_max(vm.f32(b + offsets[2]), vm.f32(b + offsets[3]));
-        sse_max(a, c)
-    };
-    let x6 = fold(vm, [0xc7c, 0xc80, 0xc84, 0xc88]);
-    let alt = altitude(vm, env, f);
-    let args = {
-        let mut a = float_args(&[0.0, alt]);
-        a.int[0] = Some(f + 0xbfa8);
-        a.xmm[0] = None;
-        a
-    };
-    let temperature = reply_f32(env.call(vm, 0x141ba6750, args));
-    let outside = temperature + x6 * vm.f32(m + 0x264);
-    let alt = altitude(vm, env, f);
-    let mut a = float_args(&[0.0, alt, outside]);
-    a.int[0] = Some(f + 0xbfa8);
-    a.xmm[0] = None;
-    let density = reply_f32(env.call(vm, 0x141ba64e0, a));
-    let x258 = density / 1.225 * vm.f32(m + 0x24c);
-    vm.set_f32(m + 0x258, x258);
-    if bind(env, f, 0x1a1, n) {
-        let seed = vm.f64(SEED_GLOBAL) as f32;
-        let noise = |vm: &mut Vm, env: &mut dyn Callees| {
+    impl PowerEnv for Adapter<'_> {
+        fn frame_time(&mut self) -> f64 {
+            frame_time(self.env)
+        }
+        fn bound(&mut self, id: u32, index: i32) -> bool {
+            bind(self.env, self.f, id, index)
+        }
+        fn altitude(&mut self) -> f32 {
+            altitude(self.vm, self.env, self.f)
+        }
+        fn temperature(&mut self, alt: f32) -> f32 {
+            let mut a = float_args(&[0.0, alt]);
+            a.int[0] = Some(self.f + 0xbfa8);
+            a.xmm[0] = None;
+            reply_f32(self.env.call(self.vm, 0x141ba6750, a))
+        }
+        fn density(&mut self, alt: f32, outside: f32) -> f32 {
+            let mut a = float_args(&[0.0, alt, outside]);
+            a.int[0] = Some(self.f + 0xbfa8);
+            a.xmm[0] = None;
+            reply_f32(self.env.call(self.vm, 0x141ba64e0, a))
+        }
+        fn noise(&mut self) -> f32 {
+            let vm = &*self.vm;
+            let seed = *self.seed.get_or_insert_with(|| vm.f64(SEED_GLOBAL) as f32);
             let mut a = float_args(&[seed, 0.0]);
             a.int[2] = Some(0);
-            reply_f32(env.call(vm, 0x140984e50, a))
-        };
-        let v = noise(vm, env);
-        let scaled = ((f64::from(v) * 0.1 + 0.75) * f64::from(vm.f32(m + 0x254))) as f32;
-        vm.set_f32(m + 0x254, scaled);
-        let v = noise(vm, env);
-        let scaled = ((f64::from(v) * 0.1 + 0.75) * f64::from(vm.f32(m + 0x258))) as f32;
-        vm.set_f32(m + 0x258, scaled);
+            let _ = self.m;
+            reply_f32(self.env.call(self.vm, 0x140984e50, a))
+        }
     }
+    let engine = vm.u64(vm.u64(f + 0x20) + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let input = PowerInput {
+        kind: vm.i32(engine),
+        n,
+        target_a: vm.f32(m + 0x54),
+        current_a: vm.f32(m + 0x58),
+        target_b: vm.f32(m + 0x5c),
+        current_b: vm.f32(m + 0x60),
+        speed_percent: vm.f32(m + 0x90),
+        m50: vm.f32(m + 0x50),
+        m2b4: vm.f32(m + 0x2b4),
+        heat_offset: vm.f32(m + 0x264),
+        b934: vm.f32(b + 0x934),
+        f424: vm.f32(f + 0x424),
+        f68: vm.f32(f + 0x68),
+        power_input: vm.f32(f + 0xb7a8 + 4 * n as i64 as u64),
+        fold: [0xc7c, 0xc80, 0xc84, 0xc88].map(|o| vm.f32(b + o)),
+    };
+    let out = {
+        let mut adapter = Adapter {
+            vm: &mut *vm,
+            env: &mut *env,
+            f,
+            m,
+            seed: None,
+        };
+        power_terms(&input, &mut adapter)
+    };
+    vm.set_f32(m + 0x58, out.current_a);
+    vm.set_f32(m + 0x60, out.current_b);
+    vm.set_f32(m + 0x24c, out.power_fraction);
+    vm.set_f32(m + 0x254, out.pressure_term);
+    vm.set_f32(m + 0x258, out.density_term);
 }
 
 /// The second part: the lever level of the engine's kind, the limits against the bound elements, the per-kind

@@ -122,3 +122,14 @@ how each field is used, not from names in the original.
 
 Not yet known: what the setup code writes to `M+0x64` (the quantity whose drop is detected), and the units of
 `M+0x84` (the factor `0x3c8efa36` is `pi/180`, so degrees).
+
+## Progress: the power stage is native
+`crates/xp-airfoil/src/piston_native.rs` now holds the power stage (`piston_power`: the lag of `M+0x58/0x60`,
+and the terms `M+0x24c/0x254/0x258`) as plain Rust, `power_terms(&PowerInput, &mut dyn PowerEnv)`. It has no
+emulated memory: the fields it reads are a typed struct and its surroundings (frame time, bindings, altitude,
+temperature, density, noise) are a trait called in the original's order. The emulator adapter in `piston.rs`
+calls it, so the recorded original vectors (`piston_engine_update_matches_the_original_machine_code`, 50+ cases
+from `tools/gen_piston_vectors.py`) check it; a deliberate change of one coefficient makes that test fail.
+Still on the emulator: `piston_levers` and the handlers `update_engine_kind12` (the C172's kind) and the
+helpers. Next slices, in order of the C172's path: `piston_levers` (without kinds 3/4), `update_engine_kind12`,
+then the propeller stage.
