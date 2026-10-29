@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from xp_vmcase import VmCase, entry_rsp  # noqa: E402
 
 EXE, TRIALS, SEED = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+BIAS = len(sys.argv) > 4 and sys.argv[4] == 'stock'
 FUNC = 0x14119ac90
 SEED_GLOBAL = 0x142f01918
 CLOCK_GLOBAL = 0x142f01910
@@ -71,6 +72,13 @@ def main():
             fz.preset('B', 0xd38 + 4 * e, rng.randrange(0, 8))
         for j in range(4):
             fz.preset('B', 0xbbc + 4 * j, rng.randrange(0, 3))
+        if BIAS:
+            # the stock Cessna path: piston kinds 1 and 2 with a critical altitude below 1 (manifold limit branch)
+            fz.preset('E', 0, rng.choice([1, 2]))
+            fz.preset('B', 0x938, struct.unpack('<I', struct.pack('<f', rng.uniform(0.0, 0.99)))[0])
+            fz.preset('B', 0x9f4, struct.unpack('<I', struct.pack('<f', rng.choice([0.0, rng.uniform(100.0, 800.0)])))[0])
+            fz.preset('M', 0x74, 1)
+            fz.preset('M', 0x6c, rng.choice([0, 1]))
         fz.preset('B', 0x990, rng.choice([0, 0, 1, 1, 2]))
         fz.preset('B', 0xa9c, rng.choice([0, 2, 3, 3, 2]))
         fz.preset('B', 0xc24, rng.choice([0, 1]))

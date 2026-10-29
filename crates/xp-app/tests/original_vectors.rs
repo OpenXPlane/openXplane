@@ -2674,8 +2674,19 @@ fn engine_kind7_update_matches_the_original_machine_code() {
 
 #[test]
 fn piston_engine_update_matches_the_original_machine_code() {
-    let cases = parse_vm_cases("piston.txt");
-    assert!(cases.len() >= 50);
+    piston_cases_match("piston.txt", 50);
+}
+
+/// Vectors biased to the stock Cessna path (`tools/gen_piston_vectors.py ... stock`): piston kinds 1 and 2 with a
+/// critical altitude below 1, which takes the manifold-limit branch of the end stage.
+#[test]
+fn piston_engine_update_matches_the_original_on_the_stock_path() {
+    piston_cases_match("piston_stock.txt", 40);
+}
+
+fn piston_cases_match(file: &str, at_least: usize) {
+    let cases = parse_vm_cases(file);
+    assert!(cases.len() >= at_least);
     for (n, mut case) in cases.into_iter().enumerate() {
         let state = u64::from_str_radix(&case.header[0], 16).unwrap();
         let f = u64::from_str_radix(&case.header[1], 16).unwrap();
