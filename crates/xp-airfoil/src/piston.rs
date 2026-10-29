@@ -761,11 +761,6 @@ fn flight_altitude(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> f32 {
     reply_f32(env.call(vm, 0x1408be0f0, CallArgs::ints(&[f])))
 }
 
-/// A `0..10` limit (`minss` against 10 after the lower bound test).
-fn limit_0_10(v: f32) -> f32 {
-    if 0.0 > v { 0.0 } else { sse_min(10.0, v) }
-}
-
 /// The `[lo, hi]`-limited line `(v1 - v0) * t + v0` between two values (the original's inlined form of
 /// [`interpolate_clamped`] where the parameter `t` is already computed).
 fn line_between(v0: f32, v1: f32, t_line: f32) -> f32 {
@@ -790,49 +785,50 @@ pub fn update_engine_kind12(
     n: i32,
     level: f32,
 ) {
-    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
-    let x0 = vm.f32(b + 0x93c) * vm.f32(m + 0x258);
-    let a10 = if 0.0 > x0 { 0.0 } else { sse_min(1.0, x0) };
-    let altitude = flight_altitude(vm, env, f) - 0.0;
-    let e14 = vm.f32(engine(vm) + 0x14);
-    let e18 = vm.f32(engine(vm) + 0x18);
-    let w1 = sse_max(
-        line_between(e14, e18, (e18 - e14) / 10000.0 * altitude + e14),
-        1.0,
-    );
-    let m78 = vm.f32(m + 0x78);
-    let d15 = m78 / w1;
-    if vm.i32(m + 0x6c) != 0 {
-        let clamp_ratio = |q: f32| {
-            if 0.001 > q { 0.001 } else { sse_min(1000.0, q) }
-        };
-        let ca = clamp_ratio(m78 / sse_max(vm.f32(b + 0x9f4), 1.0));
-        let cb = clamp_ratio(m78 / sse_max(e18, 1.0));
-        let s11 = (2.0 / f64::from(ca)) as f32;
-        let two = (cb - 0.0) + (cb - 0.0);
-        let v = 1.0 - two;
-        let c3 = if 0.0 > v { 0.0 } else { sse_min(1.0, v) };
-        let m210 = (f64::from(vm.f32(m + 0x20c))
-            * 0.3
-            * f64::from(vm.f32(m + 0x40))
-            * (f64::from(vm.f32(m + 4)) * 0.8 + 0.2)
-            * f64::from(c3)) as f32;
-        vm.set_f32(m + 0x210, m210);
-        let dt = frame_time(env);
-        let v = (f64::from(vm.f32(m + 0x214)) + dt * f64::from(m210)) as f32;
-        let held = limit_0_10(v);
-        vm.set_f32(m + 0x214, held);
-        let dt = frame_time(env);
-        let v = (f64::from(held) - dt / f64::from(s11)) as f32;
-        vm.set_f32(m + 0x214, limit_0_10(v));
+    use crate::piston_native::{Kind12HeadEnv, Kind12HeadInput, kind12_head};
+    struct Adapter<'a> {
+        vm: &'a mut Vm,
+        env: &'a mut dyn Callees,
+        f: u64,
     }
-    if vm.i32(engine(vm)) == 1 {
-        let (m64, m68) = (vm.f32(m + 0x64), vm.f32(m + 0x68));
-        if m68 > m64 {
-            let t = (m68 - m64) * 0.3 + vm.f32(m + 0x214);
-            vm.set_f32(m + 0x214, limit_0_10(t));
+    impl Kind12HeadEnv for Adapter<'_> {
+        fn altitude(&mut self) -> f32 {
+            flight_altitude(self.vm, self.env, self.f)
+        }
+        fn frame_time(&mut self) -> f64 {
+            frame_time(self.env)
         }
     }
+    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let input = Kind12HeadInput {
+        kind: vm.i32(engine(vm)),
+        e14: vm.f32(engine(vm) + 0x14),
+        e18: vm.f32(engine(vm) + 0x18),
+        b93c: vm.f32(b + 0x93c),
+        b9f4: vm.f32(b + 0x9f4),
+        m258: vm.f32(m + 0x258),
+        m78: vm.f32(m + 0x78),
+        m6c: vm.i32(m + 0x6c),
+        m20c: vm.f32(m + 0x20c),
+        m40: vm.f32(m + 0x40),
+        lever: vm.f32(m + 4),
+        m214: vm.f32(m + 0x214),
+        m64: vm.f32(m + 0x64),
+        m68: vm.f32(m + 0x68),
+    };
+    let head = {
+        let mut adapter = Adapter {
+            vm: &mut *vm,
+            env: &mut *env,
+            f,
+        };
+        kind12_head(&input, &mut adapter)
+    };
+    if let Some(rate) = head.m210 {
+        vm.set_f32(m + 0x210, rate);
+    }
+    vm.set_f32(m + 0x214, head.m214);
+    let (a10, d15) = (head.a10, head.d15);
     let running = vm.i32(m + 0x74);
     vm.set_i32(m + 0x68, vm.i32(m + 0x64));
     let mut x13 = 0.0f32;

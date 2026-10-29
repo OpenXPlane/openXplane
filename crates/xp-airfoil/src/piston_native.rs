@@ -262,3 +262,102 @@ pub fn lever_terms(i: &LeverInput, env: &mut dyn LeverEnv) -> LeverOutput {
     }
     LeverOutput { level, x6, x11 }
 }
+
+/// The calls of the head of the kind 1 and 2 handler, in the original's order: the flight altitude, then the
+/// frame time twice (only when the lean/rich response `M+0x6c` is enabled).
+pub trait Kind12HeadEnv {
+    fn altitude(&mut self) -> f32;
+    fn frame_time(&mut self) -> f64;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Kind12HeadInput {
+    /// Engine kind `E+0`, `E+0x14` and `E+0x18` (rated power and speed).
+    pub kind: i32,
+    pub e14: f32,
+    pub e18: f32,
+    /// `B+0x93c`, `B+0x9f4`.
+    pub b93c: f32,
+    pub b9f4: f32,
+    /// `M+0x258`, `M+0x78`, `M+0x6c`, `M+0x20c`, `M+0x40`, `M+4`, `M+0x214`, `M+0x64`, `M+0x68`.
+    pub m258: f32,
+    pub m78: f32,
+    pub m6c: i32,
+    pub m20c: f32,
+    pub m40: f32,
+    pub lever: f32,
+    pub m214: f32,
+    pub m64: f32,
+    pub m68: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Kind12HeadOutput {
+    /// Limited `B+0x93c * M+0x258`.
+    pub a10: f32,
+    /// Speed over the altitude-dependent rated speed.
+    pub d15: f32,
+    /// New `M+0x210` (written only when `M+0x6c` is set) and the final `M+0x214`.
+    pub m210: Option<f32>,
+    pub m214: f32,
+}
+
+fn limit_0_10(v: f32) -> f32 {
+    if 0.0 > v { 0.0 } else { sse_min(10.0, v) }
+}
+
+fn line_between(v0: f32, v1: f32, t_line: f32) -> f32 {
+    let lo = sse_min(v0, v1);
+    if lo > t_line {
+        lo
+    } else {
+        sse_min(sse_max(v0, v1), t_line)
+    }
+}
+
+/// The head of `update_engine_kind12` before the running-engine part; the caller then sets `M+0x68 = M+0x64`.
+pub fn kind12_head(i: &Kind12HeadInput, env: &mut dyn Kind12HeadEnv) -> Kind12HeadOutput {
+    let x0 = i.b93c * i.m258;
+    let a10 = if 0.0 > x0 { 0.0 } else { sse_min(1.0, x0) };
+    let altitude = env.altitude() - 0.0;
+    let w1 = sse_max(
+        line_between(i.e14, i.e18, (i.e18 - i.e14) / 10000.0 * altitude + i.e14),
+        1.0,
+    );
+    let d15 = i.m78 / w1;
+    let mut m214 = i.m214;
+    let mut m210 = None;
+    if i.m6c != 0 {
+        let clamp_ratio = |q: f32| {
+            if 0.001 > q { 0.001 } else { sse_min(1000.0, q) }
+        };
+        let ca = clamp_ratio(i.m78 / sse_max(i.b9f4, 1.0));
+        let cb = clamp_ratio(i.m78 / sse_max(i.e18, 1.0));
+        let s11 = (2.0 / f64::from(ca)) as f32;
+        let two = (cb - 0.0) + (cb - 0.0);
+        let v = 1.0 - two;
+        let c3 = if 0.0 > v { 0.0 } else { sse_min(1.0, v) };
+        let rate = (f64::from(i.m20c)
+            * 0.3
+            * f64::from(i.m40)
+            * (f64::from(i.lever) * 0.8 + 0.2)
+            * f64::from(c3)) as f32;
+        m210 = Some(rate);
+        let dt = env.frame_time();
+        let v = (f64::from(m214) + dt * f64::from(rate)) as f32;
+        let held = limit_0_10(v);
+        let dt = env.frame_time();
+        let v = (f64::from(held) - dt / f64::from(s11)) as f32;
+        m214 = limit_0_10(v);
+    }
+    if i.kind == 1 && i.m68 > i.m64 {
+        let t = (i.m68 - i.m64) * 0.3 + m214;
+        m214 = limit_0_10(t);
+    }
+    Kind12HeadOutput {
+        a10,
+        d15,
+        m210,
+        m214,
+    }
+}

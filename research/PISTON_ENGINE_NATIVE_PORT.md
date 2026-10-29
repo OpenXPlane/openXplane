@@ -147,3 +147,12 @@ but not a changed `0.95` (kind 3 mode 2 limit), a changed `0.13` (kinds 1 and 2 
 kind 4 seed (the comparison tolerance is 1e-5 relative). So these three paths are carried over from the
 emulator code unchanged but are not independently pinned by the vectors; they need more vectors with the
 ceiling and the bound elements away from zero before they can be called verified.
+
+## Progress: the head of the kind 1/2 handler is native
+`piston_native::kind12_head` holds the part of `update_engine_kind12` before the running-engine branch: the
+limited power input `a10`, the speed over the altitude-dependent rated speed `d15`, the lean/rich response
+(`M+0x210`, `M+0x214`) and the kind 1 throttle-closing transient. Its environment is the flight altitude and the
+frame time (twice). Unlike the lever stage, the recorded vectors pin it: changing any one of the constants
+`0.3` (rate and transient), `0.8/0.2` (lever blend), `10000` (altitude span) and the decay divisor made the
+test fail. Remaining on the emulator: `kind12_running` and `kind12_finish` (the manifold terms, the table
+power, the fuel flow and the speeds), then the dispatch, `power_from_tables` and the kinds 0, 3 and 4 handlers.
