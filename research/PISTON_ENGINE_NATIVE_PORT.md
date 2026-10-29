@@ -156,3 +156,18 @@ frame time (twice). Unlike the lever stage, the recorded vectors pin it: changin
 `0.3` (rate and transient), `0.8/0.2` (lever blend), `10000` (altitude span) and the decay divisor made the
 test fail. Remaining on the emulator: `kind12_running` and `kind12_finish` (the manifold terms, the table
 power, the fuel flow and the speeds), then the dispatch, `power_from_tables` and the kinds 0, 3 and 4 handlers.
+
+## Progress: the running-engine part of the kind 1/2 handler is native
+`piston_native::kind12_running_terms` holds `kind12_running`: the five temperature breakpoints `A1..A5`, the
+throttle `M+0x40` ramp, the manifold terms `M+0x240/0x244/0x248` with the magneto cuts, the table power
+`M+0xcc` and the fuel factor it returns. Its environment is the bindings, the flight altitude, the atmosphere
+table, the clock and the wave noise.
+
+Pinning by the recorded vectors, measured by changing one constant at a time: caught are the `-0.9848` and
+`0.243` terms, the lever blend `0.45/0.55`, `-0.14`, the noise weights `0.05/0.95`, the magneto factors
+`0.95` and `1.04`, the `a4 - a3` slope, the doubling `v0 + v0` and the throttle ramp's `0.25`... except
+that these changes were NOT caught: the `0.633` slope (below `A2`), the `0.1235` and `1.3826` terms of `q4`,
+both `0.95` thresholds (kinds 1 and 2), the `3.2` slope (below `A5`) and the `level - 0.25` ramp offset.
+Those branches are carried over from the emulator code unchanged but the vectors do not pin them; they need
+vectors where the state sits below the breakpoints and near the threshold. The remaining emulator parts are
+`kind12_finish`, the dispatch, `power_from_tables` and the kinds 0, 3 and 4 handlers.

@@ -853,114 +853,77 @@ fn kind12_running(
     a10: f32,
     d15: f32,
 ) -> f32 {
-    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
-    let k = f64::from(vm.f32(b + 0xb6c)) * 125.0;
-    let a = f64::from(a10) * 0.8;
-    let bterm = f64::from(d15) * 0.2;
-    let breakpoint = |numerator: f64| (((numerator / k) + a) + bterm - 1.0) as f32;
-    let (a1, a2, a3, a4, a5) = (
-        breakpoint(125.0),
-        breakpoint(105.0),
-        breakpoint(110.0),
-        breakpoint(85.0),
-        breakpoint(95.0),
-    );
-    if vm.i32(b + 0xab0) != 0 {
-        let state = vm.u64(f + 0x68b0) + (i64::from(n) * 0x2cc) as u64;
-        if vm.i32(state + 0x1e4) != 0 && !bind(env, f, 0x2fb, 0) && !bind(env, f, 0x239, n) {
-            let l = level - 0.25;
-            let t = (a1 - a5) / f32::from_bits(0x3f266666) * l + a5;
-            let y = line_between(a5, a1, t);
-            let v = if 0.0 > y { 0.0 } else { sse_min(1.0, y) };
-            vm.set_f32(m + 0x40, v);
+    use crate::piston_native::{Kind12RunEnv, Kind12RunInput, kind12_running_terms};
+    struct Adapter<'a> {
+        vm: &'a mut Vm,
+        env: &'a mut dyn Callees,
+        f: u64,
+    }
+    impl Kind12RunEnv for Adapter<'_> {
+        fn bound(&mut self, id: u32, index: i32) -> bool {
+            bind(self.env, self.f, id, index)
+        }
+        fn altitude(&mut self) -> f32 {
+            flight_altitude(self.vm, self.env, self.f)
+        }
+        fn table(&mut self, position: f32) -> f32 {
+            table_lookup(self.vm, position)
+        }
+        fn clock(&mut self) -> f64 {
+            self.vm.f64(0x142f01910)
+        }
+        fn wave_noise(&mut self, t: f32, n: i32) -> f32 {
+            crate::engine_small::wave_noise(self.vm, t, n)
         }
     }
-    let s = vm.f32(m + 0x214) + vm.f32(m + 0x40);
-    let dd = f64::from(s - a5);
-    let u2 = if s > a5 {
-        ((dd * -0.9848) * dd - dd * 0.203) as f32
-    } else {
-        (dd * 3.2) as f32
+    let engine = vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let state = vm.u64(f + 0x68b0) + (i64::from(n) * 0x2cc) as u64;
+    let input = Kind12RunInput {
+        kind: vm.i32(engine),
+        n,
+        level,
+        a10,
+        d15,
+        b6c: vm.f32(b + 0xb6c),
+        bab0: vm.i32(b + 0xab0),
+        ramp_flag: vm.i32(state + 0x1e4),
+        m214: vm.f32(m + 0x214),
+        m40: vm.f32(m + 0x40),
+        m0: vm.f32(m),
+        m48: vm.i32(m + 0x48),
+        m258: vm.f32(m + 0x258),
+        m25c: vm.f32(m + 0x25c),
+        bb00: vm.f32(b + 0xb00),
+        bb04: vm.f32(b + 0xb04),
+        bb08: vm.f32(b + 0xb08),
+        bb0c: vm.f32(b + 0xb0c),
+        bb10: vm.f32(b + 0xb10),
+        bb14: vm.f32(b + 0xb14),
+        bb18: vm.f32(b + 0xb18),
+        e4: vm.f32(engine + 4),
+        f28: vm.i32(f + 0x28),
+        f6880: vm.i32(f + 0x6880),
     };
-    let dd2 = f64::from(s - a2);
-    let u12 = if s > a2 {
-        (0.015 - dd2 * 0.243) as f32
-    } else {
-        (dd2 * 0.633 + 0.015) as f32
+    let out = {
+        let mut adapter = Adapter {
+            vm: &mut *vm,
+            env: &mut *env,
+            f,
+        };
+        kind12_running_terms(&input, &mut adapter)
     };
-    let x6 = (f64::from(u2) + 1.0) as f32;
-    let s1 = signed_pow(vm.f32(m), 0.5);
-    let d15d = f64::from(d15);
-    let inner = ((f64::from(s1) * 0.45 + 0.55) * f64::from(x6)) as f32;
-    let v6 = ((0.25 - d15d * 0.25) + f64::from(inner)) as f32;
-    let mut v6 = clamp(v6, 0.0, 2.0);
-    let e = s - a3;
-    let ed = f64::from(e);
-    let mut q4 = (ed * 0.1235 - (ed * 1.3826) * ed) as f32;
-    if e > 0.0 {
-        q4 = sse_max((ed * -0.14) as f32, q4);
+    if let Some(v) = out.m40 {
+        vm.set_f32(m + 0x40, v);
     }
-    let kind = vm.i32(engine(vm));
-    let threshold = match kind {
-        1 => (f64::from(a5) * 0.95) as f32,
-        2 => (f64::from(a4) * 0.95) as f32,
-        _ => 0.0,
-    };
-    let mut x13 = 0.0f32;
-    if s > threshold {
-        let v = (f64::from(q4) + 1.0) as f32;
-        if v >= 0.0 || v.is_nan() {
-            x13 = sse_min(2.0, v);
-        }
-        if bind(env, f, 0x181, n) {
-            let t = (vm.f64(0x142f01910) * 2.0) as f32;
-            let noise = crate::engine_small::wave_noise(vm, t, n);
-            x13 = ((f64::from(noise) * 0.05 + 0.95) * f64::from(x13)) as f32;
-        }
-        let m48 = vm.i32(m + 0x48);
-        let mut working = 0;
-        if (m48.wrapping_sub(2) as u32) <= 1 && !bind(env, f, 0x151, n) {
-            working = 1;
-        }
-        if (m48.wrapping_sub(1) & !2) == 0 && !bind(env, f, 0x159, n) {
-            working += 1;
-        }
-        if working == 0 {
-            x13 = (f64::from(x13) * 0.0) as f32;
-            v6 = (f64::from(v6) * 0.0) as f32;
-        } else if working == 1 {
-            x13 = (f64::from(x13) * 0.95) as f32;
-            v6 = (f64::from(v6) * 1.04) as f32;
-        }
+    if let Some((v6, u12)) = out.manifold {
         vm.set_f32(m + 0x240, v6);
         vm.set_f32(m + 0x244, v6);
-        vm.set_f32(m + 0x248, (f64::from(u12) + 1.0) as f32);
+        vm.set_f32(m + 0x248, u12);
     }
-    // the power from the altitude and temperature tables
-    let r1 = flight_altitude(vm, env, f);
-    let k208 = f32::from_bits(0x3e9c0ebf);
-    let la = table_lookup(vm, table_position(vm.f32(b + 0xb04)));
-    let lb = table_lookup(vm, table_position(vm.f32(b + 0xb00)));
-    let lc = table_lookup(vm, table_position(r1 * k208));
-    let h1 = interpolate_clamped(la, vm.f32(b + 0xb14), lb, vm.f32(b + 0xb10), lc);
-    let r2 = flight_altitude(vm, env, f);
-    let la = table_lookup(vm, table_position(vm.f32(b + 0xb04)));
-    let lb = table_lookup(vm, table_position(vm.f32(b + 0xb00)));
-    let lc = table_lookup(vm, table_position(r2 * k208));
-    let h2 = interpolate_clamped(la, vm.f32(b + 0xb0c), lb, vm.f32(b + 0xb08), lc);
-    let h = if a3 == a4 {
-        (h2 + h1) * 0.5
-    } else {
-        (h1 - h2) / (a4 - a3) * (s - a3) + h2
-    };
-    let v0 = vm.f32(engine(vm) + 4) * vm.f32(b + 0xb18) * vm.f32(m + 0x258);
-    if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
-        let a1b = (f64::from(v0) + f64::from(v0)) as f32;
-        let m25c = vm.f32(m + 0x25c);
-        let r = interpolate_clamped(0.0, v0, a1b, m25c, m25c);
-        vm.set_f32(m + 0xcc, r * sse_max(h, 0.0));
+    if let Some(p) = out.power {
+        vm.set_f32(m + 0xcc, p);
     }
-    x13
+    out.fuel_factor
 }
 
 /// The common end of [`update_engine_kind12`] (`0x14119de7f..0x14119e559`): the load terms of the cylinder

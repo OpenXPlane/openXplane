@@ -361,3 +361,178 @@ pub fn kind12_head(i: &Kind12HeadInput, env: &mut dyn Kind12HeadEnv) -> Kind12He
         m214,
     }
 }
+
+/// Calls of the running-engine part of the kind 1 and 2 handler, in the original's order: the ramp bindings
+/// (`0x2fb`, `0x239`), the noise binding `0x181` (then the clock and the wave noise), the magneto bindings
+/// (`0x151`, `0x159`), and the flight altitude twice with the atmosphere table lookups after each.
+pub trait Kind12RunEnv {
+    fn bound(&mut self, id: u32, index: i32) -> bool;
+    fn altitude(&mut self) -> f32;
+    /// The value of the runtime atmosphere table at a position (`table_position` of a value).
+    fn table(&mut self, position: f32) -> f32;
+    /// The simulation clock in seconds (the global at `0x142f01910`).
+    fn clock(&mut self) -> f64;
+    /// The wave noise at `t` for engine `n`.
+    fn wave_noise(&mut self, t: f32, n: i32) -> f32;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Kind12RunInput {
+    pub kind: i32,
+    pub n: i32,
+    pub level: f32,
+    pub a10: f32,
+    pub d15: f32,
+    /// `B+0xb6c`, `B+0xab0`, and the `+0x1e4` field of the engine's flight state.
+    pub b6c: f32,
+    pub bab0: i32,
+    pub ramp_flag: i32,
+    /// `M+0x214`, `M+0x40`, `M+0` (lever), `M+0x48`, `M+0x258`, `M+0x25c`.
+    pub m214: f32,
+    pub m40: f32,
+    pub m0: f32,
+    pub m48: i32,
+    pub m258: f32,
+    pub m25c: f32,
+    /// `B+0xb00..0xb18` (the table positions, the two power pairs and `ff_rat_idle`).
+    pub bb00: f32,
+    pub bb04: f32,
+    pub bb08: f32,
+    pub bb0c: f32,
+    pub bb10: f32,
+    pub bb14: f32,
+    pub bb18: f32,
+    /// `E+4` and `F+0x28`, `F+0x6880`.
+    pub e4: f32,
+    pub f28: i32,
+    pub f6880: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Kind12RunOutput {
+    /// New `M+0x40` when the ramp rule set it.
+    pub m40: Option<f32>,
+    /// New `M+0x240` (= `M+0x244`) and `M+0x248` when the engine is above its threshold.
+    pub manifold: Option<(f32, f32)>,
+    /// New `M+0xcc`.
+    pub power: Option<f32>,
+    /// The magneto fuel factor returned to the handler.
+    pub fuel_factor: f32,
+}
+
+fn table_position(value: f32) -> f32 {
+    ((f64::from(value) + 5000.0) / 100.0) as f32
+}
+
+pub fn kind12_running_terms(i: &Kind12RunInput, env: &mut dyn Kind12RunEnv) -> Kind12RunOutput {
+    use crate::engine::signed_pow;
+    use crate::wing_element::interpolate_clamped;
+    let k = f64::from(i.b6c) * 125.0;
+    let a = f64::from(i.a10) * 0.8;
+    let bterm = f64::from(i.d15) * 0.2;
+    let breakpoint = |numerator: f64| (((numerator / k) + a) + bterm - 1.0) as f32;
+    let (a1, a2, a3, a4, a5) = (
+        breakpoint(125.0),
+        breakpoint(105.0),
+        breakpoint(110.0),
+        breakpoint(85.0),
+        breakpoint(95.0),
+    );
+    let mut m40 = i.m40;
+    let mut m40_set = None;
+    if i.bab0 != 0 && i.ramp_flag != 0 && !env.bound(0x2fb, 0) && !env.bound(0x239, i.n) {
+        let l = i.level - 0.25;
+        let t = (a1 - a5) / f32::from_bits(0x3f266666) * l + a5;
+        let y = line_between(a5, a1, t);
+        let v = if 0.0 > y { 0.0 } else { sse_min(1.0, y) };
+        m40 = v;
+        m40_set = Some(v);
+    }
+    let s = i.m214 + m40;
+    let dd = f64::from(s - a5);
+    let u2 = if s > a5 {
+        ((dd * -0.9848) * dd - dd * 0.203) as f32
+    } else {
+        (dd * 3.2) as f32
+    };
+    let dd2 = f64::from(s - a2);
+    let u12 = if s > a2 {
+        (0.015 - dd2 * 0.243) as f32
+    } else {
+        (dd2 * 0.633 + 0.015) as f32
+    };
+    let x6 = (f64::from(u2) + 1.0) as f32;
+    let s1 = signed_pow(i.m0, 0.5);
+    let d15d = f64::from(i.d15);
+    let inner = ((f64::from(s1) * 0.45 + 0.55) * f64::from(x6)) as f32;
+    let v6 = ((0.25 - d15d * 0.25) + f64::from(inner)) as f32;
+    let mut v6 = clamp(v6, 0.0, 2.0);
+    let e = s - a3;
+    let ed = f64::from(e);
+    let mut q4 = (ed * 0.1235 - (ed * 1.3826) * ed) as f32;
+    if e > 0.0 {
+        q4 = sse_max((ed * -0.14) as f32, q4);
+    }
+    let threshold = match i.kind {
+        1 => (f64::from(a5) * 0.95) as f32,
+        2 => (f64::from(a4) * 0.95) as f32,
+        _ => 0.0,
+    };
+    let mut x13 = 0.0f32;
+    let mut manifold = None;
+    if s > threshold {
+        let v = (f64::from(q4) + 1.0) as f32;
+        if v >= 0.0 || v.is_nan() {
+            x13 = sse_min(2.0, v);
+        }
+        if env.bound(0x181, i.n) {
+            let t = (env.clock() * 2.0) as f32;
+            let noise = env.wave_noise(t, i.n);
+            x13 = ((f64::from(noise) * 0.05 + 0.95) * f64::from(x13)) as f32;
+        }
+        let mut working = 0;
+        if (i.m48.wrapping_sub(2) as u32) <= 1 && !env.bound(0x151, i.n) {
+            working = 1;
+        }
+        if (i.m48.wrapping_sub(1) & !2) == 0 && !env.bound(0x159, i.n) {
+            working += 1;
+        }
+        if working == 0 {
+            x13 = (f64::from(x13) * 0.0) as f32;
+            v6 = (f64::from(v6) * 0.0) as f32;
+        } else if working == 1 {
+            x13 = (f64::from(x13) * 0.95) as f32;
+            v6 = (f64::from(v6) * 1.04) as f32;
+        }
+        manifold = Some((v6, (f64::from(u12) + 1.0) as f32));
+    }
+    let k208 = f32::from_bits(0x3e9c0ebf);
+    let r1 = env.altitude();
+    let la = env.table(table_position(i.bb04));
+    let lb = env.table(table_position(i.bb00));
+    let lc = env.table(table_position(r1 * k208));
+    let h1 = interpolate_clamped(la, i.bb14, lb, i.bb10, lc);
+    let r2 = env.altitude();
+    let la = env.table(table_position(i.bb04));
+    let lb = env.table(table_position(i.bb00));
+    let lc = env.table(table_position(r2 * k208));
+    let h2 = interpolate_clamped(la, i.bb0c, lb, i.bb08, lc);
+    let h = if a3 == a4 {
+        (h2 + h1) * 0.5
+    } else {
+        (h1 - h2) / (a4 - a3) * (s - a3) + h2
+    };
+    let v0 = i.e4 * i.bb18 * i.m258;
+    let mut power = None;
+    if i.f28 != 0 || i.f6880 == 0 {
+        let a1b = (f64::from(v0) + f64::from(v0)) as f32;
+        let r = interpolate_clamped(0.0, v0, a1b, i.m25c, i.m25c);
+        power = Some(r * sse_max(h, 0.0));
+    }
+    Kind12RunOutput {
+        m40: m40_set,
+        manifold,
+        power,
+        fuel_factor: x13,
+    }
+}
