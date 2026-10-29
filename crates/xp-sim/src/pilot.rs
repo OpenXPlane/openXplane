@@ -53,6 +53,18 @@ pub fn apply_command(c: &mut Controls, command: &str, phase: Phase) -> Effect {
         "sim/engines/mixture_down" if acts => bump(&mut c.mixture, -MIXTURE_STEP, 0.0, 1.0),
         "sim/engines/mixture_max" if phase == Phase::Begin => c.mixture = 1.0,
         "sim/engines/mixture_min" if phase == Phase::Begin => c.mixture = 0.0,
+        "sim/magnetos/magnetos_off" if phase == Phase::Begin => {
+            c.ignition.set(crate::ignition::OFF)
+        }
+        "sim/magnetos/magnetos_both" if phase == Phase::Begin => {
+            c.ignition.set(crate::ignition::BOTH)
+        }
+        "laminar/c172/ignition_down" if phase == Phase::Begin => c.ignition.down(),
+        "laminar/c172/ignition_up" => match phase {
+            Phase::End => c.ignition.up_release(),
+            Phase::Begin => c.ignition.up_press(),
+            Phase::Continue => {}
+        },
         "sim/engines/carb_heat_on" if phase == Phase::Begin => c.carb_heat = 1.0,
         "sim/engines/carb_heat_off" if phase == Phase::Begin => c.carb_heat = 0.0,
         "sim/engines/carb_heat_toggle" if phase == Phase::Begin => {
@@ -155,6 +167,9 @@ fn is_stateless_noop(command: &str, phase: Phase) -> bool {
                 | "sim/engines/carb_heat_on"
                 | "sim/engines/carb_heat_off"
                 | "sim/engines/carb_heat_toggle"
+                | "sim/magnetos/magnetos_off"
+                | "sim/magnetos/magnetos_both"
+                | "laminar/c172/ignition_down"
                 | "sim/flight_controls/flaps_up"
                 | "sim/flight_controls/flaps_down"
                 | "sim/flight_controls/brakes_toggle_max"
@@ -298,6 +313,21 @@ mod tests {
         assert_eq!(c.carb_heat, 1.0);
         run(&mut c, "sim/engines/carb_heat_off", Phase::Begin);
         assert_eq!(c.carb_heat, 0.0);
+    }
+
+    #[test]
+    fn magneto_and_ignition_commands_drive_the_key() {
+        let mut c = Controls::default();
+        run(&mut c, "sim/magnetos/magnetos_both", Phase::Begin);
+        assert_eq!(c.ignition.key, crate::ignition::BOTH);
+        run(&mut c, "laminar/c172/ignition_up", Phase::Begin);
+        assert!(c.ignition.starter_engaged());
+        run(&mut c, "laminar/c172/ignition_up", Phase::End);
+        assert_eq!(c.ignition.key, crate::ignition::BOTH);
+        run(&mut c, "laminar/c172/ignition_down", Phase::Begin);
+        assert_eq!(c.ignition.key, crate::ignition::LEFT);
+        run(&mut c, "sim/magnetos/magnetos_off", Phase::Begin);
+        assert_eq!(c.ignition.key, crate::ignition::OFF);
     }
 
     #[test]

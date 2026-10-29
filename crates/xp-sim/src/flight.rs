@@ -71,6 +71,7 @@ pub struct Controls {
     pub mixture: f32,
     /// Carburettor heat 0..1 (0 = off).
     pub carb_heat: f32,
+    pub ignition: crate::ignition::Ignition,
 }
 
 impl Default for Controls {
@@ -87,6 +88,7 @@ impl Default for Controls {
             rudder_trim: 0.0,
             mixture: 1.0,
             carb_heat: 0.0,
+            ignition: crate::ignition::Ignition::default(),
         }
     }
 }
@@ -192,7 +194,6 @@ pub struct FlightModel {
     /// Switch state behind the electrical datarefs (cold and dark, analog Cessna).
     pub electrical: crate::electrical::Electrical,
     pub fuel: crate::fuel::FuelSelector,
-    pub ignition: crate::ignition::Ignition,
 }
 
 /// A simple scripted pilot for tests and demonstrations: full power after two seconds, rotation at 55
@@ -565,7 +566,6 @@ impl FlightModel {
             rest: None,
             clock: crate::clock::SimClock::default(),
             fuel: crate::fuel::FuelSelector::default(),
-            ignition: crate::ignition::Ignition::default(),
             electrical: crate::electrical::Electrical::at_start(
                 crate::electrical::Start::ColdAndDark,
                 1,
@@ -695,7 +695,7 @@ impl FlightModel {
         if let Some(value) = self.fuel.dataref(name) {
             return Some(value);
         }
-        if let Some(value) = self.ignition.dataref(name) {
+        if let Some(value) = c.ignition.dataref(name) {
             return Some(value);
         }
         match name {

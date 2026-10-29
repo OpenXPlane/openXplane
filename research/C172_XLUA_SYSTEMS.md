@@ -35,6 +35,6 @@ from the native electrical model and the start mode, so they still need a refere
   `c172_fuel_selector`. Start position "all" is assumed; the commands are not bound to keys and fuel
   flow is not modelled.
 - `xp_sim::flight::c172_flap_side_shift` and `laminar/c172/knob_OAT` (starts on volts, value 2).
-- `xp_sim::ignition`: the `c172_starter` key steps and starter hold (spring-back inferred; engine ignores it).
+- `xp_sim::ignition` (state in `Controls.ignition`): the `c172_starter` key steps and starter hold (spring-back inferred; engine ignores it), plus `magnetos_off`/`magnetos_both` setting the key directly.
 - Not ported: `c172_sound`,
   the ADF frequency clamps (200..1799) and `knob_TAS`/`knob_EGT` of `c172_custom_datarefs`.

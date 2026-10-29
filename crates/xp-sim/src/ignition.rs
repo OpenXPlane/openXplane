@@ -47,6 +47,11 @@ impl Ignition {
         }
     }
 
+    /// `sim/magnetos/magnetos_off` and `magnetos_both` set the key directly.
+    pub fn set(&mut self, key: u8) {
+        self.key = key.min(START);
+    }
+
     pub fn starter_engaged(&self) -> bool {
         self.key == START
     }
