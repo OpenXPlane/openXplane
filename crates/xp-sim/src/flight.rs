@@ -189,6 +189,7 @@ pub struct FlightModel {
     /// Switch state behind the electrical datarefs (cold and dark, analog Cessna).
     pub electrical: crate::electrical::Electrical,
     pub fuel: crate::fuel::FuelSelector,
+    pub ignition: crate::ignition::Ignition,
 }
 
 /// A simple scripted pilot for tests and demonstrations: full power after two seconds, rotation at 55
@@ -561,6 +562,7 @@ impl FlightModel {
             rest: None,
             clock: crate::clock::SimClock::default(),
             fuel: crate::fuel::FuelSelector::default(),
+            ignition: crate::ignition::Ignition::default(),
             electrical: crate::electrical::Electrical::at_start(
                 crate::electrical::Start::ColdAndDark,
                 1,
@@ -688,6 +690,9 @@ impl FlightModel {
             return Some(value);
         }
         if let Some(value) = self.fuel.dataref(name) {
+            return Some(value);
+        }
+        if let Some(value) = self.ignition.dataref(name) {
             return Some(value);
         }
         match name {
