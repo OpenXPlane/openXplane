@@ -20,8 +20,36 @@ pub struct Draw {
     enabled: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LightKind {
+    /// `LIGHT_NAMED name x y z`: a light from the named-light table.
+    Named,
+    /// `LIGHT_PARAM name x y z params...`: a named light with parameters.
+    Param,
+    /// `LIGHT_CUSTOM x y z r g b a size u1 v1 u2 v2 dataref`.
+    Custom,
+    /// `LIGHT_SPILL_CUSTOM x y z r g b a size dx dy dz width dataref`.
+    Spill,
+    /// `VLIGHT` table entry drawn by `LIGHTS first count`.
+    Legacy,
+}
+
+/// A light declared by an OBJ. Parsed only: nothing draws it yet.
+#[derive(Clone, Debug)]
+pub struct Light {
+    pub kind: LightKind,
+    pub name: Option<String>,
+    /// Position in object space, transformed by the animation pose active at the declaration.
+    pub position: Vec3,
+    pub color: Option<[f32; 4]>,
+    /// Remaining numeric arguments in file order.
+    pub params: Vec<f32>,
+    pub dataref: Option<String>,
+}
+
 #[derive(Debug, Default)]
 pub struct Object {
+    pub lights: Vec<Light>,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub draws: Vec<Draw>,
@@ -268,6 +296,7 @@ impl Object {
         let mut enabled = true;
         let mut counts = None;
         let mut lod_count = 0;
+        let mut vlights: Vec<([f32; 3], [f32; 3])> = Vec::new();
         for (line, record) in records {
             let tokens: Vec<_> = record.split_whitespace().collect();
             let command = tokens[0];
@@ -500,6 +529,76 @@ impl Object {
                             }
                         }
                     }
+                    "LIGHT_NAMED" | "LIGHT_PARAM" => {
+                        let name = args.first().ok_or("light needs a name")?;
+                        let v = numeric(&args[1.min(args.len())..], 3)?;
+                        let params = args[4.min(args.len())..]
+                            .iter()
+                            .filter_map(|a| obj_decimal(a).ok())
+                            .collect();
+                        obj.lights.push(Light {
+                            kind: if command == "LIGHT_NAMED" {
+                                LightKind::Named
+                            } else {
+                                LightKind::Param
+                            },
+                            name: Some((*name).into()),
+                            position: pose.matrix.transform_point3(vec3(&v)),
+                            color: None,
+                            params,
+                            dataref: None,
+                        });
+                    }
+                    "LIGHT_CUSTOM" | "LIGHT_SPILL_CUSTOM" => {
+                        let v = numeric(args, 7)?;
+                        let params = args[7..]
+                            .iter()
+                            .filter_map(|a| obj_decimal(a).ok())
+                            .collect();
+                        let dataref = args
+                            .last()
+                            .filter(|a| a.contains('/') || **a == "none")
+                            .map(|a| (*a).to_string());
+                        obj.lights.push(Light {
+                            kind: if command == "LIGHT_CUSTOM" {
+                                LightKind::Custom
+                            } else {
+                                LightKind::Spill
+                            },
+                            name: None,
+                            position: pose.matrix.transform_point3(vec3(&v)),
+                            color: Some([v[3], v[4], v[5], v[6]]),
+                            params,
+                            dataref,
+                        });
+                    }
+                    "VLIGHT" => {
+                        let v = numeric(args, 6)?;
+                        vlights.push(([v[0], v[1], v[2]], [v[3], v[4], v[5]]));
+                    }
+                    "LIGHTS" => {
+                        let v: Vec<usize> = args
+                            .iter()
+                            .map(|a| a.parse().map_err(|_| "invalid LIGHTS range"))
+                            .collect::<Result<_, _>>()?;
+                        if v.len() != 2 {
+                            return Err("LIGHTS expects first and count".into());
+                        }
+                        let end = v[0].checked_add(v[1]).ok_or("LIGHTS range overflow")?;
+                        let table = vlights
+                            .get(v[0]..end)
+                            .ok_or("LIGHTS outside VLIGHT table")?;
+                        for (at, rgb) in table {
+                            obj.lights.push(Light {
+                                kind: LightKind::Legacy,
+                                name: None,
+                                position: pose.matrix.transform_point3(Vec3::from_array(*at)),
+                                color: Some([rgb[0], rgb[1], rgb[2], 1.0]),
+                                params: vec![],
+                                dataref: None,
+                            });
+                        }
+                    }
                     "ATTR_cull" => cull = true,
                     "ATTR_no_cull" => cull = false,
                     "ATTR_draw_enable" => enabled = true,
@@ -633,6 +732,31 @@ impl Object {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn light_commands_are_parsed_not_dropped() {
+        let o = Object::parse(
+            "A\n800\nOBJ\nPOINT_COUNTS 0 0 0 0\nVLIGHT 1 2 3 0.5 0.25 1\nVLIGHT 4 5 6 1 1 1\nLIGHTS 1 1\nLIGHT_NAMED taxi_blue 7 8 9\nLIGHT_PARAM pad 1 2 3 4 5\nLIGHT_CUSTOM 0 1 0 1 0 0 1 2 0 0 1 1 none\nLIGHT_SPILL_CUSTOM 0 0 0 1 1 1 1 5 0 -1 0 0.5 sim/x/y\n",
+        )
+        .unwrap();
+        assert!(o.unsupported.is_empty(), "{:?}", o.unsupported);
+        let kinds: Vec<_> = o.lights.iter().map(|l| l.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                LightKind::Legacy,
+                LightKind::Named,
+                LightKind::Param,
+                LightKind::Custom,
+                LightKind::Spill
+            ]
+        );
+        assert_eq!(o.lights[0].position, Vec3::new(4.0, 5.0, 6.0));
+        assert_eq!(o.lights[1].name.as_deref(), Some("taxi_blue"));
+        assert_eq!(o.lights[2].params, vec![4.0, 5.0]);
+        assert_eq!(o.lights[3].dataref.as_deref(), Some("none"));
+        assert_eq!(o.lights[4].dataref.as_deref(), Some("sim/x/y"));
+    }
     #[test]
     fn non_utf8_comments_do_not_hide_invalid_resource_names() {
         let mut bytes = TRI.as_bytes().to_vec();
