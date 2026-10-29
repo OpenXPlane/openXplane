@@ -536,3 +536,171 @@ pub fn kind12_running_terms(i: &Kind12RunInput, env: &mut dyn Kind12RunEnv) -> K
         fuel_factor: x13,
     }
 }
+
+/// Calls of the common end of the kind 1 and 2 handler, in the original's order: the engine lever term
+/// (only when the power is written), the thrust term, then the frame time.
+pub trait Kind12FinishEnv {
+    fn engine_lever(&mut self) -> f32;
+    fn thrust_term(&mut self) -> f32;
+    fn frame_time(&mut self) -> f64;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Kind12FinishInput {
+    pub running: i32,
+    pub level: f32,
+    pub d15: f32,
+    pub x13: f32,
+    pub f28: i32,
+    pub f6880: i32,
+    /// `M+0x22c`, `0xcc`, `0x210`, `0x214`, `0x258`, `0x2bc`, `0x78`, `0x84`, `0x268`, `0x254`, `0x248`, `0xa0`.
+    pub m22c: f32,
+    pub mcc: f32,
+    pub m210: f32,
+    pub m214: f32,
+    pub m258: f32,
+    pub m2bc: f32,
+    pub m78: f32,
+    pub m84: f32,
+    pub m268: f32,
+    pub m254: f32,
+    pub m248: f32,
+    pub ma0: f32,
+    /// `B+0x9f0`, `0x9f4`, `0x958`, `0x938`, `0x1a64`, `0x9e0`, `0xb08`.
+    pub b9f0: f32,
+    pub b9f4: f32,
+    pub b958: i32,
+    pub b938: f32,
+    pub b1a64: f32,
+    pub b9e0: f32,
+    pub bb08: f32,
+    /// `E+0xc`, `E+4`, `E+0x64`.
+    pub e0c: f32,
+    pub e4: f32,
+    pub e64: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Kind12FinishOutput {
+    /// New `M+0xcc` when the power is written.
+    pub mcc: Option<f32>,
+    /// New `M+0x90` and `M+0x98`.
+    pub speed_percent: f32,
+    /// New `M+0xb8`, `M+0x248`, `M+0xa0`.
+    pub mb8: f32,
+    pub m248: f32,
+    pub ma0: f32,
+}
+
+pub fn kind12_finish_terms(
+    i: &Kind12FinishInput,
+    env: &mut dyn Kind12FinishEnv,
+) -> Kind12FinishOutput {
+    use crate::engine::signed_pow;
+    use crate::wing_element::interpolate_clamped;
+    let mut mcc_out = None;
+    let mut m_cc = i.mcc;
+    if i.f28 != 0 || i.f6880 == 0 {
+        let v = i.running as f32 * i.m22c * i.mcc;
+        let t = env.engine_lever();
+        m_cc = t * i.m210 + v;
+        mcc_out = Some(m_cc);
+    }
+    let cl = if 0.0 > i.d15 {
+        0.0
+    } else {
+        sse_min(1.0, i.d15)
+    };
+    let b9f0 = f64::from(i.b9f0);
+    let x14 = (b9f0 * 0.61) as f32;
+    let x12 = (b9f0 * 0.075) as f32;
+    let t10 = ((f64::from(x12) + 1.0) + f64::from(x14)) as f32;
+    let v = (f64::from(cl) * 0.4 + 0.6) as f32;
+    let p = signed_pow(v, f32::from_bits(0x3ecccccd));
+    let x6 = p * t10 * i.level * i.x13 * i.m258;
+    let pw = signed_pow(i.d15, 1.6);
+    let s100 = (f64::from(i.d15) * 100.0) as f32;
+    let q10 = if -1.0 > s100 {
+        -1.0
+    } else {
+        sse_min(1.0, s100)
+    };
+    let m214 = f64::from(i.m214);
+    let x3 = pw * x14 * i.m258 + q10 * x12 * i.m258;
+    let v9 = ((m214 + 1.0) * f64::from(x6)) as f32;
+    let a = ((1.0 - f64::from(i.m2bc)) * f64::from(q10) + f64::from(x3)) as f32;
+    let mut extra = 0.0f32;
+    if i.b9f4 > 0.0 {
+        let n958 = i.b958 as f32;
+        let a1 = (f64::from(i.b9f4) * 0.5) as f32;
+        let v1 = (1.0 / f64::from(n958)) as f32;
+        extra = interpolate_clamped(i.b9f4, 0.0, a1, v1, i.m78.abs());
+        let angle = i.m84 * f32::from_bits(0x3c8efa36) * n958;
+        extra *= angle.sin();
+    }
+    let x14b = a + extra;
+    let thrust = env.thrust_term();
+    let s_pos = sse_max(s100, 0.0);
+    let friction = i.m268 / sse_max(i.m78, 0.01);
+    let power = thrust * i.e0c + (v9 - x14b) * i.e0c - friction;
+    let g = if 0.1 > i.e64 {
+        0.1
+    } else {
+        sse_min(2.0, i.e64)
+    };
+    let v9n = v9 / t10;
+    let sg = g.sqrt() * power;
+    let q11 = v9n * i.d15;
+    let x10 = m_cc / (i.e4 * i.bb08);
+    let p2 = signed_pow(v9n, 0.5);
+    let t = (q11 - x10) * (p2 - 0.0) + x10;
+    let y = line_between(x10, q11, t);
+    let m248 = y * i.m248;
+    let x9 = i.m254 * f32::from_bits(0x41ef5eb8);
+    let mut x6f = (friction + sg) / i.e0c + extra;
+    if i.x13 > 0.0 {
+        x6f += x14b;
+        x6f /= i.x13;
+        x6f -= x14b;
+    }
+    if 0.0 > x6f {
+        x6f = (f64::from(x6f) * 0.6) as f32;
+    }
+    let pc = (f64::from(x6f) * 100.0) as f32;
+    let pw3 = signed_pow(pc, f32::from_bits(0x3f99999a));
+    let b1a64 = f64::from(i.b1a64);
+    let w = sse_max((f64::from(pw3) * 0.105 + 9.5) as f32, 0.0);
+    let mut x6g = (f64::from(w) * (b1a64 / 35.5)) as f32;
+    if i.x13 == 0.0 {
+        let l = i.level - f32::from_bits(0x3e19999a);
+        let t = (x9 - x6g) / f32::from_bits(0x3f59999a) * l + x6g;
+        x6g = line_between(x6g, x9, t);
+    }
+    if i.b9f4 == 0.0 {
+        x6g = (x6g + x9) * 0.5;
+    } else {
+        let t = (x9 - x6g) / (0.0 - i.b9f4) * (i.m78 - i.b9f4) + x6g;
+        x6g = line_between(x6g, x9, t);
+    }
+    if 1.0 > i.b938 {
+        x6g *= signed_pow(i.m254, 0.25);
+        if 0.0 > x6g {
+            x6g = 0.0;
+        } else {
+            let lim = (f64::from(x9 * i.b1a64) / 29.92 * f64::from(i.b9e0)) as f32;
+            if x6g > lim {
+                x6g = lim;
+            }
+        }
+    }
+    let dt = env.frame_time();
+    let g = clamp((dt * 4.0) as f32, 0.0, 1.0);
+    let ma0 = (1.0 - g) * i.ma0 + g * x6g;
+    Kind12FinishOutput {
+        mcc: mcc_out,
+        speed_percent: s_pos,
+        mb8: sg,
+        m248,
+        ma0,
+    }
+}

@@ -171,3 +171,11 @@ both `0.95` thresholds (kinds 1 and 2), the `3.2` slope (below `A5`) and the `le
 Those branches are carried over from the emulator code unchanged but the vectors do not pin them; they need
 vectors where the state sits below the breakpoints and near the threshold. The remaining emulator parts are
 `kind12_finish`, the dispatch, `power_from_tables` and the kinds 0, 3 and 4 handlers.
+
+## Progress: the common end of the kind 1/2 handler is native
+`piston_native::kind12_finish_terms` holds `kind12_finish` (power write with the lever term, the load and
+friction terms, `M+0xb8`, the speed percent, `M+0x248` scaling and the lagged fuel-air state `M+0xa0`); its
+environment is the engine lever, the thrust term and the frame time. The recorded vectors pass and the whole
+workspace is green; I did not run the one-constant mutation check on this stage, so its pinning is unmeasured.
+With it the whole kind 1/2 handler (head, running part, end) is native; the dispatch, `power_from_tables` and
+the kinds 0, 3 and 4 handlers are still on the emulator, and the flight loop does not call any of this yet.

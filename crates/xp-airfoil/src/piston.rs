@@ -6,7 +6,6 @@ use crate::callees::engine_ratio;
 use crate::controls::ATMOSPHERE_TABLE;
 use crate::engine::{curve, signed_pow};
 use crate::engine_env::{starter_delay, starter_ready_of, thrust_term_of};
-use crate::scalar::clamp;
 use crate::vm::{CallArgs, Callees, Vm};
 use crate::wing_element::interpolate_clamped;
 
@@ -761,17 +760,6 @@ fn flight_altitude(vm: &mut Vm, env: &mut dyn Callees, f: u64) -> f32 {
     reply_f32(env.call(vm, 0x1408be0f0, CallArgs::ints(&[f])))
 }
 
-/// The `[lo, hi]`-limited line `(v1 - v0) * t + v0` between two values (the original's inlined form of
-/// [`interpolate_clamped`] where the parameter `t` is already computed).
-fn line_between(v0: f32, v1: f32, t_line: f32) -> f32 {
-    let lo = sse_min(v0, v1);
-    if lo > t_line {
-        lo
-    } else {
-        sse_min(sse_max(v0, v1), t_line)
-    }
-}
-
 /// `0x14119d380(M, B, F, n, level)`: the handler of engine kinds 1 and 2 (the carburetted and injected piston
 /// engines): the mixture/altitude lookups (`B+0xb00..0xb18` against the runtime atmosphere table), the manifold
 /// pressure and its response, the magneto switches, the fuel flow, the thrust term, the power `M+0xb8`, the speeds
@@ -941,106 +929,72 @@ fn kind12_finish(
     x13: f32,
     running: i32,
 ) {
-    let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
-    if vm.i32(f + 0x28) != 0 || vm.i32(f + 0x6880) == 0 {
-        let v = running as f32 * vm.f32(m + 0x22c) * vm.f32(m + 0xcc);
-        vm.set_f32(m + 0xcc, v);
-        let t = crate::engine_small::engine_lever(vm, b, n);
-        vm.set_f32(m + 0xcc, t * vm.f32(m + 0x210) + v);
+    use crate::piston_native::{Kind12FinishEnv, Kind12FinishInput, kind12_finish_terms};
+    struct Adapter<'a> {
+        vm: &'a mut Vm,
+        env: &'a mut dyn Callees,
+        f: u64,
+        b: u64,
+        n: i32,
     }
-    let cl = if 0.0 > d15 { 0.0 } else { sse_min(1.0, d15) };
-    let b9f0 = f64::from(vm.f32(b + 0x9f0));
-    let x14 = (b9f0 * 0.61) as f32;
-    let x12 = (b9f0 * 0.075) as f32;
-    let t10 = ((f64::from(x12) + 1.0) + f64::from(x14)) as f32;
-    let v = (f64::from(cl) * 0.4 + 0.6) as f32;
-    let p = signed_pow(v, f32::from_bits(0x3ecccccd));
-    let m258 = vm.f32(m + 0x258);
-    let x6 = p * t10 * level * x13 * m258;
-    let pw = signed_pow(d15, 1.6);
-    let s100 = (f64::from(d15) * 100.0) as f32;
-    let q10 = if -1.0 > s100 {
-        -1.0
-    } else {
-        sse_min(1.0, s100)
-    };
-    let m214 = f64::from(vm.f32(m + 0x214));
-    let x3 = pw * x14 * m258 + q10 * x12 * m258;
-    let v9 = ((m214 + 1.0) * f64::from(x6)) as f32;
-    let a = ((1.0 - f64::from(vm.f32(m + 0x2bc))) * f64::from(q10) + f64::from(x3)) as f32;
-    let b9f4 = vm.f32(b + 0x9f4);
-    let mut extra = 0.0f32;
-    if b9f4 > 0.0 {
-        let n958 = vm.i32(b + 0x958) as f32;
-        let a1 = (f64::from(b9f4) * 0.5) as f32;
-        let v1 = (1.0 / f64::from(n958)) as f32;
-        extra = interpolate_clamped(b9f4, 0.0, a1, v1, vm.f32(m + 0x78).abs());
-        let angle = vm.f32(m + 0x84) * f32::from_bits(0x3c8efa36) * n958;
-        extra *= angle.sin();
-    }
-    let x14b = a + extra;
-    let e0c = vm.f32(engine(vm) + 0xc);
-    let thrust = thrust_term_of(vm, env, f, n);
-    let s_pos = sse_max(s100, 0.0);
-    let friction = vm.f32(m + 0x268) / sse_max(vm.f32(m + 0x78), 0.01);
-    let power = thrust * e0c + (v9 - x14b) * e0c - friction;
-    vm.set_f32(m + 0x90, s_pos);
-    vm.set_f32(m + 0x98, s_pos);
-    vm.set_f32(m + 0xb8, power);
-    let e64 = vm.f32(engine(vm) + 0x64);
-    let g = if 0.1 > e64 { 0.1 } else { sse_min(2.0, e64) };
-    let v9n = v9 / t10;
-    let m_cc = vm.f32(m + 0xcc);
-    let sg = g.sqrt() * power;
-    let q11 = v9n * d15;
-    vm.set_f32(m + 0xb8, sg);
-    let x10 = m_cc / (vm.f32(engine(vm) + 4) * vm.f32(b + 0xb08));
-    let p2 = signed_pow(v9n, 0.5);
-    let t = (q11 - x10) * (p2 - 0.0) + x10;
-    let y = line_between(x10, q11, t);
-    vm.set_f32(m + 0x248, y * vm.f32(m + 0x248));
-    let x9 = vm.f32(m + 0x254) * f32::from_bits(0x41ef5eb8);
-    let mut x6f = (friction + sg) / vm.f32(engine(vm) + 0xc) + extra;
-    if x13 > 0.0 {
-        x6f += x14b;
-        x6f /= x13;
-        x6f -= x14b;
-    }
-    if 0.0 > x6f {
-        x6f = (f64::from(x6f) * 0.6) as f32;
-    }
-    let pc = (f64::from(x6f) * 100.0) as f32;
-    let pw3 = signed_pow(pc, f32::from_bits(0x3f99999a));
-    let b1a64 = f64::from(vm.f32(b + 0x1a64));
-    let w = sse_max((f64::from(pw3) * 0.105 + 9.5) as f32, 0.0);
-    let mut x6g = (f64::from(w) * (b1a64 / 35.5)) as f32;
-    if x13 == 0.0 {
-        let l = level - f32::from_bits(0x3e19999a);
-        let t = (x9 - x6g) / f32::from_bits(0x3f59999a) * l + x6g;
-        x6g = line_between(x6g, x9, t);
-    }
-    let b9f4 = vm.f32(b + 0x9f4);
-    if b9f4 == 0.0 {
-        x6g = (x6g + x9) * 0.5;
-    } else {
-        let t = (x9 - x6g) / (0.0 - b9f4) * (vm.f32(m + 0x78) - b9f4) + x6g;
-        x6g = line_between(x6g, x9, t);
-    }
-    if 1.0 > vm.f32(b + 0x938) {
-        x6g *= signed_pow(vm.f32(m + 0x254), 0.25);
-        if 0.0 > x6g {
-            x6g = 0.0;
-        } else {
-            let lim =
-                (f64::from(x9 * vm.f32(b + 0x1a64)) / 29.92 * f64::from(vm.f32(b + 0x9e0))) as f32;
-            if x6g > lim {
-                x6g = lim;
-            }
+    impl Kind12FinishEnv for Adapter<'_> {
+        fn engine_lever(&mut self) -> f32 {
+            crate::engine_small::engine_lever(self.vm, self.b, self.n)
+        }
+        fn thrust_term(&mut self) -> f32 {
+            thrust_term_of(self.vm, self.env, self.f, self.n)
+        }
+        fn frame_time(&mut self) -> f64 {
+            frame_time(self.env)
         }
     }
-    let dt = frame_time(env);
-    let g = (dt * 4.0) as f32;
-    let g = clamp(g, 0.0, 1.0);
-    let lagged = (1.0 - g) * vm.f32(m + 0xa0) + g * x6g;
-    vm.set_f32(m + 0xa0, lagged);
+    let engine = vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
+    let input = Kind12FinishInput {
+        running,
+        level,
+        d15,
+        x13,
+        f28: vm.i32(f + 0x28),
+        f6880: vm.i32(f + 0x6880),
+        m22c: vm.f32(m + 0x22c),
+        mcc: vm.f32(m + 0xcc),
+        m210: vm.f32(m + 0x210),
+        m214: vm.f32(m + 0x214),
+        m258: vm.f32(m + 0x258),
+        m2bc: vm.f32(m + 0x2bc),
+        m78: vm.f32(m + 0x78),
+        m84: vm.f32(m + 0x84),
+        m268: vm.f32(m + 0x268),
+        m254: vm.f32(m + 0x254),
+        m248: vm.f32(m + 0x248),
+        ma0: vm.f32(m + 0xa0),
+        b9f0: vm.f32(b + 0x9f0),
+        b9f4: vm.f32(b + 0x9f4),
+        b958: vm.i32(b + 0x958),
+        b938: vm.f32(b + 0x938),
+        b1a64: vm.f32(b + 0x1a64),
+        b9e0: vm.f32(b + 0x9e0),
+        bb08: vm.f32(b + 0xb08),
+        e0c: vm.f32(engine + 0xc),
+        e4: vm.f32(engine + 4),
+        e64: vm.f32(engine + 0x64),
+    };
+    let out = {
+        let mut adapter = Adapter {
+            vm: &mut *vm,
+            env: &mut *env,
+            f,
+            b,
+            n,
+        };
+        kind12_finish_terms(&input, &mut adapter)
+    };
+    if let Some(p) = out.mcc {
+        vm.set_f32(m + 0xcc, p);
+    }
+    vm.set_f32(m + 0x90, out.speed_percent);
+    vm.set_f32(m + 0x98, out.speed_percent);
+    vm.set_f32(m + 0xb8, out.mb8);
+    vm.set_f32(m + 0x248, out.m248);
+    vm.set_f32(m + 0xa0, out.ma0);
 }
