@@ -616,7 +616,41 @@ impl FlightModel {
 
     /// Visual adapter for this approximate model, not recovered original dataref
     /// accessors. Unsupported names/indices remain unresolved rather than invented.
+    /// Scalar flight datarefs read from the approximate rigid-body state, in the units the original
+    /// getters expose (names and scale factors: `xp-dataref/data/flight_datarefs.tsv`). The values come
+    /// from this preview model, not from the original's flight object, and are not trajectory-verified.
+    pub fn flight_dataref(&self, name: &str, c: &Controls) -> Option<f32> {
+        let t = self.telemetry(c);
+        let rate = self.state.omega;
+        let true_airspeed =
+            (Mat3::from_quat(self.state.orientation).transpose() * self.state.velocity).length();
+        Some(match name {
+            "sim/flightmodel/position/theta"
+            | "sim/cockpit2/gauges/indicators/pitch_AHARS_deg_pilot" => t.pitch_deg,
+            "sim/flightmodel/position/phi"
+            | "sim/cockpit2/gauges/indicators/roll_AHARS_deg_pilot" => t.roll_deg,
+            "sim/flightmodel/position/psi"
+            | "sim/cockpit2/gauges/indicators/heading_AHARS_deg_mag_pilot" => t.heading_deg,
+            // Body rates about the right (Q, nose up), forward (P, right wing down) and up (R, nose right) axes.
+            "sim/flightmodel/position/Q" => rate.x.to_degrees(),
+            "sim/flightmodel/position/P" => (-rate.z).to_degrees(),
+            "sim/flightmodel/position/R" => (-rate.y).to_degrees(),
+            "sim/flightmodel/position/true_airspeed" => true_airspeed,
+            "sim/flightmodel/position/indicated_airspeed"
+            | "sim/cockpit2/gauges/indicators/airspeed_kts_pilot" => t.airspeed_kt,
+            "sim/cockpit2/gauges/indicators/altitude_ft_pilot" => t.altitude_ft,
+            "sim/flightmodel/position/vh_ind_fpm"
+            | "sim/cockpit2/gauges/indicators/vvi_fpm_pilot" => t.vertical_speed_fpm,
+            "sim/flightmodel/position/vh_ind" => t.vertical_speed_fpm * 0.005_08,
+            "sim/flightmodel/position/alpha" => t.alpha_deg,
+            _ => return None,
+        })
+    }
+
     pub fn animation_dataref(&self, name: &str, c: &Controls) -> Option<f32> {
+        if let Some(value) = self.flight_dataref(name, c) {
+            return Some(value);
+        }
         if name == "sim/flightmodel2/controls/elevator_trim" {
             return Some(c.elevator_trim);
         }

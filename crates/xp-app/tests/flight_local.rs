@@ -354,3 +354,36 @@ fn default_state_animation_datarefs_are_deployed_rich_and_closed() {
         Some(0.0)
     );
 }
+
+#[test]
+fn flight_datarefs_follow_state_signs_and_units() {
+    let Some(mut m) = model() else { return };
+    let c = Controls::default();
+    let get = |m: &FlightModel, n: &str| m.flight_dataref(n, &c).unwrap();
+    // At rest on the ground: level attitude, no speed, no rates.
+    assert_eq!(get(&m, "sim/flightmodel/position/true_airspeed"), 0.0);
+    assert_eq!(get(&m, "sim/flightmodel/position/Q"), 0.0);
+    assert!(get(&m, "sim/flightmodel/position/theta").abs() < 3.0);
+    // Body axes: x right, y up, z back. Positive pitch rate about +x raises the nose; rolling right is
+    // negative about z; yawing right is negative about y.
+    m.state.omega = Vec3::new(0.1, 0.0, 0.0);
+    assert!((get(&m, "sim/flightmodel/position/Q") - 0.1_f32.to_degrees()).abs() < 1e-4);
+    m.state.omega = Vec3::new(0.0, 0.0, -0.2);
+    assert!((get(&m, "sim/flightmodel/position/P") - 0.2_f32.to_degrees()).abs() < 1e-4);
+    m.state.omega = Vec3::new(0.0, -0.3, 0.0);
+    assert!((get(&m, "sim/flightmodel/position/R") - 0.3_f32.to_degrees()).abs() < 1e-4);
+    // Vertical speed: the original keeps fpm and derives m/s with 0.00508.
+    m.state.velocity = Vec3::new(0.0, 5.08, 0.0);
+    let fpm = get(&m, "sim/flightmodel/position/vh_ind_fpm");
+    assert!((fpm - 5.08 * 196.85).abs() < 0.01);
+    assert!((get(&m, "sim/flightmodel/position/vh_ind") - fpm * 0.00508).abs() < 1e-3);
+    assert!(
+        m.flight_dataref("sim/flightmodel/position/not_a_dataref", &c)
+            .is_none()
+    );
+    // Orientation sign check: a nose-up rotation increases theta.
+    m.state.omega = Vec3::ZERO;
+    m.state.velocity = Vec3::ZERO;
+    m.state.orientation = glam::Quat::from_rotation_x(10.0_f32.to_radians()) * m.state.orientation;
+    assert!(get(&m, "sim/flightmodel/position/theta") > 5.0);
+}
