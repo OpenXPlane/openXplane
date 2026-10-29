@@ -48,6 +48,40 @@ pub struct Pavement {
     pub line: usize,
 }
 
+/// Row 1300: a start location (gate, ramp tie-down, hangar or runway start).
+#[derive(Debug, Clone, PartialEq)]
+pub struct StartLocation {
+    pub lat: f64,
+    pub lon: f64,
+    pub heading_deg: f32,
+    /// `gate`, `hangar`, `misc` or `tie-down`.
+    pub location_type: String,
+    /// Allowed aircraft classes (`heavy|jets|turboprops|props|helos`).
+    pub aircraft_classes: Vec<String>,
+    pub name: String,
+    pub line: usize,
+}
+
+/// Row 19: a windsock.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Windsock {
+    pub lat: f64,
+    pub lon: f64,
+    pub lit: bool,
+    pub name: String,
+    pub line: usize,
+}
+
+/// Row 14: the tower viewpoint.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Tower {
+    pub lat: f64,
+    pub lon: f64,
+    pub height_ft: f32,
+    pub name: String,
+    pub line: usize,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Airport {
     /// Header row code: 1 land airport, 16 seaplane base, 17 heliport.
@@ -58,6 +92,9 @@ pub struct Airport {
     pub metadata: Vec<(String, String)>,
     pub runways: Vec<Runway>,
     pub pavements: Vec<Pavement>,
+    pub start_locations: Vec<StartLocation>,
+    pub windsocks: Vec<Windsock>,
+    pub towers: Vec<Tower>,
     /// Row code -> count for rows inside this airport that are not interpreted.
     pub other_rows: BTreeMap<u32, usize>,
     pub line: usize,
@@ -91,6 +128,9 @@ fn parse_header(code: u32, fields: &[&str], line: usize) -> Result<Airport, Stri
         metadata: Vec::new(),
         runways: Vec::new(),
         pavements: Vec::new(),
+        start_locations: Vec::new(),
+        windsocks: Vec::new(),
+        towers: Vec::new(),
         other_rows: BTreeMap::new(),
         line,
     })
@@ -221,6 +261,29 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
                 });
             }
             100 => airport.runways.push(parse_runway(&fields, line_no)?),
+            1300 if fields.len() >= 6 => airport.start_locations.push(StartLocation {
+                lat: num(fields[1], "start latitude", line_no)?,
+                lon: num(fields[2], "start longitude", line_no)?,
+                heading_deg: num(fields[3], "start heading", line_no)?,
+                location_type: fields[4].to_string(),
+                aircraft_classes: fields[5].split('|').map(str::to_string).collect(),
+                name: fields[6..].join(" "),
+                line: line_no,
+            }),
+            19 if fields.len() >= 4 => airport.windsocks.push(Windsock {
+                lat: num(fields[1], "windsock latitude", line_no)?,
+                lon: num(fields[2], "windsock longitude", line_no)?,
+                lit: fields[3] != "0",
+                name: fields[4..].join(" "),
+                line: line_no,
+            }),
+            14 if fields.len() >= 4 => airport.towers.push(Tower {
+                lat: num(fields[1], "tower latitude", line_no)?,
+                lon: num(fields[2], "tower longitude", line_no)?,
+                height_ft: num(fields[3], "tower height", line_no)?,
+                name: fields.get(5..).map(|f| f.join(" ")).unwrap_or_default(),
+                line: line_no,
+            }),
             1302 if fields.len() >= 2 => airport
                 .metadata
                 .push((fields[1].to_string(), fields[2..].join(" "))),
@@ -232,6 +295,35 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn start_locations_windsocks_and_towers_are_typed() {
+        let text = "A
+1200 t
+
+1 0 0 0 TEST Test Field
+14 47.01 -122.01 60.0 0 Main Tower
+19 47.02 -122.02 1 WS
+1300 47.03 -122.03 148.49 gate heavy|jets|props 13
+1300 47.04 -122.04 90.0 tie-down props Ramp A
+99
+";
+        let a = find_airport(text.as_bytes(), "TEST").unwrap().unwrap();
+        assert_eq!(a.towers.len(), 1);
+        assert_eq!(
+            (a.towers[0].height_ft, a.towers[0].name.as_str()),
+            (60.0, "Main Tower")
+        );
+        assert_eq!(a.windsocks.len(), 1);
+        assert!(a.windsocks[0].lit);
+        assert_eq!(a.start_locations.len(), 2);
+        let gate = &a.start_locations[0];
+        assert_eq!(gate.location_type, "gate");
+        assert_eq!(gate.aircraft_classes, ["heavy", "jets", "props"]);
+        assert_eq!((gate.heading_deg, gate.name.as_str()), (148.49, "13"));
+        assert_eq!(a.start_locations[1].name, "Ramp A");
+        assert!(a.other_rows.is_empty(), "{:?}", a.other_rows);
+    }
 
     const SAMPLE: &str = "A\n1200 test\n\n\
 1 100 0 0 AAAA First Field\n\
@@ -302,5 +394,27 @@ mod tests {
             assert_eq!(find_airport(text.as_bytes(), "AAAA").unwrap(), expected);
             assert!(find_airport(text.as_bytes(), "ZZZZ").unwrap().is_none());
         }
+    }
+}
+
+#[cfg(test)]
+mod installed {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires read-only installed UHWW scenery via OPENXPLANE_REFERENCE_ROOT"]
+    fn installed_uhww_start_locations_and_windsock_parse() {
+        let root = std::env::var_os("OPENXPLANE_REFERENCE_ROOT").expect("reference root required");
+        let path = std::path::Path::new(&root).join("Custom Scenery/1_UHWW/Earth nav data/apt.dat");
+        let file = std::io::BufReader::new(std::fs::File::open(path).unwrap());
+        let a = find_airport(file, "UHWW").unwrap().unwrap();
+        assert_eq!(a.start_locations.len(), 39);
+        assert_eq!(a.windsocks.len(), 1);
+        assert!(!a.other_rows.contains_key(&1300) && !a.other_rows.contains_key(&19));
+        assert!(
+            a.start_locations
+                .iter()
+                .all(|s| !s.aircraft_classes.is_empty())
+        );
     }
 }
