@@ -7,6 +7,8 @@ use xp_dataref::commands::Phase;
 
 /// Throttle change per press or key repeat for "a bit".
 pub const THROTTLE_STEP: f32 = 0.05;
+/// Step of one mixture_up/mixture_down press; assumed equal to the throttle step, not measured.
+pub const MIXTURE_STEP: f32 = 0.05;
 pub const TRIM_STEP: f32 = 0.01;
 /// "Regular" brake effort while the key is held.
 pub const BRAKE_REGULAR: f32 = 0.5;
@@ -47,6 +49,10 @@ pub fn apply_command(c: &mut Controls, command: &str, phase: Phase) -> Effect {
         "sim/engines/throttle_up" if acts => bump(&mut c.throttle, THROTTLE_STEP, 0.0, 1.0),
         "sim/engines/throttle_down" if acts => bump(&mut c.throttle, -THROTTLE_STEP, 0.0, 1.0),
         "sim/engines/throttle_full" if phase == Phase::Begin => c.throttle = 1.0,
+        "sim/engines/mixture_up" if acts => bump(&mut c.mixture, MIXTURE_STEP, 0.0, 1.0),
+        "sim/engines/mixture_down" if acts => bump(&mut c.mixture, -MIXTURE_STEP, 0.0, 1.0),
+        "sim/engines/mixture_max" if phase == Phase::Begin => c.mixture = 1.0,
+        "sim/engines/mixture_min" if phase == Phase::Begin => c.mixture = 0.0,
         "sim/flight_controls/flaps_up" if phase == Phase::Begin => {
             bump(&mut c.flaps, -1.0 / 3.0, 0.0, 1.0)
         }
@@ -137,6 +143,10 @@ fn is_stateless_noop(command: &str, phase: Phase) -> bool {
             "sim/engines/throttle_up"
                 | "sim/engines/throttle_down"
                 | "sim/engines/throttle_full"
+                | "sim/engines/mixture_up"
+                | "sim/engines/mixture_down"
+                | "sim/engines/mixture_max"
+                | "sim/engines/mixture_min"
                 | "sim/flight_controls/flaps_up"
                 | "sim/flight_controls/flaps_down"
                 | "sim/flight_controls/brakes_toggle_max"
@@ -254,6 +264,21 @@ mod tests {
     }
 
     #[test]
+    fn mixture_commands_move_the_lever_and_clamp() {
+        let mut c = Controls::default();
+        assert_eq!(c.mixture, 1.0);
+        run(&mut c, "sim/engines/mixture_min", Phase::Begin);
+        assert_eq!(c.mixture, 0.0);
+        run(&mut c, "sim/engines/mixture_up", Phase::Begin);
+        assert!((c.mixture - MIXTURE_STEP).abs() < 1e-6);
+        run(&mut c, "sim/engines/mixture_down", Phase::Continue);
+        run(&mut c, "sim/engines/mixture_down", Phase::Continue);
+        assert_eq!(c.mixture, 0.0);
+        run(&mut c, "sim/engines/mixture_max", Phase::Begin);
+        assert_eq!(c.mixture, 1.0);
+    }
+
+    #[test]
     fn non_control_commands_report_their_effect() {
         let mut c = Controls::default();
         assert_eq!(
@@ -270,7 +295,7 @@ mod tests {
         );
         assert_eq!(
             run(&mut c, "sim/engines/mixture_up", Phase::Begin),
-            Effect::NotSimulated
+            Effect::Controls
         );
         assert_eq!(
             run(&mut c, "sim/nonsense/command", Phase::Begin),

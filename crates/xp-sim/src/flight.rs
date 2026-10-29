@@ -49,7 +49,7 @@ const DOWNWASH_FACTOR: f32 = 1.2;
 /// referenced to the main wing area and mean chord (the lifting surfaces alone are too stable).
 const FUSELAGE_CM_ALPHA: f32 = 0.5;
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct Controls {
     /// Stick back positive (nose up): -1..1.
     pub elevator: f32,
@@ -67,6 +67,25 @@ pub struct Controls {
     pub elevator_trim: f32,
     pub aileron_trim: f32,
     pub rudder_trim: f32,
+    /// Mixture lever 0..1 (1 = full rich, the documented start state).
+    pub mixture: f32,
+}
+
+impl Default for Controls {
+    fn default() -> Self {
+        Self {
+            elevator: 0.0,
+            aileron: 0.0,
+            rudder: 0.0,
+            throttle: 0.0,
+            brake: 0.0,
+            flaps: 0.0,
+            elevator_trim: 0.0,
+            aileron_trim: 0.0,
+            rudder_trim: 0.0,
+            mixture: 1.0,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -668,8 +687,8 @@ impl FlightModel {
             "sim/flightmodel2/gear/deploy_ratio" => {
                 self.gears.iter().any(|g| g.index == index).then_some(1.0)
             }
-            // No mixture control exists yet; the documented start state is full rich.
-            "sim/cockpit2/engine/actuators/mixture_ratio" if index == 0 => Some(1.0),
+            // The lever state only; the engine model does not use the mixture yet.
+            "sim/cockpit2/engine/actuators/mixture_ratio" if index == 0 => Some(c.mixture),
             // Doors are never opened by the simulation: closed.
             "sim/flightmodel2/misc/door_open_ratio" => Some(0.0),
             "sim/flightmodel2/gear/tire_vertical_deflection_mtr" => self
