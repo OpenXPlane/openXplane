@@ -86,6 +86,29 @@ pub struct TaxiEdge {
     pub line: usize,
 }
 
+/// Row 20: a taxiway sign. `text` keeps the `{@...}` style codes verbatim.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sign {
+    pub lat: f64,
+    pub lon: f64,
+    pub heading_deg: f32,
+    pub size: u32,
+    pub text: String,
+    pub line: usize,
+}
+
+/// Row 21: a visual approach slope indicator (VASI/PAPI family, light type kept as the file code).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApproachLight {
+    pub lat: f64,
+    pub lon: f64,
+    pub light_type: u32,
+    pub heading_deg: f32,
+    pub glidepath_deg: f32,
+    pub runway: String,
+    pub line: usize,
+}
+
 /// Row 19: a windsock.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Windsock {
@@ -118,6 +141,8 @@ pub struct Airport {
     pub pavements: Vec<Pavement>,
     pub start_locations: Vec<StartLocation>,
     pub windsocks: Vec<Windsock>,
+    pub signs: Vec<Sign>,
+    pub approach_lights: Vec<ApproachLight>,
     pub taxi_nodes: Vec<TaxiNode>,
     pub taxi_edges: Vec<TaxiEdge>,
     pub towers: Vec<Tower>,
@@ -156,6 +181,8 @@ fn parse_header(code: u32, fields: &[&str], line: usize) -> Result<Airport, Stri
         pavements: Vec::new(),
         start_locations: Vec::new(),
         windsocks: Vec::new(),
+        signs: Vec::new(),
+        approach_lights: Vec::new(),
         taxi_nodes: Vec::new(),
         taxi_edges: Vec::new(),
         towers: Vec::new(),
@@ -323,6 +350,25 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
                 name: fields[5..].join(" "),
                 line: line_no,
             }),
+            20 if fields.len() >= 7 => airport.signs.push(Sign {
+                // 20 lat lon heading reserved size text
+                lat: num(fields[1], "sign latitude", line_no)?,
+                lon: num(fields[2], "sign longitude", line_no)?,
+                heading_deg: num(fields[3], "sign heading", line_no)?,
+                size: num(fields[5], "sign size", line_no)?,
+                text: fields[6..].join(" "),
+                line: line_no,
+            }),
+            21 if fields.len() >= 7 => airport.approach_lights.push(ApproachLight {
+                // 21 lat lon type heading glidepath runway [name]
+                lat: num(fields[1], "approach light latitude", line_no)?,
+                lon: num(fields[2], "approach light longitude", line_no)?,
+                light_type: num(fields[3], "approach light type", line_no)?,
+                heading_deg: num(fields[4], "approach light heading", line_no)?,
+                glidepath_deg: num(fields[5], "approach light glidepath", line_no)?,
+                runway: fields[6].to_string(),
+                line: line_no,
+            }),
             19 if fields.len() >= 4 => airport.windsocks.push(Windsock {
                 lat: num(fields[1], "windsock latitude", line_no)?,
                 lon: num(fields[2], "windsock longitude", line_no)?,
@@ -348,6 +394,29 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn signs_and_approach_lights_are_typed() {
+        let text = "A
+1200 t
+
+1 0 0 0 TEST Test Field
+20 47.0 -122.0 332.27 0 3 {@R}25L{@L}A
+21 47.1 -122.1 2 56.813 3.0 25R PAPI-4L
+99
+";
+        let a = find_airport(text.as_bytes(), "TEST").unwrap().unwrap();
+        assert_eq!(a.signs.len(), 1);
+        assert_eq!(
+            (a.signs[0].size, a.signs[0].text.as_str()),
+            (3, "{@R}25L{@L}A")
+        );
+        assert_eq!(a.approach_lights.len(), 1);
+        let p = &a.approach_lights[0];
+        assert_eq!((p.light_type, p.runway.as_str()), (2, "25R"));
+        assert_eq!((p.heading_deg, p.glidepath_deg), (56.813, 3.0));
+        assert!(a.other_rows.is_empty(), "{:?}", a.other_rows);
+    }
 
     #[test]
     fn taxi_nodes_and_edges_are_typed() {
@@ -506,6 +575,7 @@ mod installed {
         assert_eq!(a.start_locations.len(), 39);
         assert_eq!(a.windsocks.len(), 1);
         assert_eq!((a.taxi_nodes.len(), a.taxi_edges.len()), (26, 28));
+        assert_eq!((a.signs.len(), a.approach_lights.len()), (14, 2));
         assert!(
             a.taxi_edges
                 .iter()
