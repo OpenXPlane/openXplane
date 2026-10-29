@@ -73,3 +73,32 @@ Not resolved by the schema: `B+0x920` (bound-element count), `B+0x9dc`, `B+0xa9c
 from the installed file; the interpretation of each term is the existing port's, not re-derived here.
 Note that `B+0x938` and `B+0x93c` are 0 in the stock aircraft, so `piston_levers`' `x11 = (B+0x93c - 1)/1.7 + 1`
 is 0.412 for it.
+
+## Engine state `M` fields, as already documented
+Meanings collected from `research/FLIGHT_STEP.md` and the port code; they are the earlier passes' readings, not
+re-derived. Offsets not listed are not documented anywhere in the notes.
+
+| Offset | Role |
+|---|---|
+| `M+4` | the throttle lever (input to `piston_levers`) |
+| `M+0x40` | throttle from the starter (kind 1/2 handler) |
+| `M+0x48` | selects which magneto inputs (`0x151`/`0x159`) count |
+| `M+0x54/0x5c` -> `0x58/0x60` | commanded values and their lag (0.2 per second) |
+| `M+0x78` | engine speed used for the torque terms (ratio to `E+0x18`) |
+| `M+0x90/0x98` | engine speed in percent (integrated: 200 per second per unit of power over `B+0xa20`) |
+| `M+0xa0` | lagged fuel-air state (factor 4 times the frame time) |
+| `M+0xb8` | power from the propeller curve / summed drive less lubrication |
+| `M+0xcc` | power (output; `M+0xcc / M+0x25c` is the return value, stored at `M+0x1d8`) |
+| `M+0x20c`, `M+0x210/0x214` | rate and state of the lean/rich mixture response |
+| `M+0x22c` | lever level (1 for kinds 0 to 2) |
+| `M+0x240/0x244/0x248` | manifold terms, cut by the magneto switches |
+| `M+0x24c` | power fraction (with manifold ratio) |
+| `M+0x254` | pressure term, `M+0x24c * F+0x68 / 101325` |
+| `M+0x258` | density term, density ratio times `M+0x24c` |
+| `M+0x25c` | engine power the propeller is eased towards |
+| `M+0x264` | heat offset added to the outside temperature query |
+| `M+0x268` | friction term |
+| `M+0x2b4`, `M+0x50` | kind 1 lean term inputs |
+| `M+0x2bc` | lubrication blend |
+
+Undocumented but read: `M+0x64`, `0x68`, `0x6c`, `0x70`, `0x74`, `0x84`. They need the setup code that writes them.
