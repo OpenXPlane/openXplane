@@ -718,6 +718,7 @@ impl FlightModel {
             | "sim/graphics/view/view_is_external"
             | "sim/cockpit2/clock_timer/hobbs_time_hours"
             | "sim/cockpit2/clock_timer/hobbs_time_minutes"
+            | "sim/cockpit2/radios/actuators/HSI_source_select_pilot"
             | "sim/time/hobbs_time" => return Some(0.0),
             "laminar/c172/flap_side_shift" => return Some(c172_flap_side_shift(c.flaps)),
             // The OAT/volts button of the clock starts on volts.
@@ -738,6 +739,9 @@ impl FlightModel {
             // The lever state only; the engine model does not use the mixture yet.
             "sim/cockpit2/engine/actuators/mixture_ratio" if index == 0 => Some(c.mixture),
             "sim/cockpit2/engine/actuators/carb_heat_ratio" if index == 0 => Some(c.carb_heat),
+            // Custom sliders are driven by the cockpit panel, which does not exist yet: all at rest.
+            "sim/flightmodel2/misc/custom_slider_ratio"
+            | "sim/cockpit2/switches/custom_slider_on" => Some(0.0),
             // Doors are never opened by the simulation: closed.
             "sim/flightmodel2/misc/door_open_ratio" => Some(0.0),
             "sim/flightmodel2/gear/tire_vertical_deflection_mtr" => self

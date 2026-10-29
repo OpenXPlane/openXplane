@@ -412,6 +412,9 @@ fn cold_and_dark_defaults_are_answered() {
         "sim/graphics/view/hide_yoke",
         "sim/time/hobbs_time",
         "sim/cockpit2/switches/landing_lights_on",
+        "sim/cockpit2/radios/actuators/HSI_source_select_pilot",
+        "sim/flightmodel2/misc/custom_slider_ratio[3]",
+        "sim/cockpit2/switches/custom_slider_on[1]",
     ] {
         assert_eq!(m.animation_dataref(name, &c), Some(0.0), "{name}");
     }
