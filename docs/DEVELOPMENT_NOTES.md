@@ -246,6 +246,11 @@ cargo run --release --offline -- wing-info "Xplane12/Cessna 172 SP/Cessna_172SP.
 cargo run --release --offline -- fly-test Xplane12 "Xplane12/Cessna 172 SP/Cessna_172SP.acf" 60
 ```
 
+`fly-test` can also write a trajectory: set `OPENXPLANE_TRAJECTORY_CSV=<file>` and it records every 20th step as
+`time_s,kias,vvi_fpm,pitch_deg,roll_deg,heading_deg,alpha_deg,altitude_ft,throttle,on_ground`. The columns map to
+Data Output lines 3 (speeds), 4 (Mach/VVI), 17 (pitch/roll/heading), 18 (alpha) and 20 (position) for a later
+comparison with a reference recording. Alpha reads −180° at zero airspeed (degenerate, not a real value).
+
 `fly` opens a window with the Cessna on the first runway of the airport. It uses the **original's default
 keyboard map**, read from the reference build: F1/F2/F3 throttle down/up/full, `1`/`2` flaps up/down, `B` brakes
 (hold), `V` maximum brakes, `[` `]` pitch trim, `5 6 7` rudder trim, `8 9 0` aileron trim, `P` pause, `W` default

@@ -417,8 +417,42 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         let mut c = openxplane::flight::Controls::default();
         let dt = 1.0 / 200.0;
         let mut liftoff = None;
+        // OPENXPLANE_TRAJECTORY_CSV=<file> writes one row every 0.1 s of simulated time with the columns
+        // of the matching X-Plane Data Output lines (3 airspeed, 4 vertical speed, 17 attitude and
+        // heading, 18 alpha, 20 altitude), for pairing with a recorded reference run.
+        let mut csv = match std::env::var_os("OPENXPLANE_TRAJECTORY_CSV") {
+            Some(path) => {
+                let mut file = std::io::BufWriter::new(fs::File::create(path)?);
+                use std::io::Write;
+                writeln!(
+                    file,
+                    "time_s,kias,vvi_fpm,pitch_deg,roll_deg,heading_deg,alpha_deg,altitude_ft,throttle,on_ground"
+                )?;
+                Some(file)
+            }
+            None => None,
+        };
         for i in 0..(seconds * 200.0) as usize {
             let t = model.telemetry(&c);
+            if let Some(file) = csv.as_mut()
+                && i % 20 == 0
+            {
+                use std::io::Write;
+                writeln!(
+                    file,
+                    "{:.3},{:.3},{:.1},{:.3},{:.3},{:.3},{:.3},{:.2},{:.3},{}",
+                    model.state.time,
+                    t.airspeed_kt,
+                    t.vertical_speed_fpm,
+                    t.pitch_deg,
+                    t.roll_deg,
+                    t.heading_deg,
+                    t.alpha_deg,
+                    t.altitude_ft,
+                    t.throttle,
+                    u8::from(t.on_ground)
+                )?;
+            }
             openxplane::flight::takeoff_pilot(&model, &mut c);
             if !t.on_ground && liftoff.is_none() {
                 liftoff = Some((model.state.time, t.airspeed_kt));
