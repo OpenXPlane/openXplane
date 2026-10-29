@@ -62,6 +62,30 @@ pub struct StartLocation {
     pub line: usize,
 }
 
+/// Row 1201: a taxi network node.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaxiNode {
+    pub id: u32,
+    pub lat: f64,
+    pub lon: f64,
+    /// `init`, `end`, `both` or `junction` (documented usage values, kept verbatim).
+    pub usage: String,
+    pub name: String,
+    pub line: usize,
+}
+
+/// Row 1202: a taxi network edge between two node ids.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaxiEdge {
+    pub from: u32,
+    pub to: u32,
+    pub two_way: bool,
+    /// `taxiway` or `runway`, or `taxiway_<width code>` kept verbatim.
+    pub kind: String,
+    pub name: String,
+    pub line: usize,
+}
+
 /// Row 19: a windsock.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Windsock {
@@ -94,6 +118,8 @@ pub struct Airport {
     pub pavements: Vec<Pavement>,
     pub start_locations: Vec<StartLocation>,
     pub windsocks: Vec<Windsock>,
+    pub taxi_nodes: Vec<TaxiNode>,
+    pub taxi_edges: Vec<TaxiEdge>,
     pub towers: Vec<Tower>,
     /// Row code -> count for rows inside this airport that are not interpreted.
     pub other_rows: BTreeMap<u32, usize>,
@@ -130,6 +156,8 @@ fn parse_header(code: u32, fields: &[&str], line: usize) -> Result<Airport, Stri
         pavements: Vec::new(),
         start_locations: Vec::new(),
         windsocks: Vec::new(),
+        taxi_nodes: Vec::new(),
+        taxi_edges: Vec::new(),
         towers: Vec::new(),
         other_rows: BTreeMap::new(),
         line,
@@ -270,6 +298,31 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
                 name: fields[6..].join(" "),
                 line: line_no,
             }),
+            1201 if fields.len() >= 5 => airport.taxi_nodes.push(TaxiNode {
+                // 1201 lat lon usage id [name]; the id is node-table position by convention.
+                id: num(fields[4], "taxi node id", line_no)?,
+                lat: num(fields[1], "taxi node latitude", line_no)?,
+                lon: num(fields[2], "taxi node longitude", line_no)?,
+                usage: fields[3].to_string(),
+                name: fields[5..].join(" "),
+                line: line_no,
+            }),
+            1202 if fields.len() >= 5 => airport.taxi_edges.push(TaxiEdge {
+                from: num(fields[1], "taxi edge start", line_no)?,
+                to: num(fields[2], "taxi edge end", line_no)?,
+                two_way: match fields[3] {
+                    "twoway" => true,
+                    "oneway" => false,
+                    other => {
+                        return Err(format!(
+                            "invalid taxi edge direction '{other}' at line {line_no}"
+                        ));
+                    }
+                },
+                kind: fields[4].to_string(),
+                name: fields[5..].join(" "),
+                line: line_no,
+            }),
             19 if fields.len() >= 4 => airport.windsocks.push(Windsock {
                 lat: num(fields[1], "windsock latitude", line_no)?,
                 lon: num(fields[2], "windsock longitude", line_no)?,
@@ -295,6 +348,48 @@ pub fn find_airport<R: BufRead>(mut reader: R, id: &str) -> Result<Option<Airpor
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn taxi_nodes_and_edges_are_typed() {
+        let text = "A
+1200 t
+
+1 0 0 0 TEST Test Field
+1200
+1201 47.0 -122.0 both 0 C_stop
+1201 47.1 -122.1 junction 1
+1202 0 1 twoway taxiway C
+1202 1 0 oneway runway
+99
+";
+        let a = find_airport(text.as_bytes(), "TEST").unwrap().unwrap();
+        assert_eq!(a.taxi_nodes.len(), 2);
+        assert_eq!(
+            (
+                a.taxi_nodes[0].usage.as_str(),
+                a.taxi_nodes[0].name.as_str()
+            ),
+            ("both", "C_stop")
+        );
+        assert_eq!(a.taxi_nodes[1].name, "");
+        assert_eq!(a.taxi_edges.len(), 2);
+        assert!(a.taxi_edges[0].two_way && !a.taxi_edges[1].two_way);
+        assert_eq!((a.taxi_edges[1].from, a.taxi_edges[1].to), (1, 0));
+        assert_eq!(a.taxi_edges[1].kind, "runway");
+        assert!(
+            find_airport(
+                "A
+1200 t
+
+1 0 0 0 T x
+1202 0 1 sideways taxiway
+"
+                .as_bytes(),
+                "T"
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn start_locations_windsocks_and_towers_are_typed() {
@@ -410,6 +505,13 @@ mod installed {
         let a = find_airport(file, "UHWW").unwrap().unwrap();
         assert_eq!(a.start_locations.len(), 39);
         assert_eq!(a.windsocks.len(), 1);
+        assert_eq!((a.taxi_nodes.len(), a.taxi_edges.len()), (26, 28));
+        assert!(
+            a.taxi_edges
+                .iter()
+                .all(|e| a.taxi_nodes.iter().any(|n| n.id == e.from)
+                    && a.taxi_nodes.iter().any(|n| n.id == e.to))
+        );
         assert!(!a.other_rows.contains_key(&1300) && !a.other_rows.contains_key(&19));
         assert!(
             a.start_locations
