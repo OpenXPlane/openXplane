@@ -36,5 +36,8 @@ from the native electrical model and the start mode, so they still need a refere
   flow is not modelled.
 - `xp_sim::flight::c172_flap_side_shift` and `laminar/c172/knob_OAT` (starts on volts, value 2).
 - `xp_sim::ignition` (state in `Controls.ignition`): the `c172_starter` key steps and starter hold (spring-back inferred; engine ignores it), plus `magnetos_off`/`magnetos_both` setting the key directly.
-- Not ported: `c172_sound`,
-  the ADF frequency clamps (200..1799) and `knob_TAS`/`knob_EGT` of `c172_custom_datarefs`.
+- `c172_sound` needs no port: it only copies ten `audio_volume_*` radio datarefs (nav1-4, adf1-2, dme, dme1-2,
+  marker) into `laminar/C172/sound/radio_volume_pilot[0..9]` every frame, in that order. It matters once the
+  radios and sound exist (Phase 5 item 3, Phase 6).
+- Not ported: the ADF frequency clamps (200..1799 for the active and standby frequency) and
+  `knob_TAS`/`knob_EGT` of `c172_custom_datarefs`; they need radio and gauge state that does not exist yet.
