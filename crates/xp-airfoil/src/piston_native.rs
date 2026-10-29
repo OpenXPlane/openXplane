@@ -137,3 +137,128 @@ pub fn power_terms(i: &PowerInput, env: &mut dyn PowerEnv) -> PowerOutput {
         density_term,
     }
 }
+
+/// What the lever stage asks of its surroundings, in the original's order: the frame time (kinds 3 and 4
+/// only) and then whether the throttle ramp limits the lever.
+pub trait LeverEnv {
+    fn frame_time(&mut self) -> f64;
+    fn ramp_limited(&mut self) -> bool;
+}
+
+/// Fields of the lever stage (`piston_levers` before the per-kind handlers).
+#[derive(Clone, Debug)]
+pub struct LeverInput {
+    /// Engine kind `E+0`.
+    pub kind: i32,
+    /// `B+0x93c`, `B+0xa18`, `B+0x9dc`, `B+0xc24`, `B+0x9b8`, `B+0xa9c`.
+    pub b93c: f32,
+    pub ba18: f32,
+    pub b9dc: f32,
+    pub bc24: i32,
+    pub b9b8: f32,
+    pub ba9c: i32,
+    /// `M+4` (lever), `M+0x22c` (level), `M+0x228`, `M+0x70`, `M+0x78`, `M+0x90`, `M+0x298`.
+    pub lever: f32,
+    pub level: f32,
+    pub m228: i32,
+    pub m70: i32,
+    pub m78: f32,
+    pub m90: f32,
+    pub m298: i32,
+    /// `E+0x18`, the throttle ceiling and `engine_ratio` (both read from the objects, no environment call).
+    pub e18: f32,
+    pub ceiling: f32,
+    pub engine_ratio: f32,
+    /// `(p+0, p+0x1c)` of every element bound to the engine.
+    pub elements: Vec<(f32, f32)>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LeverOutput {
+    /// New `M+0x22c`.
+    pub level: f32,
+    /// The commanded lever value after the limits.
+    pub x6: f32,
+    pub x11: f32,
+}
+
+pub fn lever_terms(i: &LeverInput, env: &mut dyn LeverEnv) -> LeverOutput {
+    use crate::wing_element::interpolate_clamped;
+    let x11 = ((f64::from(i.b93c) - 1.0) / 1.7 + 1.0) as f32;
+    let (scale, level);
+    if i.kind == 1 || i.kind == 2 || i.kind == 0 {
+        scale = if i.kind == 0 {
+            0.0
+        } else {
+            (0.13 / f64::from(x11)) as f32
+        };
+        level = 1.0;
+    } else {
+        scale = match i.kind {
+            4 => f32::from_bits(0x3e23d70a),
+            3 => f32::from_bits(0x3e4ccccd),
+            _ => 0.0,
+        };
+        let mut dt = env.frame_time();
+        if i.m228 != 0 {
+            dt += dt;
+        }
+        let v = dt as f32 / i.ba18 + i.level;
+        let mut l = if 0.0 > v { 0.0 } else { sse_min(1.0, v) };
+        if i.m70 == 0 {
+            l = 0.0;
+        }
+        if i.bc24 != 0 && i.b9b8 > i.m90 {
+            l = 0.0;
+        }
+        level = l;
+    }
+    let x2 = i.lever;
+    let x10 = i.ceiling * scale;
+    let x7 = scale * i.b9dc;
+    let mut x6 = (x2 - 0.0) * (1.0 - x10) + x10;
+    if i.kind.wrapping_sub(3) as u32 <= 1 {
+        x6 = sse_max(x2, x10);
+        if i.kind == 4 && i.ba9c == 3 && i.m298 == 1 {
+            x6 = (x2 - 0.0) * (1.0 - x7) + x7;
+        }
+    }
+    x6 *= level;
+    if env.ramp_limited() {
+        let e18 = f64::from(i.e18);
+        let a0 = (e18 + f64::from_bits(0x4014f1a6e9000000)) as f32;
+        let a1 = (e18 + f64::from_bits(0x4024f1a6e9000000)) as f32;
+        x6 = interpolate_clamped(a0, x6, a1, x10, i.m78);
+    }
+    if i.kind == 3 {
+        if i.ba9c == 2 {
+            let mut low = (f64::from(i.engine_ratio) + f64::from(i.engine_ratio)) as f32;
+            let mut high = 0.0f32;
+            for &(a, c) in &i.elements {
+                low = sse_min(a, low);
+                high = sse_max(c, high);
+            }
+            let exceeded = if i.m298 == 1 {
+                let low = sse_min(low, i.engine_ratio);
+                f64::from(high) > f64::from(low) * f64::from_bits(0x3ff0cccccccccccd)
+            } else if i.m298 >= 2 {
+                f64::from(high) > f64::from(i.engine_ratio) * 0.95
+            } else {
+                false
+            };
+            if exceeded {
+                x6 = x10;
+            }
+        }
+    } else if i.kind == 4 && i.ba9c == 3 {
+        let limit = (f64::from(i.engine_ratio) * f64::from_bits(0x3ff0f5c28f5c28f6)) as f32;
+        let mut acc = 0.0f32;
+        for &(_, c) in &i.elements {
+            acc = sse_max(c, acc);
+        }
+        if acc > limit {
+            x6 = x10;
+        }
+    }
+    LeverOutput { level, x6, x11 }
+}

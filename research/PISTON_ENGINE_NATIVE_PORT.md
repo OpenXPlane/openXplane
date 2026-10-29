@@ -133,3 +133,17 @@ from `tools/gen_piston_vectors.py`) check it; a deliberate change of one coeffic
 Still on the emulator: `piston_levers` and the handlers `update_engine_kind12` (the C172's kind) and the
 helpers. Next slices, in order of the C172's path: `piston_levers` (without kinds 3/4), `update_engine_kind12`,
 then the propeller stage.
+
+## Progress: the lever stage is native too
+`piston_native::lever_terms` now holds the lever stage of `piston_levers` (the level `M+0x22c`, the commanded
+value with the throttle ceiling, the ramp limit and the kind 3 and 4 limits against the bound elements) over
+the typed `LeverInput`; its environment is two calls (frame time for kinds 3 and 4, then the ramp query).
+The remaining parts of `piston_levers` (the per-kind handler dispatch and `power_from_tables`) and all four
+handlers are still on the emulator.
+
+Coverage of the recorded vectors, measured by changing one constant at a time in `piston_native.rs`: the
+tests caught a changed `dt += dt` (the doubled frame time) and the `0.15` lever reduction of the power stage,
+but not a changed `0.95` (kind 3 mode 2 limit), a changed `0.13` (kinds 1 and 2 scale) or a one-ulp change of the
+kind 4 seed (the comparison tolerance is 1e-5 relative). So these three paths are carried over from the
+emulator code unchanged but are not independently pinned by the vectors; they need more vectors with the
+ceiling and the bound elements away from zero before they can be called verified.

@@ -212,71 +212,56 @@ fn piston_levers(
     inputs: u64,
 ) -> f32 {
     let engine = |vm: &Vm| vm.u64(b + 0x5ff8) + (i64::from(n) * 0x68) as u64;
-    let kind0 = vm.i32(engine(vm));
-    let x11 = ((f64::from(vm.f32(b + 0x93c)) - 1.0) / 1.7 + 1.0) as f32;
-    let scale;
-    if kind0 == 1 || kind0 == 2 || kind0 == 0 {
-        // kinds 1 and 2 take the scale from the manifold term; kind 0 has none; all three set the level to 1
-        scale = if kind0 == 0 {
-            0.0
-        } else {
-            (0.13 / f64::from(x11)) as f32
+    use crate::piston_native::{LeverEnv, LeverInput, lever_terms};
+    struct Adapter<'a> {
+        env: &'a mut dyn Callees,
+        vm: &'a Vm,
+        f: u64,
+        n: i32,
+    }
+    impl LeverEnv for Adapter<'_> {
+        fn frame_time(&mut self) -> f64 {
+            frame_time(self.env)
+        }
+        fn ramp_limited(&mut self) -> bool {
+            engine_ramp_limited(self.vm, self.env, self.f, self.n)
+        }
+    }
+    let mut elements = Vec::new();
+    each_bound_element(vm, f, b, n, |p| {
+        elements.push((vm.f32(p), vm.f32(p + 0x1c)))
+    });
+    let input = LeverInput {
+        kind: vm.i32(engine(vm)),
+        b93c: vm.f32(b + 0x93c),
+        ba18: vm.f32(b + 0xa18),
+        b9dc: vm.f32(b + 0x9dc),
+        bc24: vm.i32(b + 0xc24),
+        b9b8: vm.f32(b + 0x9b8),
+        ba9c: vm.i32(b + 0xa9c),
+        lever: vm.f32(m + 4),
+        level: vm.f32(m + 0x22c),
+        m228: vm.i32(m + 0x228),
+        m70: vm.i32(m + 0x70),
+        m78: vm.f32(m + 0x78),
+        m90: vm.f32(m + 0x90),
+        m298: vm.i32(m + 0x298),
+        e18: vm.f32(engine(vm) + 0x18),
+        ceiling: crate::engine_small::throttle_ceiling(vm, f, n),
+        engine_ratio: engine_ratio(vm, b, n),
+        elements,
+    };
+    let out = {
+        let mut adapter = Adapter {
+            env: &mut *env,
+            vm: &*vm,
+            f,
+            n,
         };
-        vm.set_f32(m + 0x22c, 1.0);
-    } else {
-        let seed = match kind0 {
-            4 => f32::from_bits(0x3e23d70a),
-            3 => f32::from_bits(0x3e4ccccd),
-            _ => 0.0,
-        };
-        scale = seed;
-        let mut dt = frame_time(env);
-        if vm.i32(m + 0x228) != 0 {
-            dt += dt;
-        }
-        let v = dt as f32 / vm.f32(b + 0xa18) + vm.f32(m + 0x22c);
-        let level = if 0.0 > v { 0.0 } else { sse_min(1.0, v) };
-        vm.set_f32(m + 0x22c, level);
-        if vm.i32(m + 0x70) == 0 {
-            vm.set_i32(m + 0x22c, 0);
-        }
-        if vm.i32(b + 0xc24) != 0 && vm.f32(b + 0x9b8) > vm.f32(m + 0x90) {
-            vm.set_i32(m + 0x22c, 0);
-        }
-    }
-    let gain = crate::engine_small::throttle_ceiling(vm, f, n);
-    let x2 = vm.f32(m + 4);
-    let x10 = gain * scale;
-    let x7 = scale * vm.f32(b + 0x9dc);
-    let mut x6 = (x2 - 0.0) * (1.0 - x10) + x10;
-    let kind = vm.i32(engine(vm));
-    if kind.wrapping_sub(3) as u32 <= 1 {
-        x6 = sse_max(x2, x10);
-        if kind == 4 && vm.i32(b + 0xa9c) == 3 && vm.i32(m + 0x298) == 1 {
-            x6 = (x2 - 0.0) * (1.0 - x7) + x7;
-        }
-    }
-    x6 *= vm.f32(m + 0x22c);
-    let limited = engine_ramp_limited(vm, env, f, n);
-    if limited {
-        let e18 = f64::from(vm.f32(engine(vm) + 0x18));
-        let a0 = (e18 + f64::from_bits(0x4014f1a6e9000000)) as f32;
-        let a1 = (e18 + f64::from_bits(0x4024f1a6e9000000)) as f32;
-        x6 = interpolate_clamped(a0, x6, a1, x10, vm.f32(m + 0x78));
-    }
-    let kind = vm.i32(engine(vm));
-    if kind == 3 {
-        if vm.i32(b + 0xa9c) == 2 {
-            x6 = lever_limit_kind3(vm, f, b, n, m, x6, x10);
-        }
-    } else if kind == 4 && vm.i32(b + 0xa9c) == 3 {
-        let limit = (f64::from(engine_ratio(vm, b, n)) * f64::from_bits(0x3ff0f5c28f5c28f6)) as f32;
-        let mut acc = 0.0f32;
-        each_bound_element(vm, f, b, n, |p| acc = sse_max(vm.f32(p + 0x1c), acc));
-        if acc > limit {
-            x6 = x10;
-        }
-    }
+        lever_terms(&input, &mut adapter)
+    };
+    vm.set_f32(m + 0x22c, out.level);
+    let (x6, x11) = (out.x6, out.x11);
     vm.set_i32(m + 0x210, 0);
     if vm.i32(engine(vm)) == 0 {
         let slot = i64::from(vm.i32(b + 0xd38 + 4 * n as i64 as u64));
@@ -302,31 +287,6 @@ fn piston_levers(
     let out = vm.f32(m + 0xcc) / vm.f32(m + 0x25c);
     vm.set_f32(m + 0x1d8, out);
     out
-}
-
-/// The limit of the kind 3 engine (for `B+0xa9c == 2`): the lever value `x6`, or `x10` when the bound elements'
-/// extremes exceed the engine's ratio by more than the margin of the mode `M+0x298`.
-fn lever_limit_kind3(vm: &Vm, f: u64, b: u64, n: i32, m: u64, x6: f32, x10: f32) -> f32 {
-    let ratio = engine_ratio(vm, b, n);
-    let mut low = (f64::from(ratio) + f64::from(ratio)) as f32;
-    let mut high = 0.0f32;
-    each_bound_element(vm, f, b, n, |p| {
-        let a = vm.f32(p);
-        let c = vm.f32(p + 0x1c);
-        low = sse_min(a, low);
-        high = sse_max(c, high);
-    });
-    let mode = vm.i32(m + 0x298);
-    let exceeded = if mode == 1 {
-        let limit = engine_ratio(vm, b, n);
-        let low = sse_min(low, limit);
-        f64::from(high) > f64::from(low) * f64::from_bits(0x3ff0cccccccccccd)
-    } else if mode >= 2 {
-        f64::from(high) > f64::from(engine_ratio(vm, b, n)) * 0.95
-    } else {
-        false
-    };
-    if exceeded { x10 } else { x6 }
 }
 
 /// The power written to `M+0xcc` for kinds 3 and 4 from the altitude/temperature tables (`B+0xb1c..0xb34`) and
