@@ -13,7 +13,7 @@ pub use xp_obj as obj8;
 pub use xp_scenery::{
     agp, apt, dsf, facade, ground, install, polygon, terrain as scenery_terrain, world,
 };
-pub use xp_sim::{flight, pilot};
+pub use xp_sim::{clock, flight, pilot};
 
 pub mod ui_resources;
 

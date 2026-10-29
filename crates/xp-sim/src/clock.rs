@@ -29,6 +29,34 @@ impl Default for SimClock {
 }
 
 impl SimClock {
+    /// A clock that shows `MM-DD HH:MM` local time at simulation time zero for `longitude_deg`.
+    /// The zulu day is not adjusted when the local offset crosses midnight; month and day stay the
+    /// local ones.
+    pub fn from_local(text: &str, longitude_deg: f64) -> Result<Self, String> {
+        let bad = || format!("expected 'MM-DD HH:MM', got '{text}'");
+        let (date, time) = text.trim().split_once(' ').ok_or_else(bad)?;
+        let (month, day) = date.split_once('-').ok_or_else(bad)?;
+        let (hour, minute) = time.trim().split_once(':').ok_or_else(bad)?;
+        let (month, day): (u32, u32) = (
+            month.parse().map_err(|_| bad())?,
+            day.parse().map_err(|_| bad())?,
+        );
+        let (hour, minute): (u32, u32) = (
+            hour.parse().map_err(|_| bad())?,
+            minute.parse().map_err(|_| bad())?,
+        );
+        if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 {
+            return Err(bad());
+        }
+        let local = f64::from(hour) * 3600.0 + f64::from(minute) * 60.0;
+        Ok(Self {
+            month,
+            day,
+            zulu_start_sec: (local - longitude_deg / 15.0 * 3600.0).rem_euclid(DAY_SECONDS),
+            longitude_deg,
+        })
+    }
+
     /// Seconds after zulu midnight at simulation time `t` (wraps at 24 h).
     pub fn zulu_sec(&self, t: f64) -> f64 {
         (self.zulu_start_sec + t).rem_euclid(DAY_SECONDS)
@@ -71,6 +99,32 @@ impl SimClock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_start_time_round_trips_through_the_longitude() {
+        let c = SimClock::from_local("10-29 07:29", 132.0).unwrap();
+        assert!((c.local_sec(0.0) - (7.0 * 3600.0 + 29.0 * 60.0)).abs() < 1e-6);
+        assert_eq!(
+            c.dataref("sim/cockpit2/clock_timer/local_time_hours", 0.0),
+            Some(7.0)
+        );
+        assert_eq!(
+            c.dataref("sim/cockpit2/clock_timer/local_time_minutes", 0.0),
+            Some(29.0)
+        );
+        assert_eq!((c.month, c.day), (10, 29));
+        for bad in [
+            "",
+            "10-29",
+            "13-01 00:00",
+            "10-32 00:00",
+            "10-29 24:00",
+            "10-29 07:60",
+            "a-b c:d",
+        ] {
+            assert!(SimClock::from_local(bad, 0.0).is_err(), "{bad}");
+        }
+    }
 
     #[test]
     fn zulu_and_local_wrap_and_split_into_fields() {

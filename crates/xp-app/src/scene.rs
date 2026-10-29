@@ -1471,6 +1471,11 @@ pub fn airport_flight(
     // Local clock time follows the airport longitude; the scenario date/time itself is still the
     // SimClock placeholder.
     model.clock.longitude_deg = frame.origin()[1];
+    // OPENXPLANE_START_TIME="MM-DD HH:MM" sets the local start time shown by the clock datarefs.
+    if let Ok(text) = std::env::var("OPENXPLANE_START_TIME") {
+        model.clock = openxplane::clock::SimClock::from_local(&text, frame.origin()[1])
+            .map_err(|e| format!("OPENXPLANE_START_TIME: {e}"))?;
+    }
     let mut direction = Vec3::new(ux, 0.0, uz);
     let mut position = [a[0] + ux * 150.0, a[1] + uz * 150.0];
     // OPENXPLANE_START=ramp starts on the first apt.dat start location (row 1300) that allows
