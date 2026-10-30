@@ -49,3 +49,6 @@ sits in the reference tree), a started flight of the stock Cessna 172 SP at a kn
 control sequence, and the resulting `Data.txt` paired with the port's `FlightModel` driven by the same inputs
 and time step. None of this was done; the Phase 1 exit check (recorded Cessna trajectories matching within a
 stated tolerance) remains unmet.
+
+## Data Output route confirmed (2026-10-30)
+With `_Bdisk0,1,3,4,17,18,20` set to 1 in `Output/preferences/X-Plane.prf` and a flight loaded ("Resume last flight"), the reference writes `Data.txt` in the install root: a 1.6 MB table within about a minute, with a header row of column names (`f-act,/sec`, `Vind,kias`, `VVI,fpm`, `pitch,deg`, `hding,true`, `alpha,deg`, `lat/lon`, `CG,ftMSL`, ...) and one fixed-width row per sample. This settles the earlier "unverified that they write Data.txt". The resumed flight was parked at UHWW in a glass-cockpit aircraft that was not identified as the Cessna 172 SP, so no C172 trajectory exists yet; the prefs file was restored from backup afterwards (hash unchanged).
