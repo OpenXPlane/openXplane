@@ -2956,10 +2956,7 @@ pub fn magnetic_variation(vm: &Vm, table: u64, a: f32, b: f32) -> f32 {
         (t as i32).wrapping_mul(5)
     };
     let lat = floor5(a).clamp(-90, 90);
-    let lon = {
-        let v = floor5(b);
-        if v < -180 { -180 } else { v.min(175) }
-    };
+    let lon = floor5(b).clamp(-180, 175);
     let row = ((90 - lat) / 5).clamp(1, 36) as u64;
     let col = ((lon + 180) / 5).clamp(0, 71) as u64;
     let at = |r: u64, c: u64| -vm.f32(table + 4 + 4 * (r * 72 + c % 72));
