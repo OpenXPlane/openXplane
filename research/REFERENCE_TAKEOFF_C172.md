@@ -102,3 +102,12 @@ of the hard-coded (0, 0, -1.6) m; the CG is at y = 0.09 m, so the thrust line li
 small. Effect on the hands-off run: with trim 0.24 the port now lifts off 36.4 s after the start (86 kt); with 0.07 it
 still does not lift. The missing nose-up moment is therefore not in the thrust line. Candidates left: the
 nose-gear load/strut model and the stabilizer/elevator lift model.
+
+## Elevator effectiveness instead of a fitted trim
+Sweeping the control effectiveness constant with the original's trim of 0.07: 1.3 → liftoff after 48.8 s at 100 kt,
+2.0 → 36.5 s at 89 kt, 2.5 → 31.8 s at 83 kt; the original 33.8 s at 86 kt. The elevator now uses 2.2 (the other
+controls stay at 0.65): the port lifts off 34.4 s after the roll starts at 86.7 kt, and its pitch swing has the
+original's period (about 25 s; peaks 5-10 s and 30 s after liftoff) but still about half the amplitude (VVI 1085
+against 2000 fpm, pitch 12 against 18 degrees). 2.2/0.65 = 3.4 is the same factor as 0.24/0.07, so the earlier
+trim fit and this one are the same finding: the port's elevator authority is 3.4 times too low. Whether the other
+controls need the same factor is untested (no recording with aileron or rudder input yet), flaps keep 0.65.

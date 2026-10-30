@@ -477,13 +477,13 @@ fn full_throttle_roll_follows_the_recorded_original() {
 
 /// Hands-off takeoff against `research/reference/c172_noinput_uhww_20261030.csv`: full power, no yoke input.
 /// The original lifts off 33.8 s after the roll starts at 86 kias and then swings in pitch between about 3 and
-/// 18 degrees with a period near 25 s. The elevator trim of 0.24 is a fit to that liftoff (the original's
-/// start trim is not read yet), so this pins the fit, not the original's pitch model.
+/// 18 degrees with a period near 25 s. The trim of 0.07 is the original's (read from Data Output); the elevator effectiveness behind
+/// the liftoff is a fit, so this pins the fit, not the original's pitch model.
 #[test]
 fn hands_off_takeoff_lifts_off_near_the_recorded_original() {
     let Some(mut m) = model() else { return };
     let mut c = Controls {
-        elevator_trim: 0.24,
+        elevator_trim: 0.07,
         ..Default::default()
     };
     let dt = 1.0 / 200.0;

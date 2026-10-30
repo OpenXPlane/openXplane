@@ -565,10 +565,10 @@ difference remains an unresolved difference for the 1:1 goal, see `PARITY_ACCEPT
 | Stage | Quantity | Tolerance | Status |
 |---|---|---|---|
 | Takeoff roll | time to 20/40/55/60/70 kt | 1.0 s | met (mean 0.6 s), test `full_throttle_roll_follows_the_recorded_original` allows 2 s |
-| Liftoff | time since the roll starts, IAS | 4 s, 5 kt | met only with elevator trim 0.24 (a fit; the original has 0.07), test `hands_off_takeoff_lifts_off_near_the_recorded_original` |
+| Liftoff | time since the roll starts, IAS | 4 s, 5 kt | met with the original's start trim 0.07 (port 34.4 s, 86.7 kt; original 33.8 s, 86.3 kt) through an elevator effectiveness factor fitted to it, test `hands_off_takeoff_lifts_off_near_the_recorded_original` |
 | Climb | pitch swing amplitude and period, VVI | amplitude 25 %, period 20 % | **not met**: the port's swing is about half the original's |
 | Cruise | trimmed IAS and VVI after the swing damps | 3 kt, 100 fpm | not recorded |
 | Stall | stall IAS, pitch at the break | 3 kt, 3 deg | not recorded |
 | Landing | touchdown IAS and sink rate, roll-out distance | 5 kt, 100 fpm, 10 % | not recorded |
 
-The exit check is met only when every row is met with the original's own start trim (0.07), not a fitted one.
+The exit check is met only when every row is met without per-case fits; the elevator effectiveness (2.2 against 0.65 for the other controls) is still a fit.

@@ -45,6 +45,10 @@ const PROP_EFFICIENCY: f32 = 0.78;
 const PROP_SPEED_OFFSET: f32 = 38.0;
 /// Assumed effectiveness of a plain control surface relative to thin-airfoil theory.
 const CONTROL_EFFECTIVENESS: f32 = 0.65;
+/// Elevator effectiveness against the original: with the original's start trim of 0.07 (read from Data Output) the
+/// stock C172 lifts off hands-off after 33.8 s at 86 kias, which the port reproduces with a factor of about 2.2
+/// (0.65 needs a trim of 0.24). A fit; the cause of the difference is not found.
+const ELEVATOR_EFFECTIVENESS: f32 = 2.2;
 /// Scale of the textbook downwash angle 2 CL / (pi AR) at the tail (typically dEps/dAlpha of 0.4-0.5).
 const DOWNWASH_FACTOR: f32 = 1.2;
 /// Assumed destabilising pitching-moment slope of the fuselage per radian of angle of attack,
@@ -851,7 +855,12 @@ impl FlightModel {
                     let theta = (1.0 - 2.0 * cf).acos();
                     let tau = 1.0 - (theta - theta.sin()) / std::f32::consts::PI;
                     let delta = control_deflection(k, ed.side, c, self.controls_range[k], flap_deg);
-                    shift += CONTROL_EFFECTIVENESS * tau * delta * ed.controls[k];
+                    let effectiveness = if k == 1 {
+                        ELEVATOR_EFFECTIVENESS
+                    } else {
+                        CONTROL_EFFECTIVENESS
+                    };
+                    shift += effectiveness * tau * delta * ed.controls[k];
                 }
             }
             // tail surfaces sit in the downwash of the wing, estimated from its lift coefficient one step ago
