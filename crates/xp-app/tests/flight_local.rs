@@ -596,6 +596,13 @@ impl openxplane::vm::Callees for LiveEnv {
             0x141ba6750 => float(15.0),
             0x141ba64e0 => float(1.225),
             0x140984e50 => float(0.0),
+            0x1408be0f0 => float(0.0),
+            0x14067b2f0 => float(1.0),
+            0x1410c9c60 => openxplane::vm::Reply {
+                rax: 0x6f00_0010_0000,
+                xmm0: 0,
+            },
+            0x14117c380 => openxplane::vm::Reply { rax: 0, xmm0: 0 },
             _ => {
                 self.unknown.push(address);
                 openxplane::vm::Reply { rax: 0, xmm0: 0 }
@@ -620,6 +627,13 @@ fn original_piston_update_runs_on_the_c172_object() {
     vm.set_f32(f + 0x68, 101_325.0);
     vm.set_f32(f + 0x424, 0.0);
     vm.set_f32(m + 0x4, 1.0);
+    // a running engine at 2400 rpm with the lean/rich response off, the state `gen_piston_vectors.py stock` presets
+    vm.set_u32(m + 0x70, 1);
+    vm.set_u32(m + 0x74, 1);
+    vm.set_f32(m + 0x78, 2400.0);
+    vm.set_f32(m + 0x214, 1.0);
+    vm.set_f32(m + 0x40, 1.0);
+    vm.set_u32(m + 0x48, 3);
     let mut env = LiveEnv {
         dt: 0.005,
         unknown: Vec::new(),

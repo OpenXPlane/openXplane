@@ -228,3 +228,14 @@ region pointers) and two tests on the stock C172:
 Next: preset the running state the way `tools/gen_piston_vectors.py ... stock` does (`piston_stock.txt`), find what
 `0x1408be0f0` returns, and then read `M+0xcc` at full throttle as the engine power the original feeds to the
 propeller.
+
+## Step 1c: with a running-engine preset the original update produces a power
+Answering the remaining callees as the vector generator does (`0x1408be0f0` a float, here 0; `0x14067b2f0` 1.0;
+`0x1410c9c60` a pointer; `0x14117c380` nothing) and presetting `M+0x70 = 1`, `M+0x74 = 1`, `M+0x78 = 2400` (rpm),
+`M+0x214 = 1`, `M+0x40 = 1`, `M+0x48 = 3` (the state of `gen_piston_vectors.py stock`), the update on the C172 object
+leaves `M+0xcc = 22518 W` and `M+0x90 = 916.7` (what unit this is is not known; the return value is `inf`) at full
+throttle and zero lever response state. 22.5 kW is 17 % of the 132.7 kW rating, so the state is not the original's
+steady full-power state: `M+0x210` (the lever response weight in `M+0xcc = engine_lever * M+0x210 + ...`), the
+speed `M+0x78` (which the update does not advance by itself: the propeller side integrates it) and the manifold terms
+(`M+0x24c = 0.75`) are still preset values. The values do not change over 2000 steps because nothing integrates the
+engine speed. Getting the steady state requires the propeller force (`prop_force`) in the loop, which is the next piece.
