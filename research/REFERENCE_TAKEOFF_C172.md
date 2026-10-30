@@ -41,7 +41,25 @@ pulled gently at 22 s and returned to the centre at 45 s. Data Output flags as b
   4.2/10.9/16.5/18.6/23.1 s in the first recording: the original's roll is reproducible to 0.2 s even at night and
   with different pilot timing, so the roll reference is sound and the calibration above holds against both runs.
 - **Liftoff** (gear height above 0.5 ft) 33.9 s after the roll started at 86 kias, pitch 2.9°.
-- **Climb** with a mouse yoke is a phugoid driven by the pilot (pitch 3°→18°→3°, IAS 68–90 kt, VVI 0–2000 fpm over
-  60 s, 836 ft at 60 s), so this stretch is **not** a trajectory that the port can be compared with sample by
-  sample: the inputs were not recorded. It becomes usable only when the controls are logged with it or replaced by
-  a fixed trim/step input. Cruise, stall and landing are still not recorded; Phase 1's exit check stays open.
+- **Climb** (pitch 3°→18°→3°, IAS 68–90 kt, VVI 0–2000 fpm over 60 s, 836 ft at 60 s): see the correction below,
+  the mouse yoke did not act, so this is the free response of the aircraft.
+
+## Third recording: no control input at all, and the first real mismatch of the port
+The same flight again with **no** yoke movement (the script only starts the engines, releases the brake, `F3`).
+The result equals the second recording within 0.2 s and 1–2 ft per 5 s (roll 4.2/10.9/16.4/18.5/23.1 s, liftoff
+33.8 s at 86 kias, 783 ft at 60 s after liftoff against 770 ft), so the mouse yoke of the second run never acted:
+the climb above is the aircraft's own, reproducible response to trim and full power with a free stick. That makes
+it a usable reference (`research/reference/c172_noinput_uhww_20261030.csv`, 1 s steps).
+
+The port (`fly-test`, same procedure, 140 s) does **not** reproduce it:
+
+| | Reference | Port |
+|---|---|---|
+| liftoff | 33.8 s after the roll starts, 86 kias, pitch 2.9° | 24.1 s, 67 kt |
+| after liftoff | pitch 11° → 18° → 3° → 12° → 15°, IAS 68–90 kt, VVI 0–2000 fpm (a damped phugoid-like swing, period about 25 s) | monotone: pitch 7.2°, IAS 86 kt, VVI 490 fpm from about 60 s |
+| altitude 60 s after liftoff | 770–857 ft | about 850 ft at 114 s |
+
+Two differences stand out: the original holds the nose wheel down until 86 kias (the port lifts at 67 kt), so the
+pitch moment at the start (trim, elevator, ground handling) is not that of the original; and the port has far
+too little pitch dynamics (no oscillation), so its longitudinal damping/stability differs. Neither is fitted. The
+Phase 1 exit check stays open; cruise, stall and landing are not recorded.
