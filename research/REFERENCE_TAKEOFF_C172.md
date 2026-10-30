@@ -162,3 +162,12 @@ What it did show is that the "growing phugoid into a dive" is a **spiral**, not 
 The port stays wings level for 190 s because it has no propeller torque, p-factor, slipstream rotation or gyroscopic
 effect: its model is symmetric. That is the actual difference behind the divergence; it is a Phase 1 gap
 (propeller and engine effects on the airframe), and the pitch comparison above holds only up to about 60 s after liftoff.
+
+## Tried and discarded: a plain engine torque roll moment
+Adding the full reaction torque `P / (2π n)` (470 N·m at 178 hp and 2700 rpm) as a roll moment about the body axis,
+in either sign, rolls the port 37° within 10 s of liftoff and then the wing dihedral rolls it back to about 1° with the
+heading settled on a constant value: a bounded response with a steady heading, not the original's slow, continuing,
+one-sided bank (1.6° at 54 s, 8° at 72 s, 44° at 100 s). The original's spiral needs (a) a much smaller or partly
+trimmed asymmetric effect and (b) a spiral mode that is neutral to unstable (the port's is stable). Both are open and
+need either the recovered propeller forces (blade-element code, not connected) or a recording with aileron and rudder
+inputs to separate the effects. Not kept.
