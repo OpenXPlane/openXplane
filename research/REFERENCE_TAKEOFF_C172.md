@@ -126,3 +126,14 @@ phugoid is neutrally stable or growing), whereas the port's is damped within abo
 damping is too high or its speed stability (the change of pitch moment with speed) too strong; the amplitude
 mismatch of the climb is the early part of the same difference. Next test: reduce the damping contribution of
 the tail (pitch-rate arm) and the wing downwash lag and see whether the first peak and the growth follow.
+
+## Joint fit of downwash and elevator effectiveness
+The downwash factor on the tail (`DOWNWASH_FACTOR`) has a strong effect on both liftoff and the swing: 0.0 → no liftoff
+before 75 s, 0.6 → 47 s, 2.0 → 29 s with a swing that does not damp at all. A joint sweep with the original's trim
+0.07: (downwash, elevator effectiveness) = (1.5, 1.9) gives liftoff 33.5 s after the roll at 85.6 kt (original
+33.8 s, 86.3 kt) and pitch peaks 16.3° (43 s), 15.3° (63 s), 13.5° (83 s) against the original's 16.5° (42-47 s), 14.6°
+(67 s), then its dive from 95 s on. (1.6, 1.9) overshoots to 18.9°; (1.5, 1.6) lifts off at 89 kt after 39 s. The
+first peak and the period now match; the original's later growth of the swing into a dive does not (the port keeps
+swinging between 6° and 12° with only slow damping). Both factors are fits; the elevator effectiveness is still 1.9/0.65
+= 2.9 times the other controls' constant, so the reason is probably not one constant but how the tail sees the wing's
+flow (the downwash model is the part of the port that is invented, not recovered).

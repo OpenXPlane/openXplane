@@ -521,7 +521,7 @@ fn hands_off_takeoff_lifts_off_near_the_recorded_original() {
         "liftoff at {kt} kt, original 86 kt"
     );
     assert!(
-        max_pitch - min_pitch > 6.0,
-        "pitch stays within {min_pitch}..{max_pitch}, the original swings by about 15 degrees"
+        (12.5..20.5).contains(&max_pitch) && min_pitch < 5.0,
+        "pitch swings {min_pitch}..{max_pitch}, the original 2.2..16.5 degrees"
     );
 }
