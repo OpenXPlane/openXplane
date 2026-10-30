@@ -79,6 +79,13 @@ def main():
             fz.preset('B', 0x9f4, struct.unpack('<I', struct.pack('<f', rng.choice([0.0, rng.uniform(100.0, 800.0)])))[0])
             fz.preset('M', 0x74, 1)
             fz.preset('M', 0x6c, rng.choice([0, 1]))
+            f32 = lambda v: struct.unpack('<I', struct.pack('<f', v))[0]
+            # state near the temperature breakpoints and thresholds, and a lever across its range
+            fz.preset('M', 0x214, f32(rng.uniform(0.0, 1.6)))
+            fz.preset('M', 0x40, f32(rng.uniform(0.0, 1.0)))
+            fz.preset('M', 4, f32(rng.uniform(0.0, 1.0)))
+            fz.preset('M', 0x78, f32(rng.uniform(0.0, 3000.0)))
+            fz.preset('M', 0x48, rng.choice([0, 1, 2, 3]))
         fz.preset('B', 0x990, rng.choice([0, 0, 1, 1, 2]))
         fz.preset('B', 0xa9c, rng.choice([0, 2, 3, 3, 2]))
         fz.preset('B', 0xc24, rng.choice([0, 1]))
