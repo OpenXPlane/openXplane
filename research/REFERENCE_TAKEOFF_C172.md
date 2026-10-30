@@ -63,3 +63,16 @@ Two differences stand out: the original holds the nose wheel down until 86 kias 
 pitch moment at the start (trim, elevator, ground handling) is not that of the original; and the port has far
 too little pitch dynamics (no oscillation), so its longitudinal damping/stability differs. Neither is fitted. The
 Phase 1 exit check stays open; cruise, stall and landing are not recorded.
+
+## Why the first comparison was wrong, and the trim fit
+`fly-test` drove the port with `takeoff_pilot` (rotation at 55 kt, pitch held), so the table above compared a
+scripted pilot with a hands-off original. With the new `OPENXPLANE_HANDS_OFF=1` (full power after 2 s, no other
+input; `OPENXPLANE_ELEVATOR_TRIM=<x>` sets the trim) and zero trim the port never leaves the ground (116 kt on the
+runway), while the original lifts at 86 kias: the original starts with nose-up trim. Port hands-off liftoff
+against trim (since the roll starts): 0.20 → 91 kt, 0.22 → 88 kt after 35.7 s, 0.25 → 85 kt after 33.0 s,
+0.30 → 80 kt after 29.5 s; original 86 kt after 33.8 s, so the fit is trim ≈ 0.24. With it the port also swings
+in pitch like the original (VVI peaks about 1050 fpm, 13° at 10 s and 30 s after liftoff, period 20 s; original
+2000 fpm, 18°, period about 25 s), so the shape is right and the damping/amplitude is not: the port's swing is
+about half the original's. The trim of 0.24 is fitted, not read from the original; where the original takes its
+start trim from is open. Test: `hands_off_takeoff_lifts_off_near_the_recorded_original` (liftoff within 4 s and 5 kt,
+pitch swing above 6°).

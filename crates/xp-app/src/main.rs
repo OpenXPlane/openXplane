@@ -417,6 +417,13 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         let mut c = openxplane::flight::Controls::default();
         let dt = 1.0 / 200.0;
         let mut liftoff = None;
+        let hands_off = std::env::var_os("OPENXPLANE_HANDS_OFF").is_some();
+        if let Some(trim) = std::env::var("OPENXPLANE_ELEVATOR_TRIM")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            c.elevator_trim = trim;
+        }
         // OPENXPLANE_TRAJECTORY_CSV=<file> writes one row every 0.1 s of simulated time with the columns
         // of the matching X-Plane Data Output lines (3 airspeed, 4 vertical speed, 17 attitude and
         // heading, 18 alpha, 20 altitude), for pairing with a recorded reference run.
@@ -453,7 +460,15 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                     u8::from(t.on_ground)
                 )?;
             }
-            openxplane::flight::takeoff_pilot(&model, &mut c);
+            // OPENXPLANE_HANDS_OFF=1: full power after two seconds and no other input, as in the
+            // reference recording `research/reference/c172_noinput_uhww_20261030.csv`.
+            if hands_off {
+                if model.state.time > 2.0 {
+                    c.throttle = 1.0;
+                }
+            } else {
+                openxplane::flight::takeoff_pilot(&model, &mut c);
+            }
             if !t.on_ground && liftoff.is_none() {
                 liftoff = Some((model.state.time, t.airspeed_kt));
             }

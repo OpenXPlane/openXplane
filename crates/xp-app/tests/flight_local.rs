@@ -474,3 +474,54 @@ fn full_throttle_roll_follows_the_recorded_original() {
         );
     }
 }
+
+/// Hands-off takeoff against `research/reference/c172_noinput_uhww_20261030.csv`: full power, no yoke input.
+/// The original lifts off 33.8 s after the roll starts at 86 kias and then swings in pitch between about 3 and
+/// 18 degrees with a period near 25 s. The elevator trim of 0.24 is a fit to that liftoff (the original's
+/// start trim is not read yet), so this pins the fit, not the original's pitch model.
+#[test]
+fn hands_off_takeoff_lifts_off_near_the_recorded_original() {
+    let Some(mut m) = model() else { return };
+    let mut c = Controls {
+        elevator_trim: 0.24,
+        ..Default::default()
+    };
+    let dt = 1.0 / 200.0;
+    let (mut rolling, mut liftoff) = (None, None);
+    let (mut min_pitch, mut max_pitch) = (f32::MAX, f32::MIN);
+    for step in 0..(90.0 / dt) as usize {
+        let time = step as f32 * dt;
+        if time > 2.0 {
+            c.throttle = 1.0;
+        }
+        let t = m.telemetry(&c);
+        if rolling.is_none() && t.airspeed_kt > 1.0 {
+            rolling = Some(time);
+        }
+        if let (Some(start), None) = (rolling, liftoff)
+            && !t.on_ground
+        {
+            liftoff = Some((time - start, t.airspeed_kt));
+        }
+        if let Some((since, _)) = liftoff
+            && time - rolling.unwrap() - since > 5.0
+        {
+            min_pitch = min_pitch.min(t.pitch_deg);
+            max_pitch = max_pitch.max(t.pitch_deg);
+        }
+        m.step(dt, &c);
+    }
+    let (since, kt) = liftoff.expect("no liftoff");
+    assert!(
+        (since - 33.8).abs() < 4.0,
+        "liftoff {since} s, original 33.8 s"
+    );
+    assert!(
+        (kt - 86.0).abs() < 5.0,
+        "liftoff at {kt} kt, original 86 kt"
+    );
+    assert!(
+        max_pitch - min_pitch > 6.0,
+        "pitch stays within {min_pitch}..{max_pitch}, the original swings by about 15 degrees"
+    );
+}
