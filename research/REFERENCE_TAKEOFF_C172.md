@@ -145,3 +145,20 @@ after 190 s). So the damping that the original lacks is not the tail's pitch-rat
 part of the phugoid (drag and thrust against speed, lift against speed). The open candidates are the thrust law
 (`T = min(cap, eta P / (V + 38))` falls with speed more or less than the original's propeller does; the native
 propeller code is not connected yet) and the drag model.
+
+## Fifth recording (planned stall attempt): what it showed instead
+The script pressed `F1` ten times after the liftoff (the throttle only fell from 1.00 to 0.97: one `F1` step is
+0.3 %, not 10 %) and then `]` thirty times (the pitch trim stayed at 0.07, so these keys do not trim in this
+configuration). The run was therefore a fourth hands-off full-throttle flight, and it did not produce a stall.
+Its excerpt is `research/reference/c172_handsoff_spiral_uhww_20261030.csv` (1 s steps, first 150 s after the roll).
+
+What it did show is that the "growing phugoid into a dive" is a **spiral**, not a longitudinal instability:
+- liftoff 38 s after the roll at 88 kt (the earlier runs 33.8 s / 86 kt: the take-off varies by a few seconds from run to
+  run, the roll times stay within 0.2 s);
+- from the roll start the bank grows slowly and one-sided: 1.6° at 54 s, 7.8° at 72 s, 17° at 82 s, 32° at 95 s, 44° at
+  100 s, 58° at 120 s (peak), heading turning through 360° by 120 s, while the pitch swing continues; speed rises to
+  130 kt, VVI -1600 fpm, and the aircraft hits the ground about 142 s after the roll started;
+- sideslip stays at -0.3° to -0.8°, so the bank is not driven by a yaw input (there is none).
+The port stays wings level for 190 s because it has no propeller torque, p-factor, slipstream rotation or gyroscopic
+effect: its model is symmetric. That is the actual difference behind the divergence; it is a Phase 1 gap
+(propeller and engine effects on the airframe), and the pitch comparison above holds only up to about 60 s after liftoff.
