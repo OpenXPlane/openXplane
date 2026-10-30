@@ -214,3 +214,17 @@ record `E` (region `R5ff8`) reads, in the original's own units (test `engine_rec
 `E+0x18` = 282.74 rad/s (2700 rpm), `E+0x64` = 1.0, and the engine part point `E+0x4c..0x54` = (0, -0.061, -2.018) m
 relative to the CG (the thrust point the port now uses, in agreement with the earlier hand calculation). The
 `F`/`B` objects and the part record `P` are the remaining pieces of step 1.
+
+## Step 1b: the original's engine code runs on an object from the ACF (not yet producing power)
+`crates/xp-app/tests/flight_local.rs` now has `vm_from_acf_object` (the words of `load_object` laid into a `Vm` with the
+region pointers) and two tests on the stock C172:
+- `original_engine_lever_runs_on_the_c172_object`: `engine_small::engine_lever` gives exactly `E+4 * B+0xb08`, i.e.
+  132735 W times the throttle word, so the original's power command for kind 2 is the 178 hp rating times the lever.
+- `original_piston_update_runs_on_the_c172_object`: `update_engine_piston` (power stage, lever stage, kind 1/2
+  handler) runs 2000 steps of 5 ms against a sea-level environment (`LiveEnv`: frame time, bindings 0, 15 °C, 1.225
+  kg/m³, noise 0). Result so far: `M+0x24c = M+0x258 = 0.75` (power/density term at full throttle), `M+0x22c = 1`,
+  but `M+0xcc` (engine power) and `M+0x90` (speed) stay 0 and the return value is NaN: the engine is not running
+  (no start state, starter and fuel flags not set) and one callee, `0x1408be0f0`, is not answered by `LiveEnv`.
+Next: preset the running state the way `tools/gen_piston_vectors.py ... stock` does (`piston_stock.txt`), find what
+`0x1408be0f0` returns, and then read `M+0xcc` at full throttle as the engine power the original feeds to the
+propeller.

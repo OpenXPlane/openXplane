@@ -525,3 +525,120 @@ fn hands_off_takeoff_lifts_off_near_the_recorded_original() {
         "pitch swings {min_pitch}..{max_pitch}, the original 2.2..16.5 degrees"
     );
 }
+
+/// Lays the words of the ACF loader into an emulator memory: the aircraft object `B` at `0x1_0000_0000` and every
+/// pointed-to region (`R5ff8` engines, ...) at its own base with the pointer stored at `B + offset`.
+fn vm_from_acf_object(acf_path: &str) -> (openxplane::vm::Vm, u64) {
+    use xp_acf::object::{Schema, load_object};
+    let acf = openxplane::Aircraft::parse(&std::fs::read_to_string(acf_path).unwrap()).unwrap();
+    let object = load_object(&acf, &Schema::load());
+    let mut vm = openxplane::vm::Vm::default();
+    let b = 0x1_0000_0000u64;
+    for (i, (region, words)) in object.regions.iter().enumerate() {
+        let base = if region == "B" {
+            b
+        } else {
+            let offset = u32::from_str_radix(region.trim_start_matches('R'), 16).unwrap();
+            let base = 0x2_0000_0000u64 + (i as u64) * 0x100_0000;
+            vm.set_u64(b + u64::from(offset), base);
+            base
+        };
+        for (offset, word) in words {
+            vm.set_u32(base + u64::from(*offset), *word);
+        }
+    }
+    (vm, b)
+}
+
+/// The original's engine lever term for the stock C172 (`engine_small::engine_lever`, kind 2: `E+4 * B+0xb08`) on an
+/// aircraft object that comes from the installed ACF: the power command in watts is the 178 hp rating times the
+/// throttle word.
+#[test]
+fn original_engine_lever_runs_on_the_c172_object() {
+    let Ok(path) = std::env::var("OPENXPLANE_REFERENCE_AIRCRAFT") else {
+        return;
+    };
+    let (mut vm, b) = vm_from_acf_object(&path);
+    vm.set_f32(b + 0xb08, 0.5);
+    let watts = openxplane::engine_small::engine_lever(&vm, b, 0);
+    assert!(
+        (watts - 0.5 * 132_734.6).abs() < 1.0,
+        "{watts} W, expected {}",
+        0.5 * 132_734.6
+    );
+    vm.set_f32(b + 0xb08, 1.0);
+    assert!((openxplane::engine_small::engine_lever(&vm, b, 0) - 132_734.6).abs() < 1.0);
+}
+
+/// Answers the original's environment calls with a fixed sea-level standard day and a fixed step.
+struct LiveEnv {
+    dt: f64,
+    unknown: Vec<u64>,
+}
+
+impl openxplane::vm::Callees for LiveEnv {
+    fn call(
+        &mut self,
+        _vm: &mut openxplane::vm::Vm,
+        address: u64,
+        _args: openxplane::vm::CallArgs,
+    ) -> openxplane::vm::Reply {
+        let float = |v: f32| openxplane::vm::Reply {
+            rax: 0,
+            xmm0: u64::from(v.to_bits()),
+        };
+        match address {
+            0x140c448c0 => openxplane::vm::Reply {
+                rax: 0,
+                xmm0: self.dt.to_bits(),
+            },
+            0x1407ace10 | 0x1417f12c0 => openxplane::vm::Reply { rax: 0, xmm0: 0 },
+            0x141ba6750 => float(15.0),
+            0x141ba64e0 => float(1.225),
+            0x140984e50 => float(0.0),
+            _ => {
+                self.unknown.push(address);
+                openxplane::vm::Reply { rax: 0, xmm0: 0 }
+            }
+        }
+    }
+}
+
+/// Runs the original's piston update (`update_engine_piston`, the native stages behind the emulator adapters) on the
+/// C172 object for a few seconds at full throttle and prints what it produces; the callee addresses it needs that
+/// the environment does not answer are listed.
+#[test]
+fn original_piston_update_runs_on_the_c172_object() {
+    let Ok(path) = std::env::var("OPENXPLANE_REFERENCE_AIRCRAFT") else {
+        return;
+    };
+    let (mut vm, b) = vm_from_acf_object(&path);
+    let (f, m, inputs) = (0x4_0000_0000u64, 0x5_0000_0000u64, 0x6_0000_0000u64);
+    vm.set_u64(f + 0x20, b);
+    vm.set_f32(b + 0xb08, 1.0);
+    vm.set_f32(f + 0xb7a8, 1.0);
+    vm.set_f32(f + 0x68, 101_325.0);
+    vm.set_f32(f + 0x424, 0.0);
+    vm.set_f32(m + 0x4, 1.0);
+    let mut env = LiveEnv {
+        dt: 0.005,
+        unknown: Vec::new(),
+    };
+    let mut last = 0.0;
+    for step in 0..2000 {
+        last = openxplane::piston::update_engine_piston(&mut vm, &mut env, m, f, 0, inputs);
+        if step % 400 == 0 {
+            eprintln!(
+                "step {step}: ret {last}, M+0xcc {}, M+0x90 {}, M+0x24c {}, M+0x258 {}, M+0x22c {}",
+                vm.f32(m + 0xcc),
+                vm.f32(m + 0x90),
+                vm.f32(m + 0x24c),
+                vm.f32(m + 0x258),
+                vm.f32(m + 0x22c)
+            );
+        }
+    }
+    env.unknown.sort_unstable();
+    env.unknown.dedup();
+    eprintln!("unanswered callees: {:x?}, last return {last}", env.unknown);
+}
