@@ -173,6 +173,8 @@ pub struct FlightModel {
     pub mass: f32,
     pub inertia: Vec3,
     pub cg: Vec3,
+    /// Where the propeller thrust acts (`_engn/0/_part_x/y/z`), in the aircraft frame.
+    pub thrust_point: Vec3,
     pub state: State,
     pub gears: Vec<Gear>,
     pub elevation_m: f32,
@@ -546,6 +548,13 @@ impl FlightModel {
             mass,
             inertia, // (x: pitch axis, y: yaw axis, z: roll axis)
             cg: Vec3::new(0.0, params.cg_y_acf_m, params.cg_z_acf_m),
+            thrust_point: {
+                let part = |k: &str| acf.float_property(&format!("_engn/0/_part_{k}")).ok();
+                match (part("x"), part("y"), part("z")) {
+                    (Some(x), Some(y), Some(z)) => Vec3::new(x, y, z) * ACF_FT_TO_M,
+                    _ => Vec3::new(0.0, 0.0, -1.6),
+                }
+            },
             state: State {
                 position: Vec3::new(0.0, 2.0, 0.0),
                 velocity: Vec3::ZERO,
@@ -992,7 +1001,7 @@ impl FlightModel {
         let static_cap = STATIC_THRUST * (power / self.max_power_w).powf(2.0 / 3.0);
         let thrust = (PROP_EFFICIENCY * power / (forward + PROP_SPEED_OFFSET)).min(static_cap);
         force_b += Vec3::NEG_Z * thrust;
-        moment_b += (Vec3::new(0.0, 0.0, -1.6) - self.cg).cross(Vec3::NEG_Z * thrust);
+        moment_b += (self.thrust_point - self.cg).cross(Vec3::NEG_Z * thrust);
 
         // landing gear
         let mut force_w = rot * force_b;

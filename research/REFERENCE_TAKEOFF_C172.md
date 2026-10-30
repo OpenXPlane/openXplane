@@ -95,3 +95,10 @@ after 75 s) and lowers the pitch swing (VVI peak about 1000 fpm, pitch 11°), so
 0.07 and was not kept. The remaining candidates: the thrust line height against the CG (the port puts the
 thrust at y=0 while the CG is at 0.30 m; the ACF fields with the engine position were not found by name in a first
 grep), ground contact (nose gear load and tire/strut model), and the elevator/stabilizer lift model.
+
+## Thrust point read from the ACF
+The thrust now acts at the engine part position `_engn/0/_part_x/y/z` (0, 0.1, -3.72 ft = 0, 0.03, -1.13 m) instead
+of the hard-coded (0, 0, -1.6) m; the CG is at y = 0.09 m, so the thrust line lies only 0.06 m below it and the moment is
+small. Effect on the hands-off run: with trim 0.24 the port now lifts off 36.4 s after the start (86 kt); with 0.07 it
+still does not lift. The missing nose-up moment is therefore not in the thrust line. Candidates left: the
+nose-gear load/strut model and the stabilizer/elevator lift model.
