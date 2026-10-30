@@ -205,3 +205,12 @@ Route that keeps 1:1 checks (not started):
 3. Compare against the four hands-off recordings: roll times (0.2 s reproducibility), liftoff, bank growth.
 The first concrete task is step 1: a test that loads the C172 through `flight_init` and prints the `E` and `P` records,
 so the emulator-memory objects are proven to exist for the stock aircraft before anything is wired.
+
+## Step 1 done: the engine record of the C172 from the ACF loader (units confirmed)
+`xp_acf::object::load_object` now stores the engine kind word `E+0` from `_engn/n/_type` (`ELE` 0, `RCP_CRB` 1,
+`RCP_INJ` 2, `TRB_FRE` 3, `TRB_FIX` 4; it was left at 0 before, i.e. an electric engine). For the stock C172 SP the
+record `E` (region `R5ff8`) reads, in the original's own units (test `engine_record_local`, needs the installed ACF):
+`E+0` = 2, `E+4` = 132734.6 (**178 hp in watts**, so the unit guess above was right), `E+0x14` = 261.80 rad/s (2500 rpm),
+`E+0x18` = 282.74 rad/s (2700 rpm), `E+0x64` = 1.0, and the engine part point `E+0x4c..0x54` = (0, -0.061, -2.018) m
+relative to the CG (the thrust point the port now uses, in agreement with the earlier hand calculation). The
+`F`/`B` objects and the part record `P` are the remaining pieces of step 1.

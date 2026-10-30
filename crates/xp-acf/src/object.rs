@@ -333,6 +333,30 @@ pub fn load_object(acf: &Aircraft, schema: &Schema) -> ObjectWords {
             store(&mut words, &e.region, *offset, word);
         }
     }
+    // The engine kind word `E+0` of every engine record (stride 0x68): the type string of the ACF mapped through the
+    // original's table (`research/FLIGHT_STEP.md`: `ELE` 0, `RCP_CRB` 1, `RCP_INJ` 2, `TRB_FRE` 3, `TRB_FIX` 4; the jet
+    // kinds that follow are not mapped here).
+    for p in &acf.properties {
+        let Some(rest) = p.key.strip_prefix("_engn/") else {
+            continue;
+        };
+        let Some((index, "_type")) = rest.split_once('/') else {
+            continue;
+        };
+        let (Ok(index), Some(kind)) = (
+            index.parse::<u32>(),
+            ["ELE", "RCP_CRB", "RCP_INJ", "TRB_FRE", "TRB_FIX"]
+                .iter()
+                .position(|name| *name == p.value.trim()),
+        ) else {
+            continue;
+        };
+        words
+            .regions
+            .entry("R5ff8".to_string())
+            .or_default()
+            .insert(index * 0x68, kind as u32);
+    }
     // Original wing-loader tail 0x141aae9ee..0x141aaea17: the reader loads
     // all eleven rib values, then only 0..=elements is converted to metres.
     // Counts beyond the recovered eleven-rib domain are not modelled here.
