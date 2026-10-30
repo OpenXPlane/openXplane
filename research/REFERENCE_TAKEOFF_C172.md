@@ -137,3 +137,11 @@ first peak and the period now match; the original's later growth of the swing in
 swinging between 6° and 12° with only slow damping). Both factors are fits; the elevator effectiveness is still 1.9/0.65
 = 2.9 times the other controls' constant, so the reason is probably not one constant but how the tail sees the wing's
 flow (the downwash model is the part of the port that is invented, not recovered).
+
+## Rotational damping is not what keeps the port's swing damped
+Scaling the angular-rate term of the flow at every element (the pitch-rate damping of the tail) by 0.5 and by 0 leaves
+liftoff (85 kt) and the first peaks (16.5° / 18.2°) and the slow decay of the swing practically unchanged (still 8-11°
+after 190 s). So the damping that the original lacks is not the tail's pitch-rate damping but the speed-dependent
+part of the phugoid (drag and thrust against speed, lift against speed). The open candidates are the thrust law
+(`T = min(cap, eta P / (V + 38))` falls with speed more or less than the original's propeller does; the native
+propeller code is not connected yet) and the drag model.
