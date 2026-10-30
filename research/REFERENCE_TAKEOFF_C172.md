@@ -30,3 +30,18 @@ straight run does not show.
 
 ## After calibrating the thrust law (same day)
 `PROP_SPEED_OFFSET` raised from 22 to 38 m/s. Roll times, reference vs port: 10 kt 1.7/2.0 s, 20 kt 4.2/4.3, 30 kt 7.5/7.0, 40 kt 10.9/10.1, 50 kt 14.6/13.7, 55 kt 16.5/15.7, 60 kt 18.6/18.0, 70 kt 23.1/24.1: within 1.0 s everywhere (mean 0.62 s), down from 5 s at 70 kt. This is a one-parameter fit to a single recording, not the original propeller model; the regression test `full_throttle_roll_follows_the_recorded_original` allows 2 s. Liftoff, climb and landing are not compared.
+
+## Second recording: roll, liftoff and the first minute of climb (same day, 21:43 UTC+3 session)
+`Resume last flight` (same C172 at UHWW 07L, night), engines started from the Flight menu, `V`, `F3`, mouse yoke
+pulled gently at 22 s and returned to the centre at 45 s. Data Output flags as before, prefs restored (sha256
+`1E75406E…` verified). 6540 samples (20 Hz); excerpt at 1 s steps in `research/reference/c172_climb_uhww_20261030.csv`
+(mission time, IAS, VVI, pitch, alpha, gear height above ground, pressure altitude).
+
+- **The roll repeats.** IAS 20/40/55/60/70 kt came 4.1/10.9/16.3/18.5/23.1 s after the roll started, against
+  4.2/10.9/16.5/18.6/23.1 s in the first recording: the original's roll is reproducible to 0.2 s even at night and
+  with different pilot timing, so the roll reference is sound and the calibration above holds against both runs.
+- **Liftoff** (gear height above 0.5 ft) 33.9 s after the roll started at 86 kias, pitch 2.9°.
+- **Climb** with a mouse yoke is a phugoid driven by the pilot (pitch 3°→18°→3°, IAS 68–90 kt, VVI 0–2000 fpm over
+  60 s, 836 ft at 60 s), so this stretch is **not** a trajectory that the port can be compared with sample by
+  sample: the inputs were not recorded. It becomes usable only when the controls are logged with it or replaced by
+  a fixed trim/step input. Cruise, stall and landing are still not recorded; Phase 1's exit check stays open.
