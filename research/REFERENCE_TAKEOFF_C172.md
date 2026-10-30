@@ -76,3 +76,14 @@ in pitch like the original (VVI peaks about 1050 fpm, 13° at 10 s and 30 s afte
 about half the original's. The trim of 0.24 is fitted, not read from the original; where the original takes its
 start trim from is open. Test: `hands_off_takeoff_lifts_off_near_the_recorded_original` (liftoff within 4 s and 5 kt,
 pitch swing above 6°).
+
+## The original's start trim is read: 0.07, not 0.24
+A fourth hands-off run with Data Output groups 8 and 13 enabled (stick positions, trim, flaps, speedbrakes; 57
+columns, `Data_c172_trim.txt` in the scratch folder, not in the repo) gives, for the whole run from the cold start,
+through the roll and the liftoff: elevator stick 0.00, **elevator trim 0.07**, aileron/rudder trim 0, flap handle
+0. So the original lifts off on its own at 86 kias with a trim of 0.07 and a free stick, whereas the port needs 0.24
+for the same liftoff (and does not leave the ground at 0.07). The fitted 0.24 is therefore a compensation for
+something else missing in the port's pitch balance, about a factor 3.4 in nose-up moment at the tail: the likely
+candidates are the propeller slipstream over the tail (raises elevator effectiveness and tail lift at full power
+and low speed), the wing's downwash on the tail, or the ground effect. None of these is checked yet; the test
+`hands_off_takeoff_lifts_off_near_the_recorded_original` pins the fit, not the cause.
