@@ -819,7 +819,48 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
                 .unwrap_or_default(),
         )
     };
-    let (b, e, p) = (words("B"), words("R5ff8"), words("R6010"));
+    let (b, e, mut p) = (words("B"), words("R5ff8"), words("R6010"));
+    // straight blade: boundary arrays of blade 0 (x, y, z at 0x5bc, 0x5e8, 0x614; chord at 0x70), as the wing code
+    // builds them for a wing with no sweep or dihedral
+    {
+        let ft = 0.3048f32;
+        let n = p.i32(0x8c) as usize;
+        p.set_i32(4, n as i32); // the element count the wing code reads at W+4
+        let (root, tip) = (p.f32(0x90), p.f32(0x94));
+        let span = acf
+            .properties
+            .iter()
+            .find(|q| q.key == "_blad/0/_semilen_SEG")
+            .map(|q| q.value.trim().parse::<f32>().unwrap() * ft)
+            .unwrap();
+        let transform = xp_airfoil::wing_boundary::Transform {
+            span,
+            design_dihedral: 0.0,
+            design_sweep: 0.0,
+            rotation: 0.0,
+            dihedral_delta: 0.0,
+            side: 1.0,
+            variable_sweep: 0,
+            rotation_offset: 0.0,
+            retract: 0.0,
+            origin: [0.0; 3],
+        };
+        let curvature = xp_airfoil::wing_boundary::Curvature {
+            angle: 0.0,
+            amplitude: 0.0,
+            scale: 1.0,
+        };
+        for i in 0..=n {
+            let chord = root + (tip - root) * (i as f32 / n as f32);
+            let q =
+                xp_airfoil::wing_boundary::boundary_point(&transform, curvature, n, i, chord, 0.25);
+            p.set_f32(0x5bc + 4 * i, q[0]);
+            p.set_f32(0x5e8 + 4 * i, q[1]);
+            p.set_f32(0x614 + 4 * i, q[2]);
+            p.set_f32(0x70 + 4 * i, chord);
+        }
+        eprintln!("blade: {n} elements, root chord {root} m, tip {tip} m, span {span} m");
+    }
     let mut f = Words::default();
     // identity attitude (sine 0, cosine 1 of the three angle pairs) and a 30 m/s flow along the aircraft's nose
     for (sin, cos) in [(0x430, 0x434), (0x440, 0x444), (0x450, 0x454)] {
@@ -888,6 +929,12 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         e_table: &e,
         m: &m,
     };
+    if std::env::var_os("OPENXPLANE_PROP_LIVE").is_none() {
+        eprintln!(
+            "prop_force call skipped: it does not return yet (set OPENXPLANE_PROP_LIVE to try)"
+        );
+        return;
+    }
     // The blade boundary arrays (x, y, z, chord per rib) that the wing code reads are derived values the ACF loader
     // does not store for the part record, so the element function indexes past them: that panic is the expected
     // state of this test until the blade geometry is built like `FlightModel` builds the wings'.

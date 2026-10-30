@@ -270,3 +270,12 @@ code indexes are derived values; `FlightModel` computes them for wings ("origina
 them for the blade records of `P`. The test catches the panic and prints it. Next piece: derive the blade boundary arrays
 from `_blad/0/_Croot/_Ctip/_semilen_SEG/_els` and the rib tables the same way as for the wings, store them in `P`, then
 rerun; after that the element forces feed `prop_force` and the `M`/`F` words are the remaining inputs.
+
+## Step 1f: blade boundary arrays filled; the call now does not return
+The test fills blade 0 of `P` like a straight wing: element count at `W+4`, ribs from `wing_boundary::boundary_point` into
+`0x5bc/0x5e8/0x614` and the chord at `0x70` (10 elements, chord 0.102 m to 0.076 m, span 0.975 m). The index panic is gone, but
+`prop_force` then runs for over 10 minutes without returning (killed), so some loop in the propeller or element code
+spins on the still-incomplete `F`/`P`/`X` words (the rest of the wing fields the element function reads, such as the
+control surface gates at `W+0x2fc..`, the flow words of `F`, or the state arrays `X`, are all zero). The call is now gated behind
+`OPENXPLANE_PROP_LIVE` so the suite stays fast. Next: run with `Stop::Segment1..10` to find which segment spins, then fill
+the words it waits on.
