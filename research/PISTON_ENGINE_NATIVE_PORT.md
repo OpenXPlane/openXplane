@@ -253,3 +253,10 @@ accepts the real records. What a physical result still needs, in order:
 3. a real `element_force` for the blade elements: build `wing_element::ElementInputs` from the blade geometry in `P`
    (`_blad/*` rows of the schema live in `R6010`, like the wing code of `FlightModel` does for wings) with the prop
    airfoil (`_afl_file_*`), and answer `ElementCall` with its lift/drag/moment.
+
+### Which words of `F` the recorded vectors set (46 offsets)
+Collected from `prop_1..11.txt`: `28 6c 118 11c 120 170 1cc 1d0 2bc 2d0 2e4 2f8 310 328 350 358 368 36c 370 378 37c 380 384
+388 38c 3cc 3d0 3d4 400 410 414 41c 430 434 440 444 450 454 651c 6520 653c 6540 b7e8 b7ec b7f0 42f54`. Filling the three
+sine/cosine pairs (`430/434`, `440/444`, `450/454`: 0 and 1), `F+0x28 = 1` and a 30 m/s flow in `F+0x370` already changes the
+output record (`R+0x50 = -2.0`, `R+0x58 = -55.87`) but the rest stays NaN until the engine record `M` and the blade
+element forces exist; the meaning of `118/11c/120`, `170`, `1cc/1d0`, `350/358`, `400..41c`, `651c..6540` is not named yet.

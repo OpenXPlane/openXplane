@@ -742,6 +742,13 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     };
     let (b, e, p) = (words("B"), words("R5ff8"), words("R6010"));
     let mut f = Words::default();
+    // identity attitude (sine 0, cosine 1 of the three angle pairs) and a 30 m/s flow along the aircraft's nose
+    for (sin, cos) in [(0x430, 0x434), (0x440, 0x444), (0x450, 0x454)] {
+        f.set_f32(sin, 0.0);
+        f.set_f32(cos, 1.0);
+    }
+    f.set_i32(0x28, 1);
+    f.set_f32(0x370, -30.0);
     let mut r = Words::default();
     let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
     let mut y = Words::default();
