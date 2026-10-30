@@ -111,3 +111,18 @@ original's period (about 25 s; peaks 5-10 s and 30 s after liftoff) but still ab
 against 2000 fpm, pitch 12 against 18 degrees). 2.2/0.65 = 3.4 is the same factor as 0.24/0.07, so the earlier
 trim fit and this one are the same finding: the port's elevator authority is 3.4 times too low. Whether the other
 controls need the same factor is untested (no recording with aileron or rudder input yet), flaps keep 0.65.
+
+## Long hands-off run: the original's swing grows, the port's damps
+Second recording (`Data_c172_climb`, hands-off, 108 s after the roll started) against the port with trim 0.07 and
+elevator effectiveness 2.2 (160 s), seconds since the roll started:
+
+| | pitch extremes | after |
+|---|---|---|
+| original | 2.4° (32 s), 16.5° (42-47 s), 2.2° (57 s), 14.6° (67 s), 2.6° (82 s), then 6° at 92 s, -0.5° at 97 s, -5..-6° at 102-122 s | the swing does not die out: from 97 s IAS rises to 126 kt, VVI -1600 fpm (a diving phugoid) |
+| port | 9.5° (38 s), 5.7° (78 s), 10.7° (88 s), 6.1° (98 s), 9.7° (108 s), 7.2° (118 s), 7.7° (148 s) | damps to a steady climb of about 500 fpm at 82-83 kt, pitch 8° |
+
+Both have a period near 25 s, but the original's first peak is 16.5° against 9.5° and it never settles (the long
+phugoid is neutrally stable or growing), whereas the port's is damped within about 80 s. So the port's longitudinal
+damping is too high or its speed stability (the change of pitch moment with speed) too strong; the amplitude
+mismatch of the climb is the early part of the same difference. Next test: reduce the damping contribution of
+the tail (pitch-rate arm) and the wing downwash lag and see whether the first peak and the growth follow.
