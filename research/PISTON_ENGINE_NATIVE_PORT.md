@@ -260,3 +260,13 @@ Collected from `prop_1..11.txt`: `28 6c 118 11c 120 170 1cc 1d0 2bc 2d0 2e4 2f8 
 sine/cosine pairs (`430/434`, `440/444`, `450/454`: 0 and 1), `F+0x28 = 1` and a 30 m/s flow in `F+0x370` already changes the
 output record (`R+0x50 = -2.0`, `R+0x58 = -55.87`) but the rest stays NaN until the engine record `M` and the blade
 element forces exist; the meaning of `118/11c/120`, `170`, `1cc/1d0`, `350/358`, `400..41c`, `651c..6540` is not named yet.
+
+## Step 1e: a real blade element function is wired into the live propeller call; the blade boundary arrays are missing
+`LiveProp` in `flight_local.rs` now answers `PropEnv::element_force` with the verified `element_force::element_force` and
+`profile::outer` (airfoils `NACA 16 (good propeller).afl`, `Clark-Y (good propeller).afl` from the install; their names
+come from the ACF text because the loader models only strings of up to 15 characters inline, longer ones are on the
+heap). The call then panics inside `wing_element::sweep_degrees`: the boundary arrays (x, y, z, chord per rib) the wing
+code indexes are derived values; `FlightModel` computes them for wings ("original boundary arithmetic") but nothing builds
+them for the blade records of `P`. The test catches the panic and prints it. Next piece: derive the blade boundary arrays
+from `_blad/0/_Croot/_Ctip/_semilen_SEG/_els` and the rib tables the same way as for the wings, store them in `P`, then
+rerun; after that the element forces feed `prop_force` and the `M`/`F` words are the remaining inputs.

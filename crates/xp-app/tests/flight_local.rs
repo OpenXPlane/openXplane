@@ -657,7 +657,16 @@ fn original_piston_update_runs_on_the_c172_object() {
     eprintln!("unanswered callees: {:x?}, last return {last}", env.unknown);
 }
 
-struct LiveProp;
+struct LiveProp {
+    f: openxplane::forces::Words,
+    b: openxplane::forces::Words,
+    p: openxplane::forces::Words,
+    x: Vec<openxplane::forces::Words>,
+    foils: Vec<(String, openxplane::airfoil::Airfoil)>,
+    noise: openxplane::buffet::NoiseTable,
+    names: [String; 3],
+    errors: Vec<String>,
+}
 
 impl openxplane::airflow::AirflowEnv for LiveProp {
     fn wind(&mut self, _x: f64, _y: f64, _z: f64) -> [f32; 3] {
@@ -709,13 +718,83 @@ impl openxplane::prop::PropEnv for LiveProp {
     fn record(&mut self, _words: [u32; 20]) {}
     fn element_force(
         &mut self,
-        _call: &openxplane::prop::ElementCall,
+        call: &openxplane::prop::ElementCall,
     ) -> openxplane::prop::ElementResult {
-        openxplane::prop::ElementResult {
-            out: [0.0; 3],
-            x4: [0.0; 4],
-            x_1bc: 0.0,
-            stall: 0,
+        use openxplane::element_force::{Call, Objects, element_force};
+        use openxplane::wing_element::FoilResult;
+        let names = self.names.clone();
+        let thickness = names.clone().map(|n| {
+            self.foils
+                .iter()
+                .find(|(k, _)| *k == n)
+                .map(|(_, a)| a.thickness())
+        });
+        let c = Call {
+            index: call.index as usize,
+            retain: call.retain != 0,
+            ice: call.ice,
+            g10: 1.0,
+            names: [&names[0], &names[1], &names[2]],
+            foil_thickness: thickness,
+        };
+        let objects = Objects {
+            f: &self.f,
+            b: &self.b,
+            w: &self.p,
+            x: &self.x[call.station],
+        };
+        let foils = &self.foils;
+        let noise = &self.noise;
+        let result = element_force(
+            &objects,
+            &c,
+            |fc: &openxplane::wing_element::FoilCall| {
+                let name = &names[fc.slot];
+                let Some((_, foil)) = foils.iter().find(|(k, _)| k == name) else {
+                    return Err(format!("airfoil {name}"));
+                };
+                let o = openxplane::profile::outer(
+                    foil,
+                    openxplane::profile::OuterInputs {
+                        alpha_deg: fc.alpha,
+                        multiplier: fc.multiplier,
+                        divisor: fc.divisor,
+                        regime: fc.re_meg,
+                        mach: fc.arg6,
+                        time: openxplane::runtime::RunningTime::from_snapshot(0.0).unwrap(),
+                        noise_coordinates: [fc.x_norm, fc.y_norm, fc.z_norm],
+                        retain_stall: fc.retain,
+                    },
+                    fc.stalled,
+                    Some(noise),
+                )?;
+                Ok(FoilResult {
+                    ret: o.ret,
+                    cl: o.cl,
+                    cd: o.cd,
+                    cm: o.cm,
+                    ratio: o.normalized_alpha,
+                    stalled: o.stalled,
+                })
+            },
+            &|_| false,
+        );
+        match result {
+            Ok(o) => openxplane::prop::ElementResult {
+                out: [o.out1, o.out2, o.out3],
+                x4: [o.x_f4, o.x_11c, o.x_144, o.x_16c],
+                x_1bc: o.element.ratio,
+                stall: i32::from(o.element.stall_flag),
+            },
+            Err(e) => {
+                self.errors.push(e);
+                openxplane::prop::ElementResult {
+                    out: [0.0; 3],
+                    x4: [0.0; 4],
+                    x_1bc: 0.0,
+                    stall: 0,
+                }
+            }
         }
     }
 }
@@ -729,7 +808,7 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         return;
     };
     use xp_acf::object::{Schema, load_object};
-    let acf = openxplane::Aircraft::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let acf = openxplane::Aircraft::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
     let object = load_object(&acf, &Schema::load());
     let words = |region: &str| {
         Words(
@@ -753,6 +832,51 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
     let mut y = Words::default();
     let m = Words::default();
+    let root = std::path::PathBuf::from(std::env::var("OPENXPLANE_REFERENCE_ROOT").unwrap());
+    let install = Install::open(&root).unwrap();
+    let dir = Path::new(&path).parent().unwrap().to_path_buf();
+    let mut foils = Vec::new();
+    // long strings are on the heap in the loader's layout (not modelled), so the names come from the ACF text
+    let afl = |k: u32| {
+        acf.properties
+            .iter()
+            .find(|q| q.key == format!("_blad/0/_afl_file_{k}"))
+            .map(|q| q.value.trim().to_string())
+            .unwrap()
+    };
+    let names = [afl(1), afl(2), afl(3)];
+    for name in names.clone() {
+        if foils.iter().any(|(k, _): &(String, _)| *k == name) {
+            continue;
+        }
+        let file = install
+            .airfoil_candidates(&dir, &name)
+            .into_iter()
+            .find(|c| c.is_file())
+            .unwrap_or_else(|| panic!("airfoil {name}"));
+        let foil =
+            openxplane::airfoil::Airfoil::parse(&std::fs::read_to_string(file).unwrap()).unwrap();
+        foils.push((name, foil));
+    }
+    let noise = openxplane::buffet::NoiseTable::new(
+        (0..openxplane::buffet::TABLE_LEN)
+            .map(|i| {
+                let h = ((i as u64 * 2_654_435_761) & 0xffff_ffff) >> 8;
+                (h as f32 / 16_777_216.0) * 2.0 - 1.0
+            })
+            .collect(),
+    )
+    .unwrap();
+    let mut env = LiveProp {
+        f: f.clone(),
+        b: b.clone(),
+        p: p.clone(),
+        x: xs.clone(),
+        foils,
+        noise,
+        names,
+        errors: Vec::new(),
+    };
     let mut objects = openxplane::prop::Objects {
         f: &mut f,
         b: &b,
@@ -765,8 +889,12 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         m: &m,
     };
     let result =
-        openxplane::prop::prop_force(&mut objects, 0, &mut LiveProp, openxplane::prop::Stop::End);
-    eprintln!("prop_force: {:?}", result.as_ref().map(|_| "ok"));
+        openxplane::prop::prop_force(&mut objects, 0, &mut env, openxplane::prop::Stop::End);
+    eprintln!(
+        "prop_force: {:?}, element errors {:?}",
+        result.as_ref().map(|_| "ok"),
+        env.errors
+    );
     let out: Vec<f32> = (0x14..0x88).step_by(4).map(|o| r.f32(o)).collect();
     eprintln!("R+0x14..0x88: {out:?}");
 }
