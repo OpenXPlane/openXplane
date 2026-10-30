@@ -656,3 +656,110 @@ fn original_piston_update_runs_on_the_c172_object() {
     env.unknown.dedup();
     eprintln!("unanswered callees: {:x?}, last return {last}", env.unknown);
 }
+
+struct LiveProp;
+
+impl openxplane::airflow::AirflowEnv for LiveProp {
+    fn wind(&mut self, _x: f64, _y: f64, _z: f64) -> [f32; 3] {
+        [0.0; 3]
+    }
+    fn wash(&mut self, _point: [f32; 3], out: [f32; 3]) -> [f32; 3] {
+        out
+    }
+}
+
+impl openxplane::prop::PropEnv for LiveProp {
+    fn engine_flag(&mut self) -> bool {
+        false
+    }
+    fn frame_time(&mut self) -> f64 {
+        0.005
+    }
+    fn time_phase(&mut self) -> f64 {
+        0.0
+    }
+    fn noise2(&mut self, _x: f32, _y: f32, _seed: i32) -> f32 {
+        0.0
+    }
+    fn terrain(&mut self, _a: [f32; 3], _b: [f32; 3], height: f32) -> (f32, i32) {
+        (height, 0)
+    }
+    fn strike_gate(&mut self) -> f64 {
+        0.0
+    }
+    fn event(&mut self, _id: i32, _arg: i32) {}
+    fn engine_ratio(&mut self, _n: i32) -> f32 {
+        1.0
+    }
+    fn held_back(&mut self, _index: i32, _mode: i32) -> bool {
+        false
+    }
+    fn limit_a(&mut self, _i: i32) -> bool {
+        false
+    }
+    fn limit_b(&mut self, _n: i32) -> bool {
+        false
+    }
+    fn blend(&mut self, _mask: i32) -> f32 {
+        1.0
+    }
+    fn recording_id(&mut self) -> i32 {
+        0
+    }
+    fn record(&mut self, _words: [u32; 20]) {}
+    fn element_force(
+        &mut self,
+        _call: &openxplane::prop::ElementCall,
+    ) -> openxplane::prop::ElementResult {
+        openxplane::prop::ElementResult {
+            out: [0.0; 3],
+            x4: [0.0; 4],
+            x_1bc: 0.0,
+            stall: 0,
+        }
+    }
+}
+
+/// First live run of the original's propeller function on the C172 records from the ACF loader: the function is
+/// called with a still airstream and the element forces stubbed to zero, to learn which words of `F` it needs.
+#[test]
+fn original_prop_force_reaches_the_end_on_the_c172_records() {
+    use openxplane::forces::Words;
+    let Ok(path) = std::env::var("OPENXPLANE_REFERENCE_AIRCRAFT") else {
+        return;
+    };
+    use xp_acf::object::{Schema, load_object};
+    let acf = openxplane::Aircraft::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let object = load_object(&acf, &Schema::load());
+    let words = |region: &str| {
+        Words(
+            object
+                .regions
+                .get(region)
+                .map(|r| r.iter().map(|(o, w)| (*o as usize, *w)).collect())
+                .unwrap_or_default(),
+        )
+    };
+    let (b, e, p) = (words("B"), words("R5ff8"), words("R6010"));
+    let mut f = Words::default();
+    let mut r = Words::default();
+    let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
+    let mut y = Words::default();
+    let m = Words::default();
+    let mut objects = openxplane::prop::Objects {
+        f: &mut f,
+        b: &b,
+        e: &e,
+        p: &p,
+        r: &mut r,
+        x: &mut xs,
+        y: &mut y,
+        e_table: &e,
+        m: &m,
+    };
+    let result =
+        openxplane::prop::prop_force(&mut objects, 0, &mut LiveProp, openxplane::prop::Stop::End);
+    eprintln!("prop_force: {:?}", result.as_ref().map(|_| "ok"));
+    let out: Vec<f32> = (0x14..0x88).step_by(4).map(|o| r.f32(o)).collect();
+    eprintln!("R+0x14..0x88: {out:?}");
+}

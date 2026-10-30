@@ -239,3 +239,17 @@ steady full-power state: `M+0x210` (the lever response weight in `M+0xcc = engin
 speed `M+0x78` (which the update does not advance by itself: the propeller side integrates it) and the manifold terms
 (`M+0x24c = 0.75`) are still preset values. The values do not change over 2000 steps because nothing integrates the
 engine speed. Getting the steady state requires the propeller force (`prop_force`) in the loop, which is the next piece.
+
+## Step 1d: the propeller function runs to its end on the C172 records (nothing physical yet)
+`original_prop_force_reaches_the_end_on_the_c172_records` (`flight_local.rs`) calls `prop::prop_force(.., Stop::End)` with
+`B`, `E` (`R5ff8`) and `P` (`R6010`) from the ACF loader, an empty `F`, a still airstream (`LiveProp` environment: wind
+0, no terrain, no events, element forces stubbed to zero) and returns `Ok`; the output record `R+0x14..0x88` is zeros
+and NaN (as expected with a zero `F` and zero element forces: divisions by the empty frame values). So the function
+accepts the real records. What a physical result still needs, in order:
+1. the words of `F` it reads (matrices `F+0x430..0x454`, origin `F+0x378..0x388`, reference velocity `F+0x368..0x370`,
+   rates `F+0x3cc..0x3d4`, density, `F+0xb7e8 + 4n` ice, ...): find them by running with `Stop::Segment1..10` against a
+   NaN check, or from the recorded vectors' `F` regions (`prop_vectors`), and fill them from `FlightModel::state`;
+2. the engine record array `M` (`F[0x68b0]`: the engine speed `M+0x78`, power `M+0xcc` from the piston update);
+3. a real `element_force` for the blade elements: build `wing_element::ElementInputs` from the blade geometry in `P`
+   (`_blad/*` rows of the schema live in `R6010`, like the wing code of `FlightModel` does for wings) with the prop
+   airfoil (`_afl_file_*`), and answer `ElementCall` with its lift/drag/moment.
