@@ -338,7 +338,7 @@ pub fn control_surface_terms(i: &ControlSurface, driven: &dyn Fn(u32) -> bool) -
 
 fn clamp01_low_high(v: f32) -> f32 {
     // `if 0 > v { 0 } else { min(1, v) }` as comiss/minss
-    if 0.0 > v { 0.0 } else { 1.0f32.min(v) }
+    if 0.0 > v { 0.0 } else { sse_min(1.0, v) }
 }
 
 /// `0x1411a00f0`: the delta-wing weight of element `i`, the product of three factors in 0..1: a ramp
@@ -347,7 +347,7 @@ fn clamp01_low_high(v: f32) -> f32 {
 pub fn delta_wing_weight(b: &Boundary, i: usize, field_18: f32, field_1c: f32) -> f32 {
     let s = sweep_degrees(b, i);
     let abs = s.abs();
-    let limited = if 15.0 > abs { 15.0 } else { 75.0f32.min(abs) };
+    let limited = if 15.0 > abs { 15.0 } else { sse_min(75.0, abs) };
     // The original tanf result matches double evaluation rounded to f32 in
     // the original-code corpus; a platform f32 tan can differ by one ulp,
     // which is amplified by the following ratio.
@@ -366,7 +366,7 @@ pub fn delta_wing_weight(b: &Boundary, i: usize, field_18: f32, field_1c: f32) -
     };
 
     let y = 0.0 - ((field_1c - 1.0) + (field_1c - 1.0));
-    let tail = if 0.0 > y { 0.0 } else { 1.0f32.min(y) };
+    let tail = if 0.0 > y { 0.0 } else { sse_min(1.0, y) };
     ramp * ratio * tail
 }
 
