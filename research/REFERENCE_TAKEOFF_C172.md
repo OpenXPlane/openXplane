@@ -87,3 +87,11 @@ something else missing in the port's pitch balance, about a factor 3.4 in nose-u
 candidates are the propeller slipstream over the tail (raises elevator effectiveness and tail lift at full power
 and low speed), the wing's downwash on the tail, or the ground effect. None of these is checked yet; the test
 `hands_off_takeoff_lifts_off_near_the_recorded_original` pins the fit, not the cause.
+
+## Tried and discarded: propeller slipstream over the tail
+A first model (tail surfaces see `sqrt(V² + 2T/(ρ·2.9 m²))` weighted by a 0.6 share of the extra speed) moves the
+fitted trim only from 0.24 to 0.20 (hands-off liftoff 85 kt after 33.5 s at 0.20; 0.07 still lifts only at 110 kt
+after 75 s) and lowers the pitch swing (VVI peak about 1000 fpm, pitch 11°), so it does not explain the original's
+0.07 and was not kept. The remaining candidates: the thrust line height against the CG (the port puts the
+thrust at y=0 while the CG is at 0.30 m; the ACF fields with the engine position were not found by name in a first
+grep), ground contact (nose gear load and tire/strut model), and the elevator/stabilizer lift model.
