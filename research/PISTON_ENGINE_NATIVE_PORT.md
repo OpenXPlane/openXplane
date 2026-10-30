@@ -185,3 +185,23 @@ Mutation check of the end stage (one constant changed at a time, 10 changes): th
 Biased vectors (`piston_stock.txt`, 80 attempts, kinds 1/2 with `B+0x938` below 1, `tools/gen_piston_vectors.py ... stock`, needs `llvm-objdump` or a copy of GNU `objdump.exe` named that on PATH) pass against the native code (test `piston_engine_update_matches_the_original_on_the_stock_path`). They did NOT catch any of the seven previously uncaught mutations (`0.6`, `29.92`, `0.633`, `0.1235`, `0.95`, `3.2`, `level - 0.25`), so those branches are still unpinned: the random state evidently does not reach them (or a later clamp hides them). Pinning them needs targeted presets of `M+0x214`, `M+0x40` and the lever, not more random cases.
 
 Second pass: the stock vectors now preset `M+0x214`, `M+0x40`, the lever, `M+0x78` and `M+0x48` (150 cases). The `0.633` slope below `A2` is now caught; still not caught: `0.6`, `29.92`, `0.1235`, the `0.95` thresholds, `3.2` and `level - 0.25`. Those may be unreachable with these presets or may only affect words the recorded dump does not include; that is not yet established.
+
+## Wiring plan for the flight loop (2026-10-30, after reading the code again)
+Findings that decide the route:
+- The propeller function `prop::prop_force` (1513 lines, checked at frame checkpoints against the original) works on the
+  original's flat objects (`F`, `B`, engine record `E`, part record `P` at `B[0x6010] + n*0x3770`, output record `R`), not on
+  typed state, and takes its airflow from `airflow()` on `F`. The piston stages in `piston_native.rs` take typed inputs.
+  So there are two different seams: the engine side (typed, native) and the propeller side (object-based).
+- `flight_init` (`flight_init.rs`) builds the `F`/`B` objects from an aircraft in the emulator's memory; it is the only
+  producer of the `P`/`R` records the propeller function reads.
+
+Route that keeps 1:1 checks (not started):
+1. Run `flight_init` for the C172 in a `Vm` to obtain `F`, `B`, `E`, `P` (the loader exists; its inputs are not yet fed
+   from the installed ACF end to end, check `flight_init` callers in `crates/xp-app`).
+2. Per frame: set the controls (`F+0xb7a8 + 4n` power input, mixture, etc.), the airspeed and density in the `F`
+   flow fields, call `update_engine_piston` (`piston.rs`), then `prop_force`; read thrust and torque from `R`
+   (`R+0x14..0x88`, see `prop.rs` segment 10) and replace `T = min(cap, eta P/(V+38))` and the missing torque and
+   P-factor in `FlightModel::forces`.
+3. Compare against the four hands-off recordings: roll times (0.2 s reproducibility), liftoff, bank growth.
+The first concrete task is step 1: a test that loads the C172 through `flight_init` and prints the `E` and `P` records,
+so the emulator-memory objects are proven to exist for the stock aircraft before anything is wired.
