@@ -555,3 +555,20 @@ checked. Earlier118 independent corpus rows remain byte-for-byte unchanged.
 Leaf calculations remain controlled. Next compare entire root construction with
 both real refreshes, then full factory/dialog/layout/menu/teardown and original
 Alt/Esc/GPU paired captures. Estimates reviewed and unchanged.
+
+### Phase 1 exit check: stated tolerances and status (2026-10-30)
+The reference is the stock Cessna 172 SP in X-Plane 12.4.3 at UHWW 07L, recorded with Data Output
+(`research/REFERENCE_TAKEOFF_C172.md`, `research/reference/*.csv`). Inputs are identical on both sides: engines
+started, parking brake released, full throttle after 2 s, **no** stick, rudder or trim input. Tolerances (a tolerated
+difference remains an unresolved difference for the 1:1 goal, see `PARITY_ACCEPTANCE.md`):
+
+| Stage | Quantity | Tolerance | Status |
+|---|---|---|---|
+| Takeoff roll | time to 20/40/55/60/70 kt | 1.0 s | met (mean 0.6 s), test `full_throttle_roll_follows_the_recorded_original` allows 2 s |
+| Liftoff | time since the roll starts, IAS | 4 s, 5 kt | met only with elevator trim 0.24 (a fit; the original has 0.07), test `hands_off_takeoff_lifts_off_near_the_recorded_original` |
+| Climb | pitch swing amplitude and period, VVI | amplitude 25 %, period 20 % | **not met**: the port's swing is about half the original's |
+| Cruise | trimmed IAS and VVI after the swing damps | 3 kt, 100 fpm | not recorded |
+| Stall | stall IAS, pitch at the break | 3 kt, 3 deg | not recorded |
+| Landing | touchdown IAS and sink rate, roll-out distance | 5 kt, 100 fpm, 10 % | not recorded |
+
+The exit check is met only when every row is met with the original's own start trim (0.07), not a fitted one.
