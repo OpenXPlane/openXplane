@@ -39,8 +39,10 @@ const PARASITE_AREA: f32 = 0.30;
 /// Assumed static thrust of the fixed-pitch propeller at sea level and full power, newtons.
 const STATIC_THRUST: f32 = 2400.0;
 const PROP_EFFICIENCY: f32 = 0.78;
-/// Speed offset in the thrust law T = min(static, eta P / (V + V_C)), m/s.
-const PROP_SPEED_OFFSET: f32 = 22.0;
+/// Speed offset in the thrust law T = min(static, eta P / (V + V_C)), m/s. Chosen so the full-throttle roll
+/// follows the recorded original within about a second up to 70 kt (`research/REFERENCE_TAKEOFF_C172.md`);
+/// a fit to one recording, not the original's propeller model.
+const PROP_SPEED_OFFSET: f32 = 38.0;
 /// Assumed effectiveness of a plain control surface relative to thin-airfoil theory.
 const CONTROL_EFFECTIVENESS: f32 = 0.65;
 /// Scale of the textbook downwash angle 2 CL / (pi AR) at the tail (typically dEps/dAlpha of 0.4-0.5).

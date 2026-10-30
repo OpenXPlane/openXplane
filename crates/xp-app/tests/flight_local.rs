@@ -445,3 +445,32 @@ fn tires_roll_with_ground_speed_and_stay_still_at_rest() {
     let radius = m.gears.iter().find(|g| g.index == 1).unwrap().tire_radius;
     assert!(radius > 0.1 && radius < 0.5, "radius {radius} m");
 }
+
+/// Times for the full-throttle roll from rest, taken from the original's Data Output
+/// (`research/REFERENCE_TAKEOFF_C172.md`), one recording, so the tolerance is loose.
+#[test]
+fn full_throttle_roll_follows_the_recorded_original() {
+    let Some(mut m) = model() else { return };
+    let c = Controls {
+        throttle: 1.0,
+        ..Default::default()
+    };
+    let reference = [(20.0, 4.2), (40.0, 10.9), (60.0, 18.6), (70.0, 23.1)];
+    let mut reached = [f32::NAN; 4];
+    let dt = 1.0 / 200.0;
+    for step in 0..(40.0 / dt) as usize {
+        m.step(dt, &c);
+        let kt = m.telemetry(&c).airspeed_kt;
+        for (slot, (speed, _)) in reached.iter_mut().zip(reference) {
+            if slot.is_nan() && kt >= speed {
+                *slot = step as f32 * dt;
+            }
+        }
+    }
+    for ((speed, want), got) in reference.iter().zip(reached) {
+        assert!(
+            (got - want).abs() < 2.0,
+            "{speed} kt after {got} s, original {want} s"
+        );
+    }
+}

@@ -27,3 +27,6 @@ came 35.5 s after the roll started at 88 kias, but that depends on when the yoke
 about the model. The run is one flight with unrepeated pilot inputs, so the numbers are indicative, not a
 tolerance. The reference aircraft left the runway sideways in the roll (no rudder input), which the port's
 straight run does not show.
+
+## After calibrating the thrust law (same day)
+`PROP_SPEED_OFFSET` raised from 22 to 38 m/s. Roll times, reference vs port: 10 kt 1.7/2.0 s, 20 kt 4.2/4.3, 30 kt 7.5/7.0, 40 kt 10.9/10.1, 50 kt 14.6/13.7, 55 kt 16.5/15.7, 60 kt 18.6/18.0, 70 kt 23.1/24.1: within 1.0 s everywhere (mean 0.62 s), down from 5 s at 70 kt. This is a one-parameter fit to a single recording, not the original propeller model; the regression test `full_throttle_roll_follows_the_recorded_original` allows 2 s. Liftoff, climb and landing are not compared.
