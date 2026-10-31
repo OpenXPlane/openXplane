@@ -291,6 +291,25 @@ fn swept_wings_run_through_delta_context_in_the_live_model() {
 }
 
 #[test]
+fn position_datarefs_follow_the_model_state() {
+    let Some(mut m) = model() else { return };
+    let c = Controls::default();
+    m.state.velocity = Vec3::new(1.0, 2.0, 3.0);
+    m.state.omega = Vec3::new(0.1, 0.2, 0.3);
+    let get = |name: &str| m.flight_dataref(name, &c).unwrap();
+    assert_eq!(get("sim/flightmodel/position/local_vx"), 1.0);
+    assert_eq!(get("sim/flightmodel/position/local_vy"), 2.0);
+    assert_eq!(get("sim/flightmodel/position/local_vz"), 3.0);
+    assert_eq!(get("sim/flightmodel/position/Qrad"), 0.1);
+    assert_eq!(get("sim/flightmodel/position/Rrad"), -0.2);
+    assert_eq!(get("sim/flightmodel/position/Prad"), -0.3);
+    // the degree versions are the radian ones times the getter's 57.2957763671875 in the original; this model
+    // converts exactly, so they agree to single precision
+    let q = get("sim/flightmodel/position/Q");
+    assert!((q - 0.1 * 57.295_776).abs() < 1e-4, "{q}");
+}
+
+#[test]
 fn animation_bindings_use_model_controls_and_original_gear_slots() {
     let Some(mut m) = model() else { return };
     let c = Controls {
@@ -661,7 +680,6 @@ struct LiveProp {
     f: openxplane::forces::Words,
     b: openxplane::forces::Words,
     p: openxplane::forces::Words,
-    x: Vec<openxplane::forces::Words>,
     foils: Vec<(String, openxplane::airfoil::Airfoil)>,
     noise: openxplane::buffet::NoiseTable,
     names: [String; 3],
@@ -959,7 +977,6 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         f: f.clone(),
         b: b.clone(),
         p: p.clone(),
-        x: xs.clone(),
         foils,
         noise,
         names,

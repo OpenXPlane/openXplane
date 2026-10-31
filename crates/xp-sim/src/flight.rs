@@ -690,6 +690,13 @@ impl FlightModel {
             "sim/flightmodel/position/Q" => rate.x.to_degrees(),
             "sim/flightmodel/position/P" => (-rate.z).to_degrees(),
             "sim/flightmodel/position/R" => (-rate.y).to_degrees(),
+            "sim/flightmodel/position/Qrad" => rate.x,
+            "sim/flightmodel/position/Prad" => -rate.z,
+            "sim/flightmodel/position/Rrad" => -rate.y,
+            // The local frame is x east, y up, z south, the same as this model's world frame.
+            "sim/flightmodel/position/local_vx" => self.state.velocity.x,
+            "sim/flightmodel/position/local_vy" => self.state.velocity.y,
+            "sim/flightmodel/position/local_vz" => self.state.velocity.z,
             "sim/flightmodel/position/true_airspeed" => true_airspeed,
             "sim/flightmodel/position/indicated_airspeed" => t.airspeed_kt,
             "sim/cockpit2/gauges/indicators/airspeed_kts_pilot" => c172_pilot_ias(t.airspeed_kt),
