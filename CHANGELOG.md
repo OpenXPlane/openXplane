@@ -7,6 +7,16 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Propeller blade elements against the running original
+
+- The ported propeller call (`prop_force` with the verified element force and airfoil code) now matches a live
+  X-Plane 12.4.3 C172 at idle: thrust 108.0 N against 103.1 N, element lift coefficients within 7 % (outer
+  elements within 0.1 %), element speeds within 0.2 %. The [comparison](site/assets/prop-idle-compare-20261101.png)
+  is port against original at the same state (53.45 rad/s, still air), one engine state, not a flight
+  comparison. The noise table of the stalled elements is the output of MT19937 seeded with 1 (checked on all
+  262144 entries). The propeller is not yet wired into the flight loop, which still uses a fitted thrust law.
+- Six more position datarefs (`local_vx/vy/vz`, `Prad/Qrad/Rrad`) read from the model state.
+
 ### apt.dat ramp start and airport data
 
 - Type every row of the UHWW `apt.dat` block (start locations, taxi network, signs, approach
