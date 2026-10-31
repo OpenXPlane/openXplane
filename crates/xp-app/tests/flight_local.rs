@@ -737,10 +737,18 @@ impl openxplane::prop::PropEnv for LiveProp {
             names: [&names[0], &names[1], &names[2]],
             foil_thickness: thickness,
         };
+        let wing = openxplane::forces::Words(
+            self.p
+                .0
+                .iter()
+                .filter(|(o, _)| **o >= 0x88)
+                .map(|(o, w)| (*o - 0x88, *w))
+                .collect(),
+        );
         let objects = Objects {
             f: &self.f,
             b: &self.b,
-            w: &self.p,
+            w: &wing,
             x: &self.x[call.station],
         };
         let foils = &self.foils;
@@ -825,7 +833,7 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     {
         let ft = 0.3048f32;
         let n = p.i32(0x8c) as usize;
-        p.set_i32(4, n as i32); // the element count the wing code reads at W+4
+        // the wing object W sits at P+0x88 (element count at W+4 = P+0x8c, which the loader already stored)
         let (root, tip) = (p.f32(0x90), p.f32(0x94));
         let span = acf
             .properties
@@ -854,10 +862,10 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
             let chord = root + (tip - root) * (i as f32 / n as f32);
             let q =
                 xp_airfoil::wing_boundary::boundary_point(&transform, curvature, n, i, chord, 0.25);
-            p.set_f32(0x5bc + 4 * i, q[0]);
-            p.set_f32(0x5e8 + 4 * i, q[1]);
-            p.set_f32(0x614 + 4 * i, q[2]);
-            p.set_f32(0x70 + 4 * i, chord);
+            p.set_f32(0x88 + 0x5bc + 4 * i, q[0]);
+            p.set_f32(0x88 + 0x5e8 + 4 * i, q[1]);
+            p.set_f32(0x88 + 0x614 + 4 * i, q[2]);
+            p.set_f32(0x88 + 0x70 + 4 * i, chord);
         }
         eprintln!("blade: {n} elements, root chord {root} m, tip {tip} m, span {span} m");
     }
@@ -929,17 +937,23 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         e_table: &e,
         m: &m,
     };
-    if std::env::var_os("OPENXPLANE_PROP_LIVE").is_none() {
-        eprintln!(
-            "prop_force call skipped: it does not return yet (set OPENXPLANE_PROP_LIVE to try)"
-        );
-        return;
-    }
-    // The blade boundary arrays (x, y, z, chord per rib) that the wing code reads are derived values the ACF loader
-    // does not store for the part record, so the element function indexes past them: that panic is the expected
-    // state of this test until the blade geometry is built like `FlightModel` builds the wings'.
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        openxplane::prop::prop_force(&mut objects, 0, &mut env, openxplane::prop::Stop::End)
+        openxplane::prop::prop_force(&mut objects, 0, &mut env, {
+            use openxplane::prop::Stop::*;
+            match std::env::var("OPENXPLANE_PROP_STOP").as_deref() {
+                Ok("1") => Segment1,
+                Ok("2") => Segment2,
+                Ok("3") => Segment3,
+                Ok("4") => Segment4,
+                Ok("5") => Segment5,
+                Ok("6") => Segment6,
+                Ok("7") => Segment7,
+                Ok("8") => Segment8,
+                Ok("9") => Segment9,
+                Ok("10") => Segment10,
+                _ => End,
+            }
+        })
     }));
     let Ok(result) = result else {
         eprintln!("element function panicked: blade boundary arrays missing");

@@ -279,3 +279,12 @@ spins on the still-incomplete `F`/`P`/`X` words (the rest of the wing fields the
 control surface gates at `W+0x2fc..`, the flow words of `F`, or the state arrays `X`, are all zero). The call is now gated behind
 `OPENXPLANE_PROP_LIVE` so the suite stays fast. Next: run with `Stop::Segment1..10` to find which segment spins, then fill
 the words it waits on.
+
+## Step 1g: the hang was a wrong base; the live call returns
+In the original's part record the wing object `W` sits at `P+0x88` (`p.f32(0x88 + 0x5bc + 4i)` in `prop.rs`; the loader's `_els`
+at `P+0x8c` is `W+4`, `_Croot` at `P+0x90` is `W+8`). The test had put the boundary arrays and chords at `W` offsets
+inside `P`, so the element code read zeros and a wrap loop spun. With the arrays at `P+0x88+...` and the element function
+given the record shifted by `0x88`, `prop_force` returns in under 2 s with the real element function and the propeller
+airfoils (no element errors). The output record is still partly NaN/zero, so the `F` words (density `F+0x6c`, speed
+reference `F+0x74`, temperature `F+0x5c`, the part-position words `F+0x350..0x38c`, rates `F+0x3cc..`) and the engine
+record `M` are the next inputs; `OPENXPLANE_PROP_STOP=1..10` picks a checkpoint to look at.
