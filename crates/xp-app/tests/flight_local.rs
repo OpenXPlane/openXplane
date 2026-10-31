@@ -912,6 +912,11 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     // X+0x288 divides or scales the element Cl (a unit default; the original's init sets it)
     for x in xs.iter_mut() {
         x.set_f32(0x288, 1.0);
+        // X+0x28c scales the induced drag and X+4+4e is the per-element speed factor in the same term (guesses)
+        x.set_f32(0x28c, 1.0);
+        for e in 0..10 {
+            x.set_f32(4 + 4 * e, 1.0);
+        }
     }
     let mut y = Words::default();
     let m = Words::default();

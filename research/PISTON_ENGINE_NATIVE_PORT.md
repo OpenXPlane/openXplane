@@ -327,3 +327,13 @@ Still open: the element drag (`out2`) is NaN for every element, independent of t
 `W+0x14` (like `P+0x4c`, a derived word the loader does not set), so some other derived input of the drag path
 (`W+0x18`, `W+0x1c`, foil terms, `X+0xa4..`) is zero or NaN. The lift is also tiny for elements 0, 1 and 3..9
 (1e-6) and 0.82 for element 2, which points to a per-element weight array at `W` that is not filled.
+
+## Step 1l: finite thrust from the live call
+
+The NaN drag came from `X+4+4e` (the per-element speed factor `v`, divisor in the induced-drag term) and
+`X+0x28c` (its scale) both being zero: inf times 0. With both set to 1 (guesses; the port does not model their
+writer yet) the elements return finite lift (200-400 N per outer element) and drag, and the output record gives
+`R+0x60` (thrust) = 2927 N, `R+0x14` = 1.2e5, torque words small. A C172 at 2400 rpm and 30 m/s should give about
+1500 N, so the guessed words or the stubbed noise table are still off by a factor of ~2. Elements 1-4 fail with
+"noise coordinate outside supported domain" (the test's noise table and coordinates are stand-ins), so only
+6 of 10 elements contribute. Open: the real writers of `P+0x4c`, `W+0x14`, `X+4+4e`, `X+0x28c`, `X+0x288`; the real noise table.
