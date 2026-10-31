@@ -867,6 +867,8 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
             p.set_f32(0x88 + 0x614 + 4 * i, q[2]);
             p.set_f32(0x88 + 0x70 + 4 * i, chord);
         }
+        // P+0x4c is not an ACF word; the call divides by it like a disk area (guess: pi r^2)
+        p.set_f32(0x4c, std::f32::consts::PI * span * span);
         eprintln!("blade: {n} elements, root chord {root} m, tip {tip} m, span {span} m");
     }
     let mut f = Words::default();
@@ -973,4 +975,11 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     );
     let out: Vec<f32> = (0x14..0x88).step_by(4).map(|o| r.f32(o)).collect();
     eprintln!("R+0x14..0x88: {out:?}");
+    if let Ok((fr, _)) = &result {
+        let probe: Vec<(i32, f32)> = [-0x18, -0x10, 0x10, 0xe0, 0xe4, 0xe8, 0x10c, 0x118, 0x8e8]
+            .iter()
+            .map(|&o| (o, fr.f(o)))
+            .collect();
+        eprintln!("frame words: {probe:x?}");
+    }
 }

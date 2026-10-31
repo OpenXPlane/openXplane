@@ -305,3 +305,13 @@ case: `R+0x1c` (the propeller's angular speed, rad/s) was simply zero in the liv
 thrust words are still zero. Checkpoints `OPENXPLANE_PROP_STOP=4..8` show the record unchanged, so the NaNs are
 produced in the post-loop section (segments 9 and 10). Next: find which post-loop input is NaN
 (candidates: `M+0xb8`, the zeroed `Y` record, the `0x3730` word of `P`).
+
+## Step 1j: the NaN came from `P+0x4c`
+
+`P+0x4c` is not an ACF word (not in `object_schema.tsv`). `prop_force` divides by it in the lag filter of
+`R+0x84` (`engine::lag_filter`, `b950` argument) and in the induced-velocity reference (`2 rho P+0x4c`), so a zero
+there gave 0/0 and the NaN words. The loader (or a later init step) must compute it. Setting it to a disk area
+guess (pi * blade length^2) removes every NaN. The thrust and torque words are still zero: frame words
+`0xe0..0xe8` (the element sums) stay 0 although `0x10c` and `0x118` are large, so the element outputs do not reach
+the sums yet. Next: trace `out1..3` of `element_force` into `fr 0xe0..0xe8` and check the guess against the
+original (find the writer of `P+0x4c`; the REA session stalled this turn).
