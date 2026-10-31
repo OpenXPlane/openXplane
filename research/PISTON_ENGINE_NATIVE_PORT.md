@@ -362,3 +362,22 @@ With these (and the guessed `X+4+4e = 1` replaced) all ten elements now return f
 lift, alpha 19 deg) suggest the test airflow (`F+0x370 = -30`, identity attitude, zero ground effect) is not the
 real inflow; the next check is reading the live `M`/`R` and the part record while the engine runs.
 Writers of the derived words (the code that computes `W+0x14`, `W+0x18`, `W+0x1c`, `B+0x64f4`) are still unported.
+
+## Step 1n: the live idle snapshot as a comparison case (2026-10-31)
+
+Engine started in the live reference (idle). The propeller output record is the part record at `F+0x68c8`
+(`R` = `Y`, 0x388 bytes; not the engine record at `F+0x68b0`): `R+0x1c` = 53.4539 rad/s (510 rpm), `R+0x54`
+= -89.9988, `R+0x58` = 16.5699, `R+0x60` = 103.1 (thrust, N), `R+0x64` = 17.7278, `R+0x84` = 7.5647 (induced
+velocity), `R+0x1e4..` = per-element induced state. The snapshot is in
+`crates/xp-app/tests/data/prop_live_idle_record.txt` (runtime values, not an original resource).
+Other derived words read live: `W+0x16c..` per-element pitch (58, 58, 47.35, 37.93, 31.54, 27.03, 23.69, 21.14,
+19.13, 17.50, 0 deg) and the annulus areas at `P+0x58..0x7c`; the boundary arrays and chords the test builds
+already equal the live ones.
+
+`OPENXPLANE_PROP_LIVE=1 OPENXPLANE_PROP_OMEGA=53.45387649536133 OPENXPLANE_PROP_AIRSPEED=0` starts the port's
+`prop_force` from that record. Result against live (one frame apart, so the accumulators differ a little):
+`R+0x54` -90 (live -89.9988), `R+0x58` 16.5575 (16.5699), `R+0x84` 7.594 (7.565), but `R+0x60` thrust 36.5 N
+(live 103.1) and `R+0x64` 12.7 (17.73). So the angles and the induced velocity now agree and the force sums are
+low by a factor of about 3: the remaining difference is in the element forces (inputs still not read from the
+live process: the other `F` words such as `F+0x120`, the element-state record `X` of the live frame, and the real
+noise table).

@@ -814,6 +814,13 @@ impl openxplane::prop::PropEnv for LiveProp {
             &|_| false,
         );
         if std::env::var("OPENXPLANE_PROP_TRACE").is_ok() {
+            let e4 = 4 * call.index as usize;
+            eprintln!(
+                "element state: alpha {} speed {} flow {}",
+                call.x.f32(0x2c + e4),
+                call.x.f32(0x54 + e4),
+                call.x.f32(0x194 + e4)
+            );
             eprintln!(
                 "element {}: {:?}",
                 call.index,
@@ -921,6 +928,29 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         p.set_f32(0x88 + 0x14, 0.875_129_8);
         p.set_f32(0x88 + 0x18, 21.942_861);
         p.set_f32(0x88 + 0x1c, 0.861_344_3);
+        // derived per-element pitch (degrees) at W+0x16c and the annulus areas at P+0x58.., live original
+        let twist = [
+            58.0f32, 58.0, 47.349_026, 37.926_93, 31.543_163, 27.026_031, 23.692_354, 21.141_447,
+            19.129_694, 17.502_792, 0.0,
+        ];
+        for (i, v) in twist.iter().enumerate() {
+            p.set_f32(0x88 + 0x16c + 4 * i, *v);
+        }
+        let areas = [
+            0.029_886_827f32,
+            0.089_660_48,
+            0.149_434_15,
+            0.209_207_77,
+            0.268_981_46,
+            0.328_755_14,
+            0.388_528_94,
+            0.448_302_5,
+            0.508_076_3,
+            0.567_849_87,
+        ];
+        for (i, v) in areas.iter().enumerate() {
+            p.set_f32(0x58 + 4 * i, *v);
+        }
         // P+0x4c is not an ACF word: the live original holds 2.98868 = pi * blade length^2
         p.set_f32(0x4c, std::f32::consts::PI * span * span);
         eprintln!("blade: {n} elements, root chord {root} m, tip {tip} m, span {span} m");
@@ -948,10 +978,37 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     f.set_f32(0x74, 1.0); // speed reference
     f.set_f32(0x68, 101_325.0); // pressure
     f.set_f32(0x408, 1.0);
-    f.set_f32(0x370, -30.0);
+    f.set_f32(
+        0x370,
+        -std::env::var("OPENXPLANE_PROP_AIRSPEED")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(30.0),
+    );
     let mut r = Words::default();
     // the propeller's angular speed, rad/s (2400 rpm)
-    r.set_f32(0x1c, 2400.0 * std::f32::consts::TAU / 60.0);
+    let omega = std::env::var("OPENXPLANE_PROP_OMEGA")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(2400.0 * std::f32::consts::TAU / 60.0);
+    r.set_f32(0x1c, omega);
+    // the whole live record of the running idle (words 0..0x90 of the original's record, one snapshot), as the
+    // starting state when OPENXPLANE_PROP_LIVE is set
+    if std::env::var("OPENXPLANE_PROP_LIVE").is_ok() {
+        let text = include_str!("data/prop_live_idle_record.txt");
+        for (i, w) in text
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+            .flat_map(str::split_whitespace)
+            .enumerate()
+        {
+            r.set_i32(4 * i, u32::from_str_radix(w, 16).unwrap() as i32);
+        }
+    }
+    // the induced-velocity state carried between frames (live value of the running idle: 7.56 m/s at 53.45 rad/s)
+    if let Ok(v) = std::env::var("OPENXPLANE_PROP_INDUCED") {
+        r.set_f32(0x84, v.parse().unwrap());
+    }
     let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
     // X+0x288 divides or scales the element Cl (a unit default; the original's init sets it)
     for x in xs.iter_mut() {
