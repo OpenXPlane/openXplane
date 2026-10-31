@@ -793,7 +793,15 @@ impl openxplane::prop::PropEnv for LiveProp {
                     },
                     fc.stalled,
                     Some(noise),
-                )?;
+                )
+                .inspect_err(|_| {
+                    if std::env::var("OPENXPLANE_PROP_TRACE").is_ok() {
+                        eprintln!(
+                            "noise coordinates {} {} {} alpha {}",
+                            fc.x_norm, fc.y_norm, fc.z_norm, fc.alpha
+                        );
+                    }
+                })?;
                 Ok(FoilResult {
                     ret: o.ret,
                     cl: o.cl,
@@ -852,7 +860,23 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
                 .unwrap_or_default(),
         )
     };
-    let (b, e, mut p) = (words("B"), words("R5ff8"), words("R6010"));
+    let (mut b, e, mut p) = (words("B"), words("R5ff8"), words("R6010"));
+    // aircraft extents the original derives (live process, C172): the divisors of the element's noise coordinates
+    for (o, v) in [
+        (0x64f4, 5.568_264_5f32),
+        (0x64f8, 1.785_518_4),
+        (0x64fc, 6.035_962_1),
+    ] {
+        b.set_f32(o, v);
+    }
+    eprintln!(
+        "B words: 1f78 {} 1f7c {} 1f80 {} 1eb0 {} 1f74 {}",
+        b.f32(0x1f78),
+        b.f32(0x1f7c),
+        b.f32(0x1f80),
+        b.i32(0x1eb0),
+        b.i32(0x1f74)
+    );
     // straight blade: boundary arrays of blade 0 (x, y, z at 0x5bc, 0x5e8, 0x614; chord at 0x70), as the wing code
     // builds them for a wing with no sweep or dihedral
     {
@@ -892,10 +916,12 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
             p.set_f32(0x88 + 0x614 + 4 * i, q[2]);
             p.set_f32(0x88 + 0x70 + 4 * i, chord);
         }
-        // W+0x14 is the wing aspect ratio in the induced-drag terms and is derived, not an ACF word (guess: blade
-        // length over the mean chord)
-        p.set_f32(0x88 + 0x14, span / (0.5 * (root + tip)));
-        // P+0x4c is not an ACF word; the call divides by it like a disk area (guess: pi r^2)
+        // Words the original derives for the C172 propeller, read from the live process (Frida, 12.4.3):
+        // W+0x14 0.87513, W+0x18 21.94286 (also X+4+4e for every element), W+0x1c 0.86134
+        p.set_f32(0x88 + 0x14, 0.875_129_8);
+        p.set_f32(0x88 + 0x18, 21.942_861);
+        p.set_f32(0x88 + 0x1c, 0.861_344_3);
+        // P+0x4c is not an ACF word: the live original holds 2.98868 = pi * blade length^2
         p.set_f32(0x4c, std::f32::consts::PI * span * span);
         eprintln!("blade: {n} elements, root chord {root} m, tip {tip} m, span {span} m");
     }
@@ -930,10 +956,10 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     // X+0x288 divides or scales the element Cl (a unit default; the original's init sets it)
     for x in xs.iter_mut() {
         x.set_f32(0x288, 1.0);
-        // X+0x28c scales the induced drag and X+4+4e is the per-element speed factor in the same term (guesses)
+        // live original: X+0x28c = 1 and X+4+4e = W+0x18 for every element
         x.set_f32(0x28c, 1.0);
         for e in 0..10 {
-            x.set_f32(4 + 4 * e, 1.0);
+            x.set_f32(4 + 4 * e, 21.942_861);
         }
     }
     let mut y = Words::default();

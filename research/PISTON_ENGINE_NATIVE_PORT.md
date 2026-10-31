@@ -337,3 +337,28 @@ writer yet) the elements return finite lift (200-400 N per outer element) and dr
 1500 N, so the guessed words or the stubbed noise table are still off by a factor of ~2. Elements 1-4 fail with
 "noise coordinate outside supported domain" (the test's noise table and coordinates are stand-ins), so only
 6 of 10 elements contribute. Open: the real writers of `P+0x4c`, `W+0x14`, `X+4+4e`, `X+0x28c`, `X+0x288`; the real noise table.
+
+## Step 1m: the derived words, read from the live original (2026-10-31)
+
+Attached Frida to the running reference (12.4.3, C172 loaded, cold and dark) and called the getter `0x141a64250`
+(`rcx = 0x1461243b0`, index 0) through the rebased module address (the exe is ASLR-relocated; the static
+addresses do not work as raw pointers). Values of the single part (`B+0x920 = 1`, `B+0x91c = 1`, kind 0):
+
+| word | live value | note |
+| --- | --- | --- |
+| `P+0x4c` | 2.98868 | = pi * 0.97536^2: the disk-area guess was right |
+| `P+0x3730` | 0.97536 | = blade length (`P+0x88+0x10`) |
+| `W+0x14` | 0.875130 | not a plain aspect ratio (my guess 10.97 was wrong) |
+| `W+0x18` | 21.942861 | also `X+4+4e` for all 10 elements and 4 stations |
+| `W+0x1c` | 0.861344 | |
+| `W+0x30`, `W+0x38` | 0 | |
+| `X+0x288`, `X+0x28c` | 1, 1 | |
+| `B+0x64f4/8/c` | 5.568264, 1.785518, 6.035962 | divisors of the element's noise coordinates |
+| `B+0x1f78/7c/80` | 0.858891, 0.1, -0.265349 | already equal to the loader's values |
+
+With these (and the guessed `X+4+4e = 1` replaced) all ten elements now return finite forces (the earlier
+"noise coordinate outside supported domain" errors came from the zero `B+0x64f4..fc`), and the live call gives
+`R+0x60` = 2784 N at 2400 rpm and 30 m/s, still above the ~1500 N expected. The stalled inner elements (negative
+lift, alpha 19 deg) suggest the test airflow (`F+0x370 = -30`, identity attitude, zero ground effect) is not the
+real inflow; the next check is reading the live `M`/`R` and the part record while the engine runs.
+Writers of the derived words (the code that computes `W+0x14`, `W+0x18`, `W+0x1c`, `B+0x64f4`) are still unported.
