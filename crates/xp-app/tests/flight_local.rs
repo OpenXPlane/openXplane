@@ -883,6 +883,8 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     f.set_f32(0x408, 1.0);
     f.set_f32(0x370, -30.0);
     let mut r = Words::default();
+    // the propeller's angular speed, rad/s (2400 rpm)
+    r.set_f32(0x1c, 2400.0 * std::f32::consts::TAU / 60.0);
     let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
     let mut y = Words::default();
     let m = Words::default();

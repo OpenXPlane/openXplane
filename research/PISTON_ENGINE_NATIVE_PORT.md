@@ -296,3 +296,12 @@ so the spin of the blades is not in `M`: the per-part runtime fields (the part r
 and the element-state records `X`, which carry the previous pass's blade angles and speeds) are the missing inputs, and the loader
 does not create them (they are runtime state of the flight object). Next: read what `flight_init` writes into `P`/`X` for engine
 parts (the init code is ported, `flight_init.rs` PART/PART_AERO constants `0x388`/`0x3770`) and replicate it, then spin the part.
+
+## Step 1i: the spin word was the missing input
+
+The earlier note that the blades' spin lives in unmodelled runtime part state was wrong for the first-order
+case: `R+0x1c` (the propeller's angular speed, rad/s) was simply zero in the live test. With 2400 rpm set there
+(251.33 rad/s) the call still returns `ok`, but the output record has NaN in several words (`R+0x50`..) and the
+thrust words are still zero. Checkpoints `OPENXPLANE_PROP_STOP=4..8` show the record unchanged, so the NaNs are
+produced in the post-loop section (segments 9 and 10). Next: find which post-loop input is NaN
+(candidates: `M+0xb8`, the zeroed `Y` record, the `0x3730` word of `P`).
