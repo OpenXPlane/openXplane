@@ -288,3 +288,11 @@ given the record shifted by `0x88`, `prop_force` returns in under 2 s with the r
 airfoils (no element errors). The output record is still partly NaN/zero, so the `F` words (density `F+0x6c`, speed
 reference `F+0x74`, temperature `F+0x5c`, the part-position words `F+0x350..0x38c`, rates `F+0x3cc..`) and the engine
 record `M` are the next inputs; `OPENXPLANE_PROP_STOP=1..10` picks a checkpoint to look at.
+
+## Step 1h: density, temperature, speed reference do not change the output
+Setting `F+0x6c = 1.225`, `F+0x5c = 15`, `F+0x74 = 1`, `F+0x68 = 101325`, `F+0x408 = 1` leaves the output record as before
+(`R+0x50 = -2`, `R+0x58 = -56.5`, thrust words zero). `prop.rs` reads from `M` only `M+0xb8` (the piston's torque-like output),
+so the spin of the blades is not in `M`: the per-part runtime fields (the part record beyond its ACF words, e.g. `P+0x3730`,
+and the element-state records `X`, which carry the previous pass's blade angles and speeds) are the missing inputs, and the loader
+does not create them (they are runtime state of the flight object). Next: read what `flight_init` writes into `P`/`X` for engine
+parts (the init code is ported, `flight_init.rs` PART/PART_AERO constants `0x388`/`0x3770`) and replicate it, then spin the part.

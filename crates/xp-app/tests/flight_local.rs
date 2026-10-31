@@ -876,6 +876,11 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         f.set_f32(cos, 1.0);
     }
     f.set_i32(0x28, 1);
+    f.set_f32(0x6c, 1.225); // air density
+    f.set_f32(0x5c, 15.0); // temperature
+    f.set_f32(0x74, 1.0); // speed reference
+    f.set_f32(0x68, 101_325.0); // pressure
+    f.set_f32(0x408, 1.0);
     f.set_f32(0x370, -30.0);
     let mut r = Words::default();
     let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
