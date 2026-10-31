@@ -718,7 +718,7 @@ impl openxplane::prop::PropEnv for LiveProp {
     fn record(&mut self, _words: [u32; 20]) {}
     fn element_force(
         &mut self,
-        call: &openxplane::prop::ElementCall,
+        call: &openxplane::prop::ElementCall<'_>,
     ) -> openxplane::prop::ElementResult {
         use openxplane::element_force::{Call, Objects, element_force};
         use openxplane::wing_element::FoilResult;
@@ -749,7 +749,7 @@ impl openxplane::prop::PropEnv for LiveProp {
             f: &self.f,
             b: &self.b,
             w: &wing,
-            x: &self.x[call.station],
+            x: call.x,
         };
         let foils = &self.foils;
         let noise = &self.noise;
@@ -787,6 +787,13 @@ impl openxplane::prop::PropEnv for LiveProp {
             },
             &|_| false,
         );
+        if std::env::var("OPENXPLANE_PROP_TRACE").is_ok() {
+            eprintln!(
+                "element {}: {:?}",
+                call.index,
+                result.as_ref().map(|o| (o.out1, o.out2, o.out3))
+            );
+        }
         match result {
             Ok(o) => openxplane::prop::ElementResult {
                 out: [o.out1, o.out2, o.out3],
@@ -867,9 +874,23 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
             p.set_f32(0x88 + 0x614 + 4 * i, q[2]);
             p.set_f32(0x88 + 0x70 + 4 * i, chord);
         }
+        // W+0x14 is the wing aspect ratio in the induced-drag terms and is derived, not an ACF word (guess: blade
+        // length over the mean chord)
+        p.set_f32(0x88 + 0x14, span / (0.5 * (root + tip)));
         // P+0x4c is not an ACF word; the call divides by it like a disk area (guess: pi r^2)
         p.set_f32(0x4c, std::f32::consts::PI * span * span);
         eprintln!("blade: {n} elements, root chord {root} m, tip {tip} m, span {span} m");
+    }
+    if std::env::var("OPENXPLANE_PROP_TRACE").is_ok() {
+        let w: Vec<(usize, f32)> = [
+            0x10, 0x14, 0x18, 0x1c, 0x20, 0x30, 0x38, 0x5c, 0x60, 0x64, 0x68,
+        ]
+        .iter()
+        .map(|&o| (o, p.f32(0x88 + o)))
+        .collect();
+        eprintln!("W words: {w:?}");
+        let k: Vec<i32> = (0..10).map(|i| p.i32(0x88 + 0x56c + 4 * i)).collect();
+        eprintln!("W+0x56c: {k:?}");
     }
     let mut f = Words::default();
     // identity attitude (sine 0, cosine 1 of the three angle pairs) and a 30 m/s flow along the aircraft's nose
@@ -888,6 +909,10 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     // the propeller's angular speed, rad/s (2400 rpm)
     r.set_f32(0x1c, 2400.0 * std::f32::consts::TAU / 60.0);
     let mut xs: Vec<Words> = (0..4).map(|_| Words::default()).collect();
+    // X+0x288 divides or scales the element Cl (a unit default; the original's init sets it)
+    for x in xs.iter_mut() {
+        x.set_f32(0x288, 1.0);
+    }
     let mut y = Words::default();
     let m = Words::default();
     let root = std::path::PathBuf::from(std::env::var("OPENXPLANE_REFERENCE_ROOT").unwrap());

@@ -315,3 +315,15 @@ guess (pi * blade length^2) removes every NaN. The thrust and torque words are s
 `0xe0..0xe8` (the element sums) stay 0 although `0x10c` and `0x118` are large, so the element outputs do not reach
 the sums yet. Next: trace `out1..3` of `element_force` into `fr 0xe0..0xe8` and check the guess against the
 original (find the writer of `P+0x4c`; the REA session stalled this turn).
+
+## Step 1k: the element function saw a stale X record
+
+`prop_force` writes the element state (`X+0x54` speed, `X+0x2c` angle, `X+0x194`) into its own `xs`, while the
+live test's `element_force` held a clone taken before the call, so the element function saw zero speed (zero
+force). `ElementCall` now carries `x: &Words`, the caller's current record, and the test uses it (the verified
+vector tests ignore the field). With that, and `X+0x288 = 1`, the element lift is non-zero and `R+0x60` is
+about 1.5 (not yet physical: a C172 prop should give ~1500 N at 2400 rpm and 30 m/s).
+Still open: the element drag (`out2`) is NaN for every element, independent of the guessed aspect ratio at
+`W+0x14` (like `P+0x4c`, a derived word the loader does not set), so some other derived input of the drag path
+(`W+0x18`, `W+0x1c`, foil terms, `X+0xa4..`) is zero or NaN. The lift is also tiny for elements 0, 1 and 3..9
+(1e-6) and 0.82 for element 2, which points to a per-element weight array at `W` that is not filled.

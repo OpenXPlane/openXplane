@@ -100,12 +100,12 @@ pub trait PropEnv: AirflowEnv {
     /// `0x141219d90`: appends the 0x50-byte pass record (the frame words `0x1b0..0x200`) to the log vector.
     fn record(&mut self, words: [u32; 20]);
     /// `0x1411b9840` (`get_el_force`, verified separately as `element_force`): the forces of one element.
-    fn element_force(&mut self, call: &ElementCall) -> ElementResult;
+    fn element_force(&mut self, call: &ElementCall<'_>) -> ElementResult;
 }
 
 /// The arguments of the `get_el_force` call that are not in the objects.
 #[derive(Clone, Copy, Debug)]
-pub struct ElementCall {
+pub struct ElementCall<'a> {
     /// The element index (frame slot `0x8d8`).
     pub index: i32,
     pub retain: i32,
@@ -115,6 +115,8 @@ pub struct ElementCall {
     pub extra: [f32; 3],
     /// Which station's element-state record is passed.
     pub station: usize,
+    /// The element-state record of the station as the caller holds it now.
+    pub x: &'a Words,
 }
 
 /// What `get_el_force` stores: the three outputs and the element arrays of the record.
@@ -862,6 +864,7 @@ pub fn prop_force(
                 ice: f.f32(0xb7e8 + 4 * n as usize),
                 extra: [0.0; 3],
                 station: inner as usize,
+                x: &xs[inner as usize],
             });
             fr.set(0x128, res.out[0]);
             fr.set(0x140, res.out[1]);

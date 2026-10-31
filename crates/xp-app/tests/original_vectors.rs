@@ -1771,7 +1771,7 @@ impl openxplane::prop::PropEnv for PropReplay {
     }
     fn element_force(
         &mut self,
-        call: &openxplane::prop::ElementCall,
+        call: &openxplane::prop::ElementCall<'_>,
     ) -> openxplane::prop::ElementResult {
         let (seen, result) = self
             .elements
