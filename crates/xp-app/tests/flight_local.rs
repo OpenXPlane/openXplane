@@ -1047,15 +1047,33 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
             openxplane::airfoil::Airfoil::parse(&std::fs::read_to_string(file).unwrap()).unwrap();
         foils.push((name, foil));
     }
-    let noise = openxplane::buffet::NoiseTable::new(
-        (0..openxplane::buffet::TABLE_LEN)
-            .map(|i| {
-                let h = ((i as u64 * 2_654_435_761) & 0xffff_ffff) >> 8;
-                (h as f32 / 16_777_216.0) * 2.0 - 1.0
-            })
-            .collect(),
-    )
-    .unwrap();
+    let noise = openxplane::buffet::NoiseTable::original();
+    // the live idle state of F and of the element records, when OPENXPLANE_PROP_LIVE is set
+    if std::env::var("OPENXPLANE_PROP_LIVE").is_ok() {
+        for line in include_str!("data/prop_live_idle_f_x.txt")
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+        {
+            let mut it = line.split_whitespace();
+            match it.next() {
+                Some("F") => {
+                    let o = usize::from_str_radix(it.next().unwrap(), 16).unwrap();
+                    f.set_i32(
+                        o,
+                        u32::from_str_radix(it.next().unwrap(), 16).unwrap() as i32,
+                    );
+                }
+                Some("X") => {
+                    for x in xs.iter_mut() {
+                        for (i, w) in it.clone().enumerate() {
+                            x.set_i32(4 * i, u32::from_str_radix(w, 16).unwrap() as i32);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
     let mut env = LiveProp {
         f: f.clone(),
         b: b.clone(),
@@ -1105,6 +1123,28 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
     );
     let out: Vec<f32> = (0x14..0x88).step_by(4).map(|o| r.f32(o)).collect();
     eprintln!("R+0x14..0x88: {out:?}");
+    if std::env::var("OPENXPLANE_PROP_LIVE").is_ok() && omega == 53.453_876 {
+        // the live reference gave 103.1 N of thrust (R+0x60) in this state, one frame earlier
+        assert!(
+            (r.f32(0x60) - 103.1).abs() < 0.1 * 103.1,
+            "thrust {} against 103.1",
+            r.f32(0x60)
+        );
+        assert!((r.f32(0x58) - 16.57).abs() < 0.05, "R+0x58 {}", r.f32(0x58));
+    }
+    if std::env::var("OPENXPLANE_PROP_TRACE").is_ok() {
+        // alpha (X+0x2c), speed (X+0x54), flow angle (X+0x194) and the stored element outputs (X+0xf4, X+0x11c)
+        for (name, o) in [
+            ("alpha", 0x2c),
+            ("speed", 0x54),
+            ("flow", 0x194),
+            ("x_f4", 0xf4),
+            ("x_11c", 0x11c),
+        ] {
+            let v: Vec<f32> = (0..10).map(|e| xs[0].f32(o + 4 * e)).collect();
+            eprintln!("X {name}: {v:?}");
+        }
+    }
     if let Ok((fr, _)) = &result {
         let probe: Vec<(i32, f32)> = [-0x18, -0x10, 0x10, 0xe0, 0xe4, 0xe8, 0x10c, 0x118, 0x8e8]
             .iter()

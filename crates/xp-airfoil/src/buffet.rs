@@ -1,5 +1,7 @@
 //! Recovered noise and coefficient perturbation stages. Runtime table supplied explicitly.
-//! Clock storage is identified; table initialization and clock advancement remain unknown.
+//! Clock storage is identified; clock advancement remains unknown. The table itself is the output of the
+//! Mersenne Twister MT19937 seeded with `init_genrand(1)`, each 32-bit output divided by 2^32 (checked against all
+//! 262144 entries of a live 12.4.3 process).
 use crate::airfoil::Coefficients;
 use crate::runtime::RunningTime;
 
@@ -9,6 +11,42 @@ pub struct NoiseTable {
 }
 
 impl NoiseTable {
+    /// The reference build's table: MT19937 with `init_genrand(1)`, `output / 2^32` as float32.
+    pub fn original() -> Self {
+        const N: usize = 624;
+        let mut mt = [0u32; N];
+        mt[0] = 1;
+        for i in 1..N {
+            mt[i] = 1812433253u32
+                .wrapping_mul(mt[i - 1] ^ (mt[i - 1] >> 30))
+                .wrapping_add(i as u32);
+        }
+        let mut index = N;
+        let values = (0..TABLE_LEN)
+            .map(|_| {
+                if index == N {
+                    for k in 0..N {
+                        let y = (mt[k] & 0x8000_0000) | (mt[(k + 1) % N] & 0x7fff_ffff);
+                        let mut next = mt[(k + 397) % N] ^ (y >> 1);
+                        if y & 1 != 0 {
+                            next ^= 0x9908_b0df;
+                        }
+                        mt[k] = next;
+                    }
+                    index = 0;
+                }
+                let mut y = mt[index];
+                index += 1;
+                y ^= y >> 11;
+                y ^= (y << 7) & 0x9d2c_5680;
+                y ^= (y << 15) & 0xefc6_0000;
+                y ^= y >> 18;
+                (f64::from(y) / 4_294_967_296.0) as f32
+            })
+            .collect();
+        Self { values }
+    }
+
     pub fn new(values: Vec<f32>) -> Result<Self, String> {
         if values.len() != TABLE_LEN || values.iter().any(|v| !v.is_finite()) {
             return Err("noise table requires 262144 finite float32 values".into());
@@ -185,6 +223,18 @@ impl NoiseTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Entries read from the running reference (12.4.3): the first four and the last.
+    #[test]
+    fn original_table_matches_the_live_process() {
+        let t = NoiseTable::original();
+        assert_eq!(
+            &t.values[..4],
+            &[0.417022, 0.9971848, 0.7203245, 0.93255734]
+        );
+        assert_eq!(t.values[262143], 0.457078218460083f32);
+        assert!(t.values.iter().all(|v| (0.0..1.0).contains(v)));
+    }
+
     #[test]
     fn uses_corner_weights_seed_offsets_and_mirrored_coordinates() {
         let mut values = vec![0.5; TABLE_LEN];

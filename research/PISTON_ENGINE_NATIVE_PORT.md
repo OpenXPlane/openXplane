@@ -381,3 +381,32 @@ already equal the live ones.
 low by a factor of about 3: the remaining difference is in the element forces (inputs still not read from the
 live process: the other `F` words such as `F+0x120`, the element-state record `X` of the live frame, and the real
 noise table).
+
+## Step 1o: the noise table is MT19937; thrust within 5% of the live idle (2026-10-31)
+
+The 262144-entry noise table (the one the buffet and the stalled elements read) sits at `0x14578f1f0` (from the
+`lea r9, [rip+0x45ad9b0]` at `0x1411e1839`); dumped from the live process it equals, for all entries, the output
+of MT19937 seeded with `init_genrand(1)` divided by 2^32 as float32. `NoiseTable::original()` now generates it
+(unit test against the first four and the last entry). The stand-in table of the live test was the reason the
+stalled inner elements had negative lift.
+
+State loaded from the live idle snapshot (`prop_live_idle_f_x.txt`: the `F` words the call reads, among them the speed of
+sound `F+0x74` = 340.26 and the non-zero yaw pair `F+0x440/444`; the element record `X` of station 0) with
+`OPENXPLANE_PROP_LIVE=1 OPENXPLANE_PROP_OMEGA=53.45387649536133 OPENXPLANE_PROP_AIRSPEED=0`:
+
+| word | port | live |
+| --- | --- | --- |
+| `R+0x60` thrust | 107.99 N | 103.10 N |
+| `R+0x58` | 16.5567 | 16.5699 |
+| `R+0x54` | -89.9993 | -89.9988 |
+| `R+0x64` | 16.65 | 17.73 |
+| element Cl (`X+0xf4`), outer | 1.294, 1.249 | 1.295, 1.249 |
+| element Cl, inner | 1.01, 1.05, 1.05, 0.93, 0.87, 1.04, 1.27, 1.36 | 1.08, 1.10, 1.09, 0.96, 0.88, 1.03, 1.26, 1.35 |
+| element alpha (`X+0x2c`) | within 0.2 deg except element 0 (41.6 vs 46.9) | |
+| element speed (`X+0x54`) | within 0.2% | |
+
+The test asserts thrust within 10% and `R+0x58` within 0.05 for this state. The live snapshot was taken a frame or
+more before the port's call, so the remaining differences are of the order of the frame-to-frame change.
+Still open: the engine/prop state of the port is not wired into `FlightModel::forces`; the record fields the
+original's flight loop feeds (`R+0x1c` from the engine, `F+0x370` airflow, ...) have to come from the port's
+state, and a loaded-propeller case (not idle) still has to be compared.
