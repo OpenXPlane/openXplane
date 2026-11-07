@@ -363,7 +363,7 @@ fn model_answers_a_growing_share_of_the_mapped_datarefs() {
         .count();
     eprintln!("{answered} of {} mapped datarefs answered", names.len());
     assert!(names.len() > 2000);
-    assert!(answered >= 39, "answered {answered}");
+    assert!(answered >= 46, "answered {answered}");
 }
 
 #[test]
@@ -383,6 +383,18 @@ fn position_datarefs_follow_the_model_state() {
     // converts exactly, so they agree to single precision
     let q = get("sim/flightmodel/position/Q");
     assert!((q - 0.1 * 57.295_776).abs() < 1e-4, "{q}");
+    // velocity (1, 2, 3): climbing at atan2(2, hypot(1, 3)); the track points east-south-east, 161.57 deg true
+    let vpath = get("sim/flightmodel/position/vpath");
+    assert!(
+        (vpath - 2.0f32.atan2(10.0f32.sqrt()).to_degrees()).abs() < 1e-4,
+        "{vpath}"
+    );
+    let hpath = get("sim/flightmodel/position/hpath");
+    assert!((hpath - 161.565).abs() < 1e-2, "{hpath}");
+    assert_eq!(
+        get("sim/flightmodel/position/true_theta"),
+        get("sim/flightmodel/position/theta")
+    );
 }
 
 #[test]

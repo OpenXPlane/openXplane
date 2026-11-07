@@ -7,6 +7,11 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Flight path datarefs (offline)
+
+- `vpath` (flight path angle), `hpath` (true ground track) and the `true_theta` / `true_phi` names now come from
+  the model state; 46 of 2388 mapped datarefs are answered (was 39). Unit test with a known velocity vector.
+
 ### Two more brake commands handled
 
 - `sim/flight_controls/brakes_max` (held, full braking) and `sim/flight_controls/brakes_toggle_regular` now act on

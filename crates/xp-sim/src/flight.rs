@@ -715,8 +715,12 @@ impl FlightModel {
             (Mat3::from_quat(self.state.orientation).transpose() * self.state.velocity).length();
         Some(match name {
             "sim/flightmodel/position/theta"
+            | "sim/flightmodel/position/true_theta"
+            | "sim/flightmodel2/position/true_theta"
             | "sim/cockpit2/gauges/indicators/pitch_AHARS_deg_pilot" => t.pitch_deg,
             "sim/flightmodel/position/phi"
+            | "sim/flightmodel/position/true_phi"
+            | "sim/flightmodel2/position/true_phi"
             | "sim/cockpit2/gauges/indicators/roll_AHARS_deg_pilot" => t.roll_deg,
             "sim/flightmodel/position/psi"
             | "sim/cockpit2/gauges/indicators/heading_AHARS_deg_mag_pilot" => t.heading_deg,
@@ -739,6 +743,20 @@ impl FlightModel {
             | "sim/cockpit2/gauges/indicators/vvi_fpm_pilot" => t.vertical_speed_fpm,
             "sim/flightmodel/position/vh_ind" => t.vertical_speed_fpm * 0.005_08,
             "sim/flightmodel/position/alpha" => t.alpha_deg,
+            // Flight path angle from the velocity in the world frame, and the true ground track (north is -z).
+            "sim/flightmodel/position/vpath" | "sim/flightmodel2/position/vpath" => self
+                .state
+                .velocity
+                .y
+                .atan2(self.state.velocity.x.hypot(self.state.velocity.z))
+                .to_degrees(),
+            "sim/flightmodel/position/hpath" => self
+                .state
+                .velocity
+                .x
+                .atan2(-self.state.velocity.z)
+                .to_degrees()
+                .rem_euclid(360.0),
             _ => return None,
         })
     }
