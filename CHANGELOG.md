@@ -7,6 +7,12 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Copilot and standby gauge datarefs follow the pilot's (offline)
+
+- The copilot AHARS pitch, roll and heading, the copilot and standby airspeed and altitude, and the copilot
+  vertical speed return the pilot-side values (one simulated aircraft, no failures). 54 of 2388 mapped datarefs
+  answered (was 46); the coverage test floor is raised.
+
 ### Flight path datarefs (offline)
 
 - `vpath` (flight path angle), `hpath` (true ground track) and the `true_theta` / `true_phi` names now come from

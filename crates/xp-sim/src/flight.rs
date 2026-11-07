@@ -717,13 +717,16 @@ impl FlightModel {
             "sim/flightmodel/position/theta"
             | "sim/flightmodel/position/true_theta"
             | "sim/flightmodel2/position/true_theta"
-            | "sim/cockpit2/gauges/indicators/pitch_AHARS_deg_pilot" => t.pitch_deg,
+            | "sim/cockpit2/gauges/indicators/pitch_AHARS_deg_pilot"
+            | "sim/cockpit2/gauges/indicators/pitch_AHARS_deg_copilot" => t.pitch_deg,
             "sim/flightmodel/position/phi"
             | "sim/flightmodel/position/true_phi"
             | "sim/flightmodel2/position/true_phi"
-            | "sim/cockpit2/gauges/indicators/roll_AHARS_deg_pilot" => t.roll_deg,
+            | "sim/cockpit2/gauges/indicators/roll_AHARS_deg_pilot"
+            | "sim/cockpit2/gauges/indicators/roll_AHARS_deg_copilot" => t.roll_deg,
             "sim/flightmodel/position/psi"
-            | "sim/cockpit2/gauges/indicators/heading_AHARS_deg_mag_pilot" => t.heading_deg,
+            | "sim/cockpit2/gauges/indicators/heading_AHARS_deg_mag_pilot"
+            | "sim/cockpit2/gauges/indicators/heading_AHARS_deg_mag_copilot" => t.heading_deg,
             // Body rates about the right (Q, nose up), forward (P, right wing down) and up (R, nose right) axes.
             "sim/flightmodel/position/Q" => rate.x.to_degrees(),
             "sim/flightmodel/position/P" => (-rate.z).to_degrees(),
@@ -737,10 +740,15 @@ impl FlightModel {
             "sim/flightmodel/position/local_vz" => self.state.velocity.z,
             "sim/flightmodel/position/true_airspeed" => true_airspeed,
             "sim/flightmodel/position/indicated_airspeed" => t.airspeed_kt,
-            "sim/cockpit2/gauges/indicators/airspeed_kts_pilot" => c172_pilot_ias(t.airspeed_kt),
-            "sim/cockpit2/gauges/indicators/altitude_ft_pilot" => t.altitude_ft,
+            "sim/cockpit2/gauges/indicators/airspeed_kts_pilot"
+            | "sim/cockpit2/gauges/indicators/airspeed_kts_copilot"
+            | "sim/cockpit2/gauges/indicators/airspeed_kts_stby" => c172_pilot_ias(t.airspeed_kt),
+            "sim/cockpit2/gauges/indicators/altitude_ft_pilot"
+            | "sim/cockpit2/gauges/indicators/altitude_ft_copilot"
+            | "sim/cockpit2/gauges/indicators/altitude_ft_stby" => t.altitude_ft,
             "sim/flightmodel/position/vh_ind_fpm"
-            | "sim/cockpit2/gauges/indicators/vvi_fpm_pilot" => t.vertical_speed_fpm,
+            | "sim/cockpit2/gauges/indicators/vvi_fpm_pilot"
+            | "sim/cockpit2/gauges/indicators/vvi_fpm_copilot" => t.vertical_speed_fpm,
             "sim/flightmodel/position/vh_ind" => t.vertical_speed_fpm * 0.005_08,
             "sim/flightmodel/position/alpha" => t.alpha_deg,
             // Flight path angle from the velocity in the world frame, and the true ground track (north is -z).

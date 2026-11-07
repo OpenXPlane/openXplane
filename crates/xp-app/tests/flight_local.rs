@@ -363,7 +363,7 @@ fn model_answers_a_growing_share_of_the_mapped_datarefs() {
         .count();
     eprintln!("{answered} of {} mapped datarefs answered", names.len());
     assert!(names.len() > 2000);
-    assert!(answered >= 46, "answered {answered}");
+    assert!(answered >= 54, "answered {answered}");
 }
 
 #[test]
