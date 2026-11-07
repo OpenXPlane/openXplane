@@ -348,6 +348,24 @@ fn control_datarefs_follow_the_commanded_values_under_every_name() {
     }
 }
 
+/// How many of the mapped flight datarefs (`flight_datarefs.tsv`) the model answers by name. A floor, not a goal:
+/// the count only goes up as more datarefs are bound to the model state.
+#[test]
+fn model_answers_a_growing_share_of_the_mapped_datarefs() {
+    let Some(m) = model() else { return };
+    let c = Controls::default();
+    let names: Vec<String> = openxplane::flight_map::fields()
+        .map(|f| f.name.to_string())
+        .collect();
+    let answered = names
+        .iter()
+        .filter(|n| m.animation_dataref(n, &c).is_some())
+        .count();
+    eprintln!("{answered} of {} mapped datarefs answered", names.len());
+    assert!(names.len() > 2000);
+    assert!(answered >= 39, "answered {answered}");
+}
+
 #[test]
 fn position_datarefs_follow_the_model_state() {
     let Some(mut m) = model() else { return };

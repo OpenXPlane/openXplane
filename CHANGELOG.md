@@ -14,6 +14,8 @@ Every entry that changes what you can see carries a screenshot or an animation (
   12.6 s where the [recording](site/assets/roll-propeller-table-20261107.png) of the original needs 23.1 s, so the
   propeller is not wired into the flight model; the fitted law stays the default. Notes and next checks are in
   `research/PISTON_ENGINE_NATIVE_PORT.md` (step 1p).
+- Dataref coverage is now measured: the model answers 39 of the 2388 mapped flight datarefs by name (a test keeps
+  the count from dropping). The rest need values read from the original, which the mapping table does not hold.
 - Control datarefs: the three trims, the flap request and the wheel brakes are answered under every name the
   original exposes them by (`sim/cockpit2/controls/*`, `sim/flightmodel/controls/*`, `sim/flightmodel2/controls/*`).
 
