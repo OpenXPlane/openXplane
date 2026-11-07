@@ -7,6 +7,12 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Two more brake commands handled
+
+- `sim/flight_controls/brakes_max` (held, full braking) and `sim/flight_controls/brakes_toggle_regular` now act on
+  the controls (unit test in `xp-sim`). Command coverage is still small; the full list of 3138 commands is only
+  available from the original at run time.
+
 ### Roll deficit of the propeller table located (offline)
 
 - From the recorded roll alone, [the acceleration against speed](site/assets/roll-accel-vs-speed-20261107.png):

@@ -83,6 +83,12 @@ pub fn apply_command(c: &mut Controls, command: &str, phase: Phase) -> Effect {
                 BRAKE_REGULAR
             };
         }
+        "sim/flight_controls/brakes_max" => {
+            c.brake = if phase == Phase::End { 0.0 } else { 1.0 };
+        }
+        "sim/flight_controls/brakes_toggle_regular" if phase == Phase::Begin => {
+            c.brake = if c.brake > 0.0 { 0.0 } else { BRAKE_REGULAR };
+        }
         "sim/flight_controls/brakes_toggle_max" if phase == Phase::Begin => {
             c.brake = if c.brake >= 1.0 { 0.0 } else { 1.0 };
         }
@@ -173,6 +179,7 @@ fn is_stateless_noop(command: &str, phase: Phase) -> bool {
                 | "sim/flight_controls/flaps_up"
                 | "sim/flight_controls/flaps_down"
                 | "sim/flight_controls/brakes_toggle_max"
+                | "sim/flight_controls/brakes_toggle_regular"
                 | "sim/flight_controls/pitch_trim_up"
                 | "sim/flight_controls/pitch_trim_down"
                 | "sim/flight_controls/aileron_trim_left"
@@ -190,6 +197,27 @@ mod tests {
 
     fn run(c: &mut Controls, cmd: &str, phase: Phase) -> Effect {
         apply_command(c, cmd, phase)
+    }
+
+    #[test]
+    fn max_brakes_hold_and_regular_brakes_toggle() {
+        let mut c = Controls::default();
+        run(&mut c, "sim/flight_controls/brakes_max", Phase::Begin);
+        assert_eq!(c.brake, 1.0);
+        run(&mut c, "sim/flight_controls/brakes_max", Phase::End);
+        assert_eq!(c.brake, 0.0);
+        run(
+            &mut c,
+            "sim/flight_controls/brakes_toggle_regular",
+            Phase::Begin,
+        );
+        assert_eq!(c.brake, BRAKE_REGULAR);
+        run(
+            &mut c,
+            "sim/flight_controls/brakes_toggle_regular",
+            Phase::Begin,
+        );
+        assert_eq!(c.brake, 0.0);
     }
 
     #[test]
