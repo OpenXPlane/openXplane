@@ -725,10 +725,30 @@ fn original_piston_update_runs_on_the_c172_object() {
     // a running engine at 2400 rpm with the lean/rich response off, the state `gen_piston_vectors.py stock` presets
     vm.set_u32(m + 0x70, 1);
     vm.set_u32(m + 0x74, 1);
-    vm.set_f32(m + 0x78, 2400.0);
+    vm.set_f32(
+        m + 0x78,
+        std::env::var("OPENXPLANE_ENGINE_SPEED")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2400.0),
+    );
     vm.set_f32(m + 0x214, 1.0);
     vm.set_f32(m + 0x40, 1.0);
     vm.set_u32(m + 0x48, 3);
+    {
+        let e = vm.u64(b + 0x5ff8);
+        let p = vm.u64(b + 0x6010);
+        eprintln!(
+            "friction B+0x964 {} B+0x968 {} E+0xc {} E+0x10 {} E+0x3c {} part+0x18 {} part+0x20 {}",
+            vm.f32(b + 0x964),
+            vm.f32(b + 0x968),
+            vm.f32(e + 0xc),
+            vm.f32(e + 0x10),
+            vm.f32(e + 0x3c),
+            vm.f32(p + 0x18),
+            vm.f32(p + 0x20)
+        );
+    }
     let mut env = LiveEnv {
         dt: 0.005,
         unknown: Vec::new(),
@@ -738,7 +758,8 @@ fn original_piston_update_runs_on_the_c172_object() {
         last = openxplane::piston::update_engine_piston(&mut vm, &mut env, m, f, 0, inputs);
         if step % 400 == 0 {
             eprintln!(
-                "step {step}: ret {last}, M+0xcc {}, M+0x90 {}, M+0x24c {}, M+0x258 {}, M+0x22c {}",
+                "step {step}: ret {last}, M+0xb8 {}, M+0xcc {}, M+0x90 {}, M+0x24c {}, M+0x258 {}, M+0x22c {}",
+                vm.f32(m + 0xb8),
                 vm.f32(m + 0xcc),
                 vm.f32(m + 0x90),
                 vm.f32(m + 0x24c),

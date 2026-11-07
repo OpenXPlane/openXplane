@@ -455,3 +455,20 @@ Findings:
   so 2100 rpm instead of 2400 would take 25% off) or its induced-velocity lag makes the first seconds a transient.
   Both need the engine side (`update_engine_piston` coupled to `prop_force`) rather than a rated-power balance;
   that coupling is the next offline step, validated against this table of accelerations.
+
+## Step 1r: how the original couples engine and propeller rpm; the words it needs are not loaded (2026-11-07)
+
+Read from `controls.rs` (the lever-group stage, already ported 1:1): per group the engine speed `x9` (`M+0x78`, rad/s;
+the propeller's `R+0x1c` is `x9 / part+0x20`) is integrated as
+`x9 += dt * x8 / x11` with the net torque
+`x8 = M+0xb8 - R+0x64 / part+0x20 - E+0xc * B+0x964 * sign(x9) - |M+0xb8| * B+0x968 * sign(x9)` (plus the
+`rate_follow` limits at 1.25 times `E+0xc`) and the inertia `x11 = E+0x3c + part+0x18 / part+0x20^2`.
+The piston finish stage writes `M+0xb8 = sqrt(E+0x64) * (E+0xc * (thrust + v9 - x14b) - M+0x268 / M+0x78)`, i.e. `E+0xc`
+is the torque scale (the table's constant 469.45 N m = 132735 W / 282.74 rad/s fits).
+
+Not available offline: on the stock C172 the loader leaves `E+0xc`, `E+0x10`, `E+0x3c`, `part+0x18` (propeller
+inertia), `B+0x964`, `B+0x968` at 0 (printed by `original_piston_update_runs_on_the_c172_object`), so they are derived
+words like `W+0x18`. The coupled equilibrium (rpm at a given throttle and airspeed) cannot be closed without them; the
+writers in the original's loader (or live reads of those six words, one call of the getter) are what is missing. With
+`OPENXPLANE_ENGINE_SPEED=<rad/s>` the piston test now takes the speed in the unit the update uses (the earlier 2400
+was rpm in a rad/s slot).
