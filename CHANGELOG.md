@@ -7,6 +7,13 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Roll deficit of the propeller table located (offline)
+
+- From the recorded roll alone, [the acceleration against speed](site/assets/roll-accel-vs-speed-20261107.png):
+  the table's net force stays near 2750 N while the original's falls to 1085 N at 33 m/s; the missing force is
+  a ramp over 13 m/s and then constant (about 1300 N), so it is not a missing body-drag term. The converged
+  propeller has a normal figure of merit (0.53); the open part is the engine/rpm side.
+
 ### Propeller table as the roll's thrust source: tried, too strong
 
 - An optional thrust table from the ported propeller code (`OPENXPLANE_THRUST_TABLE` for `fly-test`) replaces

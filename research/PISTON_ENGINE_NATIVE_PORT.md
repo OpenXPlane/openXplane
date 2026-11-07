@@ -426,3 +426,32 @@ the speed dependence matches. Causes not separated: the engine side (the real en
 piston update, not a rated-power balance), the derived words guessed for loaded states, the idle-state `F`/`X`
 snapshot used for every speed. What would settle it: the live `R+0x60` (thrust) and `R+0x1c` (rpm) during the
 original's own roll (`roll_frida.js` logs them), then the same comparison per speed.
+
+## Step 1q: where the table's roll differs from the original, without the original (2026-11-07)
+
+Offline analysis of the recorded roll (no game launched). Acceleration per speed segment, original against the port
+(`%TEMP%\xp\missing_drag.py`, mass 951 kg; chart `site/assets/roll-accel-vs-speed-20261107.png`):
+
+| V, m/s | original | table | fitted law |
+| --- | --- | --- | --- |
+| 2.6 | 3.03 | 3.22 | 2.57 |
+| 7.7 | 2.06 | 3.03 | 2.24 |
+| 12.9 | 1.56 | 2.86 | 1.91 |
+| 18.0 | 1.51 | 2.86 | 1.66 |
+| 23.1 | 1.39 | 2.86 | 1.43 |
+| 33.4 | 1.14 | 2.57 | 1.03 |
+
+Findings:
+- The table's net force is nearly flat (about 2750 N); the original's falls from 2880 N to 1085 N. The missing force
+  (table minus original, times mass) is 180 N at 2.6 m/s, then about 920, 1235, 1280, 1400, 1360 N from 7.7 m/s on:
+  a ramp over the first 13 m/s and then roughly constant, not proportional to dynamic pressure. A missing body drag
+  term (CdA) is therefore not the explanation.
+- The propeller at the table's rpm is self-consistent: the induced-velocity state has converged (300, 1500 and 4000
+  frames give the same `R+0x84` = 40.8 m/s = sqrt(2T/(rho A))) and the figure of merit is 0.53 (shaft power 117 kW,
+  ideal 62 kW), which is normal for a fixed-pitch propeller. So the thrust per torque is plausible; what is open is
+  the torque (rpm) the original's engine and propeller settle at, and the first seconds' transient.
+- The first segment agrees (3.03 against 3.22): the original starts as strong as the table and loses about half
+  of it within 13 m/s. Candidate: the original's rpm is lower once the roll starts (thrust scales with rpm squared,
+  so 2100 rpm instead of 2400 would take 25% off) or its induced-velocity lag makes the first seconds a transient.
+  Both need the engine side (`update_engine_piston` coupled to `prop_force`) rather than a rated-power balance;
+  that coupling is the next offline step, validated against this table of accelerations.
