@@ -410,3 +410,19 @@ more before the port's call, so the remaining differences are of the order of th
 Still open: the engine/prop state of the port is not wired into `FlightModel::forces`; the record fields the
 original's flight loop feeds (`R+0x1c` from the engine, `F+0x370` airflow, ...) have to come from the port's
 state, and a loaded-propeller case (not idle) still has to be compared.
+
+## Step 1p: the ported propeller as the thrust source of the roll: too strong (2026-11-07)
+
+`FlightModel::thrust_table` (optional; `fly-test` reads `OPENXPLANE_THRUST_TABLE`) replaces the fitted law by a
+full-power thrust table `(V, T)`. The table was computed with the live-state `prop_force` (idle snapshot of `F`, `X`
+and `R`, the real noise table, 1500 frames so the induced-velocity state settles) at the rpm where the blade torque
+equals a crude engine (178 hp rated at 2700 rpm, power proportional to rpm): static 3055 N at 252 rad/s, falling to
+2505 N at 70 m/s (`%TEMP%\xp\prop_table.csv`, produced by `prop_table.py`).
+
+Hands-off roll with this table (`OPENXPLANE_HANDS_OFF=1`, trim 0.07) against the recording: 70 kt after 12.6 s
+(original 23.1 s, fitted law 22.9 s), liftoff at 18.7 s (original 33.8 s). Scaling the table by 0.55..0.65 gets the
+mean error down to 1-2 s but not the shape (too slow at the start, too fast later), so neither the magnitude nor
+the speed dependence matches. Causes not separated: the engine side (the real engine power and rpm come from the
+piston update, not a rated-power balance), the derived words guessed for loaded states, the idle-state `F`/`X`
+snapshot used for every speed. What would settle it: the live `R+0x60` (thrust) and `R+0x1c` (rpm) during the
+original's own roll (`roll_frida.js` logs them), then the same comparison per speed.

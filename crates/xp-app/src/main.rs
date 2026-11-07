@@ -417,6 +417,11 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         let mut c = openxplane::flight::Controls::default();
         let dt = 1.0 / 200.0;
         let mut liftoff = None;
+        if let Some(path) = std::env::var_os("OPENXPLANE_THRUST_TABLE") {
+            model.thrust_table = Some(openxplane::flight::parse_thrust_table(
+                &fs::read_to_string(path)?,
+            )?);
+        }
         let hands_off = std::env::var_os("OPENXPLANE_HANDS_OFF").is_some();
         if let Some(trim) = std::env::var("OPENXPLANE_ELEVATOR_TRIM")
             .ok()

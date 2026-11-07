@@ -179,6 +179,9 @@ pub struct FlightModel {
     pub cg: Vec3,
     /// Where the propeller thrust acts (`_engn/0/_part_x/y/z`), in the aircraft frame.
     pub thrust_point: Vec3,
+    /// Full-power thrust against forward speed, `(m/s, N)` pairs sorted by speed, from the ported propeller code
+    /// at the rpm where its torque matches the engine's. Replaces the fitted thrust law when set.
+    pub thrust_table: Option<Vec<(f32, f32)>>,
     pub state: State,
     pub gears: Vec<Gear>,
     pub elevation_m: f32,
@@ -219,6 +222,36 @@ pub fn takeoff_pilot(model: &FlightModel, c: &mut Controls) {
         let rate = model.state.omega.x.to_degrees();
         c.elevator = (0.12 + 0.10 * (target - t.pitch_deg) - 0.06 * rate).clamp(-0.5, 0.9);
     }
+}
+
+/// Linear interpolation in a thrust table (constant beyond its ends).
+fn table_thrust(table: &[(f32, f32)], v: f32) -> f32 {
+    match table.iter().position(|(x, _)| *x >= v) {
+        None => table.last().map_or(0.0, |p| p.1),
+        Some(0) => table[0].1,
+        Some(i) => {
+            let ((x0, y0), (x1, y1)) = (table[i - 1], table[i]);
+            y0 + (y1 - y0) * (v - x0) / (x1 - x0)
+        }
+    }
+}
+
+/// Reads `v_ms,omega,thrust_n,torque_nm` rows into a thrust table.
+pub fn parse_thrust_table(text: &str) -> Result<Vec<(f32, f32)>, String> {
+    let mut rows = Vec::new();
+    for line in text.lines().skip(1).filter(|l| !l.trim().is_empty()) {
+        let cols: Vec<&str> = line.split(',').collect();
+        if cols.len() < 3 {
+            return Err(format!("thrust table row: {line}"));
+        }
+        let v = cols[0].parse::<f32>().map_err(|e| e.to_string())?;
+        let t = cols[2].parse::<f32>().map_err(|e| e.to_string())?;
+        rows.push((v, t));
+    }
+    if rows.is_empty() {
+        return Err("empty thrust table".into());
+    }
+    Ok(rows)
 }
 
 pub fn isa(height_m: f32) -> (f32, f32) {
@@ -559,6 +592,7 @@ impl FlightModel {
                     _ => Vec3::new(0.0, 0.0, -1.6),
                 }
             },
+            thrust_table: None,
             state: State {
                 position: Vec3::new(0.0, 2.0, 0.0),
                 velocity: Vec3::ZERO,
@@ -752,8 +786,23 @@ impl FlightModel {
             "laminar/c172/knob_OAT" => return Some(2.0),
             _ => {}
         }
-        if name == "sim/flightmodel2/controls/elevator_trim" {
-            return Some(c.elevator_trim);
+        // Pilot-commanded values the model keeps in `Controls`, under every name the original exposes them by.
+        match name {
+            "sim/flightmodel2/controls/elevator_trim"
+            | "sim/cockpit2/controls/elevator_trim"
+            | "sim/flightmodel/controls/elv_trim" => return Some(c.elevator_trim),
+            "sim/flightmodel2/controls/aileron_trim"
+            | "sim/cockpit2/controls/aileron_trim"
+            | "sim/flightmodel/controls/ail_trim" => return Some(c.aileron_trim),
+            "sim/flightmodel2/controls/rudder_trim"
+            | "sim/cockpit2/controls/rudder_trim"
+            | "sim/flightmodel/controls/rud_trim" => return Some(c.rudder_trim),
+            "sim/cockpit2/controls/flap_handle_request_ratio"
+            | "sim/flightmodel/controls/flaprqst" => return Some(c.flaps),
+            "sim/cockpit2/controls/wheel_brake_ratio"
+            | "sim/cockpit2/controls/left_brake_ratio"
+            | "sim/cockpit2/controls/right_brake_ratio" => return Some(c.brake),
+            _ => {}
         }
         let (array, index) = name.strip_suffix(']')?.rsplit_once('[')?;
         let index: usize = index.parse().ok()?;
@@ -1015,7 +1064,12 @@ impl FlightModel {
         let lapse = ((rho / SEA_LEVEL_DENSITY) - 0.12) / 0.88;
         let power = c.throttle.clamp(0.0, 1.0) * self.max_power_w * lapse.max(0.0);
         let static_cap = STATIC_THRUST * (power / self.max_power_w).powf(2.0 / 3.0);
-        let thrust = (PROP_EFFICIENCY * power / (forward + PROP_SPEED_OFFSET)).min(static_cap);
+        let thrust = if let Some(table) = &self.thrust_table {
+            // power scales with the throttle and the density lapse, and so does the thrust at a given speed
+            table_thrust(table, forward) * (power / self.max_power_w)
+        } else {
+            (PROP_EFFICIENCY * power / (forward + PROP_SPEED_OFFSET)).min(static_cap)
+        };
         force_b += Vec3::NEG_Z * thrust;
         moment_b += (self.thrust_point - self.cg).cross(Vec3::NEG_Z * thrust);
 

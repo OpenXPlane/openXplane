@@ -7,6 +7,16 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Propeller table as the roll's thrust source: tried, too strong
+
+- An optional thrust table from the ported propeller code (`OPENXPLANE_THRUST_TABLE` for `fly-test`) replaces
+  the fitted thrust law for tests. With the table computed at a rated-power rpm balance the C172 reaches 70 kt in
+  12.6 s where the [recording](site/assets/roll-propeller-table-20261107.png) of the original needs 23.1 s, so the
+  propeller is not wired into the flight model; the fitted law stays the default. Notes and next checks are in
+  `research/PISTON_ENGINE_NATIVE_PORT.md` (step 1p).
+- Control datarefs: the three trims, the flap request and the wheel brakes are answered under every name the
+  original exposes them by (`sim/cockpit2/controls/*`, `sim/flightmodel/controls/*`, `sim/flightmodel2/controls/*`).
+
 ### Propeller blade elements against the running original
 
 - The ported propeller call (`prop_force` with the verified element force and airfoil code) now matches a live

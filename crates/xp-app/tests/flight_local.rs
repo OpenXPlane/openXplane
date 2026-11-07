@@ -291,6 +291,64 @@ fn swept_wings_run_through_delta_context_in_the_live_model() {
 }
 
 #[test]
+fn control_datarefs_follow_the_commanded_values_under_every_name() {
+    let Some(m) = model() else { return };
+    let c = Controls {
+        elevator_trim: 0.1,
+        aileron_trim: -0.2,
+        rudder_trim: 0.3,
+        flaps: 0.5,
+        brake: 0.7,
+        ..Controls::default()
+    };
+    for (names, value) in [
+        (
+            &[
+                "sim/flightmodel2/controls/elevator_trim",
+                "sim/cockpit2/controls/elevator_trim",
+                "sim/flightmodel/controls/elv_trim",
+            ][..],
+            0.1,
+        ),
+        (
+            &[
+                "sim/flightmodel2/controls/aileron_trim",
+                "sim/cockpit2/controls/aileron_trim",
+                "sim/flightmodel/controls/ail_trim",
+            ][..],
+            -0.2,
+        ),
+        (
+            &[
+                "sim/flightmodel2/controls/rudder_trim",
+                "sim/cockpit2/controls/rudder_trim",
+                "sim/flightmodel/controls/rud_trim",
+            ][..],
+            0.3,
+        ),
+        (
+            &[
+                "sim/cockpit2/controls/flap_handle_request_ratio",
+                "sim/flightmodel/controls/flaprqst",
+            ][..],
+            0.5,
+        ),
+        (
+            &[
+                "sim/cockpit2/controls/wheel_brake_ratio",
+                "sim/cockpit2/controls/left_brake_ratio",
+                "sim/cockpit2/controls/right_brake_ratio",
+            ][..],
+            0.7,
+        ),
+    ] {
+        for name in names {
+            assert_eq!(m.animation_dataref(name, &c), Some(value), "{name}");
+        }
+    }
+}
+
+#[test]
 fn position_datarefs_follow_the_model_state() {
     let Some(mut m) = model() else { return };
     let c = Controls::default();
@@ -1074,6 +1132,19 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
             }
         }
     }
+    // explicit overrides win over the live snapshot
+    if let Some(v) = std::env::var("OPENXPLANE_PROP_OMEGA")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    {
+        r.set_f32(0x1c, v);
+    }
+    if let Some(v) = std::env::var("OPENXPLANE_PROP_AIRSPEED")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    {
+        f.set_f32(0x370, -v);
+    }
     let mut env = LiveProp {
         f: f.clone(),
         b: b.clone(),
@@ -1094,6 +1165,15 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         e_table: &e,
         m: &m,
     };
+    // frames run before the reported one, so the induced-velocity state settles (the call filters it per frame)
+    let warmup: usize = std::env::var("OPENXPLANE_PROP_FRAMES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    for _ in 0..warmup {
+        let _ =
+            openxplane::prop::prop_force(&mut objects, 0, &mut env, openxplane::prop::Stop::End);
+    }
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         openxplane::prop::prop_force(&mut objects, 0, &mut env, {
             use openxplane::prop::Stop::*;
