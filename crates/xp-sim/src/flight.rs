@@ -54,6 +54,8 @@ const DOWNWASH_FACTOR: f32 = 1.5;
 /// Assumed destabilising pitching-moment slope of the fuselage per radian of angle of attack,
 /// referenced to the main wing area and mean chord (the lifting surfaces alone are too stable).
 const FUSELAGE_CM_ALPHA: f32 = 0.5;
+/// Oswald span efficiency factor for the induced-drag ground-effect correction.
+const OSWALD_E: f32 = 0.8;
 /// Idle speed, rad/s (500 rpm from the ACF `_RSC_idlespeed_ENGN`).
 const IDLE_OMEGA: f32 = 52.36;
 
@@ -208,6 +210,7 @@ pub struct FlightModel {
     main_wing_ar: f32,
     reference_area: f32,
     reference_chord: f32,
+    wingspan: f32,
     rest: Option<(State, Vec<Gear>)>,
     /// Scenario clock behind the time datarefs; the default is a placeholder, not a scenario time.
     pub clock: crate::clock::SimClock,
@@ -641,6 +644,7 @@ impl FlightModel {
             main_wing_ar: main_ar,
             reference_area: ref_area,
             reference_chord: ref_chord,
+            wingspan: (main_ar * ref_area).sqrt(),
             rest: None,
             clock: crate::clock::SimClock::default(),
             fuel: crate::fuel::FuelSelector::default(),
@@ -958,6 +962,11 @@ impl FlightModel {
         let temperature_k = 288.15 - 0.0065 * height.clamp(-500.0, 11000.0);
         let temperature_c = temperature_k - 273.15;
         let sound_speed = 20.046_8 * temperature_k.sqrt();
+        // Ground effect: McCormick factor reduces induced drag near the surface.
+        // h_agl = CG height above the ground plane; phi → 0 on the ground, 1 in free air.
+        let h_agl = st.position.y.max(0.0);
+        let hb = 16.0 * h_agl / self.wingspan;
+        let ge_phi = hb * hb / (1.0 + hb * hb);
         let mut force_b = Vec3::ZERO;
         let mut moment_b = Vec3::ZERO;
         let flap_deg = self.flap_degrees(c.flaps);
@@ -1092,6 +1101,9 @@ impl FlightModel {
             if !behind && e.normal.y.abs() > 0.7 && e.chord > 0.5 {
                 cl_weighted += cl * e.area;
                 area_sum += e.area;
+                // ground effect: reduce the induced drag portion (Cl²/πeAR) by (1 - phi)
+                let cdi = cl * cl / (std::f32::consts::PI * OSWALD_E * self.main_wing_ar);
+                cd -= cdi * (1.0 - ge_phi);
             }
             if ed.controls[3] > 0.0 {
                 cd += 0.012 * (flap_deg / 10.0).powi(2) * ed.controls[3];

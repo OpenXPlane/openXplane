@@ -7,6 +7,12 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Ground effect reduces induced drag near the surface
+
+- McCormick ground-effect factor applied to main-wing elements: induced drag (Cl²/πeAR)
+  is reduced when the aircraft is within about one wingspan of the ground. The effect is
+  strongest at rotation (h/b ≈ 0.18 → 46 % induced drag reduction) and fades by one wingspan AGL.
+
 ### Phase 1 trajectory tests and tolerances
 
 - Three new flight-model tests pin the port's cruise, stall and landing trajectories against
