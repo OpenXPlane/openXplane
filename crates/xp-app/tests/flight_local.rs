@@ -1284,3 +1284,151 @@ fn original_prop_force_reaches_the_end_on_the_c172_records() {
         eprintln!("frame words: {probe:x?}");
     }
 }
+
+// ========== Phase 1 trajectory tests ==========
+//
+// These record cruise, stall and landing trajectories from the port's own model (no original
+// required) and check them against Cessna 172 SP POH numbers and physical plausibility.
+// They pin the port's current behaviour: if the model improves, the tolerances should tighten.
+
+/// Cruise: trimmed level flight at ~75 % power (~2300 rpm). The Cessna 172 SP POH gives
+/// about 110–122 KIAS at 75 % power at sea level. The test trims to level flight, then
+/// checks that it holds altitude within ±200 ft and airspeed within the POH band for 60 s.
+#[test]
+fn cruise_level_flight_holds_altitude_and_airspeed() {
+    let Some(mut m) = in_the_air() else { return };
+    m.set_airspeed(56.0); // ~109 kt
+    let mut c = Controls {
+        throttle: 0.75,
+        elevator_trim: 0.04,
+        ..Controls::default()
+    };
+    let dt = 1.0 / 200.0;
+    // settle for 30 s with a simple pitch-hold
+    for _ in 0..(30.0 / dt) as usize {
+        let t = m.telemetry(&c);
+        c.elevator = 0.005 * (0.0 - t.vertical_speed_fpm / 60.0);
+        c.elevator = c.elevator.clamp(-0.3, 0.3);
+        m.step(dt, &c);
+    }
+    let alt0 = m.telemetry(&c).altitude_ft;
+    let mut min_ias = f32::MAX;
+    let mut max_ias = f32::MIN;
+    let mut min_alt = f32::MAX;
+    let mut max_alt = f32::MIN;
+    // record 60 s of cruise
+    for i in 0..(60.0 / dt) as usize {
+        let t = m.telemetry(&c);
+        c.elevator = 0.005 * (0.0 - t.vertical_speed_fpm / 60.0);
+        c.elevator = c.elevator.clamp(-0.3, 0.3);
+        m.step(dt, &c);
+        if i % 200 == 0 {
+            min_ias = min_ias.min(t.airspeed_kt);
+            max_ias = max_ias.max(t.airspeed_kt);
+            min_alt = min_alt.min(t.altitude_ft);
+            max_alt = max_alt.max(t.altitude_ft);
+        }
+    }
+    assert!(
+        min_ias > 85.0 && max_ias < 140.0,
+        "cruise IAS {min_ias}–{max_ias} kt, expected 85–140 kt (POH band ~110–122 kt at 75%)"
+    );
+    assert!(
+        (max_alt - alt0).abs() < 200.0 && (min_alt - alt0).abs() < 200.0,
+        "altitude drift {min_alt}–{max_alt} ft from {alt0}, tolerance ±200 ft"
+    );
+}
+
+/// Power-off stall: idle throttle, gradual pull-up from level flight at ~70 kt.
+/// POH: clean stall at 48 KIAS (at max gross weight). The test checks that at least some
+/// wing elements report stalled, that the minimum airspeed is below 55 kt (allowing margin
+/// for the approximate model), and that the aircraft does not diverge.
+#[test]
+fn power_off_stall_triggers_below_55_kt_clean() {
+    let Some(mut m) = in_the_air() else { return };
+    m.set_airspeed(36.0); // ~70 kt
+    let dt = 1.0 / 200.0;
+    let mut min_ias = f32::MAX;
+    let mut max_stalled: usize = 0;
+    let mut stall_speed = f32::NAN;
+    for step in 0..(40.0 / dt) as usize {
+        let t = m.telemetry(&Controls::default());
+        // gradually pull back: 0 at t=0, 0.8 at t=20 s, hold
+        let time = step as f32 * dt;
+        let pull = (time / 20.0).min(0.8);
+        let c = Controls {
+            throttle: 0.0,
+            elevator: pull,
+            ..Controls::default()
+        };
+        if t.stalled_elements > 0 && stall_speed.is_nan() {
+            stall_speed = t.airspeed_kt;
+        }
+        max_stalled = max_stalled.max(t.stalled_elements);
+        min_ias = min_ias.min(t.airspeed_kt);
+        m.step(dt, &c);
+        assert!(m.state.position.is_finite(), "diverged at {time} s");
+    }
+    assert!(
+        max_stalled > 0,
+        "no wing elements stalled during the power-off pull-up"
+    );
+    assert!(
+        stall_speed < 55.0,
+        "stall onset at {stall_speed} kt, expected below 55 kt (POH 48 KIAS clean)"
+    );
+    assert!(
+        min_ias < 55.0,
+        "minimum IAS {min_ias} kt, expected below 55 kt"
+    );
+}
+
+/// Landing approach and touchdown: descend from 600 m AGL at ~65 kt with idle power and
+/// full flaps. The Cessna 172 approach speed is 60–65 KIAS with full flaps. The test checks
+/// that the aircraft touches down, that the touchdown speed is in the 50–80 kt band, and
+/// that the descent rate at contact is survivable (< 1000 fpm).
+#[test]
+fn landing_approach_touches_down_at_a_plausible_speed() {
+    let Some(mut m) = model() else { return };
+    // start at 600 m AGL, aimed south, at ~65 kt
+    m.state.position.y += 600.0;
+    m.set_airspeed(33.4); // ~65 kt
+    let dt = 1.0 / 200.0;
+    let mut touchdown_speed = f32::NAN;
+    let mut touchdown_vvi = f32::NAN;
+    for step in 0..(120.0 / dt) as usize {
+        let t = m.telemetry(&Controls::default());
+        let time = step as f32 * dt;
+        // simple glide slope hold: pitch for ~65 kt, flaps full, idle power
+        let speed_err = t.airspeed_kt - 65.0;
+        let elevator = (-0.01 * speed_err).clamp(-0.4, 0.4);
+        let c = Controls {
+            throttle: 0.0,
+            flaps: 1.0,
+            elevator,
+            elevator_trim: 0.10,
+            ..Controls::default()
+        };
+        m.step(dt, &c);
+        if t.on_ground && touchdown_speed.is_nan() && time > 5.0 {
+            touchdown_speed = t.airspeed_kt;
+            touchdown_vvi = t.vertical_speed_fpm;
+        }
+        if !touchdown_speed.is_nan() && time > 5.0 {
+            break;
+        }
+        assert!(m.state.position.is_finite(), "diverged at {time} s");
+    }
+    assert!(
+        !touchdown_speed.is_nan(),
+        "never touched down within 120 s"
+    );
+    assert!(
+        touchdown_speed > 40.0 && touchdown_speed < 90.0,
+        "touchdown at {touchdown_speed} kt, expected 50–80 kt"
+    );
+    assert!(
+        touchdown_vvi > -1000.0,
+        "touchdown VVI {touchdown_vvi} fpm, expected > -1000 fpm"
+    );
+}

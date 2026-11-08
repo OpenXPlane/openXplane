@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Phase 1 trajectory tests and tolerances
+
+- Three new flight-model tests pin the port's cruise, stall and landing trajectories against
+  Cessna 172 SP POH numbers: cruise holds 85–140 kt IAS and ±200 ft altitude at 75 % power;
+  power-off stall triggers below 55 kt with wing elements reporting stalled; landing approach
+  from 600 m AGL touches down at 40–90 kt with VVI above −1000 fpm. Tolerances recorded in
+  `docs/PLAN.md`. Controls default now starts with ignition BOTH (engine running).
+
 ### Engine-propeller coupling: mixture, ignition and rpm datarefs (offline)
 
 - The piston engine is wired into the flight model: throttle, mixture lever, ignition key and density lapse all

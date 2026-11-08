@@ -47,6 +47,21 @@ recorded trajectory), not only unit tests. Shares refer to the weights in [COMPA
 
 Exit: recorded trajectories of the stock Cessna 172 (takeoff, cruise, stall, landing) match within a stated tolerance.
 
+### Phase 1 tolerances (port model vs POH / reference recording)
+
+| Scenario | Metric | Tolerance | Source |
+|---|---|---|---|
+| **Takeoff roll** | time to 20/40/60/70 kt | ±2 s of the recorded original | `research/REFERENCE_TAKEOFF_C172.md` |
+| **Hands-off takeoff** | liftoff time and speed | ±4 s, ±5 kt of the recorded 33.8 s / 86 kt | same recording, trim 0.07 |
+| **Cruise (75 % power)** | IAS band | 85–140 kt (POH: 110–122 KIAS at sea level) | Cessna 172S POH §5 |
+| **Cruise (75 % power)** | altitude hold | ±200 ft over 60 s | steady-state flight |
+| **Power-off stall** | stall onset IAS | below 55 kt (POH: 48 KIAS clean at max gross) | Cessna 172S POH §5 |
+| **Power-off stall** | stall detection | at least one wing element reports stalled | model consistency |
+| **Landing approach** | touchdown IAS | 40–90 kt (POH approach: 60–65 KIAS full flaps) | Cessna 172S POH §4 |
+| **Landing approach** | touchdown VVI | above −1000 fpm | survivable contact |
+
+These are pinned by tests in `crates/xp-app/tests/flight_local.rs`. As the model improves toward the original's recovered code, tolerances should tighten toward the recorded reference values.
+
 ## Phase 2: Datarefs and commands (weight 8)
 
 1. Backing values for the 5503 datarefs, grouped by owner (flight, engine, controls, view, weather).

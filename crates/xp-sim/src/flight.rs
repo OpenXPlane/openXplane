@@ -96,7 +96,7 @@ impl Default for Controls {
             rudder_trim: 0.0,
             mixture: 1.0,
             carb_heat: 0.0,
-            ignition: crate::ignition::Ignition::default(),
+            ignition: crate::ignition::Ignition { key: crate::ignition::BOTH },
         }
     }
 }
