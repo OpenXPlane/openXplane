@@ -7,6 +7,14 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Engine-propeller coupling: mixture, ignition and rpm datarefs (offline)
+
+- The piston engine is wired into the flight model: throttle, mixture lever, ignition key and density lapse all
+  affect engine power and thrust. Engine rpm tracks the equilibrium and is exposed via `engine_speed_rpm[0]`,
+  `ENGN_tacrad[0]`, `ENGN_power[0]` and `engine_is_burning_fuel[0]` datarefs. Mixture cutoff kills the engine;
+  single magneto reduces power to 95 %. The fitted thrust law is unchanged (still validated against the recorded
+  original roll). [Engine model takeoff chart](site/assets/engine-model-takeoff-20261108.png).
+
 ### Copilot and standby gauge datarefs follow the pilot's (offline)
 
 - The copilot AHARS pitch, roll and heading, the copilot and standby airspeed and altitude, and the copilot

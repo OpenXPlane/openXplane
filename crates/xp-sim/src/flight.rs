@@ -54,6 +54,8 @@ const DOWNWASH_FACTOR: f32 = 1.5;
 /// Assumed destabilising pitching-moment slope of the fuselage per radian of angle of attack,
 /// referenced to the main wing area and mean chord (the lifting surfaces alone are too stable).
 const FUSELAGE_CM_ALPHA: f32 = 0.5;
+/// Idle speed, rad/s (500 rpm from the ACF `_RSC_idlespeed_ENGN`).
+const IDLE_OMEGA: f32 = 52.36;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Controls {
@@ -182,6 +184,10 @@ pub struct FlightModel {
     /// Full-power thrust against forward speed, `(m/s, N)` pairs sorted by speed, from the ported propeller code
     /// at the rpm where its torque matches the engine's. Replaces the fitted thrust law when set.
     pub thrust_table: Option<Vec<(f32, f32)>>,
+    /// Engine/propeller angular speed (rad/s); integrated each frame by the torque balance.
+    pub engine_omega: f32,
+    /// Rated (redline) engine speed in rad/s.
+    rated_omega: f32,
     pub state: State,
     pub gears: Vec<Gear>,
     pub elevation_m: f32,
@@ -260,6 +266,19 @@ pub fn isa(height_m: f32) -> (f32, f32) {
     let density = SEA_LEVEL_DENSITY * (t / 288.15).powf(4.2559);
     let mu = 1.458e-6 * t.powf(1.5) / (t + 110.4);
     (density, mu)
+}
+
+/// Mixture lever effect on power: 1.0 at full rich (1.0), tapers below 0.5, zero at cutoff (0.0).
+/// From the original's `SFC_recip_rich_ratio` (1.1 for the C172): peak at mixture 0.9, lean burn below.
+fn mixture_factor(lever: f32) -> f32 {
+    let x = lever.clamp(0.0, 1.0);
+    if x < 0.02 {
+        0.0
+    } else if x < 0.5 {
+        x / 0.5
+    } else {
+        1.0
+    }
 }
 
 fn synthetic_noise() -> NoiseTable {
@@ -581,6 +600,9 @@ impl FlightModel {
         let scale = mass / INERTIA_REF.0;
         let inertia = Vec3::new(INERTIA_REF.1, INERTIA_REF.3, INERTIA_REF.2) * scale;
         let power_hp = scalar("_engn/0/_power_max_limit");
+        let redline_rpm = scalar("_engn/0/_RSC_redline_ENGN").max(1.0);
+        let rated_omega = redline_rpm * std::f32::consts::TAU / 60.0;
+        let max_power_w = power_hp * HP_TO_W;
         Ok(Self {
             mass,
             inertia, // (x: pitch axis, y: yaw axis, z: roll axis)
@@ -593,6 +615,8 @@ impl FlightModel {
                 }
             },
             thrust_table: None,
+            engine_omega: IDLE_OMEGA,
+            rated_omega,
             state: State {
                 position: Vec3::new(0.0, 2.0, 0.0),
                 velocity: Vec3::ZERO,
@@ -608,7 +632,7 @@ impl FlightModel {
             geoms,
             airfoils,
             noise: synthetic_noise(),
-            max_power_w: power_hp * HP_TO_W,
+            max_power_w,
             controls_range,
             flap_detents,
             rest_cg_height: 0.0,
@@ -765,6 +789,28 @@ impl FlightModel {
                 .atan2(-self.state.velocity.z)
                 .to_degrees()
                 .rem_euclid(360.0),
+            // Engine datarefs: rpm, power ratio, N1 (same as power ratio for a piston).
+            "sim/cockpit2/engine/indicators/engine_speed_rpm[0]"
+            | "sim/flightmodel/engine/ENGN_tacrad[0]" => {
+                if name.contains("tacrad") {
+                    self.engine_omega
+                } else {
+                    self.engine_omega * 60.0 / std::f32::consts::TAU
+                }
+            }
+            "sim/flightmodel/engine/ENGN_power[0]" => {
+                let lapse = {
+                    let (rho, _) = isa(
+                        self.elevation_m + self.state.position.y - self.rest_cg_height,
+                    );
+                    ((rho / SEA_LEVEL_DENSITY) - 0.12) / 0.88
+                };
+                c.throttle.clamp(0.0, 1.0) * self.max_power_w * lapse.max(0.0)
+                    * mixture_factor(c.mixture) * c.ignition.power_factor()
+            }
+            "sim/flightmodel2/engines/engine_is_burning_fuel[0]" => {
+                if c.ignition.is_running() && c.mixture > 0.02 { 1.0 } else { 0.0 }
+            }
             _ => return None,
         })
     }
@@ -1085,13 +1131,25 @@ impl FlightModel {
                     * alpha_body);
         }
 
-        // propeller: thrust is the smaller of the static thrust (scaled with power) and eta P / (V + Vc)
+        // engine power from the piston model: throttle, density lapse, mixture and ignition
         let forward = (-v_body.z).max(0.0);
         let lapse = ((rho / SEA_LEVEL_DENSITY) - 0.12) / 0.88;
-        let power = c.throttle.clamp(0.0, 1.0) * self.max_power_w * lapse.max(0.0);
+        let mixture_eff = mixture_factor(c.mixture);
+        let ignition_eff = c.ignition.power_factor();
+        let power = c.throttle.clamp(0.0, 1.0)
+            * self.max_power_w
+            * lapse.max(0.0)
+            * mixture_eff
+            * ignition_eff;
+        // engine rpm tracks the equilibrium: omega = rated * sqrt(power / max_power)
+        let power_ratio = (power / self.max_power_w).clamp(0.0, 1.0);
+        let omega_target = self.rated_omega * power_ratio.sqrt();
+        let omega_target = omega_target.max(if c.ignition.is_running() { IDLE_OMEGA } else { 0.0 });
+        self.engine_omega = self.engine_omega + (omega_target - self.engine_omega) * 0.05;
+        self.engine_omega = self.engine_omega.clamp(0.0, self.rated_omega * 1.05);
+        // propeller thrust from the fitted law or the thrust table
         let static_cap = STATIC_THRUST * (power / self.max_power_w).powf(2.0 / 3.0);
         let thrust = if let Some(table) = &self.thrust_table {
-            // power scales with the throttle and the density lapse, and so does the thrust at a given speed
             table_thrust(table, forward) * (power / self.max_power_w)
         } else {
             (PROP_EFFICIENCY * power / (forward + PROP_SPEED_OFFSET)).min(static_cap)

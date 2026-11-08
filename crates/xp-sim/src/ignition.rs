@@ -56,6 +56,20 @@ impl Ignition {
         self.key == START
     }
 
+    /// At least one magneto is on (engine can run).
+    pub fn is_running(&self) -> bool {
+        self.key >= RIGHT
+    }
+
+    /// Power factor: BOTH = 1.0, one magneto = 0.95 (the original's `0.95` factor), OFF = 0.
+    pub fn power_factor(&self) -> f32 {
+        match self.key {
+            0 => 0.0,
+            1 | 2 => 0.95,
+            _ => 1.0,
+        }
+    }
+
     pub fn dataref(&self, name: &str) -> Option<f32> {
         (name == "sim/cockpit2/engine/actuators/ignition_key[0]").then(|| f32::from(self.key))
     }
