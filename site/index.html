@@ -16,6 +16,7 @@
   </button>
   <nav id="nav-links" aria-label="Main">
     <a href="#about">About</a>
+    <a href="#progress">Progress</a>
     <a href="#aircraft">Aircraft</a>
     <a href="#gallery">Gallery</a>
     <a href="#engineering">Engineering</a>
@@ -65,6 +66,34 @@
     <div class="stat"><strong>54</strong><span>Datarefs</span></div>
     <div class="stat"><strong>7</strong><span>Phases</span></div>
   </div>
+</section>
+
+<!-- ===== PROGRESS ===== -->
+<section class="section progress-sec" id="progress">
+  <div class="progress-header">
+    <div>
+      <p class="label">Porting progress</p>
+      <h2>How far along are we?</h2>
+    </div>
+    <div class="progress-overall" aria-label="Overall porting progress">
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="#1e293b" stroke-width="10"/>
+          <circle class="ring-fill" cx="60" cy="60" r="52" fill="none" stroke="#2563eb" stroke-width="10"
+                  stroke-dasharray="326.7" stroke-dashoffset="326.7" stroke-linecap="round"
+                  transform="rotate(-90 60 60)"/>
+        </svg>
+        <div class="ring-text">
+          <strong id="overall-pct">--</strong>
+          <span>implemented</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="subsystem-bars" id="subsystem-bars">
+    <!-- populated by JS from compat.json -->
+  </div>
+  <p class="progress-note">Self-assessed rubric. Each bar shows <span class="legend-impl">implemented</span> vs <span class="legend-veri">verified</span> progress, weighted by subsystem importance.</p>
 </section>
 
 <!-- ===== AIRCRAFT ===== -->

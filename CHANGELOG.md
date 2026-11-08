@@ -7,6 +7,18 @@ Every entry that changes what you can see carries a screenshot or an animation (
 
 ## 0.1
 
+### Porting progress section on the landing page
+
+- New "Porting Progress" section between About and Aircraft with a prominent overall
+  percentage ring and per-subsystem progress bars (implemented vs verified).
+  Data is fetched live from `docs/compat.json`. Navigation bar updated with Progress link.
+
+### X-Plane recorder plugin for flight data capture
+
+- Rust-based X-Plane 12 plugin (`xp_recorder`) records 14 datarefs at 5 Hz to CSV.
+  Resolves XPLM API from `XPLM_64.dll` at runtime via `GetProcAddress`.
+  Used to capture reference trajectories for Phase 1 exit validation.
+
 ### Ground effect reduces induced drag near the surface
 
 - McCormick ground-effect factor applied to main-wing elements: induced drag (Cl²/πeAR)

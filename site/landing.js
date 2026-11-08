@@ -78,11 +78,49 @@
   fetch('docs/compat.json')
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (data) {
-      ['implemented', 'verified'].forEach(function (key) {
-        var el = document.getElementById(key);
-        if (!el || !data.subsystems) return;
-        var total = data.subsystems.reduce(function (s, i) { return s + i.weight * i[key]; }, 0);
-        el.textContent = '≈' + total.toFixed(1) + '%';
+      if (!data.subsystems) return;
+      var totalImpl = data.subsystems.reduce(function (s, i) { return s + i.weight * i.implemented; }, 0);
+      var totalVeri = data.subsystems.reduce(function (s, i) { return s + i.weight * i.verified; }, 0);
+
+      /* about stat row */
+      var elImpl = document.getElementById('implemented');
+      var elVeri = document.getElementById('verified');
+      if (elImpl) elImpl.textContent = '≈' + totalImpl.toFixed(1) + '%';
+      if (elVeri) elVeri.textContent = '≈' + totalVeri.toFixed(1) + '%';
+
+      /* overall ring */
+      var ringFill = document.querySelector('.ring-fill');
+      var ringPct = document.getElementById('overall-pct');
+      if (ringFill && ringPct) {
+        var circumference = 2 * Math.PI * 52;
+        ringPct.textContent = totalImpl.toFixed(0) + '%';
+        setTimeout(function () {
+          ringFill.style.strokeDashoffset = String(circumference * (1 - totalImpl / 100));
+        }, 100);
+      }
+
+      /* per-subsystem bars */
+      var container = document.getElementById('subsystem-bars');
+      if (!container) return;
+      data.subsystems.forEach(function (sub) {
+        var row = document.createElement('div');
+        row.className = 'bar-row';
+        var implPct = (sub.implemented * 100).toFixed(0);
+        var veriPct = (sub.verified * 100).toFixed(0);
+        row.innerHTML =
+          '<span class="bar-label" title="' + sub.name + '">' + sub.name + '</span>' +
+          '<div class="bar-track">' +
+            '<div class="bar-impl" style="width:0"></div>' +
+            '<div class="bar-veri" style="width:0"></div>' +
+          '</div>' +
+          '<span class="bar-pct">' + implPct + '%</span>';
+        container.appendChild(row);
+        var implBar = row.querySelector('.bar-impl');
+        var veriBar = row.querySelector('.bar-veri');
+        setTimeout(function () {
+          implBar.style.width = implPct + '%';
+          veriBar.style.width = veriPct + '%';
+        }, 150);
       });
     })
     .catch(function () {
