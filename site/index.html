@@ -3,24 +3,212 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>openXplane — An open future for flight</title>
-<meta name="description" content="An independent flight simulator engine in Rust. Explore the aircraft, follow development, and try the latest openXplane builds.">
-<meta name="theme-color" content="#081827"><link rel="icon" href="assets/icon.svg">
+<meta name="description" content="An independent flight simulator engine in Rust, reading original X-Plane 12 content. Follow development, explore the aircraft, try the nightly builds.">
+<meta name="theme-color" content="#0a0f1a"><link rel="icon" href="assets/icon.svg">
 <link rel="stylesheet" href="landing.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="navigation"><a class="brand" href="./" aria-label="openXplane home"><img src="assets/logos/wordmark-light.svg" alt="openXplane"></a>
-<button class="menu-toggle" aria-expanded="false" aria-controls="nav-links">Menu <span>+</span></button>
-<nav id="nav-links" aria-label="Main navigation"><a href="#experience">Explore</a><a href="#aircraft">Aircraft</a><a href="docs/">Docs ↗</a><a href="https://github.com/OpenXPlane/openXplane">GitHub ↗</a><a class="button small" href="#download">Get the nightly <span>↓</span></a></nav></header>
+<header class="nav-bar">
+  <a class="logo" href="./" aria-label="openXplane home"><img src="assets/logos/wordmark-light.svg" alt="openXplane"></a>
+  <button class="hamburger" aria-expanded="false" aria-controls="nav-links">
+    <span></span><span></span><span></span>
+  </button>
+  <nav id="nav-links" aria-label="Main">
+    <a href="#about">About</a>
+    <a href="#aircraft">Aircraft</a>
+    <a href="#gallery">Gallery</a>
+    <a href="#engineering">Engineering</a>
+    <a href="docs/">Docs</a>
+    <a href="https://github.com/OpenXPlane/openXplane">GitHub</a>
+    <a class="btn btn-sm" href="#download">Download</a>
+  </nav>
+</header>
+
 <main id="main">
-<section class="hero"><div class="hero-grid" aria-hidden="true"></div><img class="hero-aircraft" src="assets/cirrus-acf-20261026.png" alt="Cirrus Vision SF50 rendered by openXplane">
-<div class="hero-copy"><p class="eyebrow">Independent. Open source. In development.</p><h1>An open future<br>for <em>flight.</em></h1><p class="intro">A new engine. Familiar skies. Rebuilding the X-Plane 12 experience in Rust, one verified step at a time.</p><div class="actions"><a class="button" href="#download">Try openXplane <span>↓</span></a><a class="text-link" href="docs/#/status">See where we are <span>↗</span></a></div></div>
-<div class="hero-bottom"><span><i></i> Early development · Approximate flight model</span><span>Actual engine capture / Cirrus Vision SF50</span><a href="#experience" aria-label="Explore the project">Scroll to explore ↓</a></div></section>
-<section class="statement section" id="experience"><p class="eyebrow">Built in the open</p><div class="statement-grid"><h2>The journey is<br>part of the flight.</h2><div><p class="large-copy">Explore an independent engine that reads the aircraft and scenery you already own.</p><p>Load original content, take the controls, and follow the work toward a complete simulator. Today’s builds are experimental. Full X-Plane compatibility is the destination, and there is still a long way to go.</p><a class="underlined" href="docs/#/doc/USER_GUIDE">Start with the flight guide ↗</a></div></div>
-<div class="platform-line"><span>Windows</span><span>macOS</span><span>Linux</span><span>Rust + wgpu</span><span>GPL-3.0-or-later</span></div></section>
-<section class="feature-band"><div class="feature-image"><img src="assets/cessna-controls-20261026-flaps-down.png" alt="Cessna with deployed flaps in an openXplane KSEA scene" loading="lazy"><span class="image-note">Actual openXplane capture · scenery remains incomplete</span></div><div class="feature-copy"><p class="eyebrow">From input to motion</p><h2>Take the controls.<br>Watch it respond.</h2><p>Control surfaces and gear state now drive aircraft animation. The Cessna flies with the current approximate model, while original-code comparisons guide the next improvements.</p><a class="underlined" href="docs/#/gallery">Explore the captures ↗</a></div></section>
-<section class="section fleet" id="aircraft"><div class="section-heading"><div><p class="eyebrow">Aircraft, in focus</p><h2>Familiar shapes.<br>A different engine.</h2></div><p>Original aircraft content, read in place.<br>Preview support and flight support differ.</p></div><div class="aircraft-grid"><article><div class="aircraft-image"><img src="assets/cessna-acf-20261026.png" alt="Cessna 172 SP exterior rendered by openXplane" loading="lazy"></div><div class="aircraft-caption"><div><span class="eyebrow">01 / General aviation</span><h3>Cessna 172 SP</h3><p>Aircraft preview + approximate flight</p></div><a href="docs/#/doc/USER_GUIDE" aria-label="Cessna usage guide">↗</a></div></article><article><div class="aircraft-image"><img src="assets/cirrus-acf-20261026.png" alt="Cirrus Vision SF50 exterior rendered by openXplane" loading="lazy"></div><div class="aircraft-caption"><div><span class="eyebrow">02 / Personal jet</span><h3>Cirrus Vision SF50</h3><p>Aircraft preview · systems incomplete</p></div><a href="docs/#/doc/COMPATIBILITY" aria-label="Cirrus compatibility status">↗</a></div></article></div></section>
-<section class="progress section"><div><p class="eyebrow">Progress, with evidence</p><h2>See the work<br>behind the wings.</h2><p>Every build is a step forward. Read the research, inspect the source, and see the limitations alongside the results.</p><a class="underlined" href="docs/#/status">Compatibility and roadmap ↗</a></div><div class="progress-numbers"><div><strong id="implemented">—</strong><span>Implemented</span></div><div><strong id="verified">—</strong><span>Verified behavior</span></div><p>Self-assessed, weighted estimates. These figures do not prove whole-game or visual equivalence.</p></div></section>
-<section class="download section" id="download"><p class="eyebrow">Your next departure</p><h2>Ready to explore?</h2><p>Try the latest development build. Bring your own installed copy of X-Plane 12 — openXplane includes no game content.</p><div class="download-actions"><a class="button" href="https://github.com/OpenXPlane/openXplane/releases/tag/nightly">Download nightly <span>↓</span></a><a class="button outline" href="docs/#/doc/BUILDING">Build from source <span>↗</span></a></div><span class="download-note">Windows x64 · macOS Apple silicon · Linux x64<br>Terminal-based builds. Read the guide before your first flight.</span></section>
-</main><footer><a class="brand" href="./"><img src="assets/logos/wordmark-light.svg" alt="openXplane"></a><div><a href="docs/">Documentation</a><a href="docs/#/doc/CHANGELOG">Changelog</a><a href="https://github.com/OpenXPlane/openXplane">Source code</a></div><p>Independent and not affiliated with or endorsed by Laminar Research. X-Plane is a trademark of its respective owner.<br>Requires an original copy of X-Plane 12. GPL-3.0-or-later.</p></footer>
-<script src="landing.js"></script></body></html>
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero-fade" aria-hidden="true"></div>
+  <img class="hero-img" src="assets/cirrus-acf-20261026.png" alt="Cirrus Vision SF50 in openXplane">
+  <div class="hero-content">
+    <p class="label">Open-source flight simulation engine</p>
+    <h1>Rebuild <em>flight</em><br>from the ground up.</h1>
+    <p class="subtitle">An independent engine in Rust that reads X-Plane 12 aircraft and scenery. Every step verified against the original.</p>
+    <div class="hero-actions">
+      <a class="btn" href="#download">Try the nightly build</a>
+      <a class="btn btn-ghost" href="#engineering">See the engineering</a>
+    </div>
+  </div>
+  <div class="hero-strip">
+    <span><i class="dot"></i>Early development</span>
+    <span>Rust + wgpu</span>
+    <span>GPL-3.0-or-later</span>
+  </div>
+</section>
+
+<!-- ===== ABOUT ===== -->
+<section class="section about" id="about">
+  <div class="about-grid">
+    <div>
+      <p class="label">Built in the open</p>
+      <h2>The journey is part of the flight.</h2>
+    </div>
+    <div>
+      <p class="lead">An independent engine that loads the aircraft and scenery you already own from X-Plane 12.</p>
+      <p>Take the controls, inspect the research, and follow the work toward a complete simulator. Today's builds are experimental. Full compatibility is the destination.</p>
+      <a class="link-arrow" href="docs/#/doc/USER_GUIDE">Read the flight guide</a>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><strong id="implemented">--</strong><span>Implemented</span></div>
+    <div class="stat"><strong id="verified">--</strong><span>Verified</span></div>
+    <div class="stat"><strong>54</strong><span>Datarefs</span></div>
+    <div class="stat"><strong>7</strong><span>Phases</span></div>
+  </div>
+</section>
+
+<!-- ===== AIRCRAFT ===== -->
+<section class="section aircraft-sec" id="aircraft">
+  <p class="label">Aircraft in focus</p>
+  <h2>Familiar shapes, a different engine.</h2>
+  <div class="aircraft-grid">
+    <article class="card">
+      <img src="assets/cessna-acf-20261026.png" alt="Cessna 172 SP" loading="lazy">
+      <div class="card-body">
+        <span class="label">General aviation</span>
+        <h3>Cessna 172 SP</h3>
+        <p>Flight model + engine coupling. The primary test aircraft for Phase 1.</p>
+      </div>
+    </article>
+    <article class="card">
+      <img src="assets/cirrus-acf-20261026.png" alt="Cirrus Vision SF50" loading="lazy">
+      <div class="card-body">
+        <span class="label">Personal jet</span>
+        <h3>Cirrus Vision SF50</h3>
+        <p>Aircraft preview with geometry and textures. Systems incomplete.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ===== GALLERY ===== -->
+<section class="section gallery-sec" id="gallery">
+  <div class="gallery-header">
+    <div>
+      <p class="label">Development gallery</p>
+      <h2>Every step, captured.</h2>
+    </div>
+    <div class="gallery-filters">
+      <button class="filter active" data-filter="all">All</button>
+      <button class="filter" data-filter="flight">Flight</button>
+      <button class="filter" data-filter="scenery">Scenery</button>
+      <button class="filter" data-filter="research">Research</button>
+    </div>
+  </div>
+  <div class="gallery-grid">
+    <figure class="gallery-item" data-tags="research">
+      <img src="assets/engine-model-takeoff-20261108.png" alt="Engine-propeller model during C172 takeoff" loading="lazy">
+      <figcaption><strong>2026-11-08</strong> Engine model: rpm, thrust and airspeed during a hands-off takeoff with the new engine-propeller coupling.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="research">
+      <img src="assets/roll-accel-vs-speed-20261107.png" alt="Acceleration vs speed: original, table and fitted law" loading="lazy">
+      <figcaption><strong>2026-11-07</strong> Roll deficit: the propeller table's constant force vs the original's falling curve. Locates the ~1300 N gap.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="research">
+      <img src="assets/prop-idle-compare-20261101.png" alt="Propeller idle comparison" loading="lazy">
+      <figcaption><strong>2026-11-01</strong> Propeller idle: ported blade-element results within 5% of the live original.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="flight">
+      <img src="assets/uhww-port-20261029.jpg" alt="C172 at UHWW in openXplane" loading="lazy">
+      <figcaption><strong>2026-10-29</strong> Cessna 172 on the ramp at UHWW. Port render with terrain and objects.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="flight">
+      <img src="assets/uhww-reference-20261029.jpg" alt="Reference X-Plane at UHWW" loading="lazy">
+      <figcaption><strong>2026-10-29</strong> Reference: the same scene in the original X-Plane 12.4.3.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="scenery">
+      <img src="assets/ksea-live-terrain-20261026.jpg" alt="KSEA terrain rendering" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> KSEA live terrain: DSF mesh, textures and elevation from the global scenery.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="flight">
+      <img src="assets/cessna-controls-20261026-flaps-down.png" alt="Cessna with flaps deployed" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> Control surfaces: flaps deployed, with animated gear and tyre rotation.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="scenery">
+      <img src="assets/ksea-dsf-objects-20261026.png" alt="KSEA objects and buildings" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> KSEA objects: library objects, OBJ8 animations and ground markings.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="scenery">
+      <img src="assets/ksea-fac-roofs-20261026.png" alt="KSEA facade roofs" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> Facade geometry: roof caps and wall segments from the DSF polygons.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="flight">
+      <img src="assets/cessna-controls-20261026-roll-left.png" alt="Cessna rolling left" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> Aileron deflection: control input visible on the flight surfaces.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="scenery">
+      <img src="assets/ksea-agp-20261026.png" alt="KSEA autogen objects" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> Autogen: placed objects from the global scenery packs.</figcaption>
+    </figure>
+    <figure class="gallery-item" data-tags="flight">
+      <img src="assets/reference-cirrus-20261026.jpg" alt="Reference Cirrus cockpit" loading="lazy">
+      <figcaption><strong>2026-10-26</strong> Reference capture: Cirrus Vision SF50 cockpit in the original.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===== ENGINEERING ===== -->
+<section class="section eng-sec" id="engineering">
+  <p class="label">Engineering log</p>
+  <h2>Evidence, not promises.</h2>
+  <p class="eng-intro">Every ported function is checked against the original binary. Research notes, vector comparisons and live captures document what works and what remains.</p>
+  <div class="eng-grid">
+    <div class="eng-card">
+      <div class="eng-icon">01</div>
+      <h3>Flight model</h3>
+      <p>Wing elements, force aggregation, piston engine with mixture/ignition, propeller coupling, landing gear. Takeoff roll within 2 s of the original.</p>
+      <span class="eng-status active">In progress</span>
+    </div>
+    <div class="eng-card">
+      <div class="eng-icon">02</div>
+      <h3>Datarefs &amp; commands</h3>
+      <p>54 of 2388 mapped datarefs answered. Engine rpm, power, flight path, controls, gauges. Command coverage growing.</p>
+      <span class="eng-status">Phase 2</span>
+    </div>
+    <div class="eng-card">
+      <div class="eng-icon">03</div>
+      <h3>Content &amp; rendering</h3>
+      <p>OBJ8 reader, DSF terrain, facades, autogen. PBR materials, animations driven by datarefs, night textures.</p>
+      <span class="eng-status">Phase 3</span>
+    </div>
+    <div class="eng-card">
+      <div class="eng-icon">04</div>
+      <h3>World</h3>
+      <p>Global scenery, library resolution, apt.dat runways and taxiways. UHWW and KSEA loaded from the install.</p>
+      <span class="eng-status">Phase 4</span>
+    </div>
+  </div>
+  <a class="link-arrow" href="docs/#/status">Full roadmap and compatibility</a>
+</section>
+
+<!-- ===== DOWNLOAD ===== -->
+<section class="section download-sec" id="download">
+  <p class="label">Your next departure</p>
+  <h2>Ready to explore?</h2>
+  <p>Try the latest development build. Bring your installed copy of X-Plane 12 — openXplane includes no game content.</p>
+  <div class="dl-actions">
+    <a class="btn" href="https://github.com/OpenXPlane/openXplane/releases/tag/nightly">Download nightly</a>
+    <a class="btn btn-ghost" href="docs/#/doc/BUILDING">Build from source</a>
+  </div>
+  <p class="dl-note">Windows x64 &middot; macOS Apple Silicon &middot; Linux x64 &middot; Terminal builds</p>
+</section>
+</main>
+
+<footer>
+  <a class="logo" href="./"><img src="assets/logos/wordmark-light.svg" alt="openXplane"></a>
+  <nav><a href="docs/">Docs</a><a href="docs/#/doc/CHANGELOG">Changelog</a><a href="https://github.com/OpenXPlane/openXplane">Source</a></nav>
+  <p>Independent, not affiliated with Laminar Research. X-Plane is a trademark of its owner.<br>Requires X-Plane 12. GPL-3.0-or-later.</p>
+</footer>
+<script src="landing.js"></script>
+</body>
+</html>

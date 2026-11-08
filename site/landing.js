@@ -1,21 +1,94 @@
-const menu = document.querySelector('.menu-toggle');
-menu.addEventListener('click', () => {
-  const open = menu.getAttribute('aria-expanded') !== 'true';
-  menu.setAttribute('aria-expanded', String(open));
-  document.querySelector('.navigation').classList.toggle('is-open', open);
-});
-document.querySelectorAll('#nav-links a').forEach(link => link.addEventListener('click', () => {
-  menu.setAttribute('aria-expanded', 'false');
-  document.querySelector('.navigation').classList.remove('is-open');
-}));
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { menu.setAttribute('aria-expanded', 'false'); document.querySelector('.navigation').classList.remove('is-open'); }
-});
-// Preserve links to the earlier documentation site without taking over landing anchors.
-if (/^#\//.test(location.hash)) location.replace(`docs/${location.hash}`);
-fetch('docs/compat.json').then(response => { if (!response.ok) throw new Error(response.status); return response.json(); }).then(data => {
-  for (const key of ['implemented', 'verified']) {
-    const total = data.subsystems.reduce((sum, item) => sum + item.weight * item[key], 0);
-    document.getElementById(key).textContent = `≈${total.toFixed(1)}%`;
+/* openXplane landing — gallery, lightbox, navigation */
+
+(function () {
+  'use strict';
+
+  /* --- Hamburger --- */
+  var ham = document.querySelector('.hamburger');
+  var nav = document.getElementById('nav-links');
+  if (ham && nav) {
+    ham.addEventListener('click', function () {
+      var open = ham.getAttribute('aria-expanded') !== 'true';
+      ham.setAttribute('aria-expanded', String(open));
+      nav.classList.toggle('open', open);
+    });
+    nav.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        ham.setAttribute('aria-expanded', 'false');
+        nav.classList.remove('open');
+      });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { ham.setAttribute('aria-expanded', 'false'); nav.classList.remove('open'); }
+    });
   }
-}).catch(() => { document.getElementById('implemented').textContent = 'See docs'; document.getElementById('verified').textContent = 'See docs'; });
+
+  /* --- Gallery filters --- */
+  var filters = document.querySelectorAll('.filter');
+  var items = document.querySelectorAll('.gallery-item');
+  filters.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      filters.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var tag = btn.getAttribute('data-filter');
+      items.forEach(function (item) {
+        if (tag === 'all' || item.getAttribute('data-tags') === tag) {
+          item.classList.remove('hidden');
+        } else {
+          item.classList.add('hidden');
+        }
+      });
+    });
+  });
+
+  /* --- Lightbox --- */
+  var box = document.createElement('div');
+  box.className = 'lightbox';
+  box.innerHTML = '<button class="lightbox-close" aria-label="Close">&times;</button><img src="" alt=""><div class="lightbox-caption"></div>';
+  document.body.appendChild(box);
+  var lbImg = box.querySelector('img');
+  var lbCap = box.querySelector('.lightbox-caption');
+  var lbClose = box.querySelector('.lightbox-close');
+
+  function openLightbox(src, alt, caption) {
+    lbImg.src = src;
+    lbImg.alt = alt;
+    lbCap.textContent = caption;
+    box.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLightbox() {
+    box.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  items.forEach(function (fig) {
+    fig.addEventListener('click', function () {
+      var img = fig.querySelector('img');
+      var cap = fig.querySelector('figcaption');
+      openLightbox(img.src, img.alt, cap ? cap.textContent : '');
+    });
+  });
+  lbClose.addEventListener('click', closeLightbox);
+  box.addEventListener('click', function (e) { if (e.target === box) closeLightbox(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLightbox(); });
+
+  /* --- Compat stats --- */
+  if (/^#\//.test(location.hash)) location.replace('docs/' + location.hash);
+  fetch('docs/compat.json')
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (data) {
+      ['implemented', 'verified'].forEach(function (key) {
+        var el = document.getElementById(key);
+        if (!el || !data.subsystems) return;
+        var total = data.subsystems.reduce(function (s, i) { return s + i.weight * i[key]; }, 0);
+        el.textContent = '≈' + total.toFixed(1) + '%';
+      });
+    })
+    .catch(function () {
+      var el = document.getElementById('implemented');
+      if (el) el.textContent = 'See docs';
+      el = document.getElementById('verified');
+      if (el) el.textContent = 'See docs';
+    });
+})();
